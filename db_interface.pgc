@@ -1,0 +1,209 @@
+#include "db_interface.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pgtypes_timestamp.h>
+
+
+void print_sqlca();
+EXEC SQL WHENEVER SQLERROR CALL print_sqlca();
+
+// https://stackoverflow.com/a/3536261
+void initPostArray(struct db_post_array *a, size_t initialSize) {
+  a->array = malloc(initialSize * sizeof(struct db_post_struct));
+  a->used = 0;
+  a->size = initialSize;
+}
+
+void insertToPostArray(struct db_post_array *a, struct db_post_struct element) {
+  // a->used is the number of used entries, because a->array[a->used++] updates a->used only *after* the array has been accessed.
+  // Therefore a->used can go up to a->size
+  if (a->used == a->size) {
+    a->size *= 2;
+    a->array = realloc(a->array, a->size * sizeof(struct db_post_struct));
+  }
+  a->array[a->used++] = element;
+}
+
+void freePostArray(struct db_post_array *a) {
+  free(a->array);
+  a->array = NULL;
+  a->used = a->size = 0;
+}
+
+// https://stackoverflow.com/a/3536261
+void initThreadArray(struct db_thread_array *a, size_t initialSize) {
+  a->array = malloc(initialSize * sizeof(struct db_thread_struct));
+  a->used = 0;
+  a->size = initialSize;
+}
+
+void insertToThreadArray(struct db_thread_array *a, struct db_thread_struct element) {
+  // a->used is the number of used entries, because a->array[a->used++] updates a->used only *after* the array has been accessed.
+  // Therefore a->used can go up to a->size
+  if (a->used == a->size) {
+    a->size *= 2;
+    a->array = realloc(a->array, a->size * sizeof(struct db_thread_struct));
+  }
+  a->array[a->used++] = element;
+}
+
+void freeThreadArray(struct db_thread_array *a) {
+  free(a->array);
+  a->array = NULL;
+  a->used = a->size = 0;
+}
+
+void db_connect() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* password = getenv("FUZE_MEDIABOARD_PASSWORD");
+	// const char* password = "watermelone";
+	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3]) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
+	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts) VALUES (?, 0);";
+	char* data;
+	EXEC SQL END DECLARE SECTION;
+	printf("password: %s\n", password);
+	EXEC SQL CONNECT TO "fuze_mediaboard" USER "mediaboard_server" USING :password;
+	printf("connected!\n");
+	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
+	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;
+
+}
+
+void db_test() {
+    EXEC SQL BEGIN DECLARE SECTION;
+    char dbname[1024];
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL SELECT current_database() INTO :dbname;
+    printf("current_database = %s\n", dbname);
+}
+
+int db_store_post(int thread_id_, int id_in_thread_, const char* name_, const char* upload_timestamp_, const char* content_, char files[4][256], int file_count) {
+    EXEC SQL BEGIN DECLARE SECTION;
+	int number_of_posts;
+	int post_id;
+	int thread_id = thread_id_;
+	int id_in_thread = id_in_thread_;
+	const char* name = name_;
+	const char* upload_timestamp = upload_timestamp_;
+	const char* content = content_;
+	const char* file_1 = files[0]; const int file_1_indicator = file_count - 1;
+	const char* file_2 = files[1]; const int file_2_indicator = file_count - 2;
+	const char* file_3 = files[2]; const int file_3_indicator = file_count - 3;
+	const char* file_4 = files[3]; const int file_4_indicator = file_count - 4;
+    EXEC SQL END DECLARE SECTION;
+	EXEC SQL SELECT number_of_posts INTO :number_of_posts FROM thread WHERE id = :thread_id;
+	EXEC SQL COMMIT;
+	number_of_posts++;
+	EXEC SQL UPDATE thread 
+		SET number_of_posts = :number_of_posts
+		WHERE id = :thread_id;
+	// strcpy(data, data_);
+	printf("%s %s", name, upload_timestamp);
+	EXEC SQL SELECT nextval('post_id_seq') INTO :post_id;
+	EXEC SQL EXECUTE upload_post_stmt USING :post_id, :thread_id, :id_in_thread, :name, :upload_timestamp, :content, :file_1 INDICATOR :file_1_indicator, :file_2 INDICATOR :file_2_indicator, :file_3 INDICATOR :file_3_indicator, :file_4 INDICATOR :file_4_indicator;
+	EXEC SQL COMMIT;
+	return post_id;
+}
+
+int db_store_thread(int number_of_posts_) {
+	printf("Executing db_store_thread\n");
+	EXEC SQL BEGIN DECLARE SECTION;
+	int thread_id;
+	// int number_of_posts = number_of_posts_;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL SELECT nextval('thread_id_seq') INTO :thread_id;
+	EXEC SQL EXECUTE create_thread_stmt USING :thread_id;
+	EXEC SQL COMMIT;
+	return thread_id;
+}
+
+struct db_thread_array* db_retrieve_threads() {
+	static struct db_thread_array thread_list;
+	initThreadArray(&thread_list, 25);
+	EXEC SQL BEGIN DECLARE SECTION;
+	int thread_id;
+	int number_of_posts;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL DECLARE thread_getter CURSOR FOR
+		SELECT id, number_of_posts FROM thread
+		ORDER BY id;
+	EXEC SQL OPEN thread_getter;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+	for (int i=0; i<10; i++) {
+		// file_1[0] = '\0';
+		EXEC SQL FETCH thread_getter INTO :thread_id, :number_of_posts;
+		struct db_thread_struct thread;
+		thread.id = thread_id;
+		thread.number_of_posts = number_of_posts;
+		insertToThreadArray(&thread_list, thread);
+	}
+	EXEC SQL CLOSE thread_getter;
+	EXEC SQL COMMIT;
+	return &thread_list;
+}
+
+struct db_post_array* db_retrieve_history() {
+	static struct db_post_array post_history;
+	initPostArray(&post_history, 25);
+	EXEC SQL BEGIN DECLARE SECTION;
+	int post_id;
+	int thread_id;
+	int id_in_thread;
+	VARCHAR post_name[POST_MAX_NAME+1];
+	timestamp upload_timestamp;
+	VARCHAR post_content[POST_MAX_CONTENT+1];
+	char files[4][256]; int file_indicators[4];
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL DECLARE post_getter CURSOR FOR
+		SELECT id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3] FROM post
+		ORDER BY id;
+	EXEC SQL OPEN post_getter;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+	while (true) {
+		// file_1[0] = '\0';
+		EXEC SQL FETCH post_getter INTO :post_id, :thread_id, :id_in_thread, :post_name, :upload_timestamp, :post_content, :files[0] INDICATOR :file_indicators[0], :files[1] INDICATOR :file_indicators[1], :files[2] INDICATOR :file_indicators[2], :files[3] INDICATOR :file_indicators[3];
+		printf("\nid: %d, content: %s\n", post_id, post_content.arr);
+		struct db_post_struct post;
+		post.id = post_id;
+		post.thread_id = thread_id;
+		post.id_in_thread = id_in_thread;
+		strcpy(post.name, post_name.arr);
+		strcpy(post.upload_timestamp, PGTYPEStimestamp_to_asc(upload_timestamp));
+		post.content = malloc(sizeof(char) * post_content.len + 1);
+		strcpy(post.content, post_content.arr);
+		int file_i;
+		for (file_i = 0; file_i < 4; file_i++) {
+			if (file_indicators[file_i] >= 0) {
+				printf("Adding file %s\n", files[file_i]);
+				strcpy(post.files[file_i], files[file_i]);
+			}
+			else
+				break;
+		}
+		post.number_of_files = file_i;
+		insertToPostArray(&post_history, post);
+	}
+	EXEC SQL CLOSE post_getter;
+	EXEC SQL COMMIT;
+	return (&post_history);
+}
+
+void db_disconnect() {
+	EXEC SQL DISCONNECT ALL;
+}
+
+void print_sqlca() {
+    fprintf(stderr, "==== sqlce ====\n");
+    fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
+    fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
+    fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
+    fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
+                                                          sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
+    fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+                                                          sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+                                                          sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+    fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
+    fprintf(stderr, "===============\n");
+}

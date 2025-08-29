@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Fuze Mediaboard</title>
+		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta charset="utf-8">
+		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
+		<!--<link rel="stylesheet" href="/static/styles.css">-->
+		<!--<link rel="stylesheet" href="/styles_mediaboard.css">-->
+	</head>
+	<body>
+		<!--Navbar can go here-->
+		<main>
+			<div id="header_bar">
+				<b>Insert website title</b>
+				<div>
+					<button id="catalog_button" onclick="openCatalog()">Catalog</button>
+					<button id="refresh_button" onclick="refresh_send()">Refresh</button>
+				</div>
+				<div class="FlexSeparator"></div>
+				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
+				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard v0.0.0</a>
+			</div>
+			<h3 id="location_indicator">Catalog</h3>
+			<div id="post_container"></div>
+		</main>
+		<div class="FlexSeparator"></div>
+		<details id="reply_container" open="">
+			<summary id="reply_heading_text"></summary>
+			<input type="text" id="name_field" placeholder="Name" />
+			<button id="post_button" onclick="postAction()">Post</button>
+			<textarea id="content_field" placeholder="Content"></textarea>
+			<input type="file" id="file_upload" accept="image/png, image/jpeg, image/gif, image/jxl, image/webp" multiple/>
+			<div id="file_post_list"></div>
+		</details>
+	</body>
+	<style>
+:root {
+	--side-margins: 0.5em;
+}
+
+body {
+	max-width: 80rem;
+	margin: 0 auto;
+	display: flex;
+	flex-flow: column;
+	height: 100vh;
+}
+
+main {
+	margin: 0 var(--side-margins);
+	overflow: auto;
+	flex: 0 0 auto;
+}
+
+.FlexSeparator {
+	flex-grow: 1;
+}
+
+#header_bar {
+	display: flex;
+	flex-wrap: wrap;
+	border-top: 1px solid #888;
+	border-bottom: 1px solid #888;
+	
+	>* {
+		&:not(:first-child) {
+			border-left: 1px solid #888;
+			padding-left: 0.25em;
+		}
+		&:not(:last-child) {
+			padding-right: 0.25em;
+		}
+	}
+
+}
+
+.Thread {
+	border-right: 2px solid #000;
+	padding: 2px 0;
+	margin-top: 0.5rem;
+	&:not(:last-child) {
+		border-bottom: 2px solid #000;
+		margin-bottom: 0.5rem;
+	}
+}
+
+.Post {
+	padding: 0 0.25rem;
+	margin-top: 0.25rem;
+
+	>* {
+		margin: 0.25rem 0;
+	}
+	.PostHeader>* {
+		margin-right: 0.5em;
+	}
+	.Username {
+		font-family: 'Tahoma', 'Arial', sans-serif;
+	}
+	.Timestamp {
+		float: right;
+		font-family: 'Courier New', monospace;
+	}
+	.ID {
+		float: right;
+	}
+	.Content {
+		white-space: pre-line;
+	}
+	.Files {
+		display: flex;
+		gap: 2rem;
+		flex-wrap: wrap;
+
+		.EmbedFigure {
+			display: inline-block;
+			margin: 0;
+			max-width: 100%;
+			.EmbedThumbnail, .EmbedImage {
+				cursor: pointer;
+				max-width: 100%;
+			}
+			figcaption {
+				word-wrap: break-word;
+			}
+		}
+	}
+}
+.Post:not(:last-child) {
+	border-bottom: 1px solid #000;
+	margin-bottom: 0.25rem;
+}
+
+#post_container {
+	border-bottom: 2px solid #000;
+}
+
+#reply_container {
+	border-top: 3px double #000;
+	position: sticky;
+	bottom: 0;
+	background: #fffc;
+	margin: 0 var(--side-margins);
+	summary {
+		/*background: lightgray;*/
+		padding: 4px 0;
+		cursor: pointer;
+		user-select: none;
+		&:hover {
+			background: #dddc;
+		}
+	input {
+		font-size: inherit;
+	}
+}
+
+#content_field {
+	box-sizing: border-box;
+	width: 100%;
+	min-height: 4em;
+	resize: none;
+	font-family: sans-serif;
+}
+
+.EmbedFigure {
+	display: block;
+}
+	</style>
+	<script>
+		"use strict";
+		const root_url = "/"
+		const api_url = "api/";
+		const media_url = "media/";
+		const thumbnail_url = "media/thumbnails/";
+		const file_size_limit = 21500000;
+		const forbidden_file_name_chars = "#?";
+		const media_uuid_len = 36;
+		let state = {selected_thread_id: null};
+		let websocket;
+		let websocket_connected;
+		console.log(websocket);
+
+		if (window.location.pathname.startsWith(root_url + "thread/")) {
+			let second_slash_index = window.location.pathname.indexOf("/", root_url.length + 7);
+			if (second_slash_index > 0) {
+				let thread_number = parseInt(window.location.pathname.substring(root_url.length + 7, second_slash_index));
+				if (!isNaN(thread_number)) {
+					state.selected_thread_id = thread_number;
+				}
+				else {
+					alert("Error: thread_number is NaN");
+				}
+			}
+			else {
+				alert("Error: missing trailing / in URL for parsing thread number");
+			}
+		}
+		else {
+			state.selected_thread_id = -1;
+		}
+
+		window.history.replaceState(state, null, ""); // Initial state
+
+		window.onpopstate = function(event) {
+			if (event.state) {
+				state = event.state;
+			}
+			// render(state);
+			refresh_send();
+		}
+
+		// function render(state) {
+		// 	if (state.selected_thread_id === -1) {
+		// 		refresh_send();
+		// 		reply_heading_text.textContent = "Create a thread";
+		// 	}
+		// 	else {
+		// 		getThreadPosts();
+		// 		reply_heading_text.textContent = "Leave a reply";
+		// 	}
+		// }
+
+		async function postAction() {
+			let response;
+			if (state.selected_thread_id === -1) {
+				response = await postThread();
+			}
+			else {
+				response = await postMessage();
+			}
+			if (response.ok) {
+				content_field.value = "";
+				file_upload.value = "";
+				file_post_list.textContent = "";
+				console.log("posted.");
+			}
+			else {
+				console.log(response);
+				alert("Error when attempting to post\nStatus: " + response.status + "\nstatusText: " + response.statusText);
+			}
+		}
+
+		function removeFileFromList(file_container) {
+			file_post_list.removeChild(file_container);
+			file_upload.disabled = false;
+		}
+
+		function openCatalog() {
+			state.selected_thread_id = -1;
+			history.pushState(state, "", root_url);
+			// location_indicator.textContent = "Catalog";
+			refresh_send();
+		}
+
+		function showThreads(message_json) {
+			location_indicator.textContent = "Catalog";
+			reply_heading_text.textContent = "Create a thread";
+			const fragment = new DocumentFragment();
+			for (let thread of message_json.threads) {
+				console.log(thread.id);
+				console.log(thread.post_zero);
+				let thread_to_push = createPost(thread.post_zero);
+				console.log(thread_to_push);
+				let thread_post_zero = document.createElement("div");
+				thread_post_zero.classList.add("Thread");
+				thread_post_zero.appendChild(thread_to_push);
+				let open_thread_button = document.createElement("button");
+				open_thread_button.textContent = "Open";
+				open_thread_button.onclick = (event) => {
+					state.selected_thread_id = thread.id;
+					history.pushState(state, "", root_url + "thread/" + state.selected_thread_id + "/");
+					getThreadPosts();
+				}
+				thread_post_zero.appendChild(open_thread_button);
+				// const reply_count = document.createElement("span");
+				// reply_count.textContent = "Replies: " + (thread.number_of_posts - 1);
+				const reply_count = document.createTextNode(" Replies: " + (thread.number_of_posts - 1));
+				thread_post_zero.appendChild(reply_count);
+				fragment.appendChild(thread_post_zero);
+			}
+			post_container.replaceChildren(fragment);
+		}
+		function showPosts(message_json) {
+			location_indicator.textContent = "Posts";
+			reply_heading_text.textContent = "Leave a reply";
+			const fragment = new DocumentFragment();
+			for (let post of message_json.posts) {
+				fragment.appendChild(createPost(post));
+			}
+			post_container.replaceChildren(fragment);
+		}
+		async function getThreads() {
+			let response = await fetch(root_url + api_url + "get_threads/");
+			if (response.ok) {
+				await response.json().then(response_obj => {
+					console.log(response_obj);
+					showThreads(response_obj);
+				});
+			}
+			else {
+				alert("Server error from getThreads(). the developer must suck lmao");
+			}
+		}
+		async function getThreadPosts() {
+			let response = await fetch(root_url + api_url + "threads/" + state.selected_thread_id + "/get_posts/");
+			if (response.ok) {
+				await response.json().then(response_obj => {
+					console.log(response_obj);
+					showPosts(response_obj);
+					console.log("1");
+				});
+				console.log("2");
+
+				websocket = connectToServer();
+				// if (websocket_connected) {
+				// 	websocket.send(JSON.stringify({
+				// 		"type": "listen_to_thread",
+				// 		"thread_id": state.selected_thread_id
+				// 	}));
+				// }
+			}
+			else {
+				alert("Server error from getThreadPosts(). the developer must suck lmao");
+			}
+		}
+
+		function addFileToList(filename) {
+			let file_container = document.createElement("div");
+			// file_container.setAttribute("id", "file_" + server_filename);
+			let file_thumbnail = document.createElement("img");
+			file_thumbnail.setAttribute("src", "//placeholder.png");
+			file_thumbnail.setAttribute("width", "100px");
+			file_thumbnail.setAttribute("height", "100px");
+			let file_title = document.createElement("span");
+			file_title.textContent = filename;
+			let file_delete_button = document.createElement("button");
+			file_delete_button.textContent = "Delete";
+			let progress_element = document.createElement("progress");
+			progress_element.value = 0;
+			file_container.append(file_thumbnail, file_title, file_delete_button, progress_element);
+			file_post_list.appendChild(file_container);
+			file_delete_button.onclick = (event) => {
+				// Add delete to server later
+				// file_post_list.removeChild(document.getElementById("file_" + server_filename));
+				removeFileFromList(file_container);
+			}
+			return file_container;
+		}
+	
+		// replace with "field-sizing: content" CSS in the future
+		content_field.oninput = (event) => {
+			content_field.style.height = "";
+			content_field.style.height = content_field.scrollHeight + 5 + "px";
+		}
+	
+		function sanitiseFileName(file_name) {
+			let sanitised_file_name = "";
+			for (let i = 0; i < file_name.length; i++) {
+				if (forbidden_file_name_chars.indexOf(file_name[i]) != -1) {
+					sanitised_file_name += "_";
+				}
+				else {
+					sanitised_file_name += file_name[i];
+				}
+			}
+			return sanitised_file_name;
+		}
+
+		function uploadFile(file_object) {
+			let formdata = new FormData();
+			formdata.append("File_1", file_object);
+			let file_name = sanitiseFileName(file_object.name);
+			console.log("file_name: " + file_name);
+			let file_element = addFileToList(file_name);
+			let file_progress_element = file_element.querySelector("progress");
+			let file_img_element = file_element.querySelector("img");
+			let request = new XMLHttpRequest();
+			file_progress_element.max = file_object.size;
+			console.log(file_object);
+			request.upload.addEventListener("progress", (event) => {
+				file_progress_element.value = event.loaded;
+			});
+			request.responseType = "text";
+			request.open("POST", root_url + api_url + "upload/");
+			request.timeout = 10000;
+			request.send(formdata);
+			request.onload = () => {
+				if (request.readyState === request.DONE) {
+			        if (request.status === 202) {
+						console.log("Received response");
+						const headers = request.getAllResponseHeaders();
+						console.log(headers);
+						const server_filename = request.getResponseHeader("File-Name");
+						console.log(server_filename);
+						file_element.setAttribute("id", "file_" + server_filename);
+						file_img_element.setAttribute("src", root_url + media_url + server_filename);
+						file_element.removeChild(file_progress_element);
+			        }
+			    }
+			};
+		}
+		file_upload.onchange = (event) => {
+			console.log("file changed.");
+			if (file_upload.files.length + file_post_list.childNodes.length > 4) {
+				alert("Error: 4 file limit reached");
+			}
+			else {
+				for (let chosen_file of file_upload.files) {
+					if (chosen_file.size > file_size_limit) {
+						alert("Error: file size exceeds 6MB limit\n" +
+							"File: " + chosen_file.name);
+					}
+					else {
+						if (chosen_file.name.length > 200) {
+							alert("Warning: file name trimmed to 200 characters.\n" + 
+								"File: " + chosen_file.name);
+						}
+						console.log("uploading...");
+						uploadFile(chosen_file);
+					}
+				}
+			}
+		}
+	
+		function createPost(data) {
+			console.log(data);
+			let post_box_element = document.createElement("article");
+			post_box_element.classList.add("Post");
+	
+			let post_header_element = document.createElement("div");
+			post_header_element.classList.add("PostHeader");
+	
+			let post_name_element = document.createElement("b");
+			post_name_element.classList.add("Username");
+			post_name_element.textContent = data.name;
+			post_header_element.appendChild(post_name_element);
+	
+			let post_timestamp_element = document.createElement("time");
+			post_timestamp_element.textContent = data.upload_timestamp;
+			post_timestamp_element.classList.add("Timestamp");
+			post_header_element.appendChild(post_timestamp_element);
+	
+			let post_id_element = document.createElement("span");
+			post_id_element.classList.add("ID");
+			// if (typeof id_string === "undefined") {
+			if (state.selected_thread_id > -1) {
+				post_id_element.textContent = `#${data.thread_id}/${data.id_in_thread}`;
+			}
+			else {
+				post_id_element.textContent = "#" + data.thread_id;
+			}
+			post_header_element.appendChild(post_id_element);
+	
+			let post_content_element = document.createElement("div");
+			post_content_element.classList.add("Content");
+			post_content_element.textContent = data.content;
+	
+			let post_files_element = document.createElement("div");
+			post_files_element.classList.add("Files");
+			for (const filename of data.files) {
+				let figure_element = document.createElement("figure");
+				figure_element.classList.add("EmbedFigure");
+				let thumbnail_element = document.createElement("img");
+				thumbnail_element.classList.add("EmbedThumbnail");
+				let filename_extension_i = filename.lastIndexOf(".");
+				let thumbnail_filename;
+				// if (filename_extension_i == -1) {
+				// 	thumbnail_filename = "THUMBNAIL_" + filename + ".jpg";
+					thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
+				// }
+				// else {
+				// 	thumbnail_filename = "THUMBNAIL_" + filename.slice(0, filename_extension_i) + ".jxl";
+				// }
+				thumbnail_element.setAttribute("src", root_url + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+				thumbnail_element.setAttribute("loading", "lazy");
+				figure_element.appendChild(thumbnail_element);
+				thumbnail_element.setAttribute("width", "150px");
+				thumbnail_element.setAttribute("height", "150px");
+				let image_opened = false;
+				let img_element = document.createElement("img");
+				img_element.classList.add("EmbedImage");
+				thumbnail_element.onclick = (event) => {
+					// if (typeof figure_element.children.find((element) => element.classList.contains("MainEmbed")) === "undefined") {
+					if (!image_opened) {
+						image_opened = true;
+						img_element.onload = (event) => {
+							img_element.style["display"] = "inherit";
+							thumbnail_element.style["display"] = "none";
+						}
+						img_element.setAttribute("src", root_url + media_url + filename.replace(" ", "%20"));
+						// thumbnail_element.insertAdjacentElement("afterend", img_element);
+					}
+					else {
+						thumbnail_element.style["display"] = "none";
+						img_element.style["display"] = "inherit";
+					}
+				}
+				img_element.style["display"] = "none";
+				img_element.onclick = (event) => {
+					thumbnail_element.style["display"] = "inherit";
+					img_element.style["display"] = "none";
+				}
+				figure_element.appendChild(img_element);
+				let pretty_filename;
+				if (filename_extension_i == -1) {
+					pretty_filename = filename.slice(0, filename.length() - media_uuid_len);
+				}
+				else {
+					pretty_filename = filename.slice(0, filename_extension_i - media_uuid_len) + filename.slice(filename_extension_i, filename.length);
+				}
+				let figcaption_element = document.createElement("figcaption");
+				let figcaption_element_a = document.createElement("a");
+				figcaption_element_a.setAttribute("href", root_url + media_url + filename.replace(" ", "%20"));
+				figcaption_element_a.textContent = pretty_filename;
+				figcaption_element.appendChild(figcaption_element_a);
+				figure_element.appendChild(figcaption_element);
+				post_files_element.appendChild(figure_element);
+	
+			}
+	
+			post_box_element.appendChild(post_header_element);
+			post_box_element.appendChild(post_content_element);
+			post_box_element.appendChild(post_files_element);
+			// post_container_element.appendChild(post_box_element);
+			return post_box_element;
+		}
+	
+		function refresh_send() {
+			if (typeof websocket !== "undefined") {
+				websocket.close();
+			}
+			if (state.selected_thread_id === -1) {
+				getThreads();
+			}
+			else {
+				getThreadPosts();
+			}
+		}
+
+		function connectToServer() {
+			let sock = new WebSocket("ws://localhost:8300");
+	
+			sock.onopen = (event) => {
+				connection_status.textContent = "Connected 🙂";
+				websocket_connected = true;
+				if (state.selected_thread_id > -1) {
+					sock.send(JSON.stringify({
+						"type": "listen_to_thread",
+						"thread_id": state.selected_thread_id
+					}));
+				}
+			}
+	
+			sock.onmessage = (event) => {
+				console.log("Message received: " + event.data);
+				let message_json = JSON.parse(event.data);
+				if (message_json.type === "post") {
+					// auto-scroll to new message if window was scrolled near the bottom already
+					let do_scroll = window.scrollY >= window.scrollMaxY - 10;
+
+					post_container.appendChild(createPost(JSON.parse(event.data)));
+
+					if (do_scroll) {
+						window.scrollTo(0, post_container.scrollHeight);
+					}
+				}
+				else {
+					console.error("message_json type " + message_json.type + " not recognised.");
+				}
+			}
+	
+			sock.onerror = (event) => {
+				connection_status.textContent = "Errored 😤"
+			}
+	
+			sock.onclose = (event) => {
+				// connection_status.textContent = "Closed 😔"
+				connection_status.textContent = "Closed \u{1F634}"
+				websocket_connected = false;
+			}
+			return sock
+		}
+
+		async function postMessage() {
+			console.log("posting message...");
+			let files = [];
+			for (let file of file_post_list.children) {
+				files.push(file.id.slice(5, file.id.length));
+			}
+			const data = {
+				post: {
+					name: name_field.value,
+					content: content_field.value,
+					files: files,
+					thread_id: state.selected_thread_id
+				}
+			};
+			const fetch_response = await fetch(root_url + api_url + "create_post/", {
+				method: "POST",
+				body: JSON.stringify(data)
+			});
+			return fetch_response;
+		}
+	
+		async function postThread() {
+			console.log("posting thread...");
+			let files = [];
+			for (let file of file_post_list.children) {
+				files.push(file.id.slice(5, file.id.length));
+			}
+			const data = {
+				type: "create_thread",
+				thread: {
+					post_zero: {
+						name: name_field.value,
+						content: content_field.value,
+						files: files
+					}
+				}
+			};
+			const fetch_response = await fetch(root_url + api_url + "create_thread/", {
+				method: "POST",
+				body: JSON.stringify(data)
+			});
+			return fetch_response;
+		}
+
+		// function parseContent(in_text) {
+		// 	const out_text;
+		//	// we can use CSS white-space: pre-line; instead
+		// 	out_text = in_text.replaceAll("\n", "<br>");
+		// 	return out_text;
+		// }
+	
+		refresh_send();
+		// websocket = connectToServer();
+	</script>
+</html>
