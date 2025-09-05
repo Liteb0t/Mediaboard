@@ -5,13 +5,6 @@
 #include <ctime>
 #include <cstring>
 
-// Thread::Thread() {
-// 	this->id = db_store_thread(0);
-// 	std::cout << "this->id: " << this->id << std::endl;
-// 	this->thread_as_json["id"] = this->id;
-// 	this->number_of_posts = 0;
-// }
-
 Thread::Thread(json thread_json, bool save_to_database) {
 	this->thread_as_json = thread_json;
 	// struct db_thread_struct thread_as_struct;
@@ -82,4 +75,8 @@ std::string Thread::dumpPost(int post_id) const {
 
 void Thread::addListener(websocket_session* listener) {
 	listeners.insert(listener);
+}
+
+void Thread::removeListener(websocket_session* listener) {
+	listeners.erase(listener);
 }

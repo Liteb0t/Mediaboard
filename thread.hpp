@@ -1,5 +1,5 @@
 #include "post.hpp"
-// `#include "websocket_session.hpp"
+// #include "websocket_session.hpp"
 #include <string>
 #include <unordered_set>
 #include <nlohmann/json.hpp>
@@ -20,6 +20,7 @@ public:
 	int addPost(json post_json, bool save_to_database);
 	int getId() const { return this->id; };
 	void addListener(websocket_session* listener);
+	void removeListener(websocket_session* listener);
 	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
 	std::string dumpLastPost() const;
 	std::string dumpPosts() const;

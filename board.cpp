@@ -12,27 +12,11 @@ Board::Board() {
 void Board::createThread(json thread_json) {
 	Thread thread(thread_json, true);
 	this->threads.emplace(thread.getId(), thread);
-	// db_store_thread(thread.number_of_posts);
 }
 
 int Board::createPost(json post_json) {
 	return this->threads.at(post_json["thread_id"].template get<int>()).addPost(post_json, true);
 }
-
-// std::string Board::dumpLastThread() const { 
-// 	// json thread_json;
-// 	// thread_json["type"] = "thread";
-// 	// struct db_thread_struct thread_struct = db_retrieve_last_thread();
-// 	// thread_json["id"] = thread_struct.id;
-// 	// thread_json["name"] = thread_struct.name;
-// 	// thread_json["content"] = thread_struct.content;
-// 	// return thread_json.dump();
-// 
-// 	std::stringstream string_stream;
-// 	string_stream << "{\"type\": \"thread\", \"thread\": "
-// 		<< this->threads.last().dumpThread() << "}";
-// 	return string_stream.str();
-// };
 
 void Board::cacheAllThreads() {
 	struct db_thread_array* thread_list = db_retrieve_threads();
@@ -83,8 +67,21 @@ std::string Board::dumpPostsInThread(int thread_id) const {
 }
 
 void Board::addListenerToThread(websocket_session* listener, int thread_id) {
-	this->threads.at(thread_id).addListener(listener);
-	std::cout << "Dummy: listener added to thread " << thread_id << std::endl;
+	if (threadExists(thread_id)) {
+		this->threads.at(thread_id).addListener(listener);
+		std::cout << "Listener added to thread " << thread_id << std::endl;
+	}
+	else
+		std::cout << "Warning: could not add listener to thread " << thread_id << " because the thread does not exist." << std::endl;
+}
+
+void Board::removeListenerFromThread(websocket_session* listener, int thread_id) {
+	if (threadExists(thread_id)) {
+		this->threads.at(thread_id).removeListener(listener);
+		std::cout << "Listener removed from thread " << thread_id << std::endl;
+	}
+	else
+		std::cout << "Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
 std::string Board::dumpPost(int thread_id, int post_id) const {

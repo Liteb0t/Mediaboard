@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <pgtypes_timestamp.h>
 
 
@@ -79,14 +80,14 @@ void db_test() {
     printf("current_database = %s\n", dbname);
 }
 
-int db_store_post(int thread_id_, int id_in_thread_, const char* name_, const char* upload_timestamp_, const char* content_, char files[4][256], int file_count) {
+int db_store_post(int thread_id_, int id_in_thread_, const char* name_, time_t upload_timestamp_, const char* content_, char files[4][256], int file_count) {
     EXEC SQL BEGIN DECLARE SECTION;
 	int number_of_posts;
 	int post_id;
 	int thread_id = thread_id_;
 	int id_in_thread = id_in_thread_;
 	const char* name = name_;
-	const char* upload_timestamp = upload_timestamp_;
+	char upload_timestamp[20];
 	const char* content = content_;
 	const char* file_1 = files[0]; const int file_1_indicator = file_count - 1;
 	const char* file_2 = files[1]; const int file_2_indicator = file_count - 2;
@@ -101,6 +102,7 @@ int db_store_post(int thread_id_, int id_in_thread_, const char* name_, const ch
 		WHERE id = :thread_id;
 	// strcpy(data, data_);
 	printf("%s %s", name, upload_timestamp);
+	strftime(upload_timestamp, 20, "%Y-%m-%d %H:%M:%S", gmtime(&upload_timestamp_));
 	EXEC SQL SELECT nextval('post_id_seq') INTO :post_id;
 	EXEC SQL EXECUTE upload_post_stmt USING :post_id, :thread_id, :id_in_thread, :name, :upload_timestamp, :content, :file_1 INDICATOR :file_1_indicator, :file_2 INDICATOR :file_2_indicator, :file_3 INDICATOR :file_3_indicator, :file_4 INDICATOR :file_4_indicator;
 	EXEC SQL COMMIT;
@@ -131,8 +133,7 @@ struct db_thread_array* db_retrieve_threads() {
 		ORDER BY id;
 	EXEC SQL OPEN thread_getter;
 	EXEC SQL WHENEVER NOT FOUND DO BREAK;
-	for (int i=0; i<10; i++) {
-		// file_1[0] = '\0';
+	while (true) {
 		EXEC SQL FETCH thread_getter INTO :thread_id, :number_of_posts;
 		struct db_thread_struct thread;
 		thread.id = thread_id;
@@ -151,26 +152,28 @@ struct db_post_array* db_retrieve_history() {
 	int post_id;
 	int thread_id;
 	int id_in_thread;
+	unsigned int upload_epoch;
 	VARCHAR post_name[POST_MAX_NAME+1];
 	timestamp upload_timestamp;
 	VARCHAR post_content[POST_MAX_CONTENT+1];
 	char files[4][256]; int file_indicators[4];
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL DECLARE post_getter CURSOR FOR
-		SELECT id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3] FROM post
+		SELECT id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], extract(epoch FROM upload_timestamp)::int AS upload_timestamp_int FROM post
+			   
 		ORDER BY id;
 	EXEC SQL OPEN post_getter;
 	EXEC SQL WHENEVER NOT FOUND DO BREAK;
 	while (true) {
-		// file_1[0] = '\0';
-		EXEC SQL FETCH post_getter INTO :post_id, :thread_id, :id_in_thread, :post_name, :upload_timestamp, :post_content, :files[0] INDICATOR :file_indicators[0], :files[1] INDICATOR :file_indicators[1], :files[2] INDICATOR :file_indicators[2], :files[3] INDICATOR :file_indicators[3];
+		EXEC SQL FETCH post_getter INTO :post_id, :thread_id, :id_in_thread, :post_name, :upload_timestamp, :post_content, :files[0] INDICATOR :file_indicators[0], :files[1] INDICATOR :file_indicators[1], :files[2] INDICATOR :file_indicators[2], :files[3] INDICATOR :file_indicators[3], :upload_epoch;
 		printf("\nid: %d, content: %s\n", post_id, post_content.arr);
 		struct db_post_struct post;
 		post.id = post_id;
 		post.thread_id = thread_id;
 		post.id_in_thread = id_in_thread;
+		post.upload_timestamp = (time_t)upload_epoch;
+		printf("Eposh: %s\n", asctime(gmtime(&post.upload_timestamp)));
 		strcpy(post.name, post_name.arr);
-		strcpy(post.upload_timestamp, PGTYPEStimestamp_to_asc(upload_timestamp));
 		post.content = malloc(sizeof(char) * post_content.len + 1);
 		strcpy(post.content, post_content.arr);
 		int file_i;

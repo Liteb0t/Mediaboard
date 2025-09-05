@@ -54,7 +54,8 @@ public:
 private:
     void
     on_send(boost::shared_ptr<std::string const> const& ss);
-	std::unordered_set<int> tracking_threads;
+	// std::unordered_set<int> tracking_threads;
+	int tracking_thread;
 };
 
 template<class Body, class Allocator>

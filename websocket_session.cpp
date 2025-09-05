@@ -21,6 +21,7 @@ websocket_session(
     : ws_(std::move(socket))
     , state_(state)
 {
+	this->tracking_thread = -1;
 }
 
 websocket_session::
@@ -28,6 +29,7 @@ websocket_session::
 {
     // Remove this session from the list of active sessions
     state_->leave(this);
+	state_->main_board.removeListenerFromThread(this, this->tracking_thread);
 }
 
 void
@@ -79,8 +81,10 @@ on_read(beast::error_code ec, std::size_t)
 	if (request_type == "listen_to_thread") {
 		if (buffer_as_json["thread_id"].is_number_integer()) {
 			int thread_id = buffer_as_json["thread_id"].template get<int>();
-			if (state_->main_board.threadExists(thread_id))
+			if (state_->main_board.threadExists(thread_id)) {
+				this->tracking_thread = thread_id;
 				state_->main_board.addListenerToThread(this, thread_id);
+			}
 			else
 				std::cout << "Warning: thread " << thread_id << " does not exist" << std::endl;
 		}

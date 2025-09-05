@@ -31,9 +31,8 @@ Post::Post(json post_json, bool save_to_database) {
 	// post_as_struct.content = this->content;
 	if (save_to_database) {
 		// ID and timestamp are not initially known
-		std::time_t current_time = std::time(nullptr);
-		// this->upload_timestamp[TIMESTAMP_LEN];
-		std::strftime(this->upload_timestamp, TIMESTAMP_LEN, "%F %T", std::gmtime(&current_time));
+		this->upload_timestamp = std::time(nullptr);
+		// std::strftime(this->upload_timestamp, TIMESTAMP_LEN, "%F %T", std::gmtime(&current_time));
 		this->post_as_json["upload_timestamp"] = this->upload_timestamp;
 
 		this->id = db_store_post(this->thread_id, this->id_in_thread, this->name.c_str(), this->upload_timestamp, this->content.c_str(), this->files, this->files_i);

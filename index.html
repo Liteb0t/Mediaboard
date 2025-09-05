@@ -438,7 +438,7 @@ main {
 			post_header_element.appendChild(post_name_element);
 	
 			let post_timestamp_element = document.createElement("time");
-			post_timestamp_element.textContent = data.upload_timestamp;
+			post_timestamp_element.textContent = new Date(data.upload_timestamp * 1000).toString();
 			post_timestamp_element.classList.add("Timestamp");
 			post_header_element.appendChild(post_timestamp_element);
 	

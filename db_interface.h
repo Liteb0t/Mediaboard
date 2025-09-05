@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <time.h>
 
 // the database must NOT have entries longer than these limits
 #define POST_MAX_NAME 100
@@ -25,7 +26,8 @@ extern "C" {
 		int thread_id;
 		int id_in_thread;
 		char name[POST_MAX_NAME];
-		char upload_timestamp[TIMESTAMP_LEN];
+		// char upload_timestamp[TIMESTAMP_LEN];
+		time_t upload_timestamp;
 		char files[4][256];  // Maximum of 4 files per post
 		short number_of_files;
 		char* content;
@@ -42,7 +44,7 @@ extern "C" {
 	void initThreadArray(struct db_thread_array*, size_t);
 	void insertToThreadArray(struct db_thread_array*, struct db_thread_struct);
 	void freeThreadArray(struct db_thread_array*);
-	int db_store_post(int /*thread id*/, int /*id_in_thread*/, const char*, const char*, const char*, char[4][256] /*files*/, int /*file_count*/);
+	int db_store_post(int /*thread id*/, int /*id_in_thread*/, const char* /*name*/, time_t /*upload_timestamp*/, const char*, char[4][256] /*files*/, int /*file_count*/);
 	int db_store_thread(int /*number_of_posts*/);
 	struct db_post_struct db_retrieve_last_post();
 	struct db_thread_array* db_retrieve_threads();
