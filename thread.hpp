@@ -1,5 +1,6 @@
 #include "post.hpp"
 // #include "websocket_session.hpp"
+#include <ctime>
 #include <string>
 #include <unordered_set>
 #include <nlohmann/json.hpp>
@@ -25,9 +26,11 @@ public:
 	std::string dumpLastPost() const;
 	std::string dumpPosts() const;
 	std::string dumpPost(int post_id) const;
+	std::time_t getLastPostTime() const { return this->last_post_timestamp; }
 	int number_of_posts;
 private:
 	int id;
+	std::time_t last_post_timestamp;
 	// std::vector<Post> posts;
 	std::map<int, Post> posts;
 	std::unordered_set<websocket_session*> listeners;

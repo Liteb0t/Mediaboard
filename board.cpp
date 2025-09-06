@@ -23,7 +23,7 @@ void Board::cacheAllThreads() {
 	for (int i = 0; i < thread_list->used; i++) {
 		json thread_json;
 		thread_json["id"] = thread_list->array[i].id;
-		thread_json["number_of_posts"] = thread_list->array[i].number_of_posts;
+		// thread_json["number_of_posts"] = thread_list->array[i].number_of_posts;
 		Thread thread(thread_json, false);
 		this->threads.insert(std::make_pair(thread.getId(), thread));
 	}
@@ -42,13 +42,16 @@ void Board::cacheAllThreads() {
 		for (short file_i = 0; file_i < post_history->array[i].number_of_files; file_i++) {
 			post_json["files"].push_back(post_history->array[i].files[file_i]);
 		}
-		if (post_history->array[i].id_in_thread == 0) {
-			this->threads.at(post_history->array[i].thread_id).addInitialPost(post_json, false);
-		}
-		else {
-			this->threads.at(post_history->array[i].thread_id).addPost(post_json, false);
-		}
+		// if (post_history->array[i].id_in_thread == 0) {
+		// 	this->threads.at(post_history->array[i].thread_id).addInitialPost(post_json, false);
+		// }
+		// else {
+			this->threads.at(post_history->array[i].thread_id).addPost(post_json, /*upload_timestamp,*/ false);
+		// }
 	}
+	// for (std::map<int, Thread>::const_iterator it = this->threads.begin(); it != this->threads.end(); ++it) {
+	// 	this->ordered_threads.insert(std::pair<
+	
 	freePostArray(post_history);
 }
 
@@ -87,3 +90,23 @@ void Board::removeListenerFromThread(websocket_session* listener, int thread_id)
 std::string Board::dumpPost(int thread_id, int post_id) const {
 	return this->threads.at(thread_id).dumpPost(post_id);
 }
+
+struct thread_order_comparator {
+	bool operator() (std::tuple<time_t, int> left, std::tuple<time_t, int> right) const {
+		if (std::get<0>(left) > std::get<0>(right)) {
+			return true;
+		}
+		else if (std::get<0>(left) < std::get<0>(right)) {
+			return false;
+		}
+		if (std::get<1>(left) > std::get<1>(right)) {
+			return true;
+		}
+		else if (std::get<1>(left) < std::get<1>(right)) {
+			return false;
+		}
+		else {
+			std::cerr << "Error: cannot sort because threads have the same ID, This shouldn't happen" << std::endl;
+		}
+	}
+};

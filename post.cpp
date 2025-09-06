@@ -5,7 +5,7 @@
 #include <ctime>
 #include <cstring>
 
-Post::Post(json post_json, bool save_to_database) {
+Post::Post(json post_json, /*std::time_t upload_timestamp,*/ bool save_to_database) {
 	this->post_as_json = post_json;
 	this->post_as_json["type"] = "post";
 	this->name = post_json["name"].template get<std::string>();
@@ -40,6 +40,7 @@ Post::Post(json post_json, bool save_to_database) {
 	}
 	else {
 		this->id = post_json["id"].template get<int>();
+		this->upload_timestamp = upload_timestamp;
 	}
 }
 

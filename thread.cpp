@@ -2,11 +2,11 @@
 #include "db_interface.h"
 #include <string>
 #include <iostream>
-#include <ctime>
 #include <cstring>
 
 Thread::Thread(json thread_json, bool save_to_database) {
 	this->thread_as_json = thread_json;
+	this->number_of_posts = 0;
 	// struct db_thread_struct thread_as_struct;
 	// thread_as_struct.name = this->name;
 	// thread_as_struct.content = this->content;
@@ -16,7 +16,7 @@ Thread::Thread(json thread_json, bool save_to_database) {
 		std::cout << "this->id: " << this->id << std::endl;
 		this->thread_as_json["id"] = this->id;
 		thread_json["post_zero"]["thread_id"] = this->id;
-		this->addInitialPost(thread_json["post_zero"], true);
+		this->addPost(thread_json["post_zero"], true);
 		// Post post_zero(thread_json["post_zero"], true);
 		// this->thread_as_json["post_zero"] = post_zero.asJson();
 		// this->posts[0] = post_zero;
@@ -25,7 +25,7 @@ Thread::Thread(json thread_json, bool save_to_database) {
 	}
 	else {
 		this->id = thread_json["id"].template get<int>();
-		this->number_of_posts = this->thread_as_json["number_of_posts"].template get<int>();
+		// this->number_of_posts = this->thread_as_json["number_of_posts"].template get<int>();
 	}
 }
 
@@ -46,8 +46,12 @@ void Thread::addInitialPost(json post_json, bool save_to_database) {
 int Thread::addPost(json post_json, int id_in_thread, bool save_to_database) {
 	post_json["id_in_thread"] = id_in_thread;
 	Post post(post_json, save_to_database);
+	if (id_in_thread == 0) {
+		this->thread_as_json["post_zero"] = post.asJson();
+	}
 	this->posts.emplace(post.getId(), post);
 	this->number_of_posts++;
+	// this->last_upload_timestamp = ???
 	this->thread_as_json["number_of_posts"] = this->number_of_posts;
 	return post.getId();
 }
