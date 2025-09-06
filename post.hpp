@@ -6,11 +6,14 @@ using json = nlohmann::json;
 
 class Post {
 public:
-	Post(json post_json, /*std::time_t upload_timestamp,*/ bool save_to_database);
+	Post(struct db_post_struct* post_struct);
+	Post(json post_json);
 	std::string dumpPost() const;
 	json asJson() const { return this->post_as_json; };
 	int getId() const { return this->id; };
+	int getIdInThread() const { return this->id_in_thread; };
 	std::time_t getUploadTimestamp() const { return this->upload_timestamp; }
+	void createFromJSON(json post_json);
 private:
 	int id;
 	int thread_id;

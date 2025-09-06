@@ -15,7 +15,7 @@ void Board::createThread(json thread_json) {
 }
 
 int Board::createPost(json post_json) {
-	return this->threads.at(post_json["thread_id"].template get<int>()).addPost(post_json, true);
+	return this->threads.at(post_json["thread_id"].template get<int>()).createPostFromJson(post_json);
 }
 
 void Board::cacheAllThreads() {
@@ -31,23 +31,7 @@ void Board::cacheAllThreads() {
 
 	struct db_post_array* post_history = db_retrieve_history();
 	for (int i = 0; i < post_history->used; i++) {
-		json post_json;
-		post_json["id"] = post_history->array[i].id;
-		post_json["thread_id"] = post_history->array[i].thread_id;
-		post_json["id_in_thread"] = post_history->array[i].id_in_thread;
-		post_json["name"] = post_history->array[i].name;
-		post_json["content"] = post_history->array[i].content;
-		post_json["upload_timestamp"] = post_history->array[i].upload_timestamp;
-		post_json["files"] = json::array();
-		for (short file_i = 0; file_i < post_history->array[i].number_of_files; file_i++) {
-			post_json["files"].push_back(post_history->array[i].files[file_i]);
-		}
-		// if (post_history->array[i].id_in_thread == 0) {
-		// 	this->threads.at(post_history->array[i].thread_id).addInitialPost(post_json, false);
-		// }
-		// else {
-			this->threads.at(post_history->array[i].thread_id).addPost(post_json, /*upload_timestamp,*/ false);
-		// }
+		this->threads.at(post_history->array[i].thread_id).createPostFromStruct(&post_history->array[i]);
 	}
 	// for (std::map<int, Thread>::const_iterator it = this->threads.begin(); it != this->threads.end(); ++it) {
 	// 	this->ordered_threads.insert(std::pair<

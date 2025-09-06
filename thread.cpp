@@ -16,7 +16,7 @@ Thread::Thread(json thread_json, bool save_to_database) {
 		std::cout << "this->id: " << this->id << std::endl;
 		this->thread_as_json["id"] = this->id;
 		thread_json["post_zero"]["thread_id"] = this->id;
-		this->addPost(thread_json["post_zero"], true);
+		this->createPostFromJson(thread_json["post_zero"]);
 		// Post post_zero(thread_json["post_zero"], true);
 		// this->thread_as_json["post_zero"] = post_zero.asJson();
 		// this->posts[0] = post_zero;
@@ -33,20 +33,10 @@ std::string Thread::dumpThread() const {
 	return this->thread_as_json.dump();
 }
 
-void Thread::addInitialPost(json post_json, bool save_to_database) {
-	post_json["id_in_thread"] = 0;
-	Post post_zero(post_json, save_to_database);
-	// this->posts[0] = post_zero;
-	this->posts.emplace(post_zero.getId(), post_zero);
-	this->thread_as_json["post_zero"] = post_zero.asJson();
-	this->number_of_posts = 1;
-	this->thread_as_json["number_of_posts"] = 1;
-}
-
-int Thread::addPost(json post_json, int id_in_thread, bool save_to_database) {
-	post_json["id_in_thread"] = id_in_thread;
-	Post post(post_json, save_to_database);
-	if (id_in_thread == 0) {
+int Thread::createPostFromJson(json post_json) {
+	post_json["id_in_thread"] = this->number_of_posts;
+	Post post(post_json);
+	if (this->number_of_posts == 0) {
 		this->thread_as_json["post_zero"] = post.asJson();
 	}
 	this->posts.emplace(post.getId(), post);
@@ -54,12 +44,6 @@ int Thread::addPost(json post_json, int id_in_thread, bool save_to_database) {
 	// this->last_upload_timestamp = ???
 	this->thread_as_json["number_of_posts"] = this->number_of_posts;
 	return post.getId();
-}
-
-int Thread::addPost(json post_json, bool save_to_database) {
-	return this->addPost(post_json, this->number_of_posts, save_to_database);
-	// Post post(post_json, save_to_database);
-	// this->posts.emplace(post.getId(), post);
 }
 
 std::string Thread::dumpPosts() const {
@@ -83,4 +67,15 @@ void Thread::addListener(websocket_session* listener) {
 
 void Thread::removeListener(websocket_session* listener) {
 	listeners.erase(listener);
+}
+
+void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
+	Post post(post_struct);
+	if (post.getIdInThread() == 0) {
+		this->thread_as_json["post_zero"] = post.asJson();
+	}
+	this->posts.emplace(post.getId(), post);
+	this->number_of_posts++;
+	this->last_post_timestamp = post.getUploadTimestamp();
+	this->thread_as_json["number_of_posts"] = this->number_of_posts;
 }

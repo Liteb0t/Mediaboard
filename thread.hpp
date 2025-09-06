@@ -16,9 +16,11 @@ public:
 	std::string dumpThread() const;
 	json asJson() const { return this->thread_as_json; };
 	// int getNumberOfPosts() const { return this->posts.size(); };
-	void addInitialPost(json post_json, bool save_to_database);
-	int addPost(json post_json, int id_in_thread, bool save_to_database);
-	int addPost(json post_json, bool save_to_database);
+	// void addInitialPost(json post_json, bool save_to_database);
+	void createPostFromStruct(struct db_post_struct* post_struct);
+	int createPostFromJson(json post_json);
+	// int addPost(json post_json, int id_in_thread, bool save_to_database);
+	// int addPost(json post_json, bool save_to_database);
 	int getId() const { return this->id; };
 	void addListener(websocket_session* listener);
 	void removeListener(websocket_session* listener);
