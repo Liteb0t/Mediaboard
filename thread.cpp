@@ -41,7 +41,7 @@ int Thread::createPostFromJson(json post_json) {
 	}
 	this->posts.emplace(post.getId(), post);
 	this->number_of_posts++;
-	// this->last_upload_timestamp = ???
+	this->last_post_timestamp = post.getUploadTimestamp();
 	this->thread_as_json["number_of_posts"] = this->number_of_posts;
 	return post.getId();
 }

@@ -2,7 +2,7 @@
 #include <ctime>
 #include <nlohmann/json.hpp>
 #include <set>
-#include <tuple>
+#include <utility>
 #include <vector>
 
 using json = nlohmann::json;
@@ -22,15 +22,35 @@ public:
 	void removeListenerFromThread(websocket_session* listener, int thread_id);
 	std::unordered_set<websocket_session*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id).getListeners(); };
 	std::string dumpPost(int thread_id, int post_id) const;
+	// struct thread_order_comparator {
+	// 	bool operator() (const std::pair<std::time_t, int>& left, const std::pair<std::time_t, int>& right) const;
+	//  };
 	struct thread_order_comparator {
-		bool operator() (std::tuple<std::time_t, int> left, std::tuple<std::time_t, int> right) const;
+		bool operator() (std::pair<std::time_t, int> left, std::pair<std::time_t, int> right) const {
+			if (left.first > right.first) {
+				return true;
+			}
+			else if (left.first < right.first) {
+				return false;
+			}
+			if (left.second > right.second) {
+				return true;
+			}
+			else if (left.second < right.second) {
+				return false;
+			}
+			else {
+				// std::cerr << "Error: cannot sort because threads have the same ID, This shouldn't happen" << std::endl;
+				return false;
+			}
+		}
 	};
 private:
 	void cacheAllThreads();
 
 	std::map<int, Thread> threads;
 	// std::vector<int> ordered_threads; // O(N) access time - room for optimisation
-	std::set<std::tuple<std::time_t, int>, thread_order_comparator> ordered_threads;
+	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
 	int thread_limit;
 	int post_limit;
 };
