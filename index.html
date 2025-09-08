@@ -20,7 +20,7 @@
 				</div>
 				<div class="FlexSeparator"></div>
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
-				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard v0.0.0</a>
+				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard v0.0.1</a>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
 			<div id="post_container"></div>
@@ -170,9 +170,9 @@ main {
 	</style>
 	<script>
 		"use strict";
-		const root_url = "/"
-		const api_url = "api/";
-		const media_url = "media/";
+		const root_url = "/"; // set these URLS according to the server configuration
+		const api_url = "api/"; // these will be managed by a central config file eventually
+		const media_url = "media/"; // so you wont need to reconfigure these every update
 		const thumbnail_url = "media/thumbnails/";
 		const file_size_limit = 21500000;
 		const forbidden_file_name_chars = "#?";
@@ -544,8 +544,9 @@ main {
 		}
 
 		function connectToServer() {
-			let sock = new WebSocket("ws://localhost:8300");
-	
+			// change this to your server URL where Fuze Mediaboard serves websockets
+			// this will be done through a central config file later
+			let sock = new WebSocket("ws://localhost:8300");	
 			sock.onopen = (event) => {
 				connection_status.textContent = "Connected 🙂";
 				websocket_connected = true;
