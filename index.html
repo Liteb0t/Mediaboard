@@ -177,6 +177,8 @@ main {
 		const file_size_limit = 21500000;
 		const forbidden_file_name_chars = "#?";
 		const media_uuid_len = 36;
+		const localDate = new Date();
+		const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 		let state = {selected_thread_id: null};
 		let websocket;
 		let websocket_connected;
@@ -436,12 +438,14 @@ main {
 			post_name_element.classList.add("Username");
 			post_name_element.textContent = data.name;
 			post_header_element.appendChild(post_name_element);
-	
+
 			let post_timestamp_element = document.createElement("time");
-			post_timestamp_element.textContent = new Date(data.upload_timestamp * 1000).toString();
+			let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
+			post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
+			post_timestamp_element.textContent = post_date;
 			post_timestamp_element.classList.add("Timestamp");
 			post_header_element.appendChild(post_timestamp_element);
-	
+
 			let post_id_element = document.createElement("span");
 			post_id_element.classList.add("ID");
 			// if (typeof id_string === "undefined") {
@@ -452,7 +456,7 @@ main {
 				post_id_element.textContent = "#" + data.thread_id;
 			}
 			post_header_element.appendChild(post_id_element);
-	
+
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
 			post_content_element.textContent = data.content;

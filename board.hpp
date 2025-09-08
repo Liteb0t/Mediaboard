@@ -22,9 +22,6 @@ public:
 	void removeListenerFromThread(websocket_session* listener, int thread_id);
 	std::unordered_set<websocket_session*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id).getListeners(); };
 	std::string dumpPost(int thread_id, int post_id) const;
-	// struct thread_order_comparator {
-	// 	bool operator() (const std::pair<std::time_t, int>& left, const std::pair<std::time_t, int>& right) const;
-	//  };
 	struct thread_order_comparator {
 		bool operator() (std::pair<std::time_t, int> left, std::pair<std::time_t, int> right) const {
 			if (left.first > right.first) {
@@ -40,7 +37,6 @@ public:
 				return false;
 			}
 			else {
-				// std::cerr << "Error: cannot sort because threads have the same ID, This shouldn't happen" << std::endl;
 				return false;
 			}
 		}
