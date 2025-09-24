@@ -1,6 +1,10 @@
+all: index.html server
+
+index.html: _index.html tokens.m4
+	m4 _index.html >index.html
+
 server: main.o
 	g++ `Magick++-config --cxxflags --cppflags` -o server main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o -I/usr/include/postgresql -l:libecpg.so -l:libpgtypes.so `Magick++-config --ldflags --libs` -lboost_program_options
-
 
 main.o: main.cpp listener.o shared_state.o
 	g++ -c `Magick++-config --cxxflags --cppflags` main.cpp -o main.o `Magick++-config --ldflags --libs` -lboost_program_options

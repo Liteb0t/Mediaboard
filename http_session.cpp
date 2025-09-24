@@ -165,9 +165,9 @@ handle_request(
         // return bad_request("Unknown HTTP-method");
     	// Build the path to the requested file
     	std::string path;
-		if (req.target().substr(0, 7) == "/media/") {
+		if (req.target().substr(0, 6) == "/media") {
 			is_media = true;
-			path = path_cat(state->doc_root(), req.target());
+			path = path_cat(state->doc_root(), req.target().substr(6, req.target().length() - 6));
 			boost::replace_all(path, "%20", " ");
 			// std::cout << "is_media is TRUE" << std::endl;
 		}
@@ -223,6 +223,7 @@ handle_request(
     	// Attempt to open the file
     	beast::error_code ec;
     	http::file_body::value_type body;
+		std::cout << "Opening path: " << path << std::endl;
     	body.open(path.c_str(), beast::file_mode::scan, ec);
 
     	// Handle the case where the file doesn't exist

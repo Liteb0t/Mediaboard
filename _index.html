@@ -5,22 +5,24 @@
 		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
+		<!--
+			include(`tokens.m4')
+		-->
 		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
-		<!--<link rel="stylesheet" href="/static/styles.css">-->
 		<!--<link rel="stylesheet" href="/styles_mediaboard.css">-->
 	</head>
 	<body>
 		<!--Navbar can go here-->
 		<main>
 			<div id="header_bar">
-				<b>Insert website title</b>
+				<b>_SITE_NAME</b>
 				<div>
 					<button id="catalog_button" onclick="openCatalog()">Catalog</button>
 					<button id="refresh_button" onclick="refresh_send()">Refresh</button>
 				</div>
 				<div class="FlexSeparator"></div>
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
-				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard v0.0.1</a>
+				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.1</a>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
 			<div id="post_container"></div>
@@ -89,6 +91,7 @@ main {
 .Post {
 	padding: 0 0.25rem;
 	margin-top: 0.25rem;
+	word-wrap: break-word;
 
 	>* {
 		margin: 0.25rem 0;
@@ -121,9 +124,6 @@ main {
 			.EmbedThumbnail, .EmbedImage {
 				cursor: pointer;
 				max-width: 100%;
-			}
-			figcaption {
-				word-wrap: break-word;
 			}
 		}
 	}
@@ -170,7 +170,7 @@ main {
 	</style>
 	<script>
 		"use strict";
-		const root_url = "/"; // set these URLS according to the server configuration
+		const root_url = "_ROOT_URL"; // set these URLS according to the server configuration
 		const api_url = "api/"; // these will be managed by a central config file eventually
 		const media_url = "media/"; // so you wont need to reconfigure these every update
 		const thumbnail_url = "media/thumbnails/";
@@ -457,6 +457,12 @@ main {
 			}
 			post_header_element.appendChild(post_id_element);
 
+			// Delete button
+			// let delete_button_element = document.createElement("button");
+			// delete_button_element.textContent = "Delete";
+			// delete_button_element.onclick = (event) => { deleteMessage(data.thread_id, data.id_in_thread); }
+			// post_header_element.appendChild(delete_button_element);
+
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
 			post_content_element.textContent = data.content;
@@ -546,7 +552,7 @@ main {
 		function connectToServer() {
 			// change this to your server URL where Fuze Mediaboard serves websockets
 			// this will be done through a central config file later
-			let sock = new WebSocket("ws://localhost:8300");	
+			let sock = new WebSocket("_WEBSOCKET_URL");	
 			sock.onopen = (event) => {
 				connection_status.textContent = "Connected 🙂";
 				websocket_connected = true;
@@ -608,6 +614,23 @@ main {
 			});
 			return fetch_response;
 		}
+
+		/*
+		async function deleteMessage(thread_id, message_id) {
+			console.log("deleting message...");
+			// const data = {
+			// 	message: {
+			// 		thread_id: thread_id,
+			// 		id_in_thread: message_id
+			// 	}
+			// };
+			const fetch_response = await fetch(root_url + api_url + "delete_message/" + `${thread_id}/${message_id}`, {
+				method: "DELETE"
+				// ,body: JSON.stringify(data)
+			});
+			return fetch_response;
+		}
+		*/
 	
 		async function postThread() {
 			console.log("posting thread...");
