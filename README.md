@@ -1,10 +1,5 @@
-### Database setup
-Install postgresql\
-To import the database template:\
-`psql -X fuze_mediaboard < fuze_mediaboard_template.sql`\
-Add the following line to pg_hba.conf:\
-`local   fuze_mediaboard mediaboard_server                       password`\
-### Required packages (Debian/Devuan)
+# ![FUZE](https://fuze.page/static/fuze-min-hover.png) Mediaboard
+### Required packages (Debian 12/Devuan 5)
 `postgresql`\
 `ecpg`\
 `libboost1.81-dev`\
@@ -12,8 +7,19 @@ Add the following line to pg_hba.conf:\
 `Imagemagick` build with the delegates for JPEG, PNG, WEBP, and JPEG-XL. On Debian/Devuan the apt build doesn't come with JPEG-XL so you need to build it yourself.\
 `make`\
 `g++`
-### Web server settings [deployment]
-Nginx reverse proxy settings:
+### Database setup
+Install postgresql.\
+\
+To import the database template, run:\
+`psql -X fuze_mediaboard < fuze_mediaboard_template.sql`\
+\
+Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it high enough in the table so that it won't be overridden by other settings:\
+`local   fuze_mediaboard mediaboard_server                       password`\
+\
+`mediaboard_server` is the Postgres user which interacts with the database named `fuze_mediaboard`.\
+Set a password for this user. Set an environment variable `FUZE_MEDIABOARD_PASSWORD` with the same password.
+### Deployment settings
+Example Nginx reverse proxy settings:
 ```
 location /mediaboard/ {
   proxy_pass http://localhost:8300/; # Fuze Mediaboard
@@ -28,16 +34,14 @@ location /mediaboard/ {
   proxy_read_timeout 7d;
 }
 ```
-
-configure these lines in `index.html`:
-```javascript\
-const root_url = "/"; // set these URLS according to the server configuration
-const api_url = "api/"; // these will be managed by a central config file eventually
-const media_url = "media/"; // so you wont need to reconfigure these every update
-const thumbnail_url = "media/thumbnails/";
+In the example above, Fuze Mediaboard is hosted on `/mediaboard/`.\
+Open `tokens.m4` and locate the following line:
 ```
-And also change localhost:8300 the URL that the nginx reverse proxy is serving:
-```javascript
-let sock = new WebSocket("ws://localhost:8300");
+define(`_WEBSOCKET_URL', `ws://localhost:8300')
 ```
-
+Set the value to the publicly accessible URL Mediaboard is proxied to.\
+In this example, if our domain is *fuze.page*, the value should be `wss://fuze.page/mediaboard/`. **Do not forget: if using HTTPS, set the scheme to `wss://`.**\
+Also change the definition of `_ROOT_URL` from `/` to `/mediaboard/`\
+Run `make` to apply the changes.
+### Storing user-submitted media in a different location
+By default, media is stored in `media/`. Currently there is no support for using a separate CDN. However you can choose a different directory within the server's filesystem to store media. Open `config.ini` and set `media_path` to another location.
