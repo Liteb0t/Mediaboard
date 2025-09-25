@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
+		<!--
+			include(`tokens.m4')
+		-->
 		<title>Fuze Mediaboard</title>
 		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
-		<!--
-			include(`tokens.m4')
-		-->
+		<base href="_ROOT_URL">
 		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
 		<!--<link rel="stylesheet" href="/styles_mediaboard.css">-->
 	</head>
@@ -224,6 +225,18 @@ main {
 		// 	}
 		// }
 
+		// Used to verify the author on deleting a message.
+		let user_key = localStorage.getItem("key");
+		if (user_key === null || user_key.length !== 8) {
+			user_key = '';
+			// 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
+			const valid_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+			for (let i = 0; i < 8; i++) {
+				user_key += valid_chars.charAt(Math.floor(Math.random() * valid_chars.length));
+			}
+			localStorage.setItem("key", user_key);
+		}
+
 		async function postAction() {
 			let response;
 			if (state.selected_thread_id === -1) {
@@ -306,7 +319,11 @@ main {
 			}
 		}
 		async function getThreadPosts() {
-			let response = await fetch(root_url + api_url + "threads/" + state.selected_thread_id + "/get_posts/");
+			let response = await fetch(root_url + api_url + "threads/" + state.selected_thread_id + "/get_posts/", {
+				headers: {
+					"key": user_key
+				}
+			});
 			if (response.ok) {
 				await response.json().then(response_obj => {
 					console.log(response_obj);
@@ -332,7 +349,7 @@ main {
 			let file_container = document.createElement("div");
 			// file_container.setAttribute("id", "file_" + server_filename);
 			let file_thumbnail = document.createElement("img");
-			file_thumbnail.setAttribute("src", "//placeholder.png");
+			file_thumbnail.setAttribute("src", "placeholder.png");
 			file_thumbnail.setAttribute("width", "100px");
 			file_thumbnail.setAttribute("height", "100px");
 			let file_title = document.createElement("span");
@@ -458,10 +475,12 @@ main {
 			post_header_element.appendChild(post_id_element);
 
 			// Delete button
-			// let delete_button_element = document.createElement("button");
-			// delete_button_element.textContent = "Delete";
-			// delete_button_element.onclick = (event) => { deleteMessage(data.thread_id, data.id_in_thread); }
-			// post_header_element.appendChild(delete_button_element);
+			if (data.is_author) {
+				let delete_button_element = document.createElement("button");
+				delete_button_element.textContent = "Delete";
+				delete_button_element.onclick = (event) => { deleteMessage(data.thread_id, data.id_in_thread); }
+				post_header_element.appendChild(delete_button_element);
+			}
 
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
@@ -606,31 +625,33 @@ main {
 					content: content_field.value,
 					files: files,
 					thread_id: state.selected_thread_id
+					,key: user_key
 				}
 			};
-			const fetch_response = await fetch(root_url + api_url + "create_post/", {
+			const fetch_response = await fetch(root_url + api_url + "create_message/", {
 				method: "POST",
 				body: JSON.stringify(data)
 			});
 			return fetch_response;
 		}
 
-		/*
 		async function deleteMessage(thread_id, message_id) {
 			console.log("deleting message...");
-			// const data = {
-			// 	message: {
-			// 		thread_id: thread_id,
-			// 		id_in_thread: message_id
-			// 	}
-			// };
-			const fetch_response = await fetch(root_url + api_url + "delete_message/" + `${thread_id}/${message_id}`, {
+			const data = {
+				key: user_key
+				,thread_id: thread_id
+				,id_in_thread: message_id
+			};
+			const fetch_response = await fetch(root_url + api_url + "delete_message/" + `${thread_id}/${message_id}/`, {
 				method: "DELETE"
-				// ,body: JSON.stringify(data)
+				// ,headers: {
+					// "auth-scheme": "token",
+				// 	"key": user_key
+				// }
+				,body: JSON.stringify(data)
 			});
 			return fetch_response;
 		}
-		*/
 	
 		async function postThread() {
 			console.log("posting thread...");
@@ -646,6 +667,7 @@ main {
 						content: content_field.value,
 						files: files
 					}
+					,key: user_key
 				}
 			};
 			const fetch_response = await fetch(root_url + api_url + "create_thread/", {

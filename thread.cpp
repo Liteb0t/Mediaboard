@@ -33,32 +33,59 @@ std::string Thread::dumpThread() const {
 	return this->thread_as_json.dump();
 }
 
+void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
+	Post post(post_struct);
+	if (post.getIdInThread() == 0) {
+		this->thread_as_json["post_zero"] = post.asJson();
+	}
+	this->posts.emplace(post.getIdInThread(), post);
+	this->number_of_posts++;
+	this->last_post_timestamp = post.getUploadTimestamp();
+	this->thread_as_json["number_of_posts"] = this->number_of_posts;
+}
+
 int Thread::createPostFromJson(json post_json) {
 	post_json["id_in_thread"] = this->number_of_posts;
 	Post post(post_json);
 	if (this->number_of_posts == 0) {
 		this->thread_as_json["post_zero"] = post.asJson();
 	}
-	this->posts.emplace(post.getId(), post);
+	this->posts.emplace(post.getIdInThread(), post);
 	this->number_of_posts++;
 	this->last_post_timestamp = post.getUploadTimestamp();
 	this->thread_as_json["number_of_posts"] = this->number_of_posts;
-	return post.getId();
+	return post.getIdInThread();
 }
 
-std::string Thread::dumpPosts() const {
+void Thread::deleteMessage(int message_id) {
+	this->posts.at(message_id).markAsDeleted();
+	std::cout << "Erased message " << message_id << " from thread " << this->id << std::endl;
+}
+
+bool Thread::keyMatchesMessage(std::string key, int message_id) const {
+	std::cout << "[Thread] key :: message_key\n" << key << " :: " << this->posts.at(message_id).getKey() << std::endl;
+	return this->posts.at(message_id).getKey() == key;
+}
+
+std::string Thread::dumpPosts(std::string key) const {
 	json multiple_post_json;
 	multiple_post_json["type"] = "post_history";
 	multiple_post_json["posts"] = json::array();
 	for (auto it = this->posts.begin(); it != this->posts.end(); ++it) {
-		std::cout << "Dumping post " << it->second.getId() << std::endl;
-		multiple_post_json["posts"].push_back(it->second.asJson());
+		if (!it->second.isDeleted()) {
+			std::cout << "Dumping post " << this->id << "/" << it->second.getIdInThread() << std::endl;
+			json post_json = it->second.asJson();
+			post_json["is_author"] = keyMatchesMessage(key, it->first);
+			multiple_post_json["posts"].push_back(post_json);
+		}
 	}
 	return multiple_post_json.dump();
 }
 
-std::string Thread::dumpPost(int post_id) const {
-	return this->posts.at(post_id).dumpPost();
+std::string Thread::dumpPost(int message_id, std::string key) const {
+	json post_json = this->posts.at(message_id).asJson();
+	post_json["is_author"] = keyMatchesMessage(key, message_id);
+	return post_json.dump();
 }
 
 void Thread::addListener(websocket_session* listener) {
@@ -67,15 +94,4 @@ void Thread::addListener(websocket_session* listener) {
 
 void Thread::removeListener(websocket_session* listener) {
 	listeners.erase(listener);
-}
-
-void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
-	Post post(post_struct);
-	if (post.getIdInThread() == 0) {
-		this->thread_as_json["post_zero"] = post.asJson();
-	}
-	this->posts.emplace(post.getId(), post);
-	this->number_of_posts++;
-	this->last_post_timestamp = post.getUploadTimestamp();
-	this->thread_as_json["number_of_posts"] = this->number_of_posts;
 }

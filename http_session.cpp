@@ -196,7 +196,20 @@ handle_request(
 					std::from_chars(req.target().substr(13, found).data(), req.target().substr(13, found).data() + req.target().substr(13, found).size(), thread_in_url);
 					// int thread_in_url = atoi(req.target().substr(13, found).c_str());
 					if (state->main_board.threadExists(thread_in_url)) {
-						res.body() = state->main_board.dumpPostsInThread(thread_in_url);
+						std::cout << "[http_session] HEADERS:" << std::endl;
+						std::string key;
+
+						// boost::intrusive::list_iterator<boost::intrusive::bhtraits<boost::beast::http::basic_fields<std::allocator<char>>::element, boost::intrusive::list_node_traits<void*>, boost::intrusive::normal_link, boost::intrusive::dft_tag, 1>, true> it = req.begin();
+						 // Iterates value_type. See: https://www.boost.org/doc/libs/boost_1_82_0/libs/beast/doc/html/beast/ref/boost__beast__http__basic_fields__value_type.html
+						for (auto it = req.begin(); it != req.end(); it++) {
+							std::cout << it->name_string() << ": " << it->value() << "\n";
+							if (it->name_string() == "key") {
+								key = it->value();
+								std::cout << "Found key in header. It is " << key << std::endl;
+								break;
+							}
+						}
+						res.body() = state->main_board.dumpPostsInThread(thread_in_url, key);
 						res.result(http::status::ok);
 					}
 					else {
@@ -217,7 +230,9 @@ handle_request(
 			std::cout << "/path: " << path << std::endl;
 		}
 		else {
-			path = path_cat(state->doc_root(), req.target());
+			// path = path_cat(state->doc_root(), req.target());
+			// This is used to access files in the server's directory
+			path = req.target().substr(1, req.target().length() - 1);
 		}
 
     	// Attempt to open the file
@@ -292,19 +307,26 @@ handle_request(
 			res.prepare_payload();
 			return res;
 		}
-		else if (req.target() == "/api/create_post/") {
+		else if (req.target() == "/api/create_message/") {
 			http::response<http::string_body> res;
 			json request_json = json::parse(req.body());
 			if (request_json["post_zero"]["files"].size() > 4) {
-				std::cerr << "Denied: More than 4 files in post\n";
+				std::cerr << "Denied: More than 4 files in message\n";
 				res.result(500);
 			}
 			else {
-				int new_post_thread_id = request_json["post"]["thread_id"].template get<int>();
-				int new_post_id = state->main_board.createPost(request_json["post"]);
-				std::string new_post_dump = state->main_board.dumpPost(new_post_thread_id, new_post_id);
-				state->sendToThread(new_post_dump, new_post_thread_id);
-				res.result(204);
+				int new_message_thread_id = request_json["post"]["thread_id"].template get<int>();
+				std::string new_message_key = request_json["post"]["key"].template get<std::string>();
+				if (state->main_board.threadExists(new_message_thread_id)) {
+					int new_message_id = state->main_board.createPost(request_json["post"]);
+					std::string new_message_dump = state->main_board.dumpPost(new_message_thread_id, new_message_id, new_message_key);
+					state->sendToThread(new_message_dump, new_message_thread_id);
+					res.result(204);
+				}
+				else {
+					std::cerr << "Couldn't create message because the thread with ID " << new_message_thread_id << " does not exist" << std::endl;
+					res.result(400);
+				}
 			}
 			res.prepare_payload();
 			return res;
@@ -315,7 +337,7 @@ handle_request(
 			// std::cout << req.body() << std::endl;
 			// std::string req_string = req.body();
 			// std::cout << req_string << std::endl;
-			std::stringstream req_stream(req.body());
+			std::istringstream req_stream(req.body());
 			std::string req_line;
 			int i = 0;
 			std::getline(req_stream, req_line);
@@ -420,6 +442,70 @@ handle_request(
     		res.content_length(0);
     		res.keep_alive(req.keep_alive());
     		return res;
+		}
+		else {
+			std::cout << "Unknown target: " << req.target() << std::endl;
+			http::response<http::empty_body> res;
+			res.result(500);
+			res.prepare_payload();
+			return res;
+		}
+	}
+	else if (req.method() == http::verb::delete_) {
+		if (req.target().substr(0, 20) == "/api/delete_message/") {
+			http::response<http::string_body> res;
+			json request_json = json::parse(req.body());
+			if (request_json.contains("key")) {
+				std::cout << "Request contains key" << std::endl;
+				int slash_index, thread_id, message_id;
+				if ((slash_index = req.target().substr(20, req.target().length() - 20).find('/')) != std::string::npos) {
+					try {
+						thread_id = std::stoi(req.target().substr(20, slash_index));
+						message_id = std::stoi(req.target().substr(20 + slash_index + 1, req.target().length() - slash_index - 1 - 20));
+					}
+					catch (std::invalid_argument const& exception) {
+						res.result(400);
+						std::cout << "Invalid ID in delete_message URL" << std::endl;
+						goto prepare_response_payload;
+					}
+					catch (std::out_of_range const& exception) {
+						res.result(400);
+						std::cout << "Out-of-range ID in delete_message URL" << std::endl;
+						goto prepare_response_payload;
+					}
+					if (state->main_board.threadExists(thread_id)) {
+						std::string user_key = request_json["key"].template get<std::string>();
+						if (message_id == 0) {
+							// state->main_board.deleteThread(thread_id, user_key);
+						}
+						else {
+							if (state->main_board.messageExistsInThread(message_id, thread_id)) {
+								if (state->main_board.keyMatchesMessageInThread(user_key, message_id, thread_id)) {
+									state->main_board.deleteMessageFromThread(message_id, thread_id);
+								}
+								else {
+									std::cout << "key doesnt match\n";
+								}
+							}
+							else {
+								std::cout << "Message " << message_id << " does not exist in thread " << thread_id << std::endl;
+							}
+						}
+						res.result(200);
+					}
+					else {
+						std::cout << "Thread " << thread_id << " does not exist\n";
+					}
+				}
+
+			}
+			else {
+				std::cout << "Denied: Request does not contain key\n";
+				res.result(400);
+			}
+prepare_response_payload:
+			res.prepare_payload();
+			return res;
 		}
 		else {
 			std::cout << "Unknown target: " << req.target() << std::endl;

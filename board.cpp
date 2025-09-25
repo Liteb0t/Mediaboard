@@ -29,6 +29,15 @@ int Board::createPost(json post_json) {
 	return new_post_id;
 }
 
+void Board::deleteMessageFromThread(int message_id, int thread_id) {
+	std::cout << "Stub: delete message " << message_id << " in thread " << thread_id << std::endl;
+	this->threads.at(thread_id).deleteMessage(message_id);
+}
+
+bool Board::keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const {
+	return this->threads.at(thread_id).keyMatchesMessage(key, message_id);
+}
+
 void Board::cacheAllThreads() {
 	struct db_thread_array* thread_list = db_retrieve_threads();
 	for (int i = 0; i < thread_list->used; i++) {
@@ -61,8 +70,8 @@ std::string Board::dumpAllThreads() const {
 	return multiple_thread_json.dump();
 }
 
-std::string Board::dumpPostsInThread(int thread_id) const {
-	return this->threads.at(thread_id).dumpPosts();
+std::string Board::dumpPostsInThread(int thread_id, std::string key) const {
+	return this->threads.at(thread_id).dumpPosts(key);
 }
 
 void Board::addListenerToThread(websocket_session* listener, int thread_id) {
@@ -83,8 +92,8 @@ void Board::removeListenerFromThread(websocket_session* listener, int thread_id)
 		std::cout << "Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
-std::string Board::dumpPost(int thread_id, int post_id) const {
-	return this->threads.at(thread_id).dumpPost(post_id);
+std::string Board::dumpPost(int thread_id, int post_id, std::string key) const {
+	return this->threads.at(thread_id).dumpPost(post_id, key);
 }
 
 /*

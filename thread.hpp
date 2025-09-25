@@ -21,13 +21,16 @@ public:
 	int createPostFromJson(json post_json);
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
+	void deleteMessage(int message_id);
+	bool keyMatchesMessage(std::string key, int message_id) const;
+	bool messageExists(int message_id) const { std::map<int, Post>::const_iterator it = posts.find(message_id); return it != posts.end(); };
 	int getId() const { return this->id; };
 	void addListener(websocket_session* listener);
 	void removeListener(websocket_session* listener);
 	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
 	std::string dumpLastPost() const;
-	std::string dumpPosts() const;
-	std::string dumpPost(int post_id) const;
+	std::string dumpPosts(std::string key) const;
+	std::string dumpPost(int message_id, std::string key) const;
 	std::time_t getLastPostTime() const { return this->last_post_timestamp; }
 	int number_of_posts;
 private:

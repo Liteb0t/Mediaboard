@@ -71,41 +71,51 @@ void db_connect() {
 	// const char* password = "watermelone";
 	    
 	    
+	    
 	 
 	
 #line 60 "db_interface.pgc"
  const char * password = getenv ( "FUZE_MEDIABOARD_PASSWORD" ) ;
  
 #line 62 "db_interface.pgc"
- const char * upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3]) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);" ;
+ const char * upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);" ;
  
 #line 63 "db_interface.pgc"
  const char * create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts) VALUES (?, 0);" ;
  
 #line 64 "db_interface.pgc"
+ const char * mark_post_as_deleted_prepared_stmt = "UPDATE post SET deleted = true WHERE id = ?;" ;
+ 
+#line 65 "db_interface.pgc"
  char * data ;
 /* exec sql end declare section */
-#line 65 "db_interface.pgc"
+#line 66 "db_interface.pgc"
 
 	printf("password: %s\n", password);
 	{ ECPGconnect(__LINE__, 0, "fuze_mediaboard" , "mediaboard_server" , password , NULL, 0); 
-#line 67 "db_interface.pgc"
+#line 68 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 67 "db_interface.pgc"
+#line 68 "db_interface.pgc"
 
 	printf("connected!\n");
 	{ ECPGprepare(__LINE__, NULL, 0, "upload_post_stmt", upload_post_prepared_stmt);
-#line 69 "db_interface.pgc"
+#line 70 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 69 "db_interface.pgc"
+#line 70 "db_interface.pgc"
 
 	{ ECPGprepare(__LINE__, NULL, 0, "create_thread_stmt", create_thread_prepared_stmt);
-#line 70 "db_interface.pgc"
+#line 71 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 70 "db_interface.pgc"
+#line 71 "db_interface.pgc"
+
+	{ ECPGprepare(__LINE__, NULL, 0, "mark_post_as_deleted_stmt", mark_post_as_deleted_prepared_stmt);
+#line 72 "db_interface.pgc"
+
+if (sqlca.sqlcode < 0) print_sqlca ( );}
+#line 72 "db_interface.pgc"
 
 
 }
@@ -114,24 +124,24 @@ void db_test() {
     /* exec sql begin declare section */
      
     
-#line 76 "db_interface.pgc"
+#line 78 "db_interface.pgc"
  char dbname [ 1024 ] ;
 /* exec sql end declare section */
-#line 77 "db_interface.pgc"
+#line 79 "db_interface.pgc"
 
 
     { ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "select current_database ( )", ECPGt_EOIT, 
 	ECPGt_char,(dbname),(long)1024,(long)1,(1024)*sizeof(char), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EORT);
-#line 79 "db_interface.pgc"
+#line 81 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 79 "db_interface.pgc"
+#line 81 "db_interface.pgc"
 
     printf("current_database = %s\n", dbname);
 }
 
-int db_store_post(int thread_id_, int id_in_thread_, const char* name_, time_t upload_timestamp_, const char* content_, char files[4][256], int file_count) {
+int db_store_post(int thread_id_, int id_in_thread_, const char* name_, time_t upload_timestamp_, const char* content_, char files[4][256], int file_count, const char key_[KEY_LENGTH+1]) {
     /* exec sql begin declare section */
 	 
 	 
@@ -144,69 +154,73 @@ int db_store_post(int thread_id_, int id_in_thread_, const char* name_, time_t u
 	           
 	           
 	           
+	    
     
-#line 85 "db_interface.pgc"
+#line 87 "db_interface.pgc"
  int number_of_posts ;
  
-#line 86 "db_interface.pgc"
+#line 88 "db_interface.pgc"
  int post_id ;
  
-#line 87 "db_interface.pgc"
+#line 89 "db_interface.pgc"
  int thread_id = thread_id_ ;
  
-#line 88 "db_interface.pgc"
+#line 90 "db_interface.pgc"
  int id_in_thread = id_in_thread_ ;
  
-#line 89 "db_interface.pgc"
+#line 91 "db_interface.pgc"
  const char * name = name_ ;
  
-#line 90 "db_interface.pgc"
+#line 92 "db_interface.pgc"
  char upload_timestamp [ 20 ] ;
  
-#line 91 "db_interface.pgc"
+#line 93 "db_interface.pgc"
  const char * content = content_ ;
  
-#line 92 "db_interface.pgc"
+#line 94 "db_interface.pgc"
  const char * file_1 = files [ 0 ] ;
  
-#line 92 "db_interface.pgc"
+#line 94 "db_interface.pgc"
  const int file_1_indicator = file_count - 1 ;
  
-#line 93 "db_interface.pgc"
+#line 95 "db_interface.pgc"
  const char * file_2 = files [ 1 ] ;
  
-#line 93 "db_interface.pgc"
+#line 95 "db_interface.pgc"
  const int file_2_indicator = file_count - 2 ;
  
-#line 94 "db_interface.pgc"
+#line 96 "db_interface.pgc"
  const char * file_3 = files [ 2 ] ;
  
-#line 94 "db_interface.pgc"
+#line 96 "db_interface.pgc"
  const int file_3_indicator = file_count - 3 ;
  
-#line 95 "db_interface.pgc"
+#line 97 "db_interface.pgc"
  const char * file_4 = files [ 3 ] ;
  
-#line 95 "db_interface.pgc"
+#line 97 "db_interface.pgc"
  const int file_4_indicator = file_count - 4 ;
+ 
+#line 98 "db_interface.pgc"
+ const char * key = key_ ;
 /* exec sql end declare section */
-#line 96 "db_interface.pgc"
+#line 99 "db_interface.pgc"
 
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "select number_of_posts from thread where id = $1 ", 
 	ECPGt_int,&(thread_id),(long)1,(long)1,sizeof(int), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EOIT, 
 	ECPGt_int,&(number_of_posts),(long)1,(long)1,sizeof(int), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EORT);
-#line 97 "db_interface.pgc"
+#line 100 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 97 "db_interface.pgc"
+#line 100 "db_interface.pgc"
 
 	{ ECPGtrans(__LINE__, NULL, "commit");
-#line 98 "db_interface.pgc"
+#line 101 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 98 "db_interface.pgc"
+#line 101 "db_interface.pgc"
 
 	number_of_posts++;
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "update thread set number_of_posts = $1  where id = $2 ", 
@@ -214,21 +228,21 @@ if (sqlca.sqlcode < 0) print_sqlca ( );}
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, 
 	ECPGt_int,&(thread_id),(long)1,(long)1,sizeof(int), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EOIT, ECPGt_EORT);
-#line 102 "db_interface.pgc"
+#line 105 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 102 "db_interface.pgc"
+#line 105 "db_interface.pgc"
 
 	// strcpy(data, data_);
-	printf("%s %s", name, upload_timestamp);
 	strftime(upload_timestamp, 20, "%Y-%m-%d %H:%M:%S", gmtime(&upload_timestamp_));
+	printf("[DB Interface] Storing post\nName: %s\nTimestamp: %s\nContent: %s[END]\n", name, upload_timestamp, content);
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "select nextval ( 'post_id_seq' )", ECPGt_EOIT, 
 	ECPGt_int,&(post_id),(long)1,(long)1,sizeof(int), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EORT);
-#line 106 "db_interface.pgc"
+#line 109 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 106 "db_interface.pgc"
+#line 109 "db_interface.pgc"
 
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_execute, "upload_post_stmt", 
 	ECPGt_int,&(post_id),(long)1,(long)1,sizeof(int), 
@@ -250,17 +264,19 @@ if (sqlca.sqlcode < 0) print_sqlca ( );}
 	ECPGt_char,&(file_3),(long)0,(long)1,(1)*sizeof(char), 
 	ECPGt_int,&(file_3_indicator),(long)1,(long)1,sizeof(int), 
 	ECPGt_char,&(file_4),(long)0,(long)1,(1)*sizeof(char), 
-	ECPGt_int,&(file_4_indicator),(long)1,(long)1,sizeof(int), ECPGt_EOIT, ECPGt_EORT);
-#line 107 "db_interface.pgc"
+	ECPGt_int,&(file_4_indicator),(long)1,(long)1,sizeof(int), 
+	ECPGt_char,&(key),(long)0,(long)1,(1)*sizeof(char), 
+	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EOIT, ECPGt_EORT);
+#line 110 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 107 "db_interface.pgc"
+#line 110 "db_interface.pgc"
 
 	{ ECPGtrans(__LINE__, NULL, "commit");
-#line 108 "db_interface.pgc"
+#line 111 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 108 "db_interface.pgc"
+#line 111 "db_interface.pgc"
 
 	return post_id;
 }
@@ -271,34 +287,61 @@ int db_store_thread(int number_of_posts_) {
 	 
 	// int number_of_posts = number_of_posts_;
 	
-#line 115 "db_interface.pgc"
+#line 118 "db_interface.pgc"
  int thread_id ;
 /* exec sql end declare section */
-#line 117 "db_interface.pgc"
+#line 120 "db_interface.pgc"
 
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "select nextval ( 'thread_id_seq' )", ECPGt_EOIT, 
 	ECPGt_int,&(thread_id),(long)1,(long)1,sizeof(int), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EORT);
-#line 118 "db_interface.pgc"
+#line 121 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 118 "db_interface.pgc"
+#line 121 "db_interface.pgc"
 
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_execute, "create_thread_stmt", 
 	ECPGt_int,&(thread_id),(long)1,(long)1,sizeof(int), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EOIT, ECPGt_EORT);
-#line 119 "db_interface.pgc"
+#line 122 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 119 "db_interface.pgc"
+#line 122 "db_interface.pgc"
 
 	{ ECPGtrans(__LINE__, NULL, "commit");
-#line 120 "db_interface.pgc"
+#line 123 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 120 "db_interface.pgc"
+#line 123 "db_interface.pgc"
 
 	return thread_id;
+}
+
+// void db_mark_message_as_deleted(int thread_id_, int post_id_) {
+void db_mark_post_as_deleted(int post_id_) {
+	/* exec sql begin declare section */
+	// int thread_id = thread_id_;
+	   
+	
+#line 131 "db_interface.pgc"
+ int post_id = post_id_ ;
+/* exec sql end declare section */
+#line 132 "db_interface.pgc"
+
+	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_execute, "mark_post_as_deleted_stmt", 
+	ECPGt_int,&(post_id),(long)1,(long)1,sizeof(int), 
+	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EOIT, ECPGt_EORT);
+#line 133 "db_interface.pgc"
+
+if (sqlca.sqlcode < 0) print_sqlca ( );}
+#line 133 "db_interface.pgc"
+
+	{ ECPGtrans(__LINE__, NULL, "commit");
+#line 134 "db_interface.pgc"
+
+if (sqlca.sqlcode < 0) print_sqlca ( );}
+#line 134 "db_interface.pgc"
+
 }
 
 struct db_thread_array* db_retrieve_threads() {
@@ -308,25 +351,25 @@ struct db_thread_array* db_retrieve_threads() {
 	 
 	 
 	
-#line 128 "db_interface.pgc"
+#line 141 "db_interface.pgc"
  int thread_id ;
  
-#line 129 "db_interface.pgc"
+#line 142 "db_interface.pgc"
  int number_of_posts ;
 /* exec sql end declare section */
-#line 130 "db_interface.pgc"
+#line 143 "db_interface.pgc"
 
 	/* declare thread_getter cursor for select id , number_of_posts from thread order by id */
-#line 133 "db_interface.pgc"
+#line 146 "db_interface.pgc"
 
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "declare thread_getter cursor for select id , number_of_posts from thread order by id", ECPGt_EOIT, ECPGt_EORT);
-#line 134 "db_interface.pgc"
+#line 147 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 134 "db_interface.pgc"
+#line 147 "db_interface.pgc"
 
 	/* exec sql whenever not found  break ; */
-#line 135 "db_interface.pgc"
+#line 148 "db_interface.pgc"
 
 	while (true) {
 		{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "fetch thread_getter", ECPGt_EOIT, 
@@ -334,13 +377,13 @@ if (sqlca.sqlcode < 0) print_sqlca ( );}
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, 
 	ECPGt_int,&(number_of_posts),(long)1,(long)1,sizeof(int), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EORT);
-#line 137 "db_interface.pgc"
+#line 150 "db_interface.pgc"
 
 if (sqlca.sqlcode == ECPG_NOT_FOUND) break;
-#line 137 "db_interface.pgc"
+#line 150 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 137 "db_interface.pgc"
+#line 150 "db_interface.pgc"
 
 		struct db_thread_struct thread;
 		thread.id = thread_id;
@@ -348,20 +391,21 @@ if (sqlca.sqlcode < 0) print_sqlca ( );}
 		insertToThreadArray(&thread_list, thread);
 	}
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "close thread_getter", ECPGt_EOIT, ECPGt_EORT);
-#line 143 "db_interface.pgc"
+#line 156 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 143 "db_interface.pgc"
+#line 156 "db_interface.pgc"
 
 	{ ECPGtrans(__LINE__, NULL, "commit");
-#line 144 "db_interface.pgc"
+#line 157 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 144 "db_interface.pgc"
+#line 157 "db_interface.pgc"
 
 	return &thread_list;
 }
 
+// Runs on start-up. Reads every message from the database and inserts it into a list of db_post_struct.
 struct db_post_array* db_retrieve_history() {
 	static struct db_post_array post_history;
 	initPostArray(&post_history, 25);
@@ -374,47 +418,55 @@ struct db_post_array* db_retrieve_history() {
 	 
 	 
 	   
+	 
+	 
 	
-#line 152 "db_interface.pgc"
+#line 166 "db_interface.pgc"
  int post_id ;
  
-#line 153 "db_interface.pgc"
+#line 167 "db_interface.pgc"
  int thread_id ;
  
-#line 154 "db_interface.pgc"
+#line 168 "db_interface.pgc"
  int id_in_thread ;
  
-#line 155 "db_interface.pgc"
+#line 169 "db_interface.pgc"
  unsigned int upload_epoch ;
  
-#line 156 "db_interface.pgc"
+#line 170 "db_interface.pgc"
   struct varchar_1  { int len; char arr[ POST_MAX_NAME + 1 ]; }  post_name ;
  
-#line 157 "db_interface.pgc"
+#line 171 "db_interface.pgc"
  timestamp upload_timestamp ;
  
-#line 158 "db_interface.pgc"
+#line 172 "db_interface.pgc"
   struct varchar_2  { int len; char arr[ POST_MAX_CONTENT + 1 ]; }  post_content ;
  
-#line 159 "db_interface.pgc"
+#line 173 "db_interface.pgc"
  char files [ 4 ] [ 256 ] ;
  
-#line 159 "db_interface.pgc"
+#line 173 "db_interface.pgc"
  int file_indicators [ 4 ] ;
+ 
+#line 174 "db_interface.pgc"
+ char deleted ;
+ 
+#line 175 "db_interface.pgc"
+ char key [ KEY_LENGTH + 1 ] ;
 /* exec sql end declare section */
-#line 160 "db_interface.pgc"
+#line 176 "db_interface.pgc"
 
-	/* declare post_getter cursor for select id , thread , id_in_thread , name , upload_timestamp , content , files [ 0 ] , files [ 1 ] , files [ 2 ] , files [ 3 ] , extract ( epoch from upload_timestamp ) :: int as upload_timestamp_int from post order by id */
-#line 164 "db_interface.pgc"
+	/* declare post_getter cursor for select id , thread , id_in_thread , name , upload_timestamp , content , files [ 0 ] , files [ 1 ] , files [ 2 ] , files [ 3 ] , extract ( epoch from upload_timestamp ) :: int as upload_timestamp_int , deleted , key from post order by id */
+#line 179 "db_interface.pgc"
 
-	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "declare post_getter cursor for select id , thread , id_in_thread , name , upload_timestamp , content , files [ 0 ] , files [ 1 ] , files [ 2 ] , files [ 3 ] , extract ( epoch from upload_timestamp ) :: int as upload_timestamp_int from post order by id", ECPGt_EOIT, ECPGt_EORT);
-#line 165 "db_interface.pgc"
+	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "declare post_getter cursor for select id , thread , id_in_thread , name , upload_timestamp , content , files [ 0 ] , files [ 1 ] , files [ 2 ] , files [ 3 ] , extract ( epoch from upload_timestamp ) :: int as upload_timestamp_int , deleted , key from post order by id", ECPGt_EOIT, ECPGt_EORT);
+#line 180 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 165 "db_interface.pgc"
+#line 180 "db_interface.pgc"
 
 	/* exec sql whenever not found  break ; */
-#line 166 "db_interface.pgc"
+#line 181 "db_interface.pgc"
 
 	while (true) {
 		{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "fetch post_getter", ECPGt_EOIT, 
@@ -439,58 +491,61 @@ if (sqlca.sqlcode < 0) print_sqlca ( );}
 	ECPGt_char,(files[3]),(long)256,(long)1,(256)*sizeof(char), 
 	ECPGt_int,&(file_indicators[3]),(long)1,(long)1,sizeof(int), 
 	ECPGt_unsigned_int,&(upload_epoch),(long)1,(long)1,sizeof(unsigned int), 
+	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, 
+	ECPGt_char,&(deleted),(long)1,(long)1,(1)*sizeof(char), 
+	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, 
+	ECPGt_char,(key),(long)KEY_LENGTH + 1,(long)1,(KEY_LENGTH + 1)*sizeof(char), 
 	ECPGt_NO_INDICATOR, NULL , 0L, 0L, 0L, ECPGt_EORT);
-#line 168 "db_interface.pgc"
+#line 183 "db_interface.pgc"
 
 if (sqlca.sqlcode == ECPG_NOT_FOUND) break;
-#line 168 "db_interface.pgc"
+#line 183 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 168 "db_interface.pgc"
+#line 183 "db_interface.pgc"
 
-		printf("\nid: %d, content: %s\n", post_id, post_content.arr);
 		struct db_post_struct post;
 		post.id = post_id;
 		post.thread_id = thread_id;
 		post.id_in_thread = id_in_thread;
 		post.upload_timestamp = (time_t)upload_epoch;
-		printf("Eposh: %s\n", asctime(gmtime(&post.upload_timestamp)));
 		strcpy(post.name, post_name.arr);
 		post.content = malloc(sizeof(char) * post_content.len + 1);
 		strcpy(post.content, post_content.arr);
 		int file_i;
 		for (file_i = 0; file_i < 4; file_i++) {
 			if (file_indicators[file_i] >= 0) {
-				printf("Adding file %s\n", files[file_i]);
 				strcpy(post.files[file_i], files[file_i]);
 			}
 			else
 				break;
 		}
 		post.number_of_files = file_i;
+		post.deleted = deleted == 't'; // In Postgres 't' means true
+		strcpy(post.key, key);
 		insertToPostArray(&post_history, post);
 	}
 	{ ECPGdo(__LINE__, 0, 1, NULL, 0, ECPGst_normal, "close post_getter", ECPGt_EOIT, ECPGt_EORT);
-#line 191 "db_interface.pgc"
+#line 205 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 191 "db_interface.pgc"
+#line 205 "db_interface.pgc"
 
 	{ ECPGtrans(__LINE__, NULL, "commit");
-#line 192 "db_interface.pgc"
+#line 206 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 192 "db_interface.pgc"
+#line 206 "db_interface.pgc"
 
 	return (&post_history);
 }
 
 void db_disconnect() {
 	{ ECPGdisconnect(__LINE__, "ALL");
-#line 197 "db_interface.pgc"
+#line 211 "db_interface.pgc"
 
 if (sqlca.sqlcode < 0) print_sqlca ( );}
-#line 197 "db_interface.pgc"
+#line 211 "db_interface.pgc"
 
 }
 

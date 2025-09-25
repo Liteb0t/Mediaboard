@@ -7,6 +7,7 @@
 #define POST_MAX_CONTENT 10000
 #define TIMESTAMP_LEN 20
 #define MAX_THREADS_PER_BOARD 50
+#define KEY_LENGTH 8
 
 #ifdef __cplusplus
 extern "C" {
@@ -31,6 +32,8 @@ extern "C" {
 		char files[4][256];  // Maximum of 4 files per post
 		short number_of_files;
 		char* content;
+		char key[KEY_LENGTH+1];
+		char deleted;
 	};
 	struct db_post_array {
 		struct db_post_struct* array;
@@ -44,8 +47,10 @@ extern "C" {
 	void initThreadArray(struct db_thread_array*, size_t);
 	void insertToThreadArray(struct db_thread_array*, struct db_thread_struct);
 	void freeThreadArray(struct db_thread_array*);
-	int db_store_post(int /*thread id*/, int /*id_in_thread*/, const char* /*name*/, time_t /*upload_timestamp*/, const char*, char[4][256] /*files*/, int /*file_count*/);
-	int db_store_thread(int /*number_of_posts*/);
+	int db_store_post(int thread_id, int id_in_thread, const char* name, time_t upload_timestamp, const char*, char files[4][256], int file_count, const char key[KEY_LENGTH+1]);
+	int db_store_thread(int number_of_posts);
+	// void db_mark_message_as_deleted(int thread_id, int message_id);
+	void db_mark_post_as_deleted(int post_id);
 	struct db_post_struct db_retrieve_last_post();
 	struct db_thread_array* db_retrieve_threads();
 	struct db_post_array* db_retrieve_history();

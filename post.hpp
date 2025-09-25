@@ -12,8 +12,11 @@ public:
 	json asJson() const { return this->post_as_json; };
 	int getId() const { return this->id; };
 	int getIdInThread() const { return this->id_in_thread; };
+	std::string getKey() const { return this->key; }
 	std::time_t getUploadTimestamp() const { return this->upload_timestamp; }
 	void createFromJSON(json post_json);
+	void markAsDeleted();
+	bool isDeleted() const { return this->deleted; }
 private:
 	int id;
 	int thread_id;
@@ -25,4 +28,6 @@ private:
 	std::string name;
 	std::string content;
 	json post_as_json;
+	std::string key;
+	bool deleted;
 };

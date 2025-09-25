@@ -31,7 +31,9 @@ CREATE TABLE public.post (
     content text,
     files text[],
     thread integer,
-    id_in_thread integer
+    id_in_thread integer,
+    deleted boolean DEFAULT false,
+    key text
 );
 
 
