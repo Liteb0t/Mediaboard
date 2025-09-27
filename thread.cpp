@@ -16,6 +16,8 @@ Thread::Thread(json thread_json, bool save_to_database) {
 		std::cout << "this->id: " << this->id << std::endl;
 		this->thread_as_json["id"] = this->id;
 		thread_json["post_zero"]["thread_id"] = this->id;
+		const std::string placeholder_key(KEY_LENGTH+1, 'T');
+		thread_json["post_zero"]["key"] = placeholder_key;
 		this->createPostFromJson(thread_json["post_zero"]);
 		// Post post_zero(thread_json["post_zero"], true);
 		// this->thread_as_json["post_zero"] = post_zero.asJson();

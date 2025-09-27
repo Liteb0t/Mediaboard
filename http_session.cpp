@@ -296,13 +296,23 @@ handle_request(
 		if (req.target() == "/api/create_thread/") {
 			http::response<http::string_body> res;
 			json request_json = json::parse(req.body());
-			if (request_json["thread"]["post_zero"]["files"].size() > 4) {
-				std::cerr << "Denied: More than 4 files in thread\n";
-				res.result(500);
+			if (request_json.contains("thread") && 
+					// request_json["thread"].contains("key") &&
+					request_json["thread"].contains("post_zero") &&
+					request_json["thread"]["post_zero"].contains("files") && 
+					request_json["thread"]["post_zero"].contains("name") && 
+					request_json["thread"]["post_zero"].contains("content")) {
+				if (request_json["thread"]["post_zero"]["files"].size() > 4) {
+					std::cerr << "Denied: More than 4 files in thread\n";
+					res.result(500);
+				}
+				else {
+					state->main_board.createThread(request_json["thread"]);
+					res.result(201);
+				}
 			}
 			else {
-				state->main_board.createThread(request_json["thread"]);
-				res.result(204);
+				res.result(400);
 			}
 			res.prepare_payload();
 			return res;
@@ -310,23 +320,32 @@ handle_request(
 		else if (req.target() == "/api/create_message/") {
 			http::response<http::string_body> res;
 			json request_json = json::parse(req.body());
-			if (request_json["post_zero"]["files"].size() > 4) {
-				std::cerr << "Denied: More than 4 files in message\n";
-				res.result(500);
-			}
-			else {
-				int new_message_thread_id = request_json["post"]["thread_id"].template get<int>();
-				std::string new_message_key = request_json["post"]["key"].template get<std::string>();
-				if (state->main_board.threadExists(new_message_thread_id)) {
-					int new_message_id = state->main_board.createPost(request_json["post"]);
-					std::string new_message_dump = state->main_board.dumpPost(new_message_thread_id, new_message_id, new_message_key);
-					state->sendToThread(new_message_dump, new_message_thread_id);
-					res.result(204);
+			if (request_json.contains("post") &&
+					request_json["post"].contains("files") && 
+					request_json["post"].contains("name") && 
+					request_json["post"].contains("content") && 
+					request_json["post"].contains("key")) {
+				if (request_json["post"]["files"].size() > 4) {
+					std::cerr << "Denied: More than 4 files in message\n";
+					res.result(500);
 				}
 				else {
-					std::cerr << "Couldn't create message because the thread with ID " << new_message_thread_id << " does not exist" << std::endl;
-					res.result(400);
+					int new_message_thread_id = request_json["post"]["thread_id"].template get<int>();
+					std::string new_message_key = request_json["post"]["key"].template get<std::string>();
+					if (state->main_board.threadExists(new_message_thread_id)) {
+						int new_message_id = state->main_board.createPost(request_json["post"]);
+						std::string new_message_dump = state->main_board.dumpPost(new_message_thread_id, new_message_id, new_message_key);
+						state->sendToThread(new_message_dump, new_message_thread_id);
+						res.result(201);
+					}
+					else {
+						std::cerr << "Couldn't create message because the thread with ID " << new_message_thread_id << " does not exist" << std::endl;
+						res.result(400);
+					}
 				}
+			}
+			else {
+				res.result(400);
 			}
 			res.prepare_payload();
 			return res;
@@ -477,6 +496,7 @@ handle_request(
 						std::string user_key = request_json["key"].template get<std::string>();
 						if (message_id == 0) {
 							// state->main_board.deleteThread(thread_id, user_key);
+							res.result(http::status::unauthorized);
 						}
 						else {
 							if (state->main_board.messageExistsInThread(message_id, thread_id)) {
