@@ -65,6 +65,20 @@ mime_type(beast::string_view path)
 
 const std::string forbidden_file_name_chars = "#?";
 
+const std::set<std::string, std::less<>> image_formats = {"gif", "jpg", "jpeg", "jxl", "png", "webp"};
+const bool fileIsImage(std::string* file_name) {
+	int dot_index = file_name->rfind('.');
+	if (dot_index != std::string::npos) {
+		std::string_view file_extension = file_name->substr(dot_index+1);
+		if (image_formats.find(file_extension) != image_formats.end())
+			return true;
+		else
+			return false;
+	}
+	else
+		return false;
+}
+
 void sanitiseFileName(std::string* file_name) {
 	for (int i = 0; i < file_name->length(); i++) {
 		if (forbidden_file_name_chars.find((*file_name)[i]) != -1) {
@@ -399,14 +413,6 @@ handle_request(
 			sanitiseFileName(&out_filename);
 			// std::cout << "START OF FILE" << std::endl;
 			// std::string out_filename_bez_extension;
-			std::string file_extension;
-			short out_filename_extension_i = out_filename.rfind(".");
-			// if (out_filename_extension_i == -1)
-			// 	out_filename_bez_extension = out_filename;
-			// else {
-			// 	out_filename_bez_extension = out_filename.substr(0, out_filename_extension_i);
-				file_extension = out_filename.substr(out_filename_extension_i, out_filename.length() - out_filename_extension_i);
-			// }
 
 			// Add UUID to filename
 			boost::uuids::uuid u = boost::uuids::random_generator()();
@@ -437,14 +443,7 @@ handle_request(
 			outfile.close();
 
 			// Write thumbnail
-			std::cout << "FIle extension: " << file_extension << std::endl;
-			if (
-				file_extension == ".png" || 
-				file_extension == ".jpg" || file_extension == ".jpeg" || 
-				file_extension == ".webp" || 
-				file_extension == ".gif" || 
-				file_extension == ".jxl"
-			) {
+			if (fileIsImage(&out_filename)) {
 				Magick::Image thumbnail;
 				thumbnail.read(state->doc_root() + out_filename);
 				thumbnail.resize("150x150");
@@ -520,8 +519,7 @@ handle_request(
 
 			}
 			else {
-				std::cout << "Denied: Request does not contain key\n";
-				res.result(400);
+				return bad_request("Denied: Request does not contain key\n");
 			}
 prepare_response_payload:
 			res.prepare_payload();

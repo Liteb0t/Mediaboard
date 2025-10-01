@@ -31,17 +31,26 @@
 		<div id="body_separator" class="FlexSeparator"></div>
 		<details id="reply_container" open="">
 			<summary id="reply_heading_text"></summary>
+			<div id="post_form">
 			<input type="text" id="name_field" placeholder="Name" />
 			<button id="post_button" onclick="postAction()">Post</button>
 			<div contenteditable="" id="content_field" placeholder="Content"></div>
-			<input type="file" id="file_upload" accept="image/png, image/jpeg, image/gif, image/jxl, image/webp" multiple/>
-			<div id="file_post_list"></div>
+			<fieldset>
+				<legend>Upload up to four files</legend>
+				<input type="file" id="file_upload" multiple/>
+				<div id="file_post_list"></div>
+			</fieldset>
+			</div>
 		</details>
 		<div id="bottom_marker"></div>
 	</body>
 	<style>
 :root {
 	--side-margins: 0.5em;
+}
+
+html {
+	scrollbar-gutter: stable;
 }
 
 body {
@@ -111,9 +120,11 @@ main {
 	.ID {
 		float: right;
 	}
+	/*
 	.Content {
 		white-space: pre-line;
 	}
+	*/
 	.Files {
 		display: flex;
 		gap: 2rem;
@@ -152,19 +163,36 @@ main {
 		&:hover {
 			background: #dddc;
 		}
-	input {
+	}
+}
+
+#post_form {
+	max-height: 60vh;
+	overflow-y: auto;
+	overscroll-behavior: contain;
+	scrollbar-gutter: stable;
+	>#name_field {
 		font-size: inherit;
+		margin: 2px 2px 0;
+		margin-inline: 2px;
+		border-radius: 0;
+		border: 1px inset #bbb;
+	}
+	>fieldset {
+		margin: 2px;
+		margin-inline: 2px;
 	}
 }
 
 #content_field {
 	background: #FFF;
-	border: 1px solid #777;
+	border: 1px inset #bbb;
+	margin: 2px;
+	margin-inline: 2px;
 	min-height: 4em;
-	max-height: 50vh;
-	overscroll-behavior: contain;
 	padding: 1px 2px;
 	white-space: -moz-pre-space;
+	word-wrap: break-word;
 	&:empty:before {
 		content: attr(placeholder);
 		cursor: text;
@@ -190,6 +218,7 @@ main {
 		const media_uuid_len = 36;
 		const localDate = new Date();
 		const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
+		const image_formats = ["gif", "jpg", "jpeg", "jxl", "png", "webp"];
 		let state = {selected_thread_id: null};
 		let websocket;
 		let websocket_connected;
@@ -430,7 +459,9 @@ main {
 						const server_filename = request.getResponseHeader("File-Name");
 						console.log(server_filename);
 						file_element.setAttribute("id", "file_" + server_filename);
-						file_img_element.setAttribute("src", root_url + media_url + server_filename);
+						if (fileIsImage(server_filename)) {
+							file_img_element.setAttribute("src", root_url + media_url + server_filename);
+						}
 						file_element.removeChild(file_progress_element);
 			        }
 			    }
@@ -456,6 +487,16 @@ main {
 						uploadFile(chosen_file);
 					}
 				}
+			}
+		}
+
+		function fileIsImage(filename) {
+			let dot_index = filename.indexOf('.');
+			if (dot_index !== -1 && image_formats.indexOf(filename.substring(dot_index+1)) !== -1) {
+				return true;
+			}
+			else {
+				return false;
 			}
 		}
 
@@ -507,7 +548,7 @@ main {
 
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
-			post_content_element.textContent = data.content;
+			post_content_element.innerText = data.content;
 	
 			let post_files_element = document.createElement("div");
 			post_files_element.classList.add("Files");
@@ -518,14 +559,13 @@ main {
 				thumbnail_element.classList.add("EmbedThumbnail");
 				let filename_extension_i = filename.lastIndexOf(".");
 				let thumbnail_filename;
-				// if (filename_extension_i == -1) {
-				// 	thumbnail_filename = "THUMBNAIL_" + filename + ".jpg";
+				if (fileIsImage(filename)) {
 					thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
-				// }
-				// else {
-				// 	thumbnail_filename = "THUMBNAIL_" + filename.slice(0, filename_extension_i) + ".jxl";
-				// }
-				thumbnail_element.setAttribute("src", root_url + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+					thumbnail_element.setAttribute("src", root_url + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+				}
+				else {
+					thumbnail_element.setAttribute("src", root_url + "placeholder.png");
+				}
 				thumbnail_element.setAttribute("loading", "lazy");
 				figure_element.appendChild(thumbnail_element);
 				thumbnail_element.setAttribute("width", "150px");
@@ -555,7 +595,7 @@ main {
 				figure_element.appendChild(img_element);
 				let pretty_filename;
 				if (filename_extension_i == -1) {
-					pretty_filename = filename.slice(0, filename.length() - media_uuid_len);
+					pretty_filename = filename.slice(0, filename.length - media_uuid_len);
 				}
 				else {
 					pretty_filename = filename.slice(0, filename_extension_i - media_uuid_len) + filename.slice(filename_extension_i, filename.length);

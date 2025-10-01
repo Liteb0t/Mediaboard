@@ -6,7 +6,8 @@
 `libboost-program-options1.81-dev`\
 `Imagemagick` build with the delegates for JPEG, PNG, WEBP, and JPEG-XL. On Debian/Devuan the apt build doesn't come with JPEG-XL so you need to build it yourself.\
 `make`\
-`g++`
+`g++`\
+`m4`
 ### Database setup
 Install postgresql.\
 \
