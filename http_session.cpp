@@ -10,6 +10,8 @@
 #include "http_session.hpp"
 #include "websocket_session.hpp"
 #include <boost/config.hpp>
+#include <boost/locale.hpp>
+#include <boost/url/src.hpp>
 #include <boost/uuid/uuid.hpp>
 // #include <boost/lexical_cast.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -171,6 +173,11 @@ handle_request(
 
 	std::cout << "req target: " << req.target() << "\n";
 
+	// boost::system::result<boost::urls::url_view> url_parse_result = boost::urls::parse_uri(req.target());
+	// boost::urls::url_view parsed_url = url_parse_result.value();
+	boost::urls::url_view parsed_url(req.target());
+	std::cout << "Parsed path: " << parsed_url.path() << std::endl;
+
 		// Make sure we can handle the method
    	if( req.method() == http::verb::get ||
    	    req.method() == http::verb::head)
@@ -181,9 +188,7 @@ handle_request(
     	std::string path;
 		if (req.target().substr(0, 6) == "/media") {
 			is_media = true;
-			path = path_cat(state->doc_root(), req.target().substr(6, req.target().length() - 6));
-			boost::replace_all(path, "%20", " ");
-			// std::cout << "is_media is TRUE" << std::endl;
+			path = path_cat(state->doc_root(), parsed_url.path().substr(6));
 		}
 		else if (req.target().substr(0, 5) == "/api/") {
 			http::response<http::string_body> res;
@@ -240,13 +245,13 @@ handle_request(
 			return res;
 		}
 		else if (req.target().back() == '/') {
-				path = "index.html";
+			path = "index.html";
 			std::cout << "/path: " << path << std::endl;
 		}
 		else {
 			// path = path_cat(state->doc_root(), req.target());
 			// This is used to access files in the server's directory
-			path = req.target().substr(1, req.target().length() - 1);
+			path = parsed_url.path().substr(1);
 		}
 
     	// Attempt to open the file
@@ -411,6 +416,7 @@ handle_request(
 				return server_error("Could not determine filename");
 			}
 			sanitiseFileName(&out_filename);
+			std::cout << "Sanitised out_filename: " << out_filename << std::endl;
 			// std::cout << "START OF FILE" << std::endl;
 			// std::string out_filename_bez_extension;
 
@@ -451,12 +457,14 @@ handle_request(
 				thumbnail.write(state->doc_root() + "thumbnails/THUMBNAIL_" + out_filename + ".jxl");
 			}
 
+			// std::string filename_utf_8 = boost::locale::conv::to_utf(out_filename, "UTF-8");
     		http::response<http::empty_body> res{http::status::accepted, req.version()};
     		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
 			res.set("File-Name", out_filename);
+			// res.set("File-Name-UTF-8", filename_utf_8);
 			res.set("Access-Control-Allow-Origin", "*");
-			res.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    		res.set(http::field::content_type, "text/plain");
+			res.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, File-Name");
+    		res.set(http::field::content_type, "text/plain; charset=utf-8");
     		res.content_length(0);
     		res.keep_alive(req.keep_alive());
     		return res;

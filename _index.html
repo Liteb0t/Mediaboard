@@ -4,7 +4,7 @@
 		<!--
 			include(`tokens.m4')
 		-->
-		<title>Fuze Mediaboard</title>
+		<title>_SITE_NAME</title>
 		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
@@ -141,13 +141,16 @@ main {
 		}
 	}
 }
-.Post:not(:last-child) {
-	border-bottom: 1px solid #000;
-	margin-bottom: 0.25rem;
-}
 
 #post_container {
 	border-bottom: 2px solid #000;
+	.Post:not(:last-child) {
+		border-bottom: 1px solid #000;
+		margin-bottom: 0.25rem;
+	}
+	.Deleted {
+		text-decoration: line-through;
+	}
 }
 
 #reply_container {
@@ -431,13 +434,16 @@ main {
 			}
 			return sanitised_file_name;
 		}
+		function decode_utf8(s) {
+			return decodeURIComponent(escape(s));
+		}
 
 		function uploadFile(file_object) {
 			let formdata = new FormData();
 			formdata.append("File_1", file_object);
-			let file_name = sanitiseFileName(file_object.name);
-			console.log("file_name: " + file_name);
-			let file_element = addFileToList(file_name);
+			// let file_name = sanitiseFileName(file_object.name);
+			// console.log("file_name: " + file_name);
+			let file_element = addFileToList(file_object.name);
 			let file_progress_element = file_element.querySelector("progress");
 			let file_img_element = file_element.querySelector("img");
 			let request = new XMLHttpRequest();
@@ -457,10 +463,15 @@ main {
 						const headers = request.getAllResponseHeaders();
 						console.log(headers);
 						const server_filename = request.getResponseHeader("File-Name");
-						console.log(server_filename);
-						file_element.setAttribute("id", "file_" + server_filename);
+						console.log("server_filename: " + server_filename);
+						let decoded_filename = decode_utf8(server_filename);
+						console.log("server_filename decoded: " + decoded_filename);
+						// const utf8array = new TextEncoder().encode(server_filename);
+						// var newdecoded = new TextDecoder().decode(utf8array);
+						// console.log("server_filename dec new: " + newdecoded);
+						file_element.setAttribute("id", "file_" + decoded_filename);
 						if (fileIsImage(server_filename)) {
-							file_img_element.setAttribute("src", root_url + media_url + server_filename);
+							file_img_element.setAttribute("src", root_url + media_url + decoded_filename);
 						}
 						file_element.removeChild(file_progress_element);
 			        }
@@ -534,10 +545,12 @@ main {
 			if (data.is_author) {
 				let delete_button_element = document.createElement("button");
 				delete_button_element.textContent = "Delete";
-				delete_button_element.onclick = (event) => { 
-					let server_response = deleteMessage(data.thread_id, data.id_in_thread);
+				delete_button_element.onclick = async() => { 
+					let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
+					console.log(server_response);
 					if (server_response.ok) {
 						post_box_element.classList.add("Deleted");
+						delete_button_element.disabled = true;
 					}
 					else {
 						alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
@@ -556,43 +569,43 @@ main {
 				let figure_element = document.createElement("figure");
 				figure_element.classList.add("EmbedFigure");
 				let thumbnail_element = document.createElement("img");
-				thumbnail_element.classList.add("EmbedThumbnail");
 				let filename_extension_i = filename.lastIndexOf(".");
 				let thumbnail_filename;
 				if (fileIsImage(filename)) {
+					thumbnail_element.classList.add("EmbedThumbnail");
 					thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
 					thumbnail_element.setAttribute("src", root_url + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+					let image_opened = false;
+					let img_element = document.createElement("img");
+					img_element.classList.add("EmbedImage");
+					thumbnail_element.onclick = (event) => {
+						if (!image_opened) {
+							image_opened = true;
+							img_element.onload = (event) => {
+								img_element.style["display"] = "inherit";
+								thumbnail_element.style["display"] = "none";
+							}
+							img_element.setAttribute("src", root_url + media_url + filename.replace(" ", "%20"));
+						}
+						else {
+							thumbnail_element.style["display"] = "none";
+							img_element.style["display"] = "inherit";
+						}
+					}
+					img_element.style["display"] = "none";
+					img_element.onclick = (event) => {
+						thumbnail_element.style["display"] = "inherit";
+						img_element.style["display"] = "none";
+					}
+					figure_element.appendChild(img_element);
 				}
 				else {
 					thumbnail_element.setAttribute("src", root_url + "placeholder.png");
 				}
 				thumbnail_element.setAttribute("loading", "lazy");
-				figure_element.appendChild(thumbnail_element);
 				thumbnail_element.setAttribute("width", "150px");
 				thumbnail_element.setAttribute("height", "150px");
-				let image_opened = false;
-				let img_element = document.createElement("img");
-				img_element.classList.add("EmbedImage");
-				thumbnail_element.onclick = (event) => {
-					if (!image_opened) {
-						image_opened = true;
-						img_element.onload = (event) => {
-							img_element.style["display"] = "inherit";
-							thumbnail_element.style["display"] = "none";
-						}
-						img_element.setAttribute("src", root_url + media_url + filename.replace(" ", "%20"));
-					}
-					else {
-						thumbnail_element.style["display"] = "none";
-						img_element.style["display"] = "inherit";
-					}
-				}
-				img_element.style["display"] = "none";
-				img_element.onclick = (event) => {
-					thumbnail_element.style["display"] = "inherit";
-					img_element.style["display"] = "none";
-				}
-				figure_element.appendChild(img_element);
+				figure_element.appendChild(thumbnail_element);
 				let pretty_filename;
 				if (filename_extension_i == -1) {
 					pretty_filename = filename.slice(0, filename.length - media_uuid_len);
@@ -728,8 +741,9 @@ main {
 						name: name_field.value,
 						content: content_field.textContent,
 						files: files
+						,key: user_key
 					}
-					,key: user_key
+					// ,key: user_key
 				}
 			};
 			console.log(data);

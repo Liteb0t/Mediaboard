@@ -27,12 +27,19 @@ location /mediaboard/ {
   proxy_set_header X-Real-IP $remote_addr;
   proxy_set_header Host $host;
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  client_max_body_size 100M;
+
   # WebSocket support
   proxy_http_version 1.1;
   proxy_set_header Upgrade $http_upgrade;
   proxy_set_header Connection "upgrade";
   proxy_send_timeout 7d;
   proxy_read_timeout 7d;
+}
+# Optional: store media in another location
+location /mediaboard/media/ {
+  try_files $uri $uri/ =404;
+  alias /path/to/media/folder/;
 }
 ```
 In the example above, Fuze Mediaboard is hosted on `/mediaboard/`.\
@@ -45,4 +52,4 @@ In this example, if our domain is *fuze.page*, the value should be `wss://fuze.p
 Also change the definition of `_ROOT_URL` from `/` to `/mediaboard/`\
 Run `make` to apply the changes.
 ### Storing user-submitted media in a different location
-By default, media is stored in `media/`. Currently there is no support for using a separate CDN. However you can choose a different directory within the server's filesystem to store media. Open `config.ini` and set `media_path` to another location.
+By default, media is stored in `media/`. You can choose a different directory within the server's filesystem to store media. Open `config.ini` and set `media_path` to another location.

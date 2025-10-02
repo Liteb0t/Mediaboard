@@ -32,7 +32,7 @@ Post::Post(struct db_post_struct* post_struct) {
 	for (short file_i = 0; file_i < this->files_i; file_i++) {
 		this->post_as_json["files"].push_back(this->files[file_i]);
 	}
-	this->post_as_json["key"] = this->key;
+	// this->post_as_json["key"] = this->key;
 }
 
 // Save post when JSON is received

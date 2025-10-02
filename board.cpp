@@ -30,8 +30,10 @@ int Board::createPost(json post_json) {
 }
 
 void Board::deleteMessageFromThread(int message_id, int thread_id) {
-	std::cout << "Stub: delete message " << message_id << " in thread " << thread_id << std::endl;
-	this->threads.at(thread_id).deleteMessage(message_id);
+	if (message_id != 0) {
+		std::cout << "Deleting message " << message_id << " in thread " << thread_id << std::endl;
+		this->threads.at(thread_id).deleteMessage(message_id);
+	}
 }
 
 bool Board::keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const {

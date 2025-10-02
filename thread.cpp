@@ -5,30 +5,19 @@
 #include <cstring>
 
 Thread::Thread(json thread_json, bool save_to_database) {
+	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
 	this->number_of_posts = 0;
-	// struct db_thread_struct thread_as_struct;
-	// thread_as_struct.name = this->name;
-	// thread_as_struct.content = this->content;
 	if (save_to_database) {
 		// ID and timestamp are not initially known
-		this->id = db_store_thread(1/*subject.c_str()*/);
+		this->id = db_store_thread(1/* add subject later*/);
 		std::cout << "this->id: " << this->id << std::endl;
 		this->thread_as_json["id"] = this->id;
 		thread_json["post_zero"]["thread_id"] = this->id;
-		const std::string placeholder_key(KEY_LENGTH+1, 'T');
-		thread_json["post_zero"]["key"] = placeholder_key;
 		this->createPostFromJson(thread_json["post_zero"]);
-		thread_json["post_zero"].erase("key");
-		// Post post_zero(thread_json["post_zero"], true);
-		// this->thread_as_json["post_zero"] = post_zero.asJson();
-		// this->posts[0] = post_zero;
-		// this->number_of_posts = 1;
-		// this->thread_as_json["number_of_posts"] = 1;
 	}
 	else {
 		this->id = thread_json["id"].template get<int>();
-		// this->number_of_posts = this->thread_as_json["number_of_posts"].template get<int>();
 	}
 }
 
@@ -43,13 +32,15 @@ void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
 	}
 	this->posts.emplace(post.getIdInThread(), post);
 	this->number_of_posts++;
-	this->last_post_timestamp = post.getUploadTimestamp();
 	this->thread_as_json["number_of_posts"] = this->number_of_posts;
+	this->last_post_timestamp = post.getUploadTimestamp();
 }
 
 int Thread::createPostFromJson(json post_json) {
 	post_json["id_in_thread"] = this->number_of_posts;
-	Post post(post_json);
+	// const std::string placeholder_key(KEY_LENGTH+1, 'T');
+	// post_json["key"] = placeholder_key;
+	Post post(post_json); // Key is deleted from post_json in its constructor
 	if (this->number_of_posts == 0) {
 		this->thread_as_json["post_zero"] = post.asJson();
 	}
@@ -67,7 +58,7 @@ void Thread::deleteMessage(int message_id) {
 
 bool Thread::keyMatchesMessage(std::string key, int message_id) const {
 	std::cout << "[Thread] key :: message_key\n" << key << " :: " << this->posts.at(message_id).getKey() << std::endl;
-	return this->posts.at(message_id).getKey() == key;
+	return message_id != 0 && this->posts.at(message_id).getKey() == key; // Don't match key to message 0, because threads can't be deleted yet
 }
 
 std::string Thread::dumpPosts(std::string key) const {
