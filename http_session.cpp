@@ -351,7 +351,8 @@ handle_request(
 					res.result(500);
 				}
 				else {
-					state->main_board.createThread(request_json["thread"]);
+					int new_thread_id = state->main_board.createThread(request_json["thread"]);
+					res.set("New-Thread-Id", std::to_string(new_thread_id));
 					res.result(201);
 				}
 			}

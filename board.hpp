@@ -12,7 +12,7 @@ class websocket_session; // Forward declaration
 class Board {
 public:
 	Board();
-	void createThread(json thread_json);
+	int createThread(json thread_json);
 	int createPost(json post_json);
 	void deleteMessageFromThread(int message_id, int thread_id);
 	// std::string dumpLastThread() const;

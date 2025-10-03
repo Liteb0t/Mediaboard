@@ -9,10 +9,11 @@ Board::Board() {
 	this->cacheAllThreads();
 }
 
-void Board::createThread(json thread_json) {
+int Board::createThread(json thread_json) {
 	Thread thread(thread_json, true);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(thread.getLastPostTime(), thread.getId()));
+	return thread.getId();
 }
 
 int Board::createPost(json post_json) {
