@@ -88,6 +88,11 @@ void sanitiseFileName(std::string* file_name) {
 		}
 	}
 }
+	
+// URL decoding in C http://www.geekhideout.com/urlcode.shtml
+char from_hex(char ch) {
+	return std::isdigit(ch) ? ch - '0' : std::tolower(ch) - 'a' + 10;
+}
 
 // Append an HTTP rel-path to a local filesystem path.
 // The returned path is normalized for the platform.
@@ -172,11 +177,30 @@ handle_request(
         return bad_request("Illegal request-target");
 
 	std::cout << "req target: " << req.target() << "\n";
+	
+	// URL decoding in C http://www.geekhideout.com/urlcode.shtml
+	std::string decoded_url;
+	decoded_url.reserve(req.target().length()+1);
+	for (boost::string_view::const_iterator i = req.target().begin(), n = req.target().end(); i != n; i++) {
+		std::string::value_type c = (*i);
+		if (c == '%') {
+			if (i+1 != n && i+2 != n) {
+				decoded_url += from_hex(*(i+1)) << 4 | from_hex(*(i+2));
+				i += 2;
+			}
+		}
+		else if (c == '+')
+			decoded_url += ' ';
+		else
+			decoded_url +=  c;
+	}
+
+	std::cout << "Decoded URL: " << decoded_url << std::endl;
 
 	// boost::system::result<boost::urls::url_view> url_parse_result = boost::urls::parse_uri(req.target());
 	// boost::urls::url_view parsed_url = url_parse_result.value();
-	boost::urls::url_view parsed_url(req.target());
-	std::cout << "Parsed path: " << parsed_url.path() << std::endl;
+	// boost::urls::url_view parsed_url(req.target());
+	// std::cout << "Parsed path: " << parsed_url.path() << std::endl;
 
 		// Make sure we can handle the method
    	if( req.method() == http::verb::get ||
@@ -188,7 +212,7 @@ handle_request(
     	std::string path;
 		if (req.target().substr(0, 6) == "/media") {
 			is_media = true;
-			path = path_cat(state->doc_root(), parsed_url.path().substr(6));
+			path = path_cat(state->doc_root(), decoded_url.substr(6));
 		}
 		else if (req.target().substr(0, 5) == "/api/") {
 			http::response<http::string_body> res;
@@ -249,9 +273,10 @@ handle_request(
 			std::cout << "/path: " << path << std::endl;
 		}
 		else {
-			// path = path_cat(state->doc_root(), req.target());
 			// This is used to access files in the server's directory
-			path = parsed_url.path().substr(1);
+			// path = path_cat(state->doc_root(), req.target());
+			// path = parsed_url.path().substr(1);
+			path = decoded_url.substr(1);
 		}
 
     	// Attempt to open the file
@@ -586,8 +611,8 @@ do_read()
     // Apply a reasonable limit to the allowed size
     // of the body in bytes to prevent abuse.
 	// 6MB would match 4chins
-	// this is just over 20.5MB, large enough to upload "Emerson, Lake, and Palmer - Tarkus" in OPUS format at default quality
-    parser_->body_limit(21500000);
+	// This is 25MB
+    parser_->body_limit(25 << 20);
 
     // Set the timeout.
     stream_.expires_after(std::chrono::seconds(30));

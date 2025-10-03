@@ -13,5 +13,7 @@ define(`_ROOT_URL', `/')
 # Path must start and end with a '/'. For example:
 # define(`_ROOT_URL', `/mediaboard/')
 
+define(`_FILE_SIZE_LIMIT_MB', `25')
+
 # To prevent javascript strings using the backtick character '`' from being interpreted as quotes in m4:
 changequote(`[[[', `]]]')

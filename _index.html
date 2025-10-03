@@ -215,7 +215,7 @@ main {
 		const api_url = "api/"; // these will be managed by a central config file eventually
 		const media_url = "media/"; // so you wont need to reconfigure these every update
 		const thumbnail_url = "media/thumbnails/";
-		const file_size_limit = 21500000;
+		const file_size_limit = _FILE_SIZE_LIMIT_MB*1024*1024;
 		// 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
 		const valid_uri_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 		const media_uuid_len = 36;
@@ -482,12 +482,14 @@ main {
 			console.log("file changed.");
 			if (file_upload.files.length + file_post_list.childNodes.length > 4) {
 				alert("Error: 4 file limit reached");
+				file_upload.value = "";
 			}
 			else {
 				for (let chosen_file of file_upload.files) {
 					if (chosen_file.size > file_size_limit) {
-						alert("Error: file size exceeds 6MB limit\n" +
+						alert("Error: file size exceeds _FILE_SIZE_LIMIT_MB megabyte limit\n" +
 							"File: " + chosen_file.name);
+						file_upload.value = "";
 					}
 					else {
 						if (chosen_file.name.length > 200) {
@@ -497,6 +499,7 @@ main {
 						console.log("uploading...");
 						uploadFile(chosen_file);
 					}
+					console.log("Event: ", event);
 				}
 			}
 		}
