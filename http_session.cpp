@@ -170,12 +170,6 @@ handle_request(
         return res;
     };
 
-    // Request path must be absolute and not contain "..".
-    if( req.target().empty() ||
-        req.target()[0] != '/' ||
-        req.target().find("..") != beast::string_view::npos)
-        return bad_request("Illegal request-target");
-
 	std::cout << "req target: " << req.target() << "\n";
 	
 	// URL decoding in C http://www.geekhideout.com/urlcode.shtml
@@ -197,10 +191,11 @@ handle_request(
 
 	std::cout << "Decoded URL: " << decoded_url << std::endl;
 
-	// boost::system::result<boost::urls::url_view> url_parse_result = boost::urls::parse_uri(req.target());
-	// boost::urls::url_view parsed_url = url_parse_result.value();
-	// boost::urls::url_view parsed_url(req.target());
-	// std::cout << "Parsed path: " << parsed_url.path() << std::endl;
+    // Request path must be absolute and not contain "..".
+    if( decoded_url.empty() ||
+        decoded_url[0] != '/' ||
+        decoded_url.find("..") != std::string::npos)
+        return bad_request("Illegal request-target");
 
 		// Make sure we can handle the method
    	if( req.method() == http::verb::get ||
@@ -274,8 +269,6 @@ handle_request(
 		}
 		else {
 			// This is used to access files in the server's directory
-			// path = path_cat(state->doc_root(), req.target());
-			// path = parsed_url.path().substr(1);
 			path = decoded_url.substr(1);
 		}
 

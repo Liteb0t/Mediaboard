@@ -277,10 +277,12 @@ main {
 				content_field.textContent = "";
 				file_upload.value = "";
 				file_post_list.textContent = "";
-				// In future replace with a proper dialog box with a link to the new thread.
-				// OR redirect the user automatically (noko)
-				let new_thread_id = response.headers.get("new-thread-id");
-				alert(`Thread posted successfully\nNew thread ID: ${new_thread_id}`);
+				if (state.selected_thread_id === -1) {
+					// In future replace with a proper dialog box with a link to the new thread.
+					// OR redirect the user automatically (noko)
+					let new_thread_id = response.headers.get("new-thread-id");
+					alert(`Thread posted successfully\nNew thread ID: ${new_thread_id}`);
+				}
 			}
 			else {
 				console.log(response);
