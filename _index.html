@@ -15,15 +15,13 @@
 	<body>
 		<!--Navbar can go here-->
 		<main>
-			<div id="header_bar">
-				<b>_SITE_NAME</b>
-				<div>
-					<button id="catalog_button" onclick="openCatalog()">Catalog</button>
-					<button id="refresh_button" onclick="refresh_send()">Refresh</button>
-				</div>
+			<div id="header_bar" class="ToolBar">
+				<div><b>_SITE_NAME</b></div>
+					<button id="catalog_button" onclick="openCatalog()">&#x1F5D0; Catalog</button>
+					<button id="refresh_button" onclick="refresh_send()">&#x2B6E; Refresh</button>
 				<div class="FlexSeparator"></div>
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
-				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3</a>
+				<div><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3 (development)</a></div>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
 			<div id="post_container"></div>
@@ -33,7 +31,7 @@
 			<summary id="reply_heading_text"></summary>
 			<div id="post_form">
 			<input type="text" id="name_field" placeholder="Name" />
-			<button id="post_button" onclick="postAction()">Post</button>
+			<button id="post_button" onclick="postAction()">&#x1F585; Post</button>
 			<div contenteditable="" id="content_field" placeholder="Content"></div>
 			<fieldset>
 				<legend>Upload up to four files</legend>
@@ -67,35 +65,65 @@ main {
 	flex: 0 0 auto;
 }
 
+button {
+	border-radius: 0;
+	font-size: 1rem;
+	&:hover:not(:disabled) {
+		cursor: pointer;
+	}
+}
+
 .FlexSeparator {
 	flex-grow: 1;
+	padding: 0 !important;
 }
 
 #header_bar {
-	display: flex;
-	flex-wrap: wrap;
 	border-top: 1px solid #888;
 	border-bottom: 1px solid #888;
+}
+
+.ToolBar {
+	display: flex;
+	flex-wrap: wrap;
+	user-select: none;
 	
 	>* {
+		display: flex;
+		align-items: center;
+		height: 2em;
+		&:is(button) {
+			border: none;
+			padding: 0 1em;
+		}
+		&:not(button) {
+			padding: 0 0.25em;
+		}
 		&:not(:first-child) {
 			border-left: 1px solid #888;
-			padding-left: 0.25em;
+			/*padding-left: 0.25em;*/
 		}
+		/*
 		&:not(:last-child) {
 			padding-right: 0.25em;
-		}
+		}*/
 	}
-
 }
 
 .Thread {
 	border-right: 2px solid #000;
-	padding: 2px 0;
-	margin-top: 0.5rem;
+	margin-top: 1rem;
 	&:not(:last-child) {
 		border-bottom: 2px solid #000;
 		margin-bottom: 0.5rem;
+	}
+	.ThreadToolBar {
+		user-select: none;
+		>* {
+			display: flex;
+			align-items: center;
+			height: 2em;
+		}
 	}
 }
 
@@ -146,7 +174,7 @@ main {
 	border-bottom: 2px solid #000;
 	.Post:not(:last-child) {
 		border-bottom: 1px solid #000;
-		margin-bottom: 0.25rem;
+		/*margin-bottom: 0.25rem;*/
 	}
 	.Deleted {
 		text-decoration: line-through;
@@ -221,6 +249,8 @@ main {
 		const media_uuid_len = 36;
 		const localDate = new Date();
 		const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
+		const flex_separator = document.createElement("div");
+		flex_separator.classList.add("FlexSeparator");
 		let state = {selected_thread_id: null};
 		let websocket;
 		let websocket_connected;
@@ -329,34 +359,45 @@ main {
 
 		function showThreads(message_json) {
 			location_indicator.textContent = "Catalog";
+			catalog_button.disabled = true;
 			reply_heading_text.textContent = "Create a thread";
 			const fragment = new DocumentFragment();
 			for (let thread of message_json.threads) {
-				console.log(thread.id);
-				console.log(thread.post_zero);
-				let thread_to_push = createPost(thread.post_zero);
-				console.log(thread_to_push);
-				let thread_post_zero = document.createElement("div");
-				thread_post_zero.classList.add("Thread");
-				thread_post_zero.appendChild(thread_to_push);
+				// console.log(thread.id);
+				// console.log(thread.post_zero);
+				let post_zero_element = createPost(thread.post_zero);
+				// console.log(post_zero_element);
+				let thread_element = document.createElement("div");
+				thread_element.classList.add("Thread");
+				thread_element.appendChild(post_zero_element);
+
+				// Toolbar at the bottom of each thread
+				let thread_toolbar = document.createElement("div");
+				thread_toolbar.classList.add("ToolBar");
+
+				const reply_count_container = document.createElement("div");
+				const reply_count = document.createElement("span");
+				reply_count.textContent = "Replies: " + (thread.number_of_posts - 1);
+				reply_count_container.appendChild(reply_count);
+
 				let open_thread_button = document.createElement("button");
-				open_thread_button.textContent = "Open";
+				open_thread_button.textContent = "\u21E8 Open thread";
 				open_thread_button.onclick = (event) => {
 					state.selected_thread_id = thread.id;
 					history.pushState(state, "", root_url + "thread/" + state.selected_thread_id + "/");
 					getThreadPosts();
 				}
-				thread_post_zero.appendChild(open_thread_button);
-				// const reply_count = document.createElement("span");
-				// reply_count.textContent = "Replies: " + (thread.number_of_posts - 1);
-				const reply_count = document.createTextNode(" Replies: " + (thread.number_of_posts - 1));
-				thread_post_zero.appendChild(reply_count);
-				fragment.appendChild(thread_post_zero);
+
+				thread_toolbar.append(reply_count_container, flex_separator.cloneNode(), open_thread_button);
+				// thread_toolbar.appendChild(open_thread_button);
+				thread_element.appendChild(thread_toolbar);
+				fragment.appendChild(thread_element);
 			}
 			post_container.replaceChildren(fragment);
 		}
 		function showPosts(message_json) {
 			location_indicator.textContent = "Posts";
+			catalog_button.disabled = false;
 			reply_heading_text.textContent = "Leave a reply";
 			const fragment = new DocumentFragment();
 			for (let post of message_json.posts) {
