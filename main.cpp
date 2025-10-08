@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 
-const std::string version_string = "0.0.2";
+const std::string version_string = "0.0.3";
 
 int
 main(int argc, char* argv[])

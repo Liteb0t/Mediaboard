@@ -23,7 +23,7 @@
 				</div>
 				<div class="FlexSeparator"></div>
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
-				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.2</a>
+				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3</a>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
 			<div id="post_container"></div>
@@ -221,7 +221,6 @@ main {
 		const media_uuid_len = 36;
 		const localDate = new Date();
 		const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
-		const image_formats = ["gif", "jpg", "jpeg", "jxl", "png", "webp"];
 		let state = {selected_thread_id: null};
 		let websocket;
 		let websocket_connected;
@@ -253,6 +252,32 @@ main {
 				state = event.state;
 			}
 			refresh_send();
+		}
+
+		class Format {
+			static IMAGE = 0;
+			static AUDIO = 1;
+			static OTHER = -1;
+			static image_formats = ["gif", "jpg", "jpeg", "jxl", "png", "webp"];
+			static audio_formats = ["flac", "mp3", "ogg", "ogx", "opus", "wav"];
+			static fromFileName(file_name) {
+				let dot_index = file_name.indexOf('.');
+				if (dot_index !== -1) {
+					let file_extension = file_name.substring(dot_index+1);
+					if (Format.image_formats.indexOf(file_extension) !== -1) {
+						return Format.IMAGE;
+					}
+					else if (Format.audio_formats.indexOf(file_extension) !== -1) {
+						return Format.AUDIO;
+					}
+					else {
+						return Format.OTHER;
+					}
+				}
+				else {
+					return Format.OTHER;
+				}
+			}
 		}
 
 		// Used to verify the author on deleting a message.
@@ -475,7 +500,7 @@ main {
 						// var newdecoded = new TextDecoder().decode(utf8array);
 						// console.log("server_filename dec new: " + newdecoded);
 						file_element.setAttribute("id", "file_" + decoded_filename);
-						if (fileIsImage(server_filename)) {
+						if (Format.fromFileName(server_filename) === Format.IMAGE) {
 							file_img_element.setAttribute("src", root_url + media_url + decoded_filename);
 						}
 						file_element.removeChild(file_progress_element);
@@ -505,16 +530,6 @@ main {
 						uploadFile(chosen_file);
 					}
 				}
-			}
-		}
-
-		function fileIsImage(filename) {
-			let dot_index = filename.indexOf('.');
-			if (dot_index !== -1 && image_formats.indexOf(filename.substring(dot_index+1)) !== -1) {
-				return true;
-			}
-			else {
-				return false;
 			}
 		}
 
@@ -575,12 +590,12 @@ main {
 			for (const filename of data.files) {
 				let figure_element = document.createElement("figure");
 				figure_element.classList.add("EmbedFigure");
-				let thumbnail_element = document.createElement("img");
 				let filename_extension_i = filename.lastIndexOf(".");
-				let thumbnail_filename;
-				if (fileIsImage(filename)) {
+				let file_format = Format.fromFileName(filename); // Format enum
+				if (file_format === Format.IMAGE) {
+					let thumbnail_element = document.createElement("img");
 					thumbnail_element.classList.add("EmbedThumbnail");
-					thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
+					let thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
 					thumbnail_element.setAttribute("src", root_url + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
 					let image_opened = false;
 					let img_element = document.createElement("img");
@@ -605,14 +620,21 @@ main {
 						img_element.style["display"] = "none";
 					}
 					figure_element.appendChild(img_element);
+					thumbnail_element.setAttribute("loading", "lazy");
+					thumbnail_element.setAttribute("width", "150px");
+					thumbnail_element.setAttribute("height", "150px");
+					figure_element.appendChild(thumbnail_element);
 				}
-				else {
-					thumbnail_element.setAttribute("src", root_url + "placeholder.png");
+				else if (file_format === Format.AUDIO) {
+					let audio_element = document.createElement("audio");
+					audio_element.controls = true;
+					audio_element.setAttribute("controlslist", "nofullscreen nodownload");
+					audio_element.setAttribute("src", root_url + media_url + filename.replace(" ", "%20"));
+					figure_element.appendChild(audio_element);
 				}
-				thumbnail_element.setAttribute("loading", "lazy");
-				thumbnail_element.setAttribute("width", "150px");
-				thumbnail_element.setAttribute("height", "150px");
-				figure_element.appendChild(thumbnail_element);
+				// else {
+					// thumbnail_element.setAttribute("src", root_url + "placeholder.png");
+				// }
 				let pretty_filename;
 				if (filename_extension_i == -1) {
 					pretty_filename = filename.slice(0, filename.length - media_uuid_len);
