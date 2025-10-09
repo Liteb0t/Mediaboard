@@ -15,10 +15,10 @@
 	<body>
 		<!--Navbar can go here-->
 		<main>
-			<div id="header_bar" class="ToolBar">
-				<div><b>_SITE_NAME</b></div>
-					<button id="catalog_button" onclick="openCatalog()">&#x1F5D0; Catalog</button>
-					<button id="refresh_button" onclick="refresh_send()">&#x2B6E; Refresh</button>
+			<div id="header_bar" class="ToolBar WithBorders">
+				<div id="WebsiteName"><b>_SITE_NAME</b></div>
+					<button id="catalog_button" class="ToolBarButton" onclick="openCatalog()">&#x1F5D0; Catalog</button>
+					<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
 				<div class="FlexSeparator"></div>
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
 				<div><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3 (development)</a></div>
@@ -45,6 +45,10 @@
 	<style>
 :root {
 	--side-margins: 0.5em;
+	--monospace-font: Noto Mono, DejaVu Sans Mono, Consolas, Monaco, Liberation Mono, monospace;
+	--name-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
+	--content-font: DejaVu Serif, Cambria, Lucida Bright, Liberation Serif, serif;
+	--interactive-font: DejaVu Sans, Verdana, Liberation Sans, sans-serif;
 }
 
 html {
@@ -57,6 +61,7 @@ body {
 	display: flex;
 	flex-flow: column;
 	height: 100vh;
+	font-family: var(--content-font);
 }
 
 main {
@@ -66,11 +71,23 @@ main {
 }
 
 button {
+	background-color: #EEE;
+	border: 2px outset #DDD;
 	border-radius: 0;
 	font-size: 1rem;
+	font-family: var(--interactive-font);
 	&:hover:not(:disabled) {
+		background-color: #CCC;
 		cursor: pointer;
+		&:active {
+			background-color: #AAA;
+			border-style: inset;
+		}
 	}
+}
+
+#WebsiteName {
+	font-family: var(--name-font);
 }
 
 .FlexSeparator {
@@ -92,21 +109,23 @@ button {
 		display: flex;
 		align-items: center;
 		height: 2em;
-		&:is(button) {
-			border: none;
-			padding: 0 1em;
-		}
 		&:not(button) {
 			padding: 0 0.25em;
 		}
+	}
+	&.WithBorders >* {
 		&:not(:first-child) {
 			border-left: 1px solid #888;
-			/*padding-left: 0.25em;*/
 		}
-		/*
-		&:not(:last-child) {
-			padding-right: 0.25em;
-		}*/
+	}
+}
+
+.ToolBarButton {
+	border-style: none;
+	padding: 0 1em;
+	&:hover:active {
+		border-style: none !important;
+		border-left: 1px solid #888 !important;
 	}
 }
 
@@ -117,46 +136,37 @@ button {
 		border-bottom: 2px solid #000;
 		margin-bottom: 0.5rem;
 	}
-	.ThreadToolBar {
-		user-select: none;
-		>* {
-			display: flex;
-			align-items: center;
-			height: 2em;
-		}
-	}
 }
 
 .Post {
-	padding: 0 0.25rem;
 	margin-top: 0.25rem;
 	word-wrap: break-word;
+	&:not(:last-child) {
+		border-bottom: 1px solid #000;
+	}
 
-	>* {
-		margin: 0.25rem 0;
-	}
-	.PostHeader>* {
-		margin-right: 0.5em;
-	}
 	.Username {
-		font-family: 'Tahoma', 'Arial', sans-serif;
+		font-family: var(--name-font);
 	}
 	.Timestamp {
 		float: right;
-		font-family: 'Courier New', monospace;
+		font-family: var(--monospace-font);
 	}
 	.ID {
 		float: right;
 	}
-	/*
+	
 	.Content {
-		white-space: pre-line;
+		margin: 0.25rem 0;
+		padding: 0 0.25rem;
 	}
-	*/
+	
 	.Files {
 		display: flex;
 		gap: 2rem;
 		flex-wrap: wrap;
+		margin: 0.25rem 0;
+		padding: 0 0.25rem;
 
 		.EmbedFigure {
 			display: inline-block;
@@ -168,17 +178,13 @@ button {
 			}
 		}
 	}
+	.Deleted {
+		text-decoration: line-through;
+	}
 }
 
 #post_container {
 	border-bottom: 2px solid #000;
-	.Post:not(:last-child) {
-		border-bottom: 1px solid #000;
-		/*margin-bottom: 0.25rem;*/
-	}
-	.Deleted {
-		text-decoration: line-through;
-	}
 }
 
 #reply_container {
@@ -373,7 +379,7 @@ button {
 
 				// Toolbar at the bottom of each thread
 				let thread_toolbar = document.createElement("div");
-				thread_toolbar.classList.add("ToolBar");
+				thread_toolbar.classList.add("ToolBar", "WithBorders");
 
 				const reply_count_container = document.createElement("div");
 				const reply_count = document.createElement("span");
@@ -381,6 +387,7 @@ button {
 				reply_count_container.appendChild(reply_count);
 
 				let open_thread_button = document.createElement("button");
+				open_thread_button.classList.add("ToolBarButton");
 				open_thread_button.textContent = "\u21E8 Open thread";
 				open_thread_button.onclick = (event) => {
 					state.selected_thread_id = thread.id;
@@ -581,18 +588,19 @@ button {
 	
 			let post_header_element = document.createElement("div");
 			post_header_element.classList.add("PostHeader");
+			post_header_element.classList.add("ToolBar");
 	
-			let post_name_element = document.createElement("b");
+			let post_name_element = document.createElement("span");
 			post_name_element.classList.add("Username");
 			post_name_element.textContent = data.name;
 			post_header_element.appendChild(post_name_element);
+			post_header_element.appendChild(flex_separator.cloneNode());
 
 			let post_timestamp_element = document.createElement("time");
 			let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
 			post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
 			post_timestamp_element.textContent = post_date;
 			post_timestamp_element.classList.add("Timestamp");
-			post_header_element.appendChild(post_timestamp_element);
 
 			let post_id_element = document.createElement("span");
 			post_id_element.classList.add("ID");
@@ -602,7 +610,6 @@ button {
 			else {
 				post_id_element.textContent = "#" + data.thread_id;
 			}
-			post_header_element.appendChild(post_id_element);
 
 			// Delete button
 			if (data.is_author) {
@@ -621,6 +628,8 @@ button {
 				}
 				post_header_element.appendChild(delete_button_element);
 			}
+			post_header_element.appendChild(post_id_element);
+			post_header_element.appendChild(post_timestamp_element);
 
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
