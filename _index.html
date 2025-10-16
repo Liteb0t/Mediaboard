@@ -103,7 +103,7 @@ button {
 .ToolBar {
 	display: flex;
 	flex-wrap: wrap;
-	user-select: none;
+	/*user-select: none;*/
 	
 	>* {
 		display: flex;
@@ -111,6 +111,9 @@ button {
 		height: 2em;
 		&:not(button) {
 			padding: 0 0.25em;
+		}
+		time, span, b, i {
+			user-select: none;
 		}
 	}
 	&.WithBorders >* {
@@ -178,7 +181,7 @@ button {
 			}
 		}
 	}
-	.Deleted {
+	&.Deleted {
 		text-decoration: line-through;
 	}
 }
@@ -209,6 +212,7 @@ button {
 	overscroll-behavior: contain;
 	scrollbar-gutter: stable;
 	>#name_field {
+		font-family: var(--name-font);
 		font-size: inherit;
 		margin: 2px 2px 0;
 		margin-inline: 2px;
@@ -236,6 +240,18 @@ button {
 		color: #888;
 		display: block;
 		font-family: sans-serif;
+	}
+}
+
+#file_post_list {
+	>* {
+		display: flow-root;
+		>img {
+			float: left;
+		}
+		.UploadCompleteIndicator {
+			color: green;
+		}
 	}
 }
 
@@ -327,27 +343,32 @@ button {
 		}
 
 		async function postAction() {
-			let response;
-			if (state.selected_thread_id === -1) {
-				response = await postThread();
+			if (content_field.textContent.length === 0) {
+				alert("Error: Cannot create post with empty content");
 			}
 			else {
-				response = await postMessage();
-			}
-			if (response.ok) {
-				content_field.textContent = "";
-				file_upload.value = "";
-				file_post_list.textContent = "";
+				let response;
 				if (state.selected_thread_id === -1) {
-					// In future replace with a proper dialog box with a link to the new thread.
-					// OR redirect the user automatically (noko)
-					let new_thread_id = response.headers.get("new-thread-id");
-					alert(`Thread posted successfully\nNew thread ID: ${new_thread_id}`);
+					response = await postThread();
 				}
-			}
-			else {
-				console.log(response);
-				alert("Error when attempting to post\nStatus: " + response.status + "\nstatusText: " + response.statusText);
+				else {
+					response = await postMessage();
+				}
+				if (response.ok) {
+					content_field.textContent = "";
+					file_upload.value = "";
+					file_post_list.textContent = "";
+					if (state.selected_thread_id === -1) {
+						// In future replace with a proper dialog box with a link to the new thread.
+						// OR redirect the user automatically (noko)
+						let new_thread_id = response.headers.get("new-thread-id");
+						alert(`Thread posted successfully\nNew thread ID: ${new_thread_id}`);
+					}
+				}
+				else {
+					console.log(response);
+					alert("Error when attempting to post\nStatus: " + response.status + "\nstatusText: " + response.statusText);
+				}
 			}
 		}
 
@@ -452,12 +473,13 @@ button {
 			file_thumbnail.setAttribute("width", "100px");
 			file_thumbnail.setAttribute("height", "100px");
 			let file_title = document.createElement("span");
+			// file_title.classList.add("FileTitle");
 			file_title.textContent = filename;
 			let file_delete_button = document.createElement("button");
-			file_delete_button.textContent = "Delete";
+			file_delete_button.textContent = "\u{1F5D1} Delete";
 			let progress_element = document.createElement("progress");
 			progress_element.value = 0;
-			file_container.append(file_thumbnail, file_title, file_delete_button, progress_element);
+			file_container.append(file_thumbnail, file_title, document.createElement("br"), progress_element, document.createElement("br"), file_delete_button);
 			file_post_list.appendChild(file_container);
 			file_delete_button.onclick = (event) => {
 				// Add delete to server later
@@ -551,7 +573,10 @@ button {
 						if (Format.fromFileName(server_filename) === Format.IMAGE) {
 							file_img_element.setAttribute("src", root_url + media_url + decoded_filename);
 						}
-						file_element.removeChild(file_progress_element);
+						const upload_complete_indicator = document.createElement("span");
+						upload_complete_indicator.classList.add("UploadCompleteIndicator");
+						upload_complete_indicator.textContent = "Upload complete";
+						file_element.replaceChild(upload_complete_indicator, file_progress_element);
 			        }
 			    }
 			};
@@ -593,8 +618,6 @@ button {
 			let post_name_element = document.createElement("span");
 			post_name_element.classList.add("Username");
 			post_name_element.textContent = data.name;
-			post_header_element.appendChild(post_name_element);
-			post_header_element.appendChild(flex_separator.cloneNode());
 
 			let post_timestamp_element = document.createElement("time");
 			let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
@@ -610,6 +633,8 @@ button {
 			else {
 				post_id_element.textContent = "#" + data.thread_id;
 			}
+
+			post_header_element.append(post_name_element, flex_separator.cloneNode());
 
 			// Delete button
 			if (data.is_author) {
@@ -628,8 +653,7 @@ button {
 				}
 				post_header_element.appendChild(delete_button_element);
 			}
-			post_header_element.appendChild(post_id_element);
-			post_header_element.appendChild(post_timestamp_element);
+			post_header_element.append(post_id_element, post_timestamp_element);
 
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
