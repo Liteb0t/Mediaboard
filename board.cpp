@@ -42,6 +42,7 @@ bool Board::keyMatchesMessageInThread(std::string key, int message_id, int threa
 }
 
 void Board::cacheAllThreads() {
+	std::cout << "Retreiving threads from database..." << std::endl;
 	struct db_thread_array* thread_list = db_retrieve_threads();
 	for (int i = 0; i < thread_list->used; i++) {
 		json thread_json;
@@ -52,14 +53,18 @@ void Board::cacheAllThreads() {
 	}
 	freeThreadArray(thread_list);
 
+	std::cout << "Retreiving posts from database..." << std::endl;
 	struct db_post_array* post_history = db_retrieve_history();
 	for (int i = 0; i < post_history->used; i++) {
+		std::cout << i << ", ";
 		this->threads.at(post_history->array[i].thread_id).createPostFromStruct(&post_history->array[i]);
 	}
+	std::cout << std::endl << "db_post_array created." << std::endl;
 	for (std::map<int, Thread>::const_iterator it = this->threads.begin(); it != this->threads.end(); ++it) {
 		this->ordered_threads.insert(std::make_pair(it->second.getLastPostTime(), it->first));
 	}
 	
+	std::cout << "Finished retreiving threads and posts from the database." << std::endl;
 	freePostArray(post_history);
 }
 

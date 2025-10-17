@@ -8,6 +8,7 @@
 
 void print_sqlca();
 EXEC SQL WHENEVER SQLERROR CALL print_sqlca();
+// EXEC SQL WHENEVER SQLERROR STOP; // https://www.postgresql.org/docs/14/ecpg-errors.html
 
 // https://stackoverflow.com/a/3536261
 void initPostArray(struct db_post_array *a, size_t initialSize) {
@@ -57,20 +58,25 @@ void freeThreadArray(struct db_thread_array *a) {
 
 void db_connect() {
 	EXEC SQL BEGIN DECLARE SECTION;
-	const char* password = getenv("FUZE_MEDIABOARD_PASSWORD");
+	const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	// const char* password = "watermelone";
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts) VALUES (?, 0);";
 	const char* mark_post_as_deleted_prepared_stmt = "UPDATE post SET deleted = true WHERE id = ?;";
 	char* data;
 	EXEC SQL END DECLARE SECTION;
-	printf("password: %s\n", password);
+	// printf("password: %s\n", password);
+	if (password)
+		printf("Found environment variable \"%s\"\n", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
+	else {
+		fprintf(stderr, "Could not find environment variable \"%s\" required for the database connection password. Exiting.", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
+		exit(2);
+	}
 	EXEC SQL CONNECT TO "fuze_mediaboard" USER "mediaboard_server" USING :password;
-	printf("connected!\n");
+	printf("Connected!\n");
 	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;
 	EXEC SQL PREPARE mark_post_as_deleted_stmt FROM :mark_post_as_deleted_prepared_stmt;
-
 }
 
 void db_test() {
@@ -82,7 +88,7 @@ void db_test() {
     printf("current_database = %s\n", dbname);
 }
 
-int db_store_post(int thread_id_, int id_in_thread_, const char* name_, time_t upload_timestamp_, const char* content_, char files[4][256], int file_count, const char key_[KEY_LENGTH+1]) {
+int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_NAME+1], time_t upload_timestamp_, const char* content_, char files[4][POST_MAX_FILE_NAME+1], int file_count, const char key_[KEY_LENGTH+1]) {
     EXEC SQL BEGIN DECLARE SECTION;
 	int number_of_posts;
 	int post_id;
@@ -145,7 +151,7 @@ struct db_thread_array* db_retrieve_threads() {
 		SELECT id, number_of_posts FROM thread
 		ORDER BY id;
 	EXEC SQL OPEN thread_getter;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `thread_getter` has retreived all threads
 	while (true) {
 		EXEC SQL FETCH thread_getter INTO :thread_id, :number_of_posts;
 		struct db_thread_struct thread;
@@ -170,7 +176,7 @@ struct db_post_array* db_retrieve_history() {
 	VARCHAR post_name[POST_MAX_NAME+1];
 	timestamp upload_timestamp;
 	VARCHAR post_content[POST_MAX_CONTENT+1];
-	char files[4][256]; int file_indicators[4];
+	char files[4][POST_MAX_FILE_NAME+1]; int file_indicators[4];
 	char deleted;
 	char key[KEY_LENGTH+1];
 	EXEC SQL END DECLARE SECTION;
@@ -178,7 +184,7 @@ struct db_post_array* db_retrieve_history() {
 		SELECT id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], extract(epoch FROM upload_timestamp)::int AS upload_timestamp_int, deleted, key FROM post
 		ORDER BY id;
 	EXEC SQL OPEN post_getter;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `post_getter` has retreived all posts
 	while (true) {
 		EXEC SQL FETCH post_getter INTO :post_id, :thread_id, :id_in_thread, :post_name, :upload_timestamp, :post_content, :files[0] INDICATOR :file_indicators[0], :files[1] INDICATOR :file_indicators[1], :files[2] INDICATOR :file_indicators[2], :files[3] INDICATOR :file_indicators[3], :upload_epoch, :deleted, :key;
 		struct db_post_struct post;
@@ -223,4 +229,6 @@ void print_sqlca() {
                                                           sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
     fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
     fprintf(stderr, "===============\n");
+	// printf("Terminating the program...\n");
+	// exit(1); // Stop the server when an SQL error is encountered. This is likely due to incorrect setup.
 }

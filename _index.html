@@ -70,7 +70,7 @@ main {
 	flex: 0 0 auto;
 }
 
-button {
+button, input[type=file]::file-selector-button {
 	background-color: #EEE;
 	border: 2px outset #DDD;
 	border-radius: 0;
@@ -84,6 +84,15 @@ button {
 			border-style: inset;
 		}
 	}
+}
+/* https://developer.mozilla.org/en-US/docs/Web/CSS/Nesting_selector#cannot_represent_pseudo-elements */
+input[type=file]::file-selector-button:hover {
+	background-color: #CCC;
+	cursor: pointer;
+}
+input[type=file]::file-selector-button:active {
+	background-color: #AAA;
+	border-style: inset;
 }
 
 #WebsiteName {
@@ -108,7 +117,8 @@ button {
 	>* {
 		display: flex;
 		align-items: center;
-		height: 2em;
+		min-height: 2rem;
+		word-wrap: anywhere;
 		&:not(button) {
 			padding: 0 0.25em;
 		}
@@ -120,6 +130,9 @@ button {
 		&:not(:first-child) {
 			border-left: 1px solid #888;
 		}
+	}
+	.RightAligned {
+		margin-left: auto;
 	}
 }
 
@@ -150,6 +163,7 @@ button {
 
 	.Username {
 		font-family: var(--name-font);
+		font-weight: bold;
 	}
 	.Timestamp {
 		float: right;
@@ -211,6 +225,7 @@ button {
 	overflow-y: auto;
 	overscroll-behavior: contain;
 	scrollbar-gutter: stable;
+	word-wrap: anywhere;
 	>#name_field {
 		font-family: var(--name-font);
 		font-size: inherit;
@@ -222,6 +237,10 @@ button {
 	>fieldset {
 		margin: 2px;
 		margin-inline: 2px;
+		min-width: 0;
+		input[type="file"] {
+			max-width: 100%;
+		}
 	}
 }
 
@@ -233,7 +252,6 @@ button {
 	min-height: 4em;
 	padding: 1px 2px;
 	white-space: -moz-pre-space;
-	word-wrap: break-word;
 	&:empty:before {
 		content: attr(placeholder);
 		cursor: text;
@@ -245,10 +263,7 @@ button {
 
 #file_post_list {
 	>* {
-		display: flow-root;
-		>img {
-			float: left;
-		}
+		display: flex;
 		.UploadCompleteIndicator {
 			color: green;
 		}
@@ -472,14 +487,16 @@ button {
 			file_thumbnail.setAttribute("src", "placeholder.png");
 			file_thumbnail.setAttribute("width", "100px");
 			file_thumbnail.setAttribute("height", "100px");
+			const file_information_container = document.createElement("div");
 			let file_title = document.createElement("span");
 			// file_title.classList.add("FileTitle");
 			file_title.textContent = filename;
 			let file_delete_button = document.createElement("button");
-			file_delete_button.textContent = "\u{1F5D1} Delete";
+			file_delete_button.textContent = "\u{1F5D9} Delete"; // 1F5D1 = смітник
 			let progress_element = document.createElement("progress");
 			progress_element.value = 0;
-			file_container.append(file_thumbnail, file_title, document.createElement("br"), progress_element, document.createElement("br"), file_delete_button);
+			file_information_container.append(file_title, document.createElement("br"), progress_element, document.createElement("br"), file_delete_button);
+			file_container.append(file_thumbnail, file_information_container);
 			file_post_list.appendChild(file_container);
 			file_delete_button.onclick = (event) => {
 				// Add delete to server later
@@ -595,12 +612,16 @@ button {
 						file_upload.value = "";
 					}
 					else {
-						if (chosen_file.name.length > 200) {
-							alert("Warning: file name trimmed to 200 characters.\n" + 
+						const file_name_size = (new TextEncoder().encode(chosen_file.name)).length;
+						if (file_name_size > 255) {
+							alert("Error: file name too long. Limit: 255 bytes\n" + 
+								"Size of this file name: " + file_name_size + "\n" +
 								"File: " + chosen_file.name);
 						}
-						console.log("uploading...");
-						uploadFile(chosen_file);
+						else {
+							console.log("uploading...");
+							uploadFile(chosen_file);
+						}
 					}
 				}
 			}
@@ -612,7 +633,7 @@ button {
 			post_box_element.classList.add("Post");
 	
 			let post_header_element = document.createElement("div");
-			post_header_element.classList.add("PostHeader");
+			// post_header_element.classList.add("PostHeader");
 			post_header_element.classList.add("ToolBar");
 	
 			let post_name_element = document.createElement("span");
@@ -634,12 +655,14 @@ button {
 				post_id_element.textContent = "#" + data.thread_id;
 			}
 
-			post_header_element.append(post_name_element, flex_separator.cloneNode());
+			post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
+			const right_aligned_toolbar_group = document.createElement("div");
+			right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
 
 			// Delete button
 			if (data.is_author) {
 				let delete_button_element = document.createElement("button");
-				delete_button_element.textContent = "Delete";
+				delete_button_element.textContent = "\u{1F5D9} Delete";
 				delete_button_element.onclick = async() => { 
 					let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
 					console.log(server_response);
@@ -651,9 +674,11 @@ button {
 						alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
 					}
 				}
-				post_header_element.appendChild(delete_button_element);
+				// post_header_element.appendChild(delete_button_element);
+				right_aligned_toolbar_group.appendChild(delete_button_element);
 			}
-			post_header_element.append(post_id_element, post_timestamp_element);
+			right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
+			post_header_element.append(right_aligned_toolbar_group);
 
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");

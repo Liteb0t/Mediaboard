@@ -101,12 +101,14 @@ main(int argc, char* argv[])
 	db_connect();
 
     // Create and launch a listening port
+	std::cout << "Creating a listening port..." << std::endl;
     boost::make_shared<listener>(
         ioc,
         tcp::endpoint{address, port},
         boost::make_shared<shared_state>(doc_root))->run();
 
     // Capture SIGINT and SIGTERM to perform a clean shutdown
+	std::cout << "Setting signals..." << std::endl;
     net::signal_set signals(ioc, SIGINT, SIGTERM);
     signals.async_wait(
         [&ioc](boost::system::error_code const&, int)
@@ -118,6 +120,7 @@ main(int argc, char* argv[])
         });
 
     // Run the I/O service on the requested number of threads
+	std::cout << "Running the I/O service..." << std::endl;
     std::vector<std::thread> v;
     v.reserve(threads - 1);
     for(auto i = threads - 1; i > 0; --i)
