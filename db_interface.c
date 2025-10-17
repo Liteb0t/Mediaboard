@@ -567,6 +567,6 @@ void print_sqlca() {
                                                           sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
     fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
     fprintf(stderr, "===============\n");
-	// printf("Terminating the program...\n");
-	// exit(1); // Stop the server when an SQL error is encountered. This is likely due to incorrect setup.
+	printf("Terminating the program...\n");
+	exit(1); // Stop the server when an SQL error is encountered. This is likely due to incorrect setup.
 }

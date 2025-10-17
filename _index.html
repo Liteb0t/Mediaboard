@@ -358,8 +358,16 @@ input[type=file]::file-selector-button:active {
 		}
 
 		async function postAction() {
+			let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
+			let content_length_bytes = (new TextEncoder().encode(content_field.innerText)).length;
 			if (content_field.textContent.length === 0) {
 				alert("Error: Cannot create post with empty content");
+			}
+			else if (name_length_bytes > 73) {
+				alert("Error: Name too long.\nLimit: 73\nThis name: " + name_length_bytes);
+			}
+			else if (content_length_bytes > 5000) {
+				alert("Error: Content too long.\nLimit: 5000\nMessage content: " + content_length_bytes);
 			}
 			else {
 				let response;
@@ -824,7 +832,7 @@ input[type=file]::file-selector-button:active {
 			const data = {
 				post: {
 					name: name_field.value,
-					content: content_field.textContent,
+					content: content_field.innerText,
 					files: files,
 					thread_id: state.selected_thread_id
 					,key: user_key
@@ -867,7 +875,7 @@ input[type=file]::file-selector-button:active {
 				thread: {
 					post_zero: {
 						name: name_field.value,
-						content: content_field.textContent,
+						content: content_field.innerText,
 						files: files
 						,key: user_key
 					}
