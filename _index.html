@@ -44,6 +44,11 @@
 			</form>
 		</details>
 		<div id="bottom_marker"></div>
+		<dialog id="thread_posted_dialog" style="display: none;" closedby="any">
+			<h2>Thread posted!</h2>
+			<p>This message will self-destruct in five seconds.</p>
+			<div class="ToolBar"><button class="RightAligned" onclick="closeThreadPostedDialog()">&#x1F5D9; Close</button><button id="thread_posted_dialog_open_thread_button" style="margin-left: 2em;">&#x21E8; Open thread</button></div>
+		</dialog>
 	</body>
 	<style>
 :root {
@@ -96,6 +101,10 @@ input[type=file]::file-selector-button:hover {
 input[type=file]::file-selector-button:active {
 	background-color: #AAA;
 	border-style: inset;
+}
+
+dialog {
+	margin-top: 20vh;
 }
 
 #WebsiteName {
@@ -293,6 +302,13 @@ input[type=file]::file-selector-button:active {
 		let websocket;
 		let websocket_connected;
 		console.log(websocket);
+		function openThreadPostedDialog() {
+			thread_posted_dialog["style"]["display"] = "block";
+			setTimeout(closeThreadPostedDialog, 5000);
+		}
+		function closeThreadPostedDialog() {
+			thread_posted_dialog["style"]["display"] = "none";
+		}
 
 		if (window.location.pathname.startsWith(root_url + "thread/")) {
 			let second_slash_index = window.location.pathname.indexOf("/", root_url.length + 7);
@@ -386,7 +402,10 @@ input[type=file]::file-selector-button:active {
 						// In future replace with a proper dialog box with a link to the new thread.
 						// OR redirect the user automatically (noko)
 						let new_thread_id = response.headers.get("new-thread-id");
-						alert(`Thread posted successfully\nNew thread ID: ${new_thread_id}`);
+						thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); closeThreadPostedDialog(); }
+						openThreadPostedDialog();
+						// thread_posted_dialog["style"]["display"] = "block";
+						// alert(`Thread posted successfully\nNew thread ID: ${new_thread_id}`);
 					}
 				}
 				else {
@@ -435,9 +454,7 @@ input[type=file]::file-selector-button:active {
 				open_thread_button.classList.add("ToolBarButton");
 				open_thread_button.textContent = "\u21E8 Open thread";
 				open_thread_button.onclick = (event) => {
-					state.selected_thread_id = thread.id;
-					history.pushState(state, "", root_url + "thread/" + state.selected_thread_id + "/");
-					getThreadPosts();
+					openThread(thread.id);
 				}
 
 				thread_toolbar.append(reply_count_container, flex_separator.cloneNode(), open_thread_button);
@@ -468,6 +485,11 @@ input[type=file]::file-selector-button:active {
 			else {
 				alert("Server error from getThreads(). the developer must suck lmao");
 			}
+		}
+		function openThread(thread_id) {
+			state.selected_thread_id = thread_id;
+			history.pushState(state, "", root_url + "thread/" + state.selected_thread_id + "/");
+			getThreadPosts();
 		}
 		async function getThreadPosts() {
 			let response = await fetch(root_url + api_url + "threads/" + state.selected_thread_id + "/get_posts/", {
