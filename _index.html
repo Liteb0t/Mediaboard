@@ -29,16 +29,19 @@
 		<div id="body_separator" class="FlexSeparator"></div>
 		<details id="reply_container" open="">
 			<summary id="reply_heading_text"></summary>
-			<div id="post_form">
-			<input type="text" id="name_field" placeholder="Name" />
-			<button id="post_button" onclick="postAction()">&#x1F585; Post</button>
-			<div contenteditable="" id="content_field" placeholder="Content"></div>
+			<form id="post_form" name="post" action="" autocomplete="on">
+			<div class="ToolBar">
+			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" />
+			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned" onclick="postAction()" tabindex="1">
+			<!--<button id="post_button" onclick="postAction()">&#x1F585; Post</button>-->
+			</div>
+			<div contenteditable="" id="content_field" tabindex="1" placeholder="Content"></div>
 			<fieldset>
 				<legend>Upload up to four files</legend>
-				<input type="file" id="file_upload" multiple/>
+				<input type="file" id="file_upload" tabindex="1" autocomplete="off" multiple>
 				<div id="file_post_list"></div>
 			</fieldset>
-			</div>
+			</form>
 		</details>
 		<div id="bottom_marker"></div>
 	</body>
@@ -70,7 +73,7 @@ main {
 	flex: 0 0 auto;
 }
 
-button, input[type=file]::file-selector-button {
+button, input[type=file]::file-selector-button, input[type=button] {
 	background-color: #EEE;
 	border: 2px outset #DDD;
 	border-radius: 0;
@@ -226,17 +229,17 @@ input[type=file]::file-selector-button:active {
 	overscroll-behavior: contain;
 	scrollbar-gutter: stable;
 	word-wrap: anywhere;
-	>#name_field {
+	#name_field {
 		font-family: var(--name-font);
 		font-size: inherit;
-		margin: 2px 2px 0;
-		margin-inline: 2px;
 		border-radius: 0;
 		border: 1px inset #bbb;
 	}
-	>fieldset {
+	>* {
 		margin: 2px;
 		margin-inline: 2px;
+	}
+	>fieldset {
 		min-width: 0;
 		input[type="file"] {
 			max-width: 100%;
@@ -247,8 +250,6 @@ input[type=file]::file-selector-button:active {
 #content_field {
 	background: #FFF;
 	border: 1px inset #bbb;
-	margin: 2px;
-	margin-inline: 2px;
 	min-height: 4em;
 	padding: 1px 2px;
 	white-space: -moz-pre-space;
