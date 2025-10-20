@@ -20,8 +20,9 @@
 					<button id="catalog_button" class="ToolBarButton" onclick="openCatalog()">&#x1F5D0; Catalog</button>
 					<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
 				<div class="FlexSeparator"></div>
-				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
-				<div><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3 (development)</a></div>
+				<!--
+				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>-->
+				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3 (development)</a></div>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
 			<div id="post_container"></div>
@@ -33,7 +34,6 @@
 			<div class="ToolBar">
 			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" />
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned" onclick="postAction()" tabindex="1">
-			<!--<button id="post_button" onclick="postAction()">&#x1F585; Post</button>-->
 			</div>
 			<div contenteditable="" id="content_field" tabindex="1" placeholder="Content"></div>
 			<fieldset>
@@ -44,10 +44,10 @@
 			</form>
 		</details>
 		<div id="bottom_marker"></div>
-		<dialog id="thread_posted_dialog" style="display: none;" closedby="any">
+		<dialog id="thread_posted_dialog" closedby="any">
 			<h2>Thread posted!</h2>
-			<p>This message will self-destruct in five seconds.</p>
-			<div class="ToolBar"><button class="RightAligned" onclick="closeThreadPostedDialog()">&#x1F5D9; Close</button><button id="thread_posted_dialog_open_thread_button" style="margin-left: 2em;">&#x21E8; Open thread</button></div>
+			<p>Click outside this box or hit the <kbd>Esc</kbd> key to close this dialog.</p>
+			<div class="ToolBar"><button class="RightAligned" onclick="thread_posted_dialog.close()">&#x1F5D9; Close</button><button id="thread_posted_dialog_open_thread_button" style="margin-left: 2em;">&#x21E8; Open thread</button></div>
 		</dialog>
 	</body>
 	<style>
@@ -104,6 +104,7 @@ input[type=file]::file-selector-button:active {
 }
 
 dialog {
+	box-shadow: -5pt -5px #0008;
 	margin-top: 20vh;
 }
 
@@ -240,9 +241,25 @@ dialog {
 	word-wrap: anywhere;
 	#name_field {
 		font-family: var(--name-font);
+	}
+	input[type=text], div[contenteditable] {
+		background: #FFF8;
 		font-size: inherit;
 		border-radius: 0;
 		border: 1px inset #bbb;
+		padding: 0 4px;
+
+		&#content_field {
+			min-height: 4em;
+			padding: 4px;
+			white-space: -moz-pre-space;
+			&:empty:before {
+				content: attr(placeholder);
+				cursor: text;
+				color: #0008;
+				display: block;
+			}
+		}
 	}
 	>* {
 		margin: 2px;
@@ -253,21 +270,6 @@ dialog {
 		input[type="file"] {
 			max-width: 100%;
 		}
-	}
-}
-
-#content_field {
-	background: #FFF;
-	border: 1px inset #bbb;
-	min-height: 4em;
-	padding: 1px 2px;
-	white-space: -moz-pre-space;
-	&:empty:before {
-		content: attr(placeholder);
-		cursor: text;
-		color: #888;
-		display: block;
-		font-family: sans-serif;
 	}
 }
 
@@ -282,6 +284,10 @@ dialog {
 
 .EmbedFigure {
 	display: block;
+}
+.PostLink {
+	color: #FFF;
+	background: #22D;
 }
 	</style>
 	<script>
@@ -302,13 +308,6 @@ dialog {
 		let websocket;
 		let websocket_connected;
 		console.log(websocket);
-		function openThreadPostedDialog() {
-			thread_posted_dialog["style"]["display"] = "block";
-			setTimeout(closeThreadPostedDialog, 5000);
-		}
-		function closeThreadPostedDialog() {
-			thread_posted_dialog["style"]["display"] = "none";
-		}
 
 		if (window.location.pathname.startsWith(root_url + "thread/")) {
 			let second_slash_index = window.location.pathname.indexOf("/", root_url.length + 7);
@@ -399,13 +398,9 @@ dialog {
 					file_upload.value = "";
 					file_post_list.textContent = "";
 					if (state.selected_thread_id === -1) {
-						// In future replace with a proper dialog box with a link to the new thread.
-						// OR redirect the user automatically (noko)
 						let new_thread_id = response.headers.get("new-thread-id");
-						thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); closeThreadPostedDialog(); }
-						openThreadPostedDialog();
-						// thread_posted_dialog["style"]["display"] = "block";
-						// alert(`Thread posted successfully\nNew thread ID: ${new_thread_id}`);
+						thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
+						thread_posted_dialog.showModal();
 					}
 				}
 				else {
@@ -523,7 +518,7 @@ dialog {
 			// file_title.classList.add("FileTitle");
 			file_title.textContent = filename;
 			let file_delete_button = document.createElement("button");
-			file_delete_button.textContent = "\u{1F5D9} Delete"; // 1F5D1 = смітник
+			file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
 			let progress_element = document.createElement("progress");
 			progress_element.value = 0;
 			file_information_container.append(file_title, document.createElement("br"), progress_element, document.createElement("br"), file_delete_button);
@@ -679,12 +674,14 @@ dialog {
 
 			let post_id_element = document.createElement("span");
 			post_id_element.classList.add("ID");
+			let post_id;
 			if (state.selected_thread_id > -1) {
-				post_id_element.textContent = `#${data.thread_id}/${data.id_in_thread}`;
+				post_id = `#${data.thread_id}/${data.id_in_thread}`;
 			}
 			else {
-				post_id_element.textContent = "#" + data.thread_id;
+				post_id = "#" + data.thread_id;
 			}
+			post_id_element.textContent = post_id;
 
 			post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
 			const right_aligned_toolbar_group = document.createElement("div");
@@ -693,7 +690,7 @@ dialog {
 			// Delete button
 			if (data.is_author) {
 				let delete_button_element = document.createElement("button");
-				delete_button_element.textContent = "\u{1F5D9} Delete";
+				delete_button_element.textContent = "\u{1F5D1} Delete";
 				delete_button_element.onclick = async() => { 
 					let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
 					console.log(server_response);
@@ -708,12 +705,22 @@ dialog {
 				// post_header_element.appendChild(delete_button_element);
 				right_aligned_toolbar_group.appendChild(delete_button_element);
 			}
+			// Reply button
+			if (state.selected_thread_id > -1) { // Reply button will not appear on catalog (thread list)
+				let reply_button_element = document.createElement("button");
+				reply_button_element.style["margin-left"] = "0.5em";
+				reply_button_element.textContent = "\u{2BA9} Reply";
+				reply_button_element.onclick = () => {
+					content_field.innerText += post_id + " ";
+				}
+				right_aligned_toolbar_group.appendChild(reply_button_element);
+			}
 			right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
 			post_header_element.append(right_aligned_toolbar_group);
 
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
-			post_content_element.innerText = data.content;
+			post_content_element.innerText = data.content; // TODO: use regex to highlight replies
 	
 			let post_files_element = document.createElement("div");
 			post_files_element.classList.add("Files");
@@ -806,7 +813,7 @@ dialog {
 			// this will be done through a central config file later
 			let sock = new WebSocket("_WEBSOCKET_URL");	
 			sock.onopen = (event) => {
-				connection_status.textContent = "Connected 🙂";
+				// connection_status.textContent = "Connected 🙂";
 				websocket_connected = true;
 				if (state.selected_thread_id > -1) {
 					sock.send(JSON.stringify({
@@ -835,12 +842,12 @@ dialog {
 			}
 	
 			sock.onerror = (event) => {
-				connection_status.textContent = "Errored 😤"
+				// connection_status.textContent = "Errored 😤"
 			}
 	
 			sock.onclose = (event) => {
 				// connection_status.textContent = "Closed 😔"
-				connection_status.textContent = "Closed \u{1F634}"
+				// connection_status.textContent = "Closed \u{1F634}"
 				websocket_connected = false;
 			}
 			return sock
