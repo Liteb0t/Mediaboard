@@ -851,7 +851,8 @@ dialog {
 				let message_json = JSON.parse(event.data);
 				if (message_json.type === "post") {
 					// auto-scroll to new message if window was scrolled near the bottom already
-					let do_scroll = window.scrollY >= window.scrollMaxY - 10;
+					// would be nice if window.scrollMaxY was standard! document.body.scrollHeight - document.body.clientHeight will be used instead
+					let do_scroll = window.scrollY >= document.body.scrollHeight - document.body.clientHeight - 10;
 
 					post_container.appendChild(createPost(JSON.parse(event.data)));
 
