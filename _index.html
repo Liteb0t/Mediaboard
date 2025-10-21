@@ -526,6 +526,7 @@ dialog {
 			file_thumbnail.setAttribute("width", "100px");
 			file_thumbnail.setAttribute("height", "100px");
 			const file_information_container = document.createElement("div");
+			file_information_container.classList.add("FileInformation");
 			let file_title = document.createElement("span");
 			// file_title.classList.add("FileTitle");
 			file_title.textContent = filename;
@@ -599,6 +600,7 @@ dialog {
 			// let file_name = sanitiseFileName(file_object.name);
 			// console.log("file_name: " + file_name);
 			let file_element = addFileToList(file_object.name);
+			let file_information_element = file_element.querySelector(".FileInformation");
 			let file_progress_element = file_element.querySelector("progress");
 			let file_img_element = file_element.querySelector("img");
 			let request = new XMLHttpRequest();
@@ -631,7 +633,7 @@ dialog {
 						const upload_complete_indicator = document.createElement("span");
 						upload_complete_indicator.classList.add("UploadCompleteIndicator");
 						upload_complete_indicator.textContent = "Upload complete";
-						file_element.replaceChild(upload_complete_indicator, file_progress_element);
+						file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
 			        }
 			    }
 			};
