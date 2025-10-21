@@ -25,6 +25,10 @@
 				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3 (development)</a></div>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
+			<noscript>
+				<dialog open><h2>Error</h2><p><b>Enable javascript</b> you fucking autist neckbeard, it's not gonna hurt you.</p></dialog>
+			</noscript>
+			<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 			<div id="post_container"></div>
 		</main>
 		<div id="body_separator" class="FlexSeparator"></div>
@@ -104,7 +108,7 @@ input[type=file]::file-selector-button:active {
 }
 
 dialog {
-	box-shadow: -5pt -5px #0008;
+	box-shadow: 8px 8px #0008;
 	margin-top: 20vh;
 }
 
@@ -176,7 +180,6 @@ dialog {
 
 	.Username {
 		font-family: var(--name-font);
-		font-weight: bold;
 	}
 	.Timestamp {
 		float: right;
@@ -308,6 +311,7 @@ dialog {
 		let websocket;
 		let websocket_connected;
 		console.log(websocket);
+		loading_dialog.show();
 
 		if (window.location.pathname.startsWith(root_url + "thread/")) {
 			let second_slash_index = window.location.pathname.indexOf("/", root_url.length + 7);
@@ -372,6 +376,8 @@ dialog {
 			}
 			localStorage.setItem("key", user_key);
 		}
+		// The value in the name field is set to the name used in the most recent post, if any.
+		name_field.value = localStorage.getItem("name");
 
 		async function postAction() {
 			let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
@@ -407,6 +413,7 @@ dialog {
 					console.log(response);
 					alert("Error when attempting to post\nStatus: " + response.status + "\nstatusText: " + response.statusText);
 				}
+				localStorage.setItem("name", name_field.value);
 			}
 		}
 
@@ -662,7 +669,7 @@ dialog {
 			// post_header_element.classList.add("PostHeader");
 			post_header_element.classList.add("ToolBar");
 	
-			let post_name_element = document.createElement("span");
+			let post_name_element = document.createElement("b");
 			post_name_element.classList.add("Username");
 			post_name_element.textContent = data.name;
 
@@ -721,7 +728,7 @@ dialog {
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
 			const regex = /#\d*\/(\d+)\b/g;
-			post_content_element.innerHTML = data.content.replaceAll(regex, "<span class=\"PostLink\">#" + data.thread_id + "/$1</span>"); // TODO: use regex to highlight replies
+			post_content_element.innerHTML = data.content.replaceAll(regex, "<span class=\"PostLink\">#" + data.thread_id + "/$1</span>");
 	
 			let post_files_element = document.createElement("div");
 			post_files_element.classList.add("Files");
@@ -922,6 +929,7 @@ dialog {
 		}
 	
 		refresh_send();
+		loading_dialog.close();
 		// websocket = connectToServer();
 	</script>
 </html>
