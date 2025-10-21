@@ -19,10 +19,11 @@
 				<div id="WebsiteName"><b>_SITE_NAME</b></div>
 					<button id="catalog_button" class="ToolBarButton" onclick="openCatalog()">&#x1F5D0; Catalog</button>
 					<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
+				<div id="warning_outdated_browser" style="color: #D00">Warning: outdated browser</div>
 				<div class="FlexSeparator"></div>
 				<!--
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>-->
-				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3 (development)</a></div>
+				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3</a></div>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
 			<noscript>
@@ -36,10 +37,10 @@
 			<summary id="reply_heading_text"></summary>
 			<form id="post_form" name="post" action="" autocomplete="on">
 			<div class="ToolBar">
-			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" />
+			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" maxlength="73" />
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned" onclick="postAction()" tabindex="1">
 			</div>
-			<div contenteditable="" id="content_field" tabindex="1" placeholder="Content*"></div>
+			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content*"></div>
 			<fieldset>
 				<legend>Upload up to four files</legend>
 				<input type="file" id="file_upload" tabindex="1" autocomplete="off" multiple>
@@ -124,6 +125,9 @@ dialog {
 #header_bar {
 	border-top: 1px solid #888;
 	border-bottom: 1px solid #888;
+	#warning_outdated_browser {
+		display: none;
+	}
 }
 
 .ToolBar {
@@ -192,6 +196,7 @@ dialog {
 	.Content {
 		margin: 0.25rem 0;
 		padding: 0 0.25rem;
+		white-space: pre-wrap;
 	}
 	
 	.Files {
@@ -727,8 +732,18 @@ dialog {
 
 			let post_content_element = document.createElement("div");
 			post_content_element.classList.add("Content");
-			const regex = /#\d*\/(\d+)\b/g;
-			post_content_element.innerHTML = data.content.replaceAll(regex, "<span class=\"PostLink\">#" + data.thread_id + "/$1</span>");
+
+			// Highlight reply links by wrapping them in a <span> element
+			const message_content_split = data.content.split(/#\d*\/(\d+)\b/g);
+			for (let i = 0; i < message_content_split.length; i+=2) {
+				post_content_element.appendChild(document.createTextNode(message_content_split[i]));
+				if (i+1 !== message_content_split.length) {
+					let reply_link = document.createElement("span");
+					reply_link.classList.add("PostLink");
+					reply_link.textContent = `#${data.thread_id}/${message_content_split[i+1]}`;
+					post_content_element.appendChild(reply_link);
+				}
+			}
 	
 			let post_files_element = document.createElement("div");
 			post_files_element.classList.add("Files");
