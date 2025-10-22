@@ -10,10 +10,10 @@
 #include "http_session.hpp"
 #include "websocket_session.hpp"
 #include <boost/config.hpp>
+#include <boost/filesystem.hpp>
 #include <boost/locale.hpp>
 #include <boost/url/src.hpp>
 #include <boost/uuid/uuid.hpp>
-// #include <boost/lexical_cast.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -277,10 +277,13 @@ handle_request(
     	http::file_body::value_type body;
 		std::cout << "Opening path: " << path << std::endl;
     	body.open(path.c_str(), beast::file_mode::scan, ec);
+		boost::filesystem::path filesystem_path(path);
 
     	// Handle the case where the file doesn't exist
     	if(ec == boost::system::errc::no_such_file_or_directory)
     	    return not_found(req.target());
+		else if (!boost::filesystem::is_regular_file(filesystem_path))
+			return bad_request("Is a directory.");
 
     	// Handle an unknown error
     	if(ec)
@@ -294,11 +297,14 @@ handle_request(
 			if ((filename_extension_index = filename.rfind(".")) == -1) {
 				filename_extension_index = filename.size();
 			}
-			filename.erase(filename_extension_index - 36, 36);
+			if (filename_extension_index >= 36) {
+				filename.erase(filename_extension_index - 36, 36);
+			}
+			// We know it's not a user-submitted file when the filename is too short to include a UUID.
+			else
+				is_media = false;
 			std::cout << "Is media. Filename: " << filename << std::endl;
 		}
-		else
-			is_media = false;
 
     	// Cache the size since we need it after the move
     	auto const size = body.size();
@@ -321,6 +327,8 @@ handle_request(
     	    std::make_tuple(http::status::ok, req.version())
 		};
 		if (is_media) {
+			// Only set when the filename is long enough to include the UUID.
+			// In other words, we know it's a user-uploaded file.
 			res.set("Content-Disposition", "attachment; filename=\"" + filename + "\"");
 		}
     	res.set(http::field::server, BOOST_BEAST_VERSION_STRING);

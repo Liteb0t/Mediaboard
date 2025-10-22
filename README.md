@@ -4,6 +4,7 @@
 `ecpg`\
 `libboost1.81-dev`\
 `libboost-program-options1.81-dev`\
+`libboost-filesystem1.81-dev`\
 `Imagemagick` build with the delegates for JPEG, PNG, WEBP, and JPEG-XL. On Debian/Devuan the apt build doesn't come with JPEG-XL so you need to build it yourself.\
 `make`\
 `g++`\
