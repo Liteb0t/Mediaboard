@@ -12,7 +12,7 @@
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/locale.hpp>
-#include <boost/url/src.hpp>
+// #include <boost/url/src.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>

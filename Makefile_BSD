@@ -1,0 +1,43 @@
+BOOSTINC=-I/usr/local/include/boost/
+INCFLAGS=-I/usr/local/include
+
+all: index.html server
+
+index.html: _index.html tokens.m4
+	m4 _index.html >index.html
+
+server: main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o 
+	clang++ `Magick++-config --cxxflags --cppflags` -o server main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o $(INCFLAGS) -I/usr/include/postgresql -l:libecpg.so -l:libpgtypes.so `Magick++-config --ldflags --libs` -lboost_program_options -lboost_filesystem -lboost_system -pthread
+
+main.o: main.cpp 
+	clang++ -c `Magick++-config --cxxflags --cppflags` main.cpp -o main.o $(INCFLAGS)  `Magick++-config --ldflags --libs` -lboost_program_options -lboost_filesystem -lboost_system
+
+listener.o: listener.cpp listener.hpp
+	clang++ -c listener.cpp -o listener.o $(INCFLAGS)
+
+beast.o: beast.hpp
+	clang++ -c beast.hpp -o beast.o $(INCFLAGS)
+
+http_session.o: http_session.cpp http_session.hpp 
+	clang++ -c `Magick++-config --cxxflags --cppflags` http_session.cpp -o http_session.o $(INCFLAGS) `Magick++-config --ldflags --libs` -lboost_filesystem -lboost_system
+
+shared_state.o: shared_state.cpp shared_state.hpp 
+	clang++ -c shared_state.cpp -o shared_state.o $(INCFLAGS)
+
+websocket_session.o: websocket_session.cpp websocket_session.hpp 
+	clang++ -c websocket_session.cpp -o websocket_session.o $(INCFLAGS)
+
+board.o: board.cpp board.hpp 
+	clang++ -c board.cpp -o board.o $(INCFLAGS)
+
+thread.o: thread.cpp thread.hpp 
+	clang++ -c thread.cpp -o thread.o $(INCFLAGS)
+
+post.o: post.cpp post.hpp field_lengths.h
+	clang++ -c post.cpp -o post.o $(INCFLAGS)
+
+db_interface.o: db_interface.c db_interface.h
+	clang -c db_interface.c -o db_interface.o $(INCFLAGS) -lecpg
+
+db_interface.c: db_interface.pgc field_lengths.h
+	ecpg db_interface.pgc

@@ -9,6 +9,19 @@
 `make`\
 `g++`\
 `m4`
+### Required packages (FreeBSD 14.3)
+`ImageMagick6-nox11`\
+`postgresql15-server`\
+`nlohmann-json`\
+`boost-libs`
+### Postgres setup (FreeBSD 14.3)
+`doas pw groupmod postgres -M <user>`\
+`doas reboot`\
+`initdb -D /var/db/postgres/15/main/`\
+`pg_ctl -D /var/db/postgres/15/main start`\
+`createdb fuze_mediaboard`\
+`psql -d fuze_mediaboard`\
+`=# CREATE USER mediaboard_server WITH PASSWORD '<password>'`
 ### Database setup
 Install postgresql.\
 \
