@@ -9,6 +9,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
 		<base href="_ROOT_URL">
+		<!--<script src="registration.js" defer></script>-->
 		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
 		<!--<link rel="stylesheet" href="/styles_mediaboard.css">-->
 	</head>
@@ -17,12 +18,15 @@
 		<main>
 			<div id="header_bar" class="ToolBar WithBorders">
 				<div id="WebsiteName"><b>_SITE_NAME</b></div>
-					<button id="catalog_button" class="ToolBarButton" onclick="openCatalog()">&#x1F5D0; Catalog</button>
-					<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
+				<button id="catalog_button" class="ToolBarButton" onclick="openCatalog()">&#x1F5D0; Catalog</button>
+				<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
 				<div id="warning_outdated_browser" style="color: #D00">Warning: outdated browser</div>
 				<div class="FlexSeparator"></div>
 				<!--
-				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>-->
+				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
+				<button id="LoginButton" class="ToolBarButton">Login</button>
+				<button id="RegisterButton" class="ToolBarButton">Register</button>-->
+				<a href="/registration.html">Registration</a>
 				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3+</a></div>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
@@ -154,6 +158,13 @@ dialog {
 	}
 	.RightAligned {
 		margin-left: auto;
+	}
+}
+
+.MessageBoxButtons button {
+	margin-left: auto;
+	&:not(:first-child) {
+		margin-left: 0.5em;
 	}
 }
 
@@ -371,6 +382,41 @@ dialog {
 				}
 			}
 		}
+
+		/*
+		class MessageBox {
+			constructor(body, title, buttons = []) {
+				this.element = document.createElement("dialog");
+				let title_element = document.createElement("h3");
+				title_element.textContent = title;
+				let body_element = document.createElement("p");
+				body_element.textContent = body;
+				this.element.setAttribute("closedby", "any");
+				this.element.append(title_element, body_element);
+				if (buttons.length >= 1) {
+					let button_container = document.createElement("div");
+					button_container.classList.add("ToolBar", "MessageBoxButtons");
+					for (let button of buttons) {
+						let button_element = document.createElement("button");
+						button_element.textContent = button.label;
+						button_element.onclick = button.action;
+						button_container.append(button_element);
+					}
+					this.element.append(button_container);
+				}
+
+				document.body.append(this.element);
+			}
+			show() {
+				this.element.showModal();
+			}
+			close() {
+				this.element.close();
+			}
+		}
+		const test_messagebox = new MessageBox("yo test", "Test messagebox", [{label: "OK", action: () => {test_messagebox.close()}}, {label: "nothing", action: null}]);
+		test_messagebox.show();
+		*/
 
 		// Used to verify the author on deleting a message.
 		let user_key = localStorage.getItem("key");

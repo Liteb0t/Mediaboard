@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<!--
+			include(`tokens.m4')
+		-->
+		<title>Registration - _SITE_NAME</title>
+		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta charset="utf-8">
+		<base href="_ROOT_URL">
+		<!--<script src="registration.js" defer></script>-->
+		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
+		<!--<link rel="stylesheet" href="/styles_mediaboard.css">-->
+	</head>
+	<body>
+		<!--Navbar can go here-->
+		<main>
+			<form class="FormGrid" action="registration/create_account/" method="POST">
+				<label for="name">Name</label>
+				<input id="name" type="text" name="name" required>
+				<label for="password">Password</label>
+				<input id="password" type="password" name="password" required>
+				<div class="FullWidth">
+				<label for="remain_logged_in">Remain logged in</label>
+				<input id="remain_logged_in" type="checkbox" name="remain_logged_in">
+				</div>
+				<div class="FullWidth">
+				<input type="submit">
+				</div>
+			</form>
+		</main>
+		<dialog closedby="any">
+		</dialog>
+	</body>
+<style>
+.FormGrid {
+	display: grid;
+	grid-template-columns: auto auto;
+	gap: 0.25em 0.5em;
+	width: fit-content;
+	.FullWidth {
+		grid-column: 1 / 3;
+	}
+}
+</html>

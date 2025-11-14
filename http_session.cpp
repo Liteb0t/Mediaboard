@@ -12,7 +12,6 @@
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/locale.hpp>
-// #include <boost/url/src.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
@@ -396,6 +395,17 @@ handle_request(
 			res.prepare_payload();
 			return res;
 		}
+		else if (req.target() == "/registration/create_account/") {
+			http::response<http::empty_body> res;
+			std::cout << "Fields:" << std::endl;
+			for (auto it = req.begin(); it != req.end(); it++) {
+				std::cout << it->name_string() << ": " << it->value() << std::endl;
+			}
+			std::cout << "Body:" << std::endl << req.body() << std::endl;
+			res.result(401);
+			res.prepare_payload();
+			return res;
+		}
 		else if (req.target() == "/api/upload/") {
 			// request_parser<empty_body> req_parser;
 			// std::string content_dispo =  req.get()[http::field::content_disposition] << std::endl;
@@ -499,7 +509,7 @@ handle_request(
 		else {
 			std::cout << "Unknown target: " << req.target() << std::endl;
 			http::response<http::empty_body> res;
-			res.result(500);
+			res.result(404);
 			res.prepare_payload();
 			return res;
 		}
