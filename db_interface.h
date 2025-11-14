@@ -48,7 +48,7 @@ extern "C" {
 	struct db_post_struct db_retrieve_last_post();
 	struct db_thread_array* db_retrieve_threads();
 	struct db_post_array* db_retrieve_history();
-	void db_connect();
+	void db_connect(const char* _database_name);
 	void db_disconnect();
 #ifdef __cplusplus
 }
