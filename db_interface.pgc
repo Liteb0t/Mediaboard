@@ -56,8 +56,9 @@ void freeThreadArray(struct db_thread_array *a) {
   a->used = a->size = 0;
 }
 
-void db_connect() {
+void db_connect(const char* _database_name) {
 	EXEC SQL BEGIN DECLARE SECTION;
+	const char* database_name = _database_name;
 	const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	// const char* password = "watermelone";
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
@@ -72,7 +73,7 @@ void db_connect() {
 		fprintf(stderr, "Could not find environment variable \"%s\" required for the database connection password. Exiting.", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 		exit(2);
 	}
-	EXEC SQL CONNECT TO "fuze_mediaboard" USER "mediaboard_server" USING :password;
+	EXEC SQL CONNECT TO :database_name USER "mediaboard_server" USING :password;
 	printf("Connected!\n");
 	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;

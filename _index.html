@@ -23,7 +23,7 @@
 				<div class="FlexSeparator"></div>
 				<!--
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>-->
-				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3+</a></div>
+				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3++</a></div>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
 			<dialog id="loading_dialog" open><p>Loading. Please wait...</p></dialog>
@@ -409,7 +409,7 @@ dialog {
 					file_upload.value = "";
 					file_post_list.textContent = "";
 					if (state.selected_thread_id === -1) {
-						let new_thread_id = response.headers.get("new-thread-id");
+						let new_thread_id = Number(response.headers.get("new-thread-id"));
 						thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
 						thread_posted_dialog.showModal();
 					}

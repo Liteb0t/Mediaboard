@@ -33,7 +33,7 @@ main(int argc, char* argv[])
     // Check command line arguments.
 	std::string config_file;
 	unsigned short port;
-	std::string doc_root;
+	std::string doc_root, database_name;
 	int threads;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
@@ -43,6 +43,7 @@ main(int argc, char* argv[])
 
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
+		("database,d", boost::program_options::value<std::string>(&database_name),  "Name of the postgresql database.")
 		("media_path,m", boost::program_options::value<std::string>(&doc_root),  "file path where user-submitted media is stored")
 		("port,p", boost::program_options::value<unsigned short>(&port), "the port which the server will serve")
 		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "number of async threads");
@@ -86,6 +87,12 @@ main(int argc, char* argv[])
 		port = 8300;
 	}
 	std::cout << "set the port to " << port << std::endl;
+	if (!variable_map.count("database")) {
+		database_name = "fuze_mediaboard";
+		std::cout << "\"database\" not found in config. Using default " << database_name << std::endl;
+	}
+	else
+		std::cout << "Set the database to " << doc_root << std::endl;
     // auto doc_root = argv[3];
 	if (!variable_map.count("media_path")) {
 		doc_root = ".";
@@ -98,7 +105,7 @@ main(int argc, char* argv[])
     // The io_context is required for all I/O
     net::io_context ioc;
 
-	db_connect();
+	db_connect(database_name.c_str());
 
     // Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
