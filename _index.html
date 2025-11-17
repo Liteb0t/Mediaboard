@@ -375,16 +375,18 @@ main {
 			registration_link.style["display"] = "inherit";
 		}
 		else {
+			logged_in_as_username.textContent = localStorage.getItem("account_username");
 			logout_button.style["display"] = "inherit";
 			logged_in_indicator.style["display"] = "inherit";
-			logged_in_as_username.textContent = localStorage.getItem("account_username");
 		}
 
 		function logoutAction() {
 			logout_button.style["display"] = "none";
 			logged_in_indicator.style["display"] = "none";
 			registration_link.style["display"] = "inherit";
+			localStorage.removeItem("account_key");
 			account_key = null;
+			refresh_send();
 		}
 
 		async function postAction() {
@@ -724,13 +726,22 @@ main {
 			}
 			// Reply button
 			if (state.selected_thread_id > -1 && !url_params_display_as_embed) { // Reply button will not appear on catalog (thread list)
-				let reply_button_element = document.createElement("button");
-				reply_button_element.style["margin-left"] = "0.5em";
-				reply_button_element.textContent = "\u{2BA9} Reply";
-				reply_button_element.onclick = () => {
-					content_field.innerText += post_id + " ";
+				let reply_button = document.createElement("button");
+				reply_button.style["margin-left"] = "0.5em";
+				reply_button.textContent = "\u{2BA9} Reply";
+				reply_button.onclick = () => {
+					let reply_link_node = document.createTextNode(post_id + " ");
+					content_field.append(reply_link_node);
+					const range = document.createRange();
+					const selection = window.getSelection();
+					console.log(reply_link_node);
+					range.setStartAfter(reply_link_node);
+					range.collapse(true);
+					selection.removeAllRanges();
+					selection.addRange(range);
+					// content_field.focus();
 				}
-				right_aligned_toolbar_group.appendChild(reply_button_element);
+				right_aligned_toolbar_group.appendChild(reply_button);
 			}
 			right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
 			post_header_element.append(right_aligned_toolbar_group);
