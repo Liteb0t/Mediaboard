@@ -552,7 +552,7 @@ main {
 
 		content_field.oninput = () => {
 			// Remove leftover <br> tag so the placeholder appears again
-			if (content_field.children.length === 1 && content_field.children[0].tagName === "BR") {
+			if (content_field.childElementCount === 1 && content_field.children[0].tagName === "BR" && content_field.textContent.length === 0) {
 				content_field.removeChild(content_field.children[0]);
 			}
 		}

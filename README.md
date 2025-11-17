@@ -2,6 +2,7 @@
 ### Required packages (Debian 12/Devuan 5)
 `postgresql`\
 `ecpg`\
+`nlohmann-json3-dev`\
 `libboost1.81-dev`\
 `libboost-program-options1.81-dev`\
 `libboost-filesystem1.81-dev`\
@@ -19,13 +20,14 @@
 `doas reboot`\
 `initdb -D /var/db/postgres/15/main/`\
 `pg_ctl -D /var/db/postgres/15/main start`\
-`createdb fuze_mediaboard`\
-`psql -d fuze_mediaboard`\
-`=# CREATE USER mediaboard_server WITH PASSWORD '<password>'`
 ### Database setup
 Install postgresql.\
 \
-To import the database template, run:\
+To create the database:\
+`createdb fuze_mediaboard`\
+`psql -d fuze_mediaboard`\
+`=# CREATE USER mediaboard_server WITH PASSWORD '<password>'`\
+To import the database template:\
 `psql -X fuze_mediaboard < fuze_mediaboard_template.sql`\
 \
 Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it high enough in the table so that it won't be overridden by other settings:\
