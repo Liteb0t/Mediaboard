@@ -4,43 +4,134 @@
 		<!--
 			include(`tokens.m4')
 		-->
-		<title>Registration - _SITE_NAME</title>
+		<title>Authentication - _SITE_NAME</title>
 		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
 		<base href="_ROOT_URL">
-		<!--<script src="registration.js" defer></script>-->
 		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
-		<!--<link rel="stylesheet" href="/styles_mediaboard.css">-->
+		<link rel="stylesheet" href="styles.css">
 	</head>
 	<body>
 		<!--Navbar can go here-->
 		<main>
-			<form class="FormGrid" action="registration/create_account/" method="POST">
-				<label for="name">Name</label>
-				<input id="name" type="text" name="name" required>
-				<label for="password">Password</label>
-				<input id="password" type="password" name="password" required>
-				<div class="FullWidth">
+			<h1>Authentication - _SITE_NAME</h1>
+			<form action="" method="POST" autocomplete="on">
+				<div class="FormGrid">
+				<label for="account_username_input">Username</label>
+				<input id="account_username_input" type="text" name="account_username" required><span></span>
+				<label for="account_password_input">Password</label>
+				<input id="account_password_input" type="password" name="account_password" required>
+				<input type="button" value="Show Password" id="toggle_password_visibility_button" class="RightAligned" onclick="togglePasswordVisibility()">
+				</div>
+				<!--<div class="FullWidth">
 				<label for="remain_logged_in">Remain logged in</label>
 				<input id="remain_logged_in" type="checkbox" name="remain_logged_in">
-				</div>
-				<div class="FullWidth">
-				<input type="submit">
-				</div>
+				</div>-->
+				<!--JSON is used instead of standard HTTP so this is not used
+				<input type="submit">-->
+				<input type="button" value="Log in" id="post_button" class="RightAligned" onclick="loginAction()">
+				<input type="button" value="Register" id="post_button" class="RightAligned" onclick="registerAction()">
 			</form>
+			<div id="error_messages"></div>
 		</main>
-		<dialog closedby="any">
+		<dialog id="login_success_dialog" closedby="any">
+			<h2>Success</h2>
+			<p>Logged in as <i id="logged_in_as">some dude idk</i></p>
+			<div class="ToolBar"><a class="Button RightAligned" href="_ROOT_URL">Proceed</a><button style="margin-left: 2em;" onclick="login_success_dialog.close()">Close</button></div>
+		</dialog>
+		<dialog id="registration_success_dialog" closedby="any">
+			<h2>Success</h2>
+			<p>Registered as <i id="registered_as">some dude idk</i>.<br>You are now logged in.</p>
+			<div class="ToolBar"><a class="Button RightAligned" href="_ROOT_URL">Proceed</a><button style="margin-left: 2em;" onclick="registration_success_dialog.close()">Close</button></div>
 		</dialog>
 	</body>
 <style>
+#error_messages {
+	color: #800;
+}
 .FormGrid {
 	display: grid;
-	grid-template-columns: auto auto;
+	grid-template-columns: auto auto auto;
 	gap: 0.25em 0.5em;
+	margin: 4px 0;
 	width: fit-content;
 	.FullWidth {
-		grid-column: 1 / 3;
+		grid-column: 1 / 4;
 	}
 }
+</style>
+<script>
+"use strict";
+const api_url = "api/";
+let password_is_visible = false;
+async function loginAction() {
+	const fetch_response = await sendRegistrationFormData("login");
+	console.log(fetch_response);
+	if (fetch_response && fetch_response.ok) {
+		let as_JSON = await fetch_response.json();
+		console.log(as_JSON);
+		logged_in_as.textContent = account_username_input.value;
+		login_success_dialog.showModal();
+		localStorage.setItem("account_username", account_username_input.value);
+		localStorage.setItem("account_key", account_password_input.value);
+	}
+}
+async function registerAction() {
+	const fetch_response = await sendRegistrationFormData("register");
+	if (fetch_response && fetch_response.ok) {
+		let as_JSON = await fetch_response.json();
+		console.log(as_JSON);
+		registered_as.textContent = account_username_input.value;
+		registration_success_dialog.showModal();
+		localStorage.setItem("account_username", account_username_input.value);
+		localStorage.setItem("account_key", account_password_input.value);
+	}
+}
+async function sendRegistrationFormData(endpoint) {
+	error_messages.textContent = "";
+	const data = {
+		username: account_username_input.value
+		,password: account_password_input.value
+		// ,remain_logged_in: remain_logged_in.checked
+	};
+	let fetch_response;
+	try {
+		if (account_username_input.value.length === 0)
+			throw new Error("Username cannot be empty");
+		if (account_password_input.value.length === 0)
+			throw new Error("Password cannot be empty");
+		fetch_response = await fetch("_ROOT_URL" + api_url + endpoint + "/", {
+			method: "POST",
+			body: JSON.stringify(data)
+		});
+		if (!fetch_response.ok) {
+			let header_error_message = fetch_response.headers.get("message");
+			if (header_error_message == null) {
+				throw new Error(`ERROR ${fetch_response.status}\n${fetch_response.statusText}`);
+			}
+			else {
+				throw new Error(`ERROR ${fetch_response.status}\n${fetch_response.statusText}\n${header_error_message}`);
+			}
+		}
+	}
+	catch (error) {
+		error_messages.innerText = error.message;
+		console.error(error.message);
+	}
+	return fetch_response;
+}
+function togglePasswordVisibility() {
+	if (password_is_visible) {
+		account_password_input.type="password";
+		toggle_password_visibility_button.value = "Show password";
+		password_is_visible=false;
+	}
+	else {
+		account_password_input.type="text";
+		toggle_password_visibility_button.value = "Hide password";
+		password_is_visible=true;
+	}
+}
+</script>
 </html>

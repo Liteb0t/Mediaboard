@@ -1,0 +1,74 @@
+button, input[type=file]::file-selector-button, input[type=button], .Button {
+	background-color: #EEE;
+	border: 2px outset #DDD;
+	border-radius: 0;
+	font-size: 1rem;
+	font-family: var(--interactive-font);
+	padding: 1px 4px;
+	text-decoration: none;
+	&:hover:not(:disabled) {
+		background-color: #CCC;
+		cursor: pointer;
+		&:active {
+			background-color: #AAA;
+			border-style: inset;
+		}
+	}
+}
+/* https://developer.mozilla.org/en-US/docs/Web/CSS/Nesting_selector#cannot_represent_pseudo-elements */
+input[type=file]::file-selector-button:hover {
+	background-color: #CCC;
+	cursor: pointer;
+}
+input[type=file]::file-selector-button:active {
+	background-color: #AAA;
+	border-style: inset;
+}
+
+dialog {
+	box-shadow: 8px 8px #0008;
+	margin-top: 20vh;
+}
+
+.ToolBar {
+	display: flex;
+	flex-wrap: wrap;
+	/*user-select: none;*/
+	
+	>* {
+		display: flex;
+		align-items: center;
+		min-height: 2rem;
+		word-wrap: anywhere;
+		&:not(button) {
+			padding: 0 0.25em;
+		}
+		time, span, b, i {
+			user-select: none;
+		}
+	}
+	&.WithBorders >* {
+		&:not(:first-child) {
+			border-left: 1px solid #888;
+		}
+	}
+	.RightAligned {
+		margin-left: auto;
+	}
+}
+
+.MessageBoxButtons button {
+	margin-left: auto;
+	&:not(:first-child) {
+		margin-left: 0.5em;
+	}
+}
+
+.ToolBarButton {
+	border-style: none;
+	padding: 0 1em;
+	&:hover:active {
+		border-style: none !important;
+		border-left: 1px solid #888 !important;
+	}
+}

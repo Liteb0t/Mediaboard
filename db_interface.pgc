@@ -64,6 +64,7 @@ void db_connect(const char* _database_name) {
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts) VALUES (?, 0);";
 	const char* mark_post_as_deleted_prepared_stmt = "UPDATE post SET deleted = true WHERE id = ?;";
+	const char* create_account_prepared_stmt = "INSERT INTO account(username, password_hash) VALUES (?, ?);";
 	char* data;
 	EXEC SQL END DECLARE SECTION;
 	// printf("password: %s\n", password);
@@ -78,6 +79,7 @@ void db_connect(const char* _database_name) {
 	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;
 	EXEC SQL PREPARE mark_post_as_deleted_stmt FROM :mark_post_as_deleted_prepared_stmt;
+	EXEC SQL PREPARE create_account_prepared_stmt FROM :create_account_prepared_stmt;
 }
 
 void db_test() {
@@ -139,6 +141,49 @@ void db_mark_post_as_deleted(int post_id_) {
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL EXECUTE mark_post_as_deleted_stmt USING :post_id;
 	EXEC SQL COMMIT;
+}
+
+int db_store_account(const char* _username, const char* _password) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* username = _username;
+	const char* password = _password;
+	char hashed_password[60];
+	char username_exists;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL SELECT exists (SELECT 1 FROM account WHERE username = :username LIMIT 1) INTO :username_exists;
+	EXEC SQL COMMIT;
+	if (username_exists == 't')
+		return 1;
+	else {
+		EXEC SQL SELECT crypt(:password, gen_salt('bf')) INTO :hashed_password;
+		EXEC SQL EXECUTE create_account_prepared_stmt USING :username, :hashed_password;
+		EXEC SQL COMMIT;
+		return 0;
+	}
+}
+
+const char db_fetch_key(char* key, const char* _username, const char* _password) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* username = _username;
+	const char* password = _password;
+	char hashed_password[61];
+	char passwords_match;
+	EXEC SQL END DECLARE SECTION;
+	hashed_password[0] = '\0';
+	EXEC SQL SELECT password_hash INTO :hashed_password FROM account WHERE username = :username;
+	EXEC SQL COMMIT;
+	if (hashed_password[0] == '\0')
+		return '\0';
+	else {
+		printf("Username exists. hashed_password: %s\n", hashed_password);
+		EXEC SQL SELECT (:hashed_password = crypt(:password, :hashed_password)) INTO :passwords_match;
+		if (passwords_match == 't') {
+			hashed_password[8] = '\0';
+			strcpy(key, hashed_password);
+		}
+		EXEC SQL COMMIT;
+		return passwords_match;
+	}
 }
 
 struct db_thread_array* db_retrieve_threads() {
@@ -214,7 +259,7 @@ struct db_post_array* db_retrieve_history() {
 	return (&post_history);
 }
 
-void db_disconnect() {
+void db_disconnect(void) {
 	EXEC SQL DISCONNECT ALL;
 }
 

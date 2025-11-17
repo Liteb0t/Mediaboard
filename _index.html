@@ -9,9 +9,8 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
 		<base href="_ROOT_URL">
-		<!--<script src="registration.js" defer></script>-->
 		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
-		<!--<link rel="stylesheet" href="/styles_mediaboard.css">-->
+		<link rel="stylesheet" href="styles.css">
 	</head>
 	<body>
 		<!--Navbar can go here-->
@@ -26,8 +25,12 @@
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
 				<button id="LoginButton" class="ToolBarButton">Login</button>
 				<button id="RegisterButton" class="ToolBarButton">Register</button>-->
-				<a href="/registration.html">Registration</a>
-				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.3+</a></div>
+				<a id="registration_link" class="Button ToolBarButton" href="/registration.html" style="display: none">Log-in or Register</a>
+				<div id="logged_in_indicator" style="display: none">
+					Logged in as&nbsp;<b id="logged_in_as_username">Someone</b>
+				</div>
+				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
+				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.4</a></div>
 			</div>
 			<h3 id="location_indicator">Catalog</h3>
 			<dialog id="loading_dialog" open><p>Loading. Please wait...</p></dialog>
@@ -42,7 +45,7 @@
 			<form id="post_form" name="post" action="" autocomplete="on">
 			<div class="ToolBar">
 			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" maxlength="73" />
-			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned" onclick="postAction()" tabindex="1">
+			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned" onclick="postAction()">
 			</div>
 			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content*"></div>
 			<fieldset>
@@ -87,36 +90,6 @@ main {
 	flex: 0 0 auto;
 }
 
-button, input[type=file]::file-selector-button, input[type=button] {
-	background-color: #EEE;
-	border: 2px outset #DDD;
-	border-radius: 0;
-	font-size: 1rem;
-	font-family: var(--interactive-font);
-	&:hover:not(:disabled) {
-		background-color: #CCC;
-		cursor: pointer;
-		&:active {
-			background-color: #AAA;
-			border-style: inset;
-		}
-	}
-}
-/* https://developer.mozilla.org/en-US/docs/Web/CSS/Nesting_selector#cannot_represent_pseudo-elements */
-input[type=file]::file-selector-button:hover {
-	background-color: #CCC;
-	cursor: pointer;
-}
-input[type=file]::file-selector-button:active {
-	background-color: #AAA;
-	border-style: inset;
-}
-
-dialog {
-	box-shadow: 8px 8px #0008;
-	margin-top: 20vh;
-}
-
 #WebsiteName {
 	font-family: var(--name-font);
 }
@@ -131,49 +104,6 @@ dialog {
 	border-bottom: 1px solid #888;
 	#warning_outdated_browser {
 		display: none;
-	}
-}
-
-.ToolBar {
-	display: flex;
-	flex-wrap: wrap;
-	/*user-select: none;*/
-	
-	>* {
-		display: flex;
-		align-items: center;
-		min-height: 2rem;
-		word-wrap: anywhere;
-		&:not(button) {
-			padding: 0 0.25em;
-		}
-		time, span, b, i {
-			user-select: none;
-		}
-	}
-	&.WithBorders >* {
-		&:not(:first-child) {
-			border-left: 1px solid #888;
-		}
-	}
-	.RightAligned {
-		margin-left: auto;
-	}
-}
-
-.MessageBoxButtons button {
-	margin-left: auto;
-	&:not(:first-child) {
-		margin-left: 0.5em;
-	}
-}
-
-.ToolBarButton {
-	border-style: none;
-	padding: 0 1em;
-	&:hover:active {
-		border-style: none !important;
-		border-left: 1px solid #888 !important;
 	}
 }
 
@@ -311,7 +241,6 @@ dialog {
 	</style>
 	<script>
 		"use strict";
-		const root_url = "_ROOT_URL"; // set these URLS according to the server configuration
 		const api_url = "api/"; // these will be managed by a central config file eventually
 		const media_url = "media/"; // so you wont need to reconfigure these every update
 		const thumbnail_url = "media/thumbnails/";
@@ -329,10 +258,22 @@ dialog {
 		console.log(websocket);
 		// loading_dialog.show();
 
-		if (window.location.pathname.startsWith(root_url + "thread/")) {
-			let second_slash_index = window.location.pathname.indexOf("/", root_url.length + 7);
+		// For embedding mediaboard within a webpage using an <iframe>.
+		// Hides everything except messages.
+		const url_params = new URLSearchParams(location.search);
+		let url_params_display_as_embed;
+		if (url_params.get("display") === "embed") {
+			header_bar.style["display"] = "none";
+			location_indicator.style["display"] = "none";
+			reply_container.style["display"] = "none";
+			url_params_display_as_embed = true;
+		}
+		else url_params_display_as_embed = false;
+
+		if (window.location.pathname.startsWith("_ROOT_URL" + "thread/")) {
+			let second_slash_index = window.location.pathname.indexOf("/", "_ROOT_URL".length + 7);
 			if (second_slash_index > 0) {
-				let thread_number = parseInt(window.location.pathname.substring(root_url.length + 7, second_slash_index));
+				let thread_number = parseInt(window.location.pathname.substring("_ROOT_URL".length + 7, second_slash_index));
 				if (!isNaN(thread_number)) {
 					state.selected_thread_id = thread_number;
 				}
@@ -419,22 +360,38 @@ dialog {
 		*/
 
 		// Used to verify the author on deleting a message.
-		let user_key = localStorage.getItem("key");
-		if (user_key === null || user_key.length !== 8) {
-			user_key = '';
+		let local_key = localStorage.getItem("local_key");
+		let account_key = localStorage.getItem("account_key");
+		if (local_key === null || local_key.length !== 8) {
+			local_key = '';
 			for (let i = 0; i < 8; i++) {
-				user_key += valid_uri_chars.charAt(Math.floor(Math.random() * valid_uri_chars.length));
+				local_key += valid_uri_chars.charAt(Math.floor(Math.random() * valid_uri_chars.length));
 			}
-			localStorage.setItem("key", user_key);
+			localStorage.setItem("local_key", local_key);
 		}
 		// The value in the name field is set to the name used in the most recent post, if any.
 		name_field.value = localStorage.getItem("name");
+		if (account_key === null) {
+			registration_link.style["display"] = "inherit";
+		}
+		else {
+			logout_button.style["display"] = "inherit";
+			logged_in_indicator.style["display"] = "inherit";
+			logged_in_as_username.textContent = localStorage.getItem("account_username");
+		}
+
+		function logoutAction() {
+			logout_button.style["display"] = "none";
+			logged_in_indicator.style["display"] = "none";
+			registration_link.style["display"] = "inherit";
+			account_key = null;
+		}
 
 		async function postAction() {
 			let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
 			let content_length_bytes = (new TextEncoder().encode(content_field.innerText)).length;
-			if (content_field.textContent.length === 0) {
-				alert("Error: Cannot create post with empty content");
+			if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
+				alert("Error: Cannot create post with empty content and no files.");
 			}
 			else if (name_length_bytes > 73) {
 				alert("Error: Name too long.\nLimit: 73\nThis name: " + name_length_bytes);
@@ -475,7 +432,7 @@ dialog {
 
 		function openCatalog() {
 			state.selected_thread_id = -1;
-			history.pushState(state, "", root_url);
+			history.pushState(state, "", "_ROOT_URL");
 			// location_indicator.textContent = "Catalog";
 			refresh_send();
 		}
@@ -518,7 +475,7 @@ dialog {
 			post_container.replaceChildren(fragment);
 		}
 		function showPosts(message_json) {
-			location_indicator.textContent = "Posts";
+			location_indicator.textContent = `Viewing thread ${state.selected_thread_id}`;
 			catalog_button.disabled = false;
 			reply_heading_text.textContent = "Leave a reply";
 			const fragment = new DocumentFragment();
@@ -528,7 +485,7 @@ dialog {
 			post_container.replaceChildren(fragment);
 		}
 		async function getThreads() {
-			let response = await fetch(root_url + api_url + "get_threads/");
+			let response = await fetch("_ROOT_URL" + api_url + "get_threads/");
 			if (response.ok) {
 				await response.json().then(response_obj => {
 					console.log(response_obj);
@@ -541,13 +498,13 @@ dialog {
 		}
 		function openThread(thread_id) {
 			state.selected_thread_id = thread_id;
-			history.pushState(state, "", root_url + "thread/" + state.selected_thread_id + "/");
+			history.pushState(state, "", "_ROOT_URL" + "thread/" + state.selected_thread_id + "/");
 			getThreadPosts();
 		}
 		async function getThreadPosts() {
-			let response = await fetch(root_url + api_url + "threads/" + state.selected_thread_id + "/get_posts/", {
+			let response = await fetch("_ROOT_URL" + api_url + "threads/" + state.selected_thread_id + "/get_posts/", {
 				headers: {
-					"key": user_key
+					"key": account_key || local_key
 				}
 			});
 			if (response.ok) {
@@ -656,7 +613,7 @@ dialog {
 				file_progress_element.value = event.loaded;
 			});
 			request.responseType = "text";
-			request.open("POST", root_url + api_url + "upload/");
+			request.open("POST", "_ROOT_URL" + api_url + "upload/");
 			request.timeout = 10000;
 			request.send(formdata);
 			request.onload = () => {
@@ -674,7 +631,7 @@ dialog {
 						// console.log("server_filename dec new: " + newdecoded);
 						file_element.setAttribute("id", "file_" + decoded_filename);
 						if (Format.fromFileName(server_filename) === Format.IMAGE) {
-							file_img_element.setAttribute("src", root_url + media_url + decoded_filename);
+							file_img_element.setAttribute("src", "_ROOT_URL" + media_url + decoded_filename);
 						}
 						const upload_complete_indicator = document.createElement("span");
 						upload_complete_indicator.classList.add("UploadCompleteIndicator");
@@ -748,7 +705,7 @@ dialog {
 			right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
 
 			// Delete button
-			if (data.is_author) {
+			if (data.is_author && !url_params_display_as_embed) {
 				let delete_button_element = document.createElement("button");
 				delete_button_element.textContent = "\u{1F5D1} Delete";
 				delete_button_element.onclick = async() => { 
@@ -766,7 +723,7 @@ dialog {
 				right_aligned_toolbar_group.appendChild(delete_button_element);
 			}
 			// Reply button
-			if (state.selected_thread_id > -1) { // Reply button will not appear on catalog (thread list)
+			if (state.selected_thread_id > -1 && !url_params_display_as_embed) { // Reply button will not appear on catalog (thread list)
 				let reply_button_element = document.createElement("button");
 				reply_button_element.style["margin-left"] = "0.5em";
 				reply_button_element.textContent = "\u{2BA9} Reply";
@@ -804,7 +761,7 @@ dialog {
 					let thumbnail_element = document.createElement("img");
 					thumbnail_element.classList.add("EmbedThumbnail");
 					let thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
-					thumbnail_element.setAttribute("src", root_url + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+					thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
 					let image_opened = false;
 					let img_element = document.createElement("img");
 					img_element.classList.add("EmbedImage");
@@ -815,7 +772,7 @@ dialog {
 								img_element.style["display"] = "inherit";
 								thumbnail_element.style["display"] = "none";
 							}
-							img_element.setAttribute("src", root_url + media_url + filename.replace(" ", "%20"));
+							img_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
 						}
 						else {
 							thumbnail_element.style["display"] = "none";
@@ -837,11 +794,11 @@ dialog {
 					let audio_element = document.createElement("audio");
 					audio_element.controls = true;
 					audio_element.setAttribute("controlslist", "nofullscreen nodownload");
-					audio_element.setAttribute("src", root_url + media_url + filename.replace(" ", "%20"));
+					audio_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
 					figure_element.appendChild(audio_element);
 				}
 				// else {
-					// thumbnail_element.setAttribute("src", root_url + "placeholder.png");
+					// thumbnail_element.setAttribute("src", "_ROOT_URL" + "placeholder.png");
 				// }
 				let pretty_filename;
 				if (filename_extension_i == -1) {
@@ -852,7 +809,7 @@ dialog {
 				}
 				let figcaption_element = document.createElement("figcaption");
 				let figcaption_element_a = document.createElement("a");
-				figcaption_element_a.setAttribute("href", root_url + media_url + filename.replace(" ", "%20"));
+				figcaption_element_a.setAttribute("href", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
 				figcaption_element_a.textContent = pretty_filename;
 				figcaption_element.appendChild(figcaption_element_a);
 				figure_element.appendChild(figcaption_element);
@@ -937,11 +894,11 @@ dialog {
 					content: content_field.innerText,
 					files: files,
 					thread_id: state.selected_thread_id
-					,key: user_key
+					,key: account_key || local_key
 				}
 			};
 			console.log(data);
-			const fetch_response = await fetch(root_url + api_url + "create_message/", {
+			const fetch_response = await fetch("_ROOT_URL" + api_url + "create_message/", {
 				method: "POST",
 				body: JSON.stringify(data)
 			});
@@ -951,15 +908,15 @@ dialog {
 		async function deleteMessage(thread_id, message_id) {
 			console.log("deleting message...");
 			const data = {
-				key: user_key
+				key: account_key || local_key
 				,thread_id: thread_id
 				,id_in_thread: message_id
 			};
-			const fetch_response = await fetch(root_url + api_url + "delete_message/" + `${thread_id}/${message_id}/`, {
+			const fetch_response = await fetch("_ROOT_URL" + api_url + "delete_message/" + `${thread_id}/${message_id}/`, {
 				method: "DELETE"
 				// ,headers: {
 					// "auth-scheme": "token",
-				// 	"key": user_key
+				// 	"key": account_key || local_key
 				// }
 				,body: JSON.stringify(data)
 			});
@@ -979,13 +936,13 @@ dialog {
 						name: name_field.value,
 						content: content_field.innerText,
 						files: files
-						,key: user_key
+						,key: account_key || local_key
 					}
-					// ,key: user_key
+					// ,key: account_key || local_key
 				}
 			};
-			console.log(data);
-			const fetch_response = await fetch(root_url + api_url + "create_thread/", {
+			console.log(data)
+			const fetch_response = await fetch("_ROOT_URL" + api_url + "create_thread/", {
 				method: "POST",
 				body: JSON.stringify(data)
 			});

@@ -45,11 +45,13 @@ extern "C" {
 	int db_store_thread(int number_of_posts);
 	// void db_mark_message_as_deleted(int thread_id, int message_id);
 	void db_mark_post_as_deleted(int post_id);
+	int db_store_account(const char* username, const char* password);
+	char db_fetch_key(char* key, const char* username, const char* password);
 	struct db_post_struct db_retrieve_last_post();
 	struct db_thread_array* db_retrieve_threads();
 	struct db_post_array* db_retrieve_history();
 	void db_connect(const char* _database_name);
-	void db_disconnect();
+	void db_disconnect(void);
 #ifdef __cplusplus
 }
 #endif

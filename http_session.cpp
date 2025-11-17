@@ -9,6 +9,7 @@
 
 #include "http_session.hpp"
 #include "websocket_session.hpp"
+#include "db_interface.h"
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/locale.hpp>
@@ -203,24 +204,36 @@ handle_request(
 		bool is_media = false;
         // return bad_request("Unknown HTTP-method");
     	// Build the path to the requested file
-    	std::string path;
-		if (req.target().substr(0, 6) == "/media") {
+    	std::string path, req_location;
+		int location_end_index;
+		int decoded_url_last_slash_index = decoded_url.rfind('/');
+		int decoded_url_last_questionmark_index = decoded_url.rfind('?');
+		if (decoded_url_last_slash_index < decoded_url_last_questionmark_index) {
+			location_end_index = decoded_url_last_questionmark_index;
+			req_location = decoded_url.substr(0, location_end_index);
+		}
+		else {
+		// 	location_end_index = decoded_url_last_slash_index;
+			req_location = req.target();
+		}
+		std::cout << "req_location: " << req_location << std::endl;
+		if (req_location.substr(0, 6) == "/media") {
 			is_media = true;
 			path = path_cat(state->doc_root(), decoded_url.substr(6));
 		}
-		else if (req.target().substr(0, 5) == "/api/") {
+		else if (req_location.substr(0, 5) == "/api/") {
 			http::response<http::string_body> res;
 			res.set(http::field::content_type, "application/json");
-			// std::cout << req.target().substr(5, 13) << std::endl;
-			if (req.target().substr(5, 12) == "get_threads/") {
+			// std::cout << req_location.substr(5, 13) << std::endl;
+			if (req_location.substr(5, 12) == "get_threads/") {
 				res.result(http::status::ok);
 				// json response_json;
 				// res.body() = json::serialize(json_response);
 				res.body() = state->main_board.dumpAllThreads();
 			}
-			else if (req.target().substr(5, 8) == "threads/") {
-				std::size_t found = req.target().find_first_not_of("0123456789", 13);
-				if (req.target()[found] != '/') {
+			else if (req_location.substr(5, 8) == "threads/") {
+				std::size_t found = req_location.find_first_not_of("0123456789", 13);
+				if (req_location[found] != '/') {
 					std::cout << "Error: invalid thread ID" << std::endl;
 					res.result(500);
 				}
@@ -230,8 +243,8 @@ handle_request(
 				}
 				else {
 					int thread_in_url;
-					std::from_chars(req.target().substr(13, found).data(), req.target().substr(13, found).data() + req.target().substr(13, found).size(), thread_in_url);
-					// int thread_in_url = atoi(req.target().substr(13, found).c_str());
+					std::from_chars(req_location.substr(13, found).data(), req_location.substr(13, found).data() + req_location.substr(13, found).size(), thread_in_url);
+					// int thread_in_url = atoi(req_location.substr(13, found).c_str());
 					if (state->main_board.threadExists(thread_in_url)) {
 						std::cout << "[http_session] HEADERS:" << std::endl;
 						std::string key;
@@ -257,12 +270,12 @@ handle_request(
 			}
 			else {
 				res.result(404);
-				res.body() = "ERROOOORRRRRR!!!! OH NOES!!!";
+				res.body() = "That API endpoint does not exist.";
 			}
 			res.prepare_payload();
 			return res;
 		}
-		else if (req.target().back() == '/') {
+		else if (req_location.back() == '/') {
 			path = "index.html";
 			std::cout << "/path: " << path << std::endl;
 		}
@@ -395,16 +408,79 @@ handle_request(
 			res.prepare_payload();
 			return res;
 		}
-		else if (req.target() == "/registration/create_account/") {
+		else if (req.target().substr(5,9) == "register/") {
 			http::response<http::empty_body> res;
-			std::cout << "Fields:" << std::endl;
-			for (auto it = req.begin(); it != req.end(); it++) {
-				std::cout << it->name_string() << ": " << it->value() << std::endl;
+			json request_json = json::parse(req.body());
+			if (       request_json.contains("username")
+					&& request_json.contains("password")
+					// && request_json.contains("remain_logged_in")
+					) {
+				std::string username = request_json["username"].template get<std::string>();
+				std::string password = request_json["password"].template get<std::string>();
+				if (db_store_account(username.c_str(), password.c_str())) {
+					res.result(400);
+					res.set("message", "Username already exists.");
+				}
+				else {
+					char key[8];
+					db_fetch_key(key, username.c_str(), password.c_str());
+					http::response<http::string_body> res;
+					json response_json;
+					response_json["account_key"] = key;
+					res.body() = response_json.dump();
+					std::cout << "Logging user in, Response: " << res.body() << std::endl;
+					res.result(http::status::ok);
+				}
 			}
-			std::cout << "Body:" << std::endl << req.body() << std::endl;
-			res.result(401);
+			else {
+				res.result(400);
+				res.set("message", "One or more JSON fields missing.");
+			}
 			res.prepare_payload();
 			return res;
+		}
+		else if (req.target().substr(5,6) == "login/") {
+			json request_json = json::parse(req.body());
+			if (       request_json.contains("username")
+					&& request_json.contains("password")
+					// && request_json.contains("remain_logged_in")
+					) {
+				std::string username = request_json["username"].template get<std::string>();
+				std::string password = request_json["password"].template get<std::string>();
+				char key[8];
+				char passwords_match = db_fetch_key(key, username.c_str(), password.c_str());
+				if (passwords_match == 't') {
+					http::response<http::string_body> res;
+					json response_json;
+					response_json["account_key"] = key;
+					res.body() = response_json.dump();
+					std::cout << "Logging user in, Response: " << res.body() << std::endl;
+					res.result(http::status::ok);
+					res.prepare_payload();
+					return res;
+				}
+				else if (passwords_match == '\0') {
+					http::response<http::empty_body> res;
+					res.result(400);
+					res.set("message", "No account with that username exists.");
+					res.prepare_payload();
+					return res;
+				}
+				else {
+					http::response<http::empty_body> res;
+					res.result(400);
+					res.set("message", "Incorrect password.");
+					res.prepare_payload();
+					return res;
+				}
+			}
+			else {
+				http::response<http::empty_body> res;
+				res.result(400);
+				res.set("message", "One or more JSON fields missing.");
+				res.prepare_payload();
+				return res;
+			}
 		}
 		else if (req.target() == "/api/upload/") {
 			// request_parser<empty_body> req_parser;
