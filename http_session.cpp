@@ -10,6 +10,7 @@
 #include "http_session.hpp"
 #include "websocket_session.hpp"
 #include "db_interface.h"
+#include "field_lengths.h"
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/locale.hpp>
@@ -390,11 +391,16 @@ handle_request(
 				else {
 					int new_message_thread_id = request_json["post"]["thread_id"].template get<int>();
 					std::string new_message_key = request_json["post"]["key"].template get<std::string>();
+					std::string message_content = request_json["post"]["content"].template get<std::string>();
 					if (state->main_board.threadExists(new_message_thread_id)) {
-						int new_message_id = state->main_board.createPost(request_json["post"]);
-						std::string new_message_dump = state->main_board.dumpPost(new_message_thread_id, new_message_id, new_message_key);
-						state->sendToThread(new_message_dump, new_message_thread_id);
-						res.result(201);
+						if ((message_content.length() > 0 || request_json["post"]["files"].size() > 0) && message_content.length() < POST_MAX_CONTENT) {
+							int new_message_id = state->main_board.createPost(request_json["post"]);
+							std::string new_message_dump = state->main_board.dumpPost(new_message_thread_id, new_message_id, new_message_key);
+							state->sendToThread(new_message_dump, new_message_thread_id);
+							res.result(201);
+						}
+						else
+							res.result(400);
 					}
 					else {
 						std::cerr << "Couldn't create message because the thread with ID " << new_message_thread_id << " does not exist" << std::endl;
@@ -409,7 +415,6 @@ handle_request(
 			return res;
 		}
 		else if (req.target().substr(5,9) == "register/") {
-			http::response<http::empty_body> res;
 			json request_json = json::parse(req.body());
 			if (       request_json.contains("username")
 					&& request_json.contains("password")
@@ -418,26 +423,32 @@ handle_request(
 				std::string username = request_json["username"].template get<std::string>();
 				std::string password = request_json["password"].template get<std::string>();
 				if (db_store_account(username.c_str(), password.c_str())) {
+					http::response<http::empty_body> res;
 					res.result(400);
 					res.set("message", "Username already exists.");
+					res.prepare_payload();
+					return res;
 				}
 				else {
-					char key[8];
+					char key[8+1];
 					db_fetch_key(key, username.c_str(), password.c_str());
 					http::response<http::string_body> res;
+					res.result(http::status::ok);
 					json response_json;
 					response_json["account_key"] = key;
 					res.body() = response_json.dump();
-					std::cout << "Logging user in, Response: " << res.body() << std::endl;
-					res.result(http::status::ok);
+					std::cout << "Logging user in automatically, Response: " << res.body() << std::endl;
+					res.prepare_payload();
+					return res;
 				}
 			}
 			else {
+				http::response<http::empty_body> res;
 				res.result(400);
 				res.set("message", "One or more JSON fields missing.");
+				res.prepare_payload();
+				return res;
 			}
-			res.prepare_payload();
-			return res;
 		}
 		else if (req.target().substr(5,6) == "login/") {
 			json request_json = json::parse(req.body());
@@ -447,7 +458,7 @@ handle_request(
 					) {
 				std::string username = request_json["username"].template get<std::string>();
 				std::string password = request_json["password"].template get<std::string>();
-				char key[8];
+				char key[8+1];
 				char passwords_match = db_fetch_key(key, username.c_str(), password.c_str());
 				if (passwords_match == 't') {
 					http::response<http::string_body> res;
@@ -481,6 +492,36 @@ handle_request(
 				res.prepare_payload();
 				return res;
 			}
+		}
+		else if (decoded_url == "/api/change_password/") {
+			http::response<http::empty_body> res;
+			json request_json = json::parse(req.body());
+			if (	   request_json.contains("username")
+			 		&& request_json.contains("old_password")
+					&& request_json.contains("new_password")
+					) {
+				std::string username = request_json["username"].template get<std::string>();
+				std::string old_password = request_json["old_password"].template get<std::string>();
+				std::string new_password = request_json["new_password"].template get<std::string>();
+				char change_password_result = db_change_password(username.c_str(), old_password.c_str(), new_password.c_str());
+				if (change_password_result == 't') {
+					res.result(http::status::ok);
+				}
+				else if (change_password_result == '\0') {
+					res.result(400);
+					res.set("message", "No account with this username exists.");
+				}
+				else {
+					res.result(400);
+					res.set("message", "Password change operation failed.");
+				}
+			}
+			else {
+				res.result(400);
+				res.set("message", "One or more JSON fields missing.");
+			}
+			res.prepare_payload();
+			return res;
 		}
 		else if (req.target() == "/api/upload/") {
 			// request_parser<empty_body> req_parser;
@@ -584,6 +625,7 @@ handle_request(
 		}
 		else {
 			std::cout << "Unknown target: " << req.target() << std::endl;
+			std::cout << "Unknown target: " << decoded_url << std::endl;
 			http::response<http::empty_body> res;
 			res.result(404);
 			res.prepare_payload();
@@ -592,7 +634,7 @@ handle_request(
 	}
 	else if (req.method() == http::verb::delete_) {
 		if (req.target().substr(0, 20) == "/api/delete_message/") {
-			http::response<http::string_body> res;
+			http::response<http::empty_body> res;
 			json request_json = json::parse(req.body());
 			if (request_json.contains("key")) {
 				std::cout << "Request contains key" << std::endl;
@@ -613,31 +655,37 @@ handle_request(
 						goto prepare_response_payload;
 					}
 					if (state->main_board.threadExists(thread_id)) {
-						std::string user_key = request_json["key"].template get<std::string>();
 						if (message_id == 0) {
 							// state->main_board.deleteThread(thread_id, user_key);
 							res.result(http::status::unauthorized);
 						}
 						else {
 							if (state->main_board.messageExistsInThread(message_id, thread_id)) {
-								if (state->main_board.keyMatchesMessageInThread(user_key, message_id, thread_id)) {
+								std::string user_key = request_json["key"].template get<std::string>();
+								if (state->main_board.keyMatchesMessageInThread(user_key, message_id, thread_id) || db_key_matches_account(user_key.c_str(), "Administrator")) {
 									state->main_board.deleteMessageFromThread(message_id, thread_id);
+									res.result(200);
 								}
 								else {
 									std::cout << "key doesnt match\n";
+									res.result(400);
 								}
 							}
 							else {
 								std::cout << "Message " << message_id << " does not exist in thread " << thread_id << std::endl;
+								res.result(400);
 							}
 						}
-						res.result(200);
 					}
 					else {
 						std::cout << "Thread " << thread_id << " does not exist\n";
+						res.result(400);
 					}
 				}
-
+				else {
+					std::cout << "Could not get ID of message to delete; Badly formed URL" << std::endl;
+					res.result(400);
+				}
 			}
 			else {
 				return bad_request("Denied: Request does not contain key\n");

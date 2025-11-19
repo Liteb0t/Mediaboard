@@ -88,23 +88,21 @@ async function loginAction() {
 	const fetch_response = await sendRegistrationFormData("login");
 	console.log(fetch_response);
 	if (fetch_response && fetch_response.ok) {
-		let as_JSON = await fetch_response.json();
-		console.log(as_JSON);
+		let response_body_as_JSON = await fetch_response.json();
 		logged_in_as.textContent = account_username_input.value;
 		login_success_dialog.showModal();
 		localStorage.setItem("account_username", account_username_input.value);
-		localStorage.setItem("account_key", account_password_input.value);
+		localStorage.setItem("account_key", response_body_as_JSON.account_key);
 	}
 }
 async function registerAction() {
 	const fetch_response = await sendRegistrationFormData("register");
 	if (fetch_response && fetch_response.ok) {
-		let as_JSON = await fetch_response.json();
-		console.log(as_JSON);
+		let response_body_as_JSON = await fetch_response.json();
 		registered_as.textContent = account_username_input.value;
 		registration_success_dialog.showModal();
 		localStorage.setItem("account_username", account_username_input.value);
-		localStorage.setItem("account_key", account_password_input.value);
+		localStorage.setItem("account_key", response_body_as_JSON.account_key);
 	}
 }
 async function sendRegistrationFormData(endpoint) {

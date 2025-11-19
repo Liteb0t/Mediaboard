@@ -35,6 +35,9 @@ Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-
 \
 `mediaboard_server` is the Postgres user which interacts with the database named `fuze_mediaboard`.\
 Set a password for this user. Set an environment variable `FUZE_MEDIABOARD_PASSWORD` with the same password.
+### Administrator account
+The administrator is able to delete posts from any user. To create the administrator account:\
+`./server create_administrator <password>`
 ### Deployment settings
 Example Nginx reverse proxy settings:
 ```

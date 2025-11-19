@@ -47,6 +47,9 @@ extern "C" {
 	void db_mark_post_as_deleted(int post_id);
 	int db_store_account(const char* username, const char* password);
 	char db_fetch_key(char* key, const char* username, const char* password);
+	int db_key_matches_account(const char* _key, const char* _username);
+	char db_change_password(const char* username, const char* old_password, const char* new_password);
+	void db_create_administrator(const char* _password);
 	struct db_post_struct db_retrieve_last_post();
 	struct db_thread_array* db_retrieve_threads();
 	struct db_post_array* db_retrieve_history();

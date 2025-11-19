@@ -1,10 +1,13 @@
-all: index.html registration.html server
+all: index.html registration.html change_password.html server
 
 index.html: _index.html tokens.m4
 	m4 _index.html >index.html
 
 registration.html: _registration.html tokens.m4
 	m4 _registration.html >registration.html
+
+change_password.html: _change_password.html tokens.m4
+	m4 _change_password.html >change_password.html
 
 server: main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o 
 	g++ `Magick++-config --cxxflags --cppflags` -o server main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o -I/usr/include/postgresql -l:libecpg.so -l:libpgtypes.so `Magick++-config --ldflags --libs` -lboost_program_options -lboost_filesystem -lboost_system
@@ -15,7 +18,7 @@ main.o: main.cpp
 listener.o: listener.cpp listener.hpp
 	g++ -c listener.cpp -o listener.o
 
-http_session.o: http_session.cpp http_session.hpp 
+http_session.o: http_session.cpp http_session.hpp field_lengths.h
 	g++ -c `Magick++-config --cxxflags --cppflags` http_session.cpp -o http_session.o `Magick++-config --ldflags --libs` -lboost_filesystem -lboost_system
 
 shared_state.o: shared_state.cpp shared_state.hpp 

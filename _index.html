@@ -29,6 +29,7 @@
 				<div id="logged_in_indicator" style="display: none">
 					Logged in as&nbsp;<b id="logged_in_as_username">Someone</b>
 				</div>
+				<a id="change_password_link" class="Button ToolBarButton" href="/change_password.html" style="display: none">Change password</a>
 				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
 				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.4</a></div>
 			</div>
@@ -47,7 +48,7 @@
 			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" maxlength="73" />
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned" onclick="postAction()">
 			</div>
-			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content*"></div>
+			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content"></div>
 			<fieldset>
 				<legend>Upload up to four files</legend>
 				<input type="file" id="file_upload" tabindex="1" autocomplete="off" multiple>
@@ -167,12 +168,12 @@ main {
 }
 
 #reply_container {
-	border-top: 3px double #000;
 	position: sticky;
 	bottom: 0;
 	background: #fffc;
 	margin: 0 var(--side-margins);
 	summary {
+		border-top: 3px double #000;
 		padding: 4px 0;
 		cursor: pointer;
 		user-select: none;
@@ -255,6 +256,7 @@ main {
 		let state = {selected_thread_id: null};
 		let websocket;
 		let websocket_connected;
+		let is_administrator = false;
 		console.log(websocket);
 		// loading_dialog.show();
 
@@ -375,17 +377,23 @@ main {
 			registration_link.style["display"] = "inherit";
 		}
 		else {
-			logged_in_as_username.textContent = localStorage.getItem("account_username");
+			let account_username = localStorage.getItem("account_username");
+			logged_in_as_username.textContent = account_username;
+			if (account_username === "Administrator")
+				is_administrator = true;
 			logout_button.style["display"] = "inherit";
 			logged_in_indicator.style["display"] = "inherit";
+			change_password_link.style["display"] = "inherit";
 		}
 
 		function logoutAction() {
 			logout_button.style["display"] = "none";
 			logged_in_indicator.style["display"] = "none";
 			registration_link.style["display"] = "inherit";
+			change_password_link.style["display"] = "none";
 			localStorage.removeItem("account_key");
 			account_key = null;
+			is_administrator = false;
 			refresh_send();
 		}
 
@@ -481,9 +489,11 @@ main {
 			catalog_button.disabled = false;
 			reply_heading_text.textContent = "Leave a reply";
 			const fragment = new DocumentFragment();
+			// for (let i = 0; i < 1000; ++i) {
 			for (let post of message_json.posts) {
 				fragment.appendChild(createPost(post));
 			}
+			// }
 			post_container.replaceChildren(fragment);
 		}
 		async function getThreads() {
@@ -673,7 +683,7 @@ main {
 		}
 
 		function createPost(data) {
-			console.log(data);
+			// console.log(data);
 			let post_box_element = document.createElement("article");
 			post_box_element.classList.add("Post");
 	
@@ -707,7 +717,7 @@ main {
 			right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
 
 			// Delete button
-			if (data.is_author && !url_params_display_as_embed) {
+			if ((is_administrator === true || data.is_author) && !url_params_display_as_embed) {
 				let delete_button_element = document.createElement("button");
 				delete_button_element.textContent = "\u{1F5D1} Delete";
 				delete_button_element.onclick = async() => { 
@@ -731,9 +741,19 @@ main {
 				reply_button.textContent = "\u{2BA9} Reply";
 				reply_button.onclick = () => {
 					let reply_link_node = document.createTextNode(post_id + " ");
-					content_field.append(reply_link_node);
-					const range = document.createRange();
-					const selection = window.getSelection();
+					// Add reply tag at caret position, if focused on content_field
+					let range, selection;
+					selection = window.getSelection();
+					if (content_field.contains(selection.focusNode)) {
+						range = selection.getRangeAt(0);
+						console.log(range);
+						range.insertNode(reply_link_node);
+					}
+					else
+						content_field.append(reply_link_node);
+
+					// Move caret position to end of reply tag
+					range = document.createRange();
 					console.log(reply_link_node);
 					range.setStartAfter(reply_link_node);
 					range.collapse(true);

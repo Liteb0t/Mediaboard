@@ -33,10 +33,11 @@ main(int argc, char* argv[])
     // Check command line arguments.
 	std::string config_file;
 	unsigned short port;
-	std::string doc_root, database_name;
+	std::string admin_password, doc_root, database_name;
 	int threads;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
+		("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
 		("config,c", boost::program_options::value<std::string>(&config_file)->default_value("config.ini"), "location of configuration file")
 		("version,v", "show version string")
 		("help,h", "show list of options");
@@ -64,6 +65,7 @@ main(int argc, char* argv[])
 		return 0;
 	}
 
+
 	std::ifstream config_file_ifstream(config_file.c_str());
 	if (config_file_ifstream) {
 		std::cout << "Loaded config file" << std::endl;
@@ -81,31 +83,37 @@ main(int argc, char* argv[])
     //         "    websocket-chat-server 0.0.0.0 8080 . 5\n";
     //     return EXIT_FAILURE;
     // }
-    auto address = net::ip::make_address("127.0.0.1");
     // auto port = static_cast<unsigned short>(std::atoi(argv[2]));
-	if (!variable_map.count("port")) {
-		port = 8300;
-	}
-	std::cout << "set the port to " << port << std::endl;
 	if (!variable_map.count("database")) {
 		database_name = "fuze_mediaboard";
 		std::cout << "\"database\" not found in config. Using default " << database_name << std::endl;
 	}
 	else
 		std::cout << "Set the database to " << doc_root << std::endl;
+
+	db_connect(database_name.c_str());
+
+	if (variable_map.count("create_administrator")) {
+		db_create_administrator(admin_password.c_str());
+		std::cout << "Created 'Administrator' account successfully" << std::endl;
+		return 0;
+	}
     // auto doc_root = argv[3];
 	if (!variable_map.count("media_path")) {
 		doc_root = ".";
 	}
-	std::cout << "set the doc_root to " << doc_root << std::endl;
-	std::cout << "Threads: " << threads << std::endl;
+	if (!variable_map.count("port")) {
+		port = 8300;
+	}
+	std::cout << "Set port: " << port << std::endl;
+	std::cout << "Set doc_root:" << doc_root << std::endl;
+	std::cout << "Set threads: " << threads << std::endl;
     // auto media_root = argv[4];
 	// std::string media_root = "/var/www/cdn-fuze-page/fuze-imageboard";
 
+    auto address = net::ip::make_address("127.0.0.1");
     // The io_context is required for all I/O
     net::io_context ioc;
-
-	db_connect(database_name.c_str());
 
     // Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;

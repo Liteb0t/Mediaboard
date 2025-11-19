@@ -54,11 +54,11 @@ Post::Post(json post_json) {
 		this->post_as_json["name"] = this->name;
 	}
 	this->content = post_json["content"].template get<std::string>();
-	if (this->content == "") {
-		this->content = "I'm speechless."; // Post looks ugly with empty content.
-		this->post_as_json["content"] = this->content;
-	}
-	else if (this->content.length() > POST_MAX_CONTENT) {
+	// if (this->content == "") {
+	// 	this->content = "I'm speechless."; // Post looks ugly with empty content.
+	// 	this->post_as_json["content"] = this->content;
+	// }
+	if (this->content.length() > POST_MAX_CONTENT) {
 		this->content = "I have much to say.";
 		this->post_as_json["content"] = this->content;
 	}

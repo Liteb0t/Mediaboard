@@ -64,7 +64,7 @@ void db_connect(const char* _database_name) {
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts) VALUES (?, 0);";
 	const char* mark_post_as_deleted_prepared_stmt = "UPDATE post SET deleted = true WHERE id = ?;";
-	const char* create_account_prepared_stmt = "INSERT INTO account(username, password_hash) VALUES (?, ?);";
+	const char* create_account_prepared_stmt = "INSERT INTO account(username, password_hash, key) VALUES (?, ?, ?);";
 	char* data;
 	EXEC SQL END DECLARE SECTION;
 	// printf("password: %s\n", password);
@@ -89,6 +89,20 @@ void db_test() {
 
     EXEC SQL SELECT current_database() INTO :dbname;
     printf("current_database = %s\n", dbname);
+}
+
+void db_create_administrator(const char* _password) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* password = _password;
+	char hashed_password[60+1];
+	char key[8+1];
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL DELETE FROM account WHERE username = 'Administrator';
+	EXEC SQL SELECT crypt(:password, gen_salt('bf')) INTO :hashed_password;
+	strncpy(key, &hashed_password[25], 8); // Copying 8 characters from the index 25 takes 4 characters from the salt and 4 from the hash
+	key[8] = '\0';
+	EXEC SQL INSERT INTO account(username, password_hash, key, administrator) VALUES ('Administrator', :hashed_password, :key, 't');
+	EXEC SQL COMMIT;
 }
 
 int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_NAME+1], time_t upload_timestamp_, const char* content_, char files[4][POST_MAX_FILE_NAME+1], int file_count, const char key_[KEY_LENGTH+1]) {
@@ -147,28 +161,37 @@ int db_store_account(const char* _username, const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	const char* username = _username;
 	const char* password = _password;
-	char hashed_password[60];
+	char hashed_password[60+1];
+	char key[8+1];
 	char username_exists;
 	EXEC SQL END DECLARE SECTION;
+	printf("Calling db_store_account with username: %s, password: %s\n", username, password);
 	EXEC SQL SELECT exists (SELECT 1 FROM account WHERE username = :username LIMIT 1) INTO :username_exists;
 	EXEC SQL COMMIT;
-	if (username_exists == 't')
+	// -------------------------> block if using reserved name "Administrator"
+	if (username_exists == 't' || (strcmp(username, "Administrator") == 0))
 		return 1;
 	else {
 		EXEC SQL SELECT crypt(:password, gen_salt('bf')) INTO :hashed_password;
-		EXEC SQL EXECUTE create_account_prepared_stmt USING :username, :hashed_password;
+		EXEC SQL COMMIT;
+		strncpy(key, &hashed_password[25], 8); // Copying 8 characters from the index 25 takes 4 characters from the salt and 4 from the hash
+		printf("hashed_password: %s\n", hashed_password);
+		printf("key: %s\n", key);
+		EXEC SQL EXECUTE create_account_prepared_stmt USING :username, :hashed_password, :key;
 		EXEC SQL COMMIT;
 		return 0;
 	}
 }
 
-const char db_fetch_key(char* key, const char* _username, const char* _password) {
+const char db_fetch_key(char* _key, const char* _username, const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	const char* username = _username;
 	const char* password = _password;
+	char key[8+1];
 	char hashed_password[61];
 	char passwords_match;
 	EXEC SQL END DECLARE SECTION;
+	printf("Calling db_fetch_key with username: %s, password: %s\n", username, password);
 	hashed_password[0] = '\0';
 	EXEC SQL SELECT password_hash INTO :hashed_password FROM account WHERE username = :username;
 	EXEC SQL COMMIT;
@@ -178,8 +201,58 @@ const char db_fetch_key(char* key, const char* _username, const char* _password)
 		printf("Username exists. hashed_password: %s\n", hashed_password);
 		EXEC SQL SELECT (:hashed_password = crypt(:password, :hashed_password)) INTO :passwords_match;
 		if (passwords_match == 't') {
-			hashed_password[8] = '\0';
-			strcpy(key, hashed_password);
+			EXEC SQL SELECT key INTO :key FROM account WHERE username = :username;
+			EXEC SQL COMMIT;
+			strcpy(_key, key); // Copy fetched key into the pointer passed to db_fetch_key
+		}
+		EXEC SQL COMMIT;
+		return passwords_match;
+	}
+}
+
+int db_key_matches_account(const char* _key, const char* _username) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* username = _username;
+	char key[8+1];
+	char username_exists;
+	EXEC SQL END DECLARE SECTION;
+	printf("Calling db_key_matches_account with username: %s, key: %s\n", username, _key);
+	EXEC SQL SELECT exists (SELECT 1 FROM account WHERE username = :username LIMIT 1) INTO :username_exists;
+	EXEC SQL COMMIT;
+	if (username_exists == 't') {
+		EXEC SQL SELECT key INTO :key FROM account WHERE username = :username;
+		EXEC SQL COMMIT;
+		if (strcmp(key, _key) == 0)
+			return 1;
+		else
+			return 0;
+	}
+	else
+		return 0;
+}
+
+char db_change_password(const char* _username, const char* _old_password, const char* _new_password) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* username = _username;
+	const char* old_password = _old_password;
+	const char* new_password = _new_password;
+	char hashed_old_password[61];
+	char hashed_new_password[61];
+	char passwords_match;
+	EXEC SQL END DECLARE SECTION;
+	printf("Calling db_change_password with:\nusername: %s\nold_password: %s\nnew_password: %s\n", username, old_password, new_password);
+	hashed_old_password[0] = '\0';
+	EXEC SQL SELECT password_hash INTO :hashed_old_password FROM account WHERE username = :username;
+	EXEC SQL COMMIT;
+	if (hashed_old_password[0] == '\0')
+		return '\0';
+	else {
+		printf("Username exists. hashed_password: %s\n", hashed_old_password);
+		EXEC SQL SELECT (:hashed_old_password = crypt(:old_password, :hashed_old_password)) INTO :passwords_match;
+		EXEC SQL COMMIT;
+		if (passwords_match == 't') {
+			EXEC SQL SELECT crypt(:new_password, gen_salt('bf')) INTO :hashed_new_password;
+			EXEC SQL UPDATE account SET password_hash = :hashed_new_password WHERE username = :username;
 		}
 		EXEC SQL COMMIT;
 		return passwords_match;
