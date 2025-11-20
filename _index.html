@@ -43,7 +43,7 @@
 		<div id="body_separator" class="FlexSeparator"></div>
 		<details id="reply_container" open="">
 			<summary id="reply_heading_text"></summary>
-			<form id="post_form" name="post" action="" autocomplete="on">
+			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
 			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" maxlength="73" />
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned" onclick="postAction()">
@@ -256,6 +256,7 @@ main {
 		let state = {selected_thread_id: null};
 		let websocket;
 		let websocket_connected;
+		let reconnect_websocket_interval;
 		let is_administrator = false;
 		console.log(websocket);
 		// loading_dialog.show();
@@ -872,8 +873,11 @@ main {
 			// this will be done through a central config file later
 			let sock = new WebSocket("_WEBSOCKET_URL");	
 			sock.onopen = (event) => {
-				// connection_status.textContent = "Connected 🙂";
+				connection_status.textContent = "Connected 🙂";
+				console.log("Websocket connected.");
 				websocket_connected = true;
+				clearInterval(reconnect_websocket_interval);
+				reconnect_websocket_interval = null;
 				if (state.selected_thread_id > -1) {
 					sock.send(JSON.stringify({
 						"type": "listen_to_thread",
@@ -901,17 +905,29 @@ main {
 				}
 			}
 	
-			sock.onerror = (event) => {
+			// sock.onerror = (event) => {
 				// connection_status.textContent = "Errored 😤"
-			}
+			// }
 	
 			sock.onclose = (event) => {
-				// connection_status.textContent = "Closed 😔"
-				// connection_status.textContent = "Closed \u{1F634}"
-				websocket_connected = false;
+				if (websocket_connected === true) {
+					console.log("Websocket connection broken. Re-connecting will be attempted in 10 seconds.");
+					connection_status.textContent = "Closed \u{1F634}"
+					websocket_connected = false;
+				}
+				if (reconnect_websocket_interval === null) {
+					reconnect_websocket_interval = setInterval(async() => {
+						console.log("Attempting websocket reconnect...");
+						websocket = connectToServer();
+					}, 10000);
+				}
 			}
 			return sock
 		}
+
+		// async function reconnectWebsocket() {
+
+		// }
 
 		async function postMessage() {
 			console.log("posting message...");

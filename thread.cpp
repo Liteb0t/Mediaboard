@@ -42,8 +42,8 @@ void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
 		this->thread_as_json["post_zero"] = post.asJson();
 	}
 	this->posts.emplace(post.getIdInThread(), post);
-	this->number_of_posts++;
-	this->thread_as_json["number_of_posts"] = this->number_of_posts;
+	// this->number_of_posts++;
+	// this->thread_as_json["number_of_posts"] = this->number_of_posts;
 	this->last_post_timestamp = post.getUploadTimestamp();
 }
 
@@ -56,9 +56,9 @@ int Thread::createPostFromJson(json post_json) {
 		this->thread_as_json["post_zero"] = post.asJson();
 	}
 	this->posts.emplace(post.getIdInThread(), post);
-	this->number_of_posts++;
-	this->last_post_timestamp = post.getUploadTimestamp();
+	this->number_of_posts++; // number_of_posts gets updated in the database too, in db_store_post()
 	this->thread_as_json["number_of_posts"] = this->number_of_posts;
+	this->last_post_timestamp = post.getUploadTimestamp();
 	return post.getIdInThread();
 }
 

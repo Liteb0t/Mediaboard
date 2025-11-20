@@ -605,6 +605,7 @@ handle_request(
 			if (fileIsImage(&out_filename)) {
 				Magick::Image thumbnail;
 				thumbnail.read(state->doc_root() + out_filename);
+				thumbnail.strip(); // Removes metadata
 				thumbnail.resize("150x150");
 				thumbnail.quality(50);
 				thumbnail.write(state->doc_root() + "thumbnails/THUMBNAIL_" + out_filename + ".jxl");
