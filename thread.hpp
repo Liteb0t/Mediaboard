@@ -1,4 +1,5 @@
 #include "post.hpp"
+#include "db_interface.h"
 // #include "websocket_session.hpp"
 #include <ctime>
 #include <string>
@@ -12,7 +13,8 @@ class websocket_session;
 class Thread {
 public:
 	// Thread();
-	Thread(json thread_json, bool save_to_database);
+	Thread(json thread_json/*, bool save_to_database*/);
+	Thread(struct db_thread_struct* thread_struct);
 	std::string dumpThread() const;
 	json asJson() const { return this->thread_as_json; };
 	// int getNumberOfPosts() const { return this->posts.size(); };
@@ -31,8 +33,10 @@ public:
 	std::string dumpLastPost() const;
 	std::string dumpPosts(std::string key) const;
 	std::string dumpPost(int message_id, std::string key) const;
+	void markAsDeleted();
 	std::time_t getLastPostTime() const { return this->last_post_timestamp; }
 	int number_of_posts;
+	bool isDeleted() const { return this->deleted; }
 private:
 	int id;
 	std::time_t last_post_timestamp;
@@ -46,4 +50,5 @@ private:
 	// std::string name;
 	// std::string content;
 	json thread_as_json;
+	bool deleted;
 };

@@ -10,6 +10,7 @@ extern "C" {
 		int id;
 		// Add char* subject later
 		int number_of_posts;
+		char deleted;
 	};
 	struct db_thread_array {
 		struct db_thread_struct* array;
@@ -45,6 +46,7 @@ extern "C" {
 	int db_store_thread(int number_of_posts);
 	// void db_mark_message_as_deleted(int thread_id, int message_id);
 	void db_mark_post_as_deleted(int post_id);
+	void db_mark_thread_as_deleted(int _thread_id);
 	int db_store_account(const char* username, const char* password);
 	char db_fetch_key(char* key, const char* username, const char* password);
 	int db_key_matches_account(const char* _key, const char* _username);

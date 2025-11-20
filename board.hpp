@@ -14,6 +14,7 @@ public:
 	Board();
 	int createThread(json thread_json);
 	int createPost(json post_json);
+	void deleteThread(int thread_id);
 	void deleteMessageFromThread(int message_id, int thread_id);
 	// std::string dumpLastThread() const;
 	bool keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const;

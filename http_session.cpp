@@ -9,7 +9,6 @@
 
 #include "http_session.hpp"
 #include "websocket_session.hpp"
-#include "db_interface.h"
 #include "field_lengths.h"
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
@@ -635,60 +634,65 @@ handle_request(
 	else if (req.method() == http::verb::delete_) {
 		if (req.target().substr(0, 20) == "/api/delete_message/") {
 			http::response<http::empty_body> res;
-			json request_json = json::parse(req.body());
-			if (request_json.contains("key")) {
-				std::cout << "Request contains key" << std::endl;
-				int slash_index, thread_id, message_id;
-				if ((slash_index = req.target().substr(20, req.target().length() - 20).find('/')) != std::string::npos) {
-					try {
-						thread_id = std::stoi(req.target().substr(20, slash_index));
-						message_id = std::stoi(req.target().substr(20 + slash_index + 1, req.target().length() - slash_index - 1 - 20));
-					}
-					catch (std::invalid_argument const& exception) {
-						res.result(400);
-						std::cout << "Invalid ID in delete_message URL" << std::endl;
-						goto prepare_response_payload;
-					}
-					catch (std::out_of_range const& exception) {
-						res.result(400);
-						std::cout << "Out-of-range ID in delete_message URL" << std::endl;
-						goto prepare_response_payload;
-					}
-					if (state->main_board.threadExists(thread_id)) {
-						if (message_id == 0) {
-							// state->main_board.deleteThread(thread_id, user_key);
-							res.result(http::status::unauthorized);
-						}
-						else {
-							if (state->main_board.messageExistsInThread(message_id, thread_id)) {
-								std::string user_key = request_json["key"].template get<std::string>();
-								if (state->main_board.keyMatchesMessageInThread(user_key, message_id, thread_id) || db_key_matches_account(user_key.c_str(), "Administrator")) {
+			int slash_index, thread_id, message_id;
+			if ((slash_index = req.target().substr(20, req.target().length() - 20).find('/')) != std::string::npos) {
+				try {
+					thread_id = std::stoi(req.target().substr(20, slash_index));
+					message_id = std::stoi(req.target().substr(20 + slash_index + 1, req.target().length() - slash_index - 1 - 20));
+				}
+				catch (std::invalid_argument const& exception) {
+					res.result(400);
+					std::cout << "Invalid ID in delete_message URL" << std::endl;
+					goto prepare_response_payload;
+				}
+				catch (std::out_of_range const& exception) {
+					res.result(400);
+					std::cout << "Out-of-range ID in delete_message URL" << std::endl;
+					goto prepare_response_payload;
+				}
+				if (state->main_board.threadExists(thread_id)) {
+					json request_json = json::parse(req.body());
+					if (request_json.contains("key")) {
+						std::cout << "Request contains key" << std::endl;
+						std::string user_key = request_json["key"].template get<std::string>();
+						bool is_administrator = db_key_matches_account(user_key.c_str(), "Administrator");
+						if (is_administrator || state->main_board.keyMatchesMessageInThread(user_key.c_str(), message_id, thread_id)) {
+							if (message_id == 0) {
+								if (is_administrator) {
+									state->main_board.deleteThread(thread_id);
+									res.result(http::status::ok);
+								}
+								else
+									return bad_request("Denied: User must be administrator to delete a thread");
+							}
+							else {
+								if (state->main_board.messageExistsInThread(message_id, thread_id)) {
 									state->main_board.deleteMessageFromThread(message_id, thread_id);
 									res.result(200);
 								}
 								else {
-									std::cout << "key doesnt match\n";
+									std::cout << "Message " << message_id << " does not exist in thread " << thread_id << std::endl;
 									res.result(400);
 								}
 							}
-							else {
-								std::cout << "Message " << message_id << " does not exist in thread " << thread_id << std::endl;
-								res.result(400);
-							}
+						}
+						else {
+							std::cout << "Permission denied for post deletion.\n";
+							res.result(400);
 						}
 					}
 					else {
-						std::cout << "Thread " << thread_id << " does not exist\n";
-						res.result(400);
+						return bad_request("Denied: Request does not contain key\n");
 					}
 				}
 				else {
-					std::cout << "Could not get ID of message to delete; Badly formed URL" << std::endl;
+					std::cout << "Thread " << thread_id << " does not exist\n";
 					res.result(400);
 				}
 			}
 			else {
-				return bad_request("Denied: Request does not contain key\n");
+				std::cout << "Could not get ID of message to delete; Badly formed URL" << std::endl;
+				res.result(400);
 			}
 prepare_response_payload:
 			res.prepare_payload();

@@ -64,6 +64,7 @@ void db_connect(const char* _database_name) {
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts) VALUES (?, 0);";
 	const char* mark_post_as_deleted_prepared_stmt = "UPDATE post SET deleted = true WHERE id = ?;";
+	const char* mark_thread_as_deleted_prepared_stmt = "UPDATE thread SET deleted = true WHERE id = ?;";
 	const char* create_account_prepared_stmt = "INSERT INTO account(username, password_hash, key) VALUES (?, ?, ?);";
 	char* data;
 	EXEC SQL END DECLARE SECTION;
@@ -79,6 +80,7 @@ void db_connect(const char* _database_name) {
 	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;
 	EXEC SQL PREPARE mark_post_as_deleted_stmt FROM :mark_post_as_deleted_prepared_stmt;
+	EXEC SQL PREPARE mark_thread_as_deleted_stmt FROM :mark_thread_as_deleted_prepared_stmt;
 	EXEC SQL PREPARE create_account_prepared_stmt FROM :create_account_prepared_stmt;
 }
 
@@ -154,6 +156,14 @@ void db_mark_post_as_deleted(int post_id_) {
 	int post_id = post_id_;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL EXECUTE mark_post_as_deleted_stmt USING :post_id;
+	EXEC SQL COMMIT;
+}
+
+void db_mark_thread_as_deleted(int _thread_id) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int thread_id = _thread_id;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL EXECUTE mark_thread_as_deleted_stmt USING :thread_id;
 	EXEC SQL COMMIT;
 }
 
@@ -265,17 +275,19 @@ struct db_thread_array* db_retrieve_threads() {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int thread_id;
 	int number_of_posts;
+	char deleted;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL DECLARE thread_getter CURSOR FOR
-		SELECT id, number_of_posts FROM thread
+		SELECT id, number_of_posts, deleted FROM thread
 		ORDER BY id;
 	EXEC SQL OPEN thread_getter;
 	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `thread_getter` has retreived all threads
 	while (true) {
-		EXEC SQL FETCH thread_getter INTO :thread_id, :number_of_posts;
+		EXEC SQL FETCH thread_getter INTO :thread_id, :number_of_posts, :deleted;
 		struct db_thread_struct thread;
 		thread.id = thread_id;
 		thread.number_of_posts = number_of_posts;
+		thread.deleted = deleted == 't';
 		insertToThreadArray(&thread_list, thread);
 	}
 	EXEC SQL CLOSE thread_getter;

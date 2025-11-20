@@ -1,5 +1,5 @@
 #include "board.hpp"
-#include "db_interface.h"
+// #include "db_interface.h"
 #include <sstream>
 #include <iostream>
 
@@ -10,7 +10,7 @@ Board::Board() {
 }
 
 int Board::createThread(json thread_json) {
-	Thread thread(thread_json, true);
+	Thread thread(thread_json);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(thread.getLastPostTime(), thread.getId()));
 	return thread.getId();
@@ -30,6 +30,10 @@ int Board::createPost(json post_json) {
 	return new_post_id;
 }
 
+void Board::deleteThread(int thread_id) {
+	this->threads.at(thread_id).markAsDeleted();
+}
+
 void Board::deleteMessageFromThread(int message_id, int thread_id) {
 	if (message_id != 0) {
 		std::cout << "Deleting message " << message_id << " in thread " << thread_id << std::endl;
@@ -45,10 +49,11 @@ void Board::cacheAllThreads() {
 	std::cout << "Retreiving threads from database..." << std::endl;
 	struct db_thread_array* thread_list = db_retrieve_threads();
 	for (int i = 0; i < thread_list->used; i++) {
-		json thread_json;
-		thread_json["id"] = thread_list->array[i].id;
+		// json thread_json;
+		// thread_json["id"] = thread_list->array[i].id;
 		// thread_json["number_of_posts"] = thread_list->array[i].number_of_posts;
-		Thread thread(thread_json, false);
+		// Thread thread(thread_json, false);
+		Thread thread(&thread_list->array[i]);
 		this->threads.insert(std::make_pair(thread.getId(), thread));
 	}
 	freeThreadArray(thread_list);
@@ -63,7 +68,7 @@ void Board::cacheAllThreads() {
 	for (std::map<int, Thread>::const_iterator it = this->threads.begin(); it != this->threads.end(); ++it) {
 		this->ordered_threads.insert(std::make_pair(it->second.getLastPostTime(), it->first));
 	}
-	
+
 	std::cout << "Finished retreiving threads and posts from the database." << std::endl;
 	freePostArray(post_history);
 }
@@ -72,8 +77,10 @@ std::string Board::dumpAllThreads() const {
 	json multiple_thread_json;
 	multiple_thread_json["type"] = "thread_catalog";
 	multiple_thread_json["threads"] = json::array();
-	for (auto it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
-		multiple_thread_json["threads"].push_back(this->threads.at(it->second).asJson());
+	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
+		if (!this->threads.at(it->second).isDeleted()) {
+			multiple_thread_json["threads"].push_back(this->threads.at(it->second).asJson());
+		}
 	}
 	return multiple_thread_json.dump();
 }

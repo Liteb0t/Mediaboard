@@ -1,24 +1,35 @@
 #include "thread.hpp"
-#include "db_interface.h"
 #include <string>
 #include <iostream>
 #include <cstring>
 
-Thread::Thread(json thread_json, bool save_to_database) {
+// Save thread when JSON is received
+Thread::Thread(json thread_json/*, bool save_to_database*/) {
 	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
 	this->number_of_posts = 0;
-	if (save_to_database) {
+	// if (save_to_database) {
 		// ID and timestamp are not initially known
 		this->id = db_store_thread(1/* add subject later*/);
 		std::cout << "this->id: " << this->id << std::endl;
 		this->thread_as_json["id"] = this->id;
 		thread_json["post_zero"]["thread_id"] = this->id;
 		this->createPostFromJson(thread_json["post_zero"]);
-	}
-	else {
-		this->id = thread_json["id"].template get<int>();
-	}
+	// }
+	// else {
+	// 	this->id = thread_json["id"].template get<int>();
+	// }
+}
+
+// Cache thread using db_interface struct
+Thread::Thread(struct db_thread_struct* thread_struct) {
+	this->id = thread_struct->id;
+	this->deleted = thread_struct->deleted;
+	this->number_of_posts = thread_struct->number_of_posts;
+	// json thread_as_json;
+	this->thread_as_json["id"] = this->id;
+	this->thread_as_json["deleted"] = this->deleted;
+	this->thread_as_json["number_of_posts"] = this->number_of_posts;
 }
 
 std::string Thread::dumpThread() const {
@@ -58,7 +69,7 @@ void Thread::deleteMessage(int message_id) {
 
 bool Thread::keyMatchesMessage(std::string key, int message_id) const {
 	std::cout << "[Thread] key :: message_key\n" << key << " :: " << this->posts.at(message_id).getKey() << std::endl;
-	return message_id != 0 && this->posts.at(message_id).getKey() == key; // Don't match key to message 0, because threads can't be deleted yet
+	return message_id != 0 && this->posts.at(message_id).getKey() == key; // Don't match key to message 0, because threads can't be deleted by regular users (yet?)
 }
 
 std::string Thread::dumpPosts(std::string key) const {
@@ -80,6 +91,11 @@ std::string Thread::dumpPost(int message_id, std::string key) const {
 	json post_json = this->posts.at(message_id).asJson();
 	post_json["is_author"] = keyMatchesMessage(key, message_id);
 	return post_json.dump();
+}
+
+void Thread::markAsDeleted() {
+	this->deleted = true;
+	db_mark_thread_as_deleted(this->id);
 }
 
 void Thread::addListener(websocket_session* listener) {
