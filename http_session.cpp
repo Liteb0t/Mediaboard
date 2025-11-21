@@ -350,64 +350,77 @@ handle_request(
     	return res;
 	}
 	else if (req.method() == http::verb::post) {
-		if (req.target() == "/api/create_thread/") {
-			http::response<http::string_body> res;
+		if (req.target() == "/api/create_message/" || req.target() == "/api/create_thread/") {
+			http::response<http::empty_body> res;
 			json request_json = json::parse(req.body());
-			if (request_json.contains("thread") && 
-					// request_json["thread"].contains("key") &&
-					request_json["thread"].contains("post_zero") &&
-					request_json["thread"]["post_zero"].contains("files") && 
-					request_json["thread"]["post_zero"].contains("name") && 
-					request_json["thread"]["post_zero"].contains("content")) {
-				if (request_json["thread"]["post_zero"]["files"].size() > 4) {
-					std::cerr << "Denied: More than 4 files in thread\n";
-					res.result(500);
+			bool is_thread;
+			json post_json;
+			if (req.target() == "/api/create_thread/") {
+				if (request_json.contains("thread") && 
+					request_json["thread"].contains("post_zero")) {
+					post_json = request_json["thread"]["post_zero"];
+					is_thread = true;
 				}
 				else {
-					int new_thread_id = state->main_board.createThread(request_json["thread"]);
-					res.set("New-Thread-Id", std::to_string(new_thread_id));
-					res.result(201);
+					res.result(400);
+					res.set("message", "\"thread\" or \"post_zero\" JSON field(s) missing.");
+					res.prepare_payload();
+					return res;
 				}
 			}
 			else {
-				res.result(400);
-			}
-			res.prepare_payload();
-			return res;
-		}
-		else if (req.target() == "/api/create_message/") {
-			http::response<http::string_body> res;
-			json request_json = json::parse(req.body());
-			if (request_json.contains("post") &&
-					request_json["post"].contains("files") && 
-					request_json["post"].contains("name") && 
-					request_json["post"].contains("content") && 
-					request_json["post"].contains("key")) {
-				if (request_json["post"]["files"].size() > 4) {
-					std::cerr << "Denied: More than 4 files in message\n";
-					res.result(500);
+				if (request_json.contains("post")) {
+					post_json = request_json["post"];
+					is_thread = false;
 				}
 				else {
-					int new_message_thread_id = request_json["post"]["thread_id"].template get<int>();
-					std::string new_message_key = request_json["post"]["key"].template get<std::string>();
-					std::string message_content = request_json["post"]["content"].template get<std::string>();
-					if (state->main_board.threadExists(new_message_thread_id)) {
-						if ((message_content.length() > 0 || request_json["post"]["files"].size() > 0) && message_content.length() < POST_MAX_CONTENT) {
-							int new_message_id = state->main_board.createPost(request_json["post"]);
-							std::string new_message_dump = state->main_board.dumpPost(new_message_thread_id, new_message_id, new_message_key);
-							state->sendToThread(new_message_dump, new_message_thread_id);
+					res.result(400);
+					res.set("message", "\"post\" JSON field missing.");
+					res.prepare_payload();
+					return res;
+				}
+			}
+			if (post_json.contains("files") && 
+					post_json.contains("name") && 
+					post_json.contains("content") && 
+					post_json.contains("key")) {
+				if (post_json["files"].size() > 4) {
+					std::cerr << "Denied: More than 4 files in message\n";
+					res.set("message", "More than 4 files attatched.");
+					res.result(400);
+				}
+				else {
+					std::string message_content = post_json["content"].template get<std::string>();
+					if ((message_content.length() > 0 || post_json["files"].size() > 0) && message_content.length() < POST_MAX_CONTENT) {
+						if (is_thread) {
+							int new_thread_id = state->main_board.createThread(request_json["thread"]);
+							res.set("New-Thread-Id", std::to_string(new_thread_id));
 							res.result(201);
 						}
-						else
-							res.result(400);
+						else {
+							int new_message_thread_id = post_json["thread_id"].template get<int>();
+							std::string new_message_key = post_json["key"].template get<std::string>();
+							if (state->main_board.threadExists(new_message_thread_id)) {
+								int new_message_id = state->main_board.createPost(request_json["post"]);
+								std::string new_message_dump = state->main_board.dumpPost(new_message_thread_id, new_message_id, new_message_key);
+								state->sendToThread(new_message_dump, new_message_thread_id);
+								res.result(201);
+							}
+							else {
+								std::cerr << "Couldn't create message because the thread with ID " << new_message_thread_id << " does not exist" << std::endl;
+								res.set("message", "thread with ID " + std::to_string(new_message_thread_id) + " does not exist");
+								res.result(400);
+							}
+						}
 					}
 					else {
-						std::cerr << "Couldn't create message because the thread with ID " << new_message_thread_id << " does not exist" << std::endl;
+						res.set("message", "The post does not meet the constraints set by the server.\nThis could mean that the message content was empty and no files were uploaded, or the message content is too long.");
 						res.result(400);
 					}
 				}
 			}
 			else {
+				res.set("message", "One or more JSON fields missing in post.");
 				res.result(400);
 			}
 			res.prepare_payload();

@@ -17,7 +17,7 @@
 		<main>
 			<div id="header_bar" class="ToolBar WithBorders">
 				<div id="WebsiteName"><b>_SITE_NAME</b></div>
-				<button id="catalog_button" class="ToolBarButton" onclick="openCatalog()">&#x1F5D0; Catalog</button>
+				<button id="threads_button" class="ToolBarButton" onclick="openThreadList()">&#x1F5D0; Threads</button>
 				<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
 				<div id="warning_outdated_browser" style="color: #D00">Warning: outdated browser</div>
 				<div class="FlexSeparator"></div>
@@ -33,7 +33,7 @@
 				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
 				<div class="RightAligned"><a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.4</a></div>
 			</div>
-			<h3 id="location_indicator">Catalog</h3>
+			<h3 id="location_indicator"></h3>
 			<dialog id="loading_dialog" open><p>Loading. Please wait...</p></dialog>
 			<noscript>
 				<dialog open><h2>Error</h2><p><b>Enable javascript</b> you fucking autist neckbeard, it's not gonna hurt you.</p></dialog>
@@ -60,7 +60,37 @@
 		<dialog id="thread_posted_dialog" closedby="any">
 			<h2>Thread posted!</h2>
 			<p>Click outside this box or hit the <kbd>Esc</kbd> key to close this dialog.</p>
-			<div class="ToolBar"><button class="RightAligned" onclick="thread_posted_dialog.close()">&#x1F5D9; Close</button><button id="thread_posted_dialog_open_thread_button" style="margin-left: 2em;">&#x21E8; Open thread</button></div>
+			<div class="ToolBar"><button onclick="thread_posted_dialog.close()">&#x1F5D9; Close</button><button id="thread_posted_dialog_open_thread_button">&#x21E8; Open thread</button></div>
+		</dialog>
+		<dialog id="thread_not_found_dialog" closedby="any">
+			<h2>Error: Thread not found</h2>
+			<p>It may have been deleted.</p>
+			<div class="ToolBar"><button onclick="openThreadList();thread_not_found_dialog.close()">&#x1F5D0; Threads</button><button onclick="thread_not_found_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="post_failed_dialog" closedby="any">
+			<h2>Error: <span id="post_failed_dialog_error_title"></span></h2>
+			<p><span id="post_failed_dialog_error_body"></span></p>
+			<div class="ToolBar"><button onclick="post_failed_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="post_content_empty_dialog" closedby="any">
+			<h2>Error</h2>
+			<p>Cannot post with empty content and no files.</p>
+			<div class="ToolBar"><button onclick="post_content_empty_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="post_content_too_long_dialog" closedby="any">
+			<h2>Error</h2>
+			<p>Content too long. Limit: 5000.<br>This post: <span id="post_content_too_long_dialog_content_length"></span></p>
+			<div class="ToolBar"><button onclick="post_content_too_long_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="post_name_too_long_dialog" closedby="any">
+			<h2>Error</h2>
+			<p>Name too long. Limit: 73<br>This post: <span id="post_name_too_long_dialog_name_length"></span></p>
+			<div class="ToolBar"><button onclick="post_name_too_long_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="post_file_upload_not_complete_dialog" closedby="any">
+			<h2>Error</h2>
+			<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attatchments.</p>
+			<div class="ToolBar"><button onclick="post_content_empty_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 	</body>
 	<style>
@@ -327,41 +357,6 @@ main {
 			}
 		}
 
-		/*
-		class MessageBox {
-			constructor(body, title, buttons = []) {
-				this.element = document.createElement("dialog");
-				let title_element = document.createElement("h3");
-				title_element.textContent = title;
-				let body_element = document.createElement("p");
-				body_element.textContent = body;
-				this.element.setAttribute("closedby", "any");
-				this.element.append(title_element, body_element);
-				if (buttons.length >= 1) {
-					let button_container = document.createElement("div");
-					button_container.classList.add("ToolBar", "MessageBoxButtons");
-					for (let button of buttons) {
-						let button_element = document.createElement("button");
-						button_element.textContent = button.label;
-						button_element.onclick = button.action;
-						button_container.append(button_element);
-					}
-					this.element.append(button_container);
-				}
-
-				document.body.append(this.element);
-			}
-			show() {
-				this.element.showModal();
-			}
-			close() {
-				this.element.close();
-			}
-		}
-		const test_messagebox = new MessageBox("yo test", "Test messagebox", [{label: "OK", action: () => {test_messagebox.close()}}, {label: "nothing", action: null}]);
-		test_messagebox.show();
-		*/
-
 		// Used to verify the author on deleting a message.
 		let local_key = localStorage.getItem("local_key");
 		let account_key = localStorage.getItem("account_key");
@@ -401,14 +396,20 @@ main {
 		async function postAction() {
 			let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
 			let content_length_bytes = (new TextEncoder().encode(content_field.innerText)).length;
+			console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
 			if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
-				alert("Error: Cannot create post with empty content and no files.");
+				post_content_empty_dialog.showModal();
 			}
 			else if (name_length_bytes > 73) {
-				alert("Error: Name too long.\nLimit: 73\nThis name: " + name_length_bytes);
+				post_name_too_long_dialog_name_length.textContent = name_length_bytes;
+				post_name_too_long_dialog.showModal();
 			}
 			else if (content_length_bytes > 5000) {
-				alert("Error: Content too long.\nLimit: 5000\nMessage content: " + content_length_bytes);
+				post_content_too_long_dialog_content_length.textContent = content_length_bytes;
+				post_content_too_long_dialog.showModal();
+			}
+			else if (file_post_list.querySelector("progress")) {
+				post_file_upload_not_complete_dialog.showModal();
 			}
 			else {
 				let response;
@@ -429,8 +430,21 @@ main {
 					}
 				}
 				else {
+					if (state.selected_thread_id === -1) {
+						post_failed_dialog_error_title.textContent = "Could not create thread";
+					}
+					else {
+						post_failed_dialog_error_title.textContent = "Could not send message";
+					}
+					let header_error_message = response.headers.get("message");
+					if (header_error_message) {
+						post_failed_dialog_error_body.innerText = `${response.status} ${response.statusText}\n${header_error_message}`;
+					}
+					else {
+						post_failed_dialog_error_body = `Status: ${response.status} ${response.statusText}`;
+					}
+					post_failed_dialog.showModal();
 					console.log(response);
-					alert("Error when attempting to post\nStatus: " + response.status + "\nstatusText: " + response.statusText);
 				}
 				localStorage.setItem("name", name_field.value);
 			}
@@ -441,16 +455,15 @@ main {
 			file_upload.disabled = false;
 		}
 
-		function openCatalog() {
+		function openThreadList() {
 			state.selected_thread_id = -1;
 			history.pushState(state, "", "_ROOT_URL");
-			// location_indicator.textContent = "Catalog";
 			refresh_send();
 		}
 
 		function showThreads(message_json) {
-			location_indicator.textContent = "Catalog";
-			catalog_button.disabled = true;
+			location_indicator.textContent = "Threads";
+			threads_button.disabled = true;
 			reply_heading_text.textContent = "Create a thread";
 			const fragment = new DocumentFragment();
 			for (let thread of message_json.threads) {
@@ -487,7 +500,7 @@ main {
 		}
 		function showPosts(message_json) {
 			location_indicator.textContent = `Viewing thread ${state.selected_thread_id}`;
-			catalog_button.disabled = false;
+			threads_button.disabled = false;
 			reply_heading_text.textContent = "Leave a reply";
 			const fragment = new DocumentFragment();
 			// for (let i = 0; i < 1000; ++i) {
@@ -529,6 +542,9 @@ main {
 				console.log("2");
 
 				websocket = connectToServer();
+			}
+			else if (response.status === 404) {
+				thread_not_found_dialog.showModal();
 			}
 			else {
 				alert("Server error from getThreadPosts(). the developer must suck lmao");
@@ -873,7 +889,7 @@ main {
 			// this will be done through a central config file later
 			let sock = new WebSocket("_WEBSOCKET_URL");	
 			sock.onopen = (event) => {
-				connection_status.textContent = "Connected 🙂";
+				// connection_status.textContent = "Connected 🙂";
 				console.log("Websocket connected.");
 				websocket_connected = true;
 				clearInterval(reconnect_websocket_interval);
@@ -911,11 +927,13 @@ main {
 	
 			sock.onclose = (event) => {
 				if (websocket_connected === true) {
-					console.log("Websocket connection broken. Re-connecting will be attempted in 10 seconds.");
-					connection_status.textContent = "Closed \u{1F634}"
+					if (state.selected_thread_id !== -1) {
+						console.log("Websocket connection broken. Re-connecting will be attempted in 10 seconds.");
+					}
+					// connection_status.textContent = "Closed \u{1F634}"
 					websocket_connected = false;
 				}
-				if (reconnect_websocket_interval === null) {
+				if (state.selected_thread_id !== -1 && reconnect_websocket_interval === null) {
 					reconnect_websocket_interval = setInterval(async() => {
 						console.log("Attempting websocket reconnect...");
 						websocket = connectToServer();
@@ -924,10 +942,6 @@ main {
 			}
 			return sock
 		}
-
-		// async function reconnectWebsocket() {
-
-		// }
 
 		async function postMessage() {
 			console.log("posting message...");

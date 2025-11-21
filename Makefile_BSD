@@ -1,10 +1,16 @@
 BOOSTINC=-I/usr/local/include/boost/
 INCFLAGS=-I/usr/local/include
 
-all: index.html server
+all: index.html registration.html change_password.html server
 
 index.html: _index.html tokens.m4
 	m4 _index.html >index.html
+
+registration.html: _registration.html tokens.m4
+	m4 _registration.html >registration.html
+
+change_password.html: _change_password.html tokens.m4
+	m4 _change_password.html >change_password.html
 
 server: main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o 
 	clang++ `Magick++-config --cxxflags --cppflags` -o server main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o $(INCFLAGS) -I/usr/include/postgresql -l:libecpg.so -l:libpgtypes.so `Magick++-config --ldflags --libs` -lboost_program_options -lboost_filesystem -lboost_system -pthread

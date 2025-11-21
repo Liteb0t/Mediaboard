@@ -28,6 +28,15 @@ input[type=file]::file-selector-button:active {
 dialog {
 	box-shadow: 8px 8px #0008;
 	margin-top: 20vh;
+	max-width: 80vw;
+	>.ToolBar {
+		:first-child {
+			margin-left: auto;
+		}
+		>button:not(:first-child), >.Button:not(:first-child) {
+			margin-left: 16px;
+		}
+	}
 }
 
 .ToolBar {
