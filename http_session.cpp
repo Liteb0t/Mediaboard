@@ -67,7 +67,7 @@ mime_type(beast::string_view path)
 
 const std::string forbidden_file_name_chars = "#?";
 
-const std::set<std::string, std::less<>> image_formats = {"gif", "jpg", "jpeg", "jxl", "png", "webp"};
+const std::set<std::string, std::less<>> image_formats = {"gif", "jpg", "jpeg", "jxl", "png", "webp", "bmp", "ico"};
 const bool fileIsImage(std::string* file_name) {
 	int dot_index = file_name->rfind('.');
 	if (dot_index != std::string::npos) {
@@ -598,10 +598,38 @@ handle_request(
 			// Write to the file
 			std::ofstream outfile(state->doc_root() + out_filename, std::ios::binary);
 			bool terminator_found = false;
+			bool is_initial_line = true;
+			int previous_line_is_cr_return = false;
+			bool previous_line_ends_with_carriage_return = false;
 			while (std::getline(req_stream, req_line)) {
 				if (req_line != req_terminator) {
 					// std::cout << "this is not the terminator" << std::endl;
-					outfile << req_line + "\n";
+					// if (is_initial_line) {
+					// 	outfile << req_line;
+					// 	is_initial_line = false;
+					// }
+					// else {
+					// else {
+						// while (previous_line_is_cr_return) {
+						// 	outfile << "\n\r";
+						// 	previous_line_is_cr_return--;
+						// }
+					if (previous_line_ends_with_carriage_return) {
+						previous_line_ends_with_carriage_return = false;
+						outfile << "\r";
+					}
+					if (!is_initial_line)
+						outfile << "\n";
+					if (req_line.back() == '\r') {
+						std::cout << "Req line ends with carriage return" << std::endl;
+						previous_line_is_cr_return++;
+						previous_line_ends_with_carriage_return = true;
+						outfile << req_line.substr(0, req_line.length() - 1);
+					}
+					else
+						outfile << req_line;
+					// }
+					is_initial_line = false;
 				}
 				else {
 					// std::cout << "THE TERMINATOR" << std::endl;
@@ -617,11 +645,16 @@ handle_request(
 			// Write thumbnail
 			if (fileIsImage(&out_filename)) {
 				Magick::Image thumbnail;
-				thumbnail.read(state->doc_root() + out_filename);
-				thumbnail.strip(); // Removes metadata
-				thumbnail.resize("150x150");
-				thumbnail.quality(50);
-				thumbnail.write(state->doc_root() + "thumbnails/THUMBNAIL_" + out_filename + ".jxl");
+				try {
+					thumbnail.read(state->doc_root() + out_filename);
+					thumbnail.strip(); // Removes metadata
+					thumbnail.resize("150x150");
+					thumbnail.quality(50);
+					thumbnail.write(state->doc_root() + "thumbnails/THUMBNAIL_" + out_filename + ".jxl");
+				}
+				catch (Magick::Error& magick_error) {
+					std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Thumbnail will therefore not be made." << std::endl;
+				}
 			}
 
 			// std::string filename_utf_8 = boost::locale::conv::to_utf(out_filename, "UTF-8");

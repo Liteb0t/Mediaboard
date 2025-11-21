@@ -92,29 +92,6 @@ on_read(beast::error_code ec, std::size_t)
 			std::cout << "Warning: thread is not an integer" << std::endl;
 		}
 	}
-	// if (request_type == "create_thread") {
-	// 	// Validate JSON
-	// 	if (buffer_as_json["post_zero"]["files"].size() > 4) {
-	// 		std::cerr << "Denied: More than 4 files in post\n";
-	// 		return;
-	// 	}
-	// 	else {
-	// 		// state_->main_board.createPost(buffer_as_json["post"]);
-	// 		state_->main_board.createThread(buffer_as_json["thread"]);
-	// 		// Send to all connections
-	// 		// state_->send(state_->main_board.dumpLastThread());
-	// 	}
-	// }
-	// else if (request_type == "create_post") {
-	// 	// state_->send(state_->main_board.createPost(buffer_as_json["post"]));
-	// 	state_->main_board.createPost(buffer_as_json["post"]);
-	// }
-	// else if (request_type == "fetch_catalog") {
-	// 	state_->send(state_->main_board.dumpAllThreads());
-	// }
-	// else if (request_type == "fetch_thread_posts") {
-	// 	state_->send(state_->main_board.dumpPostsInThread(buffer_as_json["thread_id"].template get<int>()));
-	// }
 	else {
 		// TODO send error message back to requester
 		std::cerr << "request_type " + request_type + " not recognised" << std::endl;

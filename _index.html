@@ -21,8 +21,8 @@
 				<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
 				<div id="warning_outdated_browser" style="color: #D00">Warning: outdated browser</div>
 				<div class="FlexSeparator"></div>
-				<!--
 				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
+				<!--
 				<button id="LoginButton" class="ToolBarButton">Login</button>
 				<button id="RegisterButton" class="ToolBarButton">Register</button>-->
 				<a id="registration_link" class="Button ToolBarButton" href="/registration.html" style="display: none">Log-in or Register</a>
@@ -90,7 +90,7 @@
 		<dialog id="post_file_upload_not_complete_dialog" closedby="any">
 			<h2>Error</h2>
 			<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attatchments.</p>
-			<div class="ToolBar"><button onclick="post_content_empty_dialog.close()">&#x1F5D9; Close</button></div>
+			<div class="ToolBar"><button onclick="post_file_upload_not_complete_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 	</body>
 	<style>
@@ -285,7 +285,7 @@ main {
 		flex_separator.classList.add("FlexSeparator");
 		let state = {selected_thread_id: null};
 		let websocket;
-		let websocket_connected;
+		let websocket_connected = false;
 		let reconnect_websocket_interval;
 		let is_administrator = false;
 		console.log(websocket);
@@ -335,7 +335,7 @@ main {
 			static IMAGE = 0;
 			static AUDIO = 1;
 			static OTHER = -1;
-			static image_formats = ["gif", "jpg", "jpeg", "jxl", "png", "webp"];
+			static image_formats = ["gif", "jpg", "jpeg", "jxl", "png", "webp", "bmp", "ico"];
 			static audio_formats = ["flac", "mp3", "ogg", "ogx", "opus", "wav"];
 			static fromFileName(file_name) {
 				let dot_index = file_name.indexOf('.');
@@ -884,12 +884,13 @@ main {
 			}
 		}
 
-		function connectToServer() {
-			// change this to your server URL where Fuze Mediaboard serves websockets
-			// this will be done through a central config file later
-			let sock = new WebSocket("_WEBSOCKET_URL");	
+		function connectToServer(sock) {
+			if (sock) {
+				sock.close();
+			}
+			sock = new WebSocket("_WEBSOCKET_URL");	
 			sock.onopen = (event) => {
-				// connection_status.textContent = "Connected 🙂";
+				connection_status.textContent = "Connected 🙂";
 				console.log("Websocket connected.");
 				websocket_connected = true;
 				clearInterval(reconnect_websocket_interval);
@@ -926,18 +927,26 @@ main {
 			// }
 	
 			sock.onclose = (event) => {
+				console.log("Websocket closed.");
+				const listening_thread = state.selected_thread_id;
 				if (websocket_connected === true) {
 					if (state.selected_thread_id !== -1) {
 						console.log("Websocket connection broken. Re-connecting will be attempted in 10 seconds.");
 					}
-					// connection_status.textContent = "Closed \u{1F634}"
+					connection_status.textContent = "Closed \u{1F634}"
 					websocket_connected = false;
-				}
-				if (state.selected_thread_id !== -1 && reconnect_websocket_interval === null) {
-					reconnect_websocket_interval = setInterval(async() => {
-						console.log("Attempting websocket reconnect...");
-						websocket = connectToServer();
-					}, 10000);
+					if (state.selected_thread_id !== -1 && reconnect_websocket_interval === null) {
+						reconnect_websocket_interval = setInterval(async() => {
+							console.log("Attempting websocket reconnect...");
+							if (listening_thread === state.selected_thread_id) {
+								connectToServer(sock);
+							}
+							else {
+								console.log("Cancelling websocket reconnect attempt; thread has changed.");
+								clearInterval(reconnect_websocket_interval);
+							}
+						}, 10000);
+					}
 				}
 			}
 			return sock
