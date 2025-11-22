@@ -2,6 +2,7 @@
 #define POST_MAX_NAME 73
 // #define POST_MAX_EMAIL 254
 #define POST_MAX_CONTENT 5000
-#define MAX_THREADS_PER_BOARD 50
+// #define MAX_THREADS_PER_BOARD 50
 #define KEY_LENGTH 8
-#define POST_MAX_FILE_NAME 255
+#define POST_MAX_FILE_NAME 205 // The Unix file name limit is 255, but some space is required for UUID and other parts.
+#define POST_MAX_FILE_NAME_WITH_UUID POST_MAX_FILE_NAME+36

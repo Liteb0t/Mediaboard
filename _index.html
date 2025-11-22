@@ -21,8 +21,8 @@
 				<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
 				<div id="warning_outdated_browser" style="color: #D00">Warning: outdated browser</div>
 				<div class="FlexSeparator"></div>
-				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
 				<!--
+				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
 				<button id="LoginButton" class="ToolBarButton">Login</button>
 				<button id="RegisterButton" class="ToolBarButton">Register</button>-->
 				<a id="registration_link" class="Button ToolBarButton" href="/registration.html" style="display: none">Log-in or Register</a>
@@ -45,7 +45,7 @@
 			<summary id="reply_heading_text"></summary>
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
-			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" maxlength="73" />
+			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" maxlength="_POST_MAX_NAME" />
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned" onclick="postAction()">
 			</div>
 			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content"></div>
@@ -60,7 +60,7 @@
 		<dialog id="thread_posted_dialog" closedby="any">
 			<h2>Thread posted!</h2>
 			<p>Click outside this box or hit the <kbd>Esc</kbd> key to close this dialog.</p>
-			<div class="ToolBar"><button onclick="thread_posted_dialog.close()">&#x1F5D9; Close</button><button id="thread_posted_dialog_open_thread_button">&#x21E8; Open thread</button></div>
+			<div class="ToolBar"><button id="thread_posted_dialog_open_thread_button">&#x21E8; Open thread</button><button onclick="thread_posted_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 		<dialog id="thread_not_found_dialog" closedby="any">
 			<h2>Error: Thread not found</h2>
@@ -84,13 +84,34 @@
 		</dialog>
 		<dialog id="post_name_too_long_dialog" closedby="any">
 			<h2>Error</h2>
-			<p>Name too long. Limit: 73<br>This post: <span id="post_name_too_long_dialog_name_length"></span></p>
+			<p>Name too long. Limit: _POST_MAX_NAME<br>This post: <span id="post_name_too_long_dialog_name_length"></span></p>
 			<div class="ToolBar"><button onclick="post_name_too_long_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 		<dialog id="post_file_upload_not_complete_dialog" closedby="any">
-			<h2>Error</h2>
-			<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attatchments.</p>
+			<h2>Warning</h2>
+			<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attachments.</p>
 			<div class="ToolBar"><button onclick="post_file_upload_not_complete_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="file_size_limit_exceeded_dialog" closedby="any">
+			<h2>Error: could not upload file</h2>
+			<p>The file <span id="file_size_limit_exceeded_dialog_file_name"></span> exceeds the _FILE_SIZE_LIMIT_MB megabyte limit.<br>
+			<code id="file_size_limit_exceeded_dialog_file_size_bytes"></code> - this file (bytes)<br><code id="file_size_limit_exceeded_dialog_file_limit_bytes"></code> - limit (bytes)</p>
+			<div class="ToolBar"><button onclick="file_size_limit_exceeded_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="generic_error_dialog" closedby="any">
+			<h2>Error</h2>
+			<p id="generic_error_dialog_message">Something happened.</p>
+			<div class="ToolBar"><button onclick="generic_error_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="file_name_too_long_dialog" closedby="any">
+			<h2>Error: could not upload file</h2>
+			<p>File name "<span id="file_name_too_long_dialog_file_name"></span>" exceeds the limit of _POST_MAX_FILE_NAME bytes.<br>This file name: <span id="file_name_too_long_dialog_name_length"></span> bytes.</p>
+			<div class="ToolBar"><button onclick="file_name_too_long_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<dialog id="file_upload_error_dialog" closedby="any">
+			<h2>Error: could not upload file</h2>
+			<p id="file_upload_error_dialog_message">Something happened.</p>
+			<div class="ToolBar"><button onclick="file_upload_error_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 	</body>
 	<style>
@@ -259,6 +280,12 @@ main {
 		.UploadCompleteIndicator {
 			color: green;
 		}
+		.UploadFailedIndicator {
+			color: red;
+		}
+		&.Errored {
+			image-rendering: pixelated;
+		}
 	}
 }
 
@@ -276,6 +303,7 @@ main {
 		const media_url = "media/"; // so you wont need to reconfigure these every update
 		const thumbnail_url = "media/thumbnails/";
 		const file_size_limit = _FILE_SIZE_LIMIT_MB*1024*1024;
+		file_size_limit_exceeded_dialog_file_limit_bytes.textContent = file_size_limit;
 		// 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
 		const valid_uri_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 		const media_uuid_len = 36;
@@ -400,7 +428,7 @@ main {
 			if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
 				post_content_empty_dialog.showModal();
 			}
-			else if (name_length_bytes > 73) {
+			else if (name_length_bytes > _POST_MAX_NAME) {
 				post_name_too_long_dialog_name_length.textContent = name_length_bytes;
 				post_name_too_long_dialog.showModal();
 			}
@@ -511,15 +539,25 @@ main {
 			post_container.replaceChildren(fragment);
 		}
 		async function getThreads() {
-			let response = await fetch("_ROOT_URL" + api_url + "get_threads/");
-			if (response.ok) {
-				await response.json().then(response_obj => {
-					console.log(response_obj);
-					showThreads(response_obj);
-				});
+			let response;
+			try {
+				response = await fetch("_ROOT_URL" + api_url + "get_threads/");
 			}
-			else {
-				alert("Server error from getThreads(). the developer must suck lmao");
+			catch (error) {
+				generic_error_dialog_message.innerText = error.message + "\nThe server may be down";
+				generic_error_dialog.showModal();
+			}
+			if (response) {
+				if (response.ok) {
+					await response.json().then(response_obj => {
+						console.log(response_obj);
+						showThreads(response_obj);
+					});
+				}
+				else {
+					generic_error_dialog_message.innerText = `${response.status} ${response.statusText}\nCould not get threads.`;
+					generic_error_dialog.showModal();
+				}
 			}
 		}
 		function openThread(thread_id) {
@@ -528,26 +566,36 @@ main {
 			getThreadPosts();
 		}
 		async function getThreadPosts() {
-			let response = await fetch("_ROOT_URL" + api_url + "threads/" + state.selected_thread_id + "/get_posts/", {
-				headers: {
-					"key": account_key || local_key
-				}
-			});
-			if (response.ok) {
-				await response.json().then(response_obj => {
-					console.log(response_obj);
-					showPosts(response_obj);
-					console.log("1");
+			let response;
+			try {
+				response = await fetch("_ROOT_URL" + api_url + "threads/" + state.selected_thread_id + "/get_posts/", {
+					headers: {
+						"key": account_key || local_key
+					}
 				});
-				console.log("2");
+			}
+			catch (error) {
+				generic_error_dialog_message.innerText = error.message + "\nThe server may be down.";
+				generic_error_dialog.showModal();
+			}
+			if (response) {
+				if (response.ok) {
+					await response.json().then(response_obj => {
+						console.log(response_obj);
+						showPosts(response_obj);
+						console.log("1");
+					});
+					console.log("2");
 
-				websocket = connectToServer();
-			}
-			else if (response.status === 404) {
-				thread_not_found_dialog.showModal();
-			}
-			else {
-				alert("Server error from getThreadPosts(). the developer must suck lmao");
+					websocket = connectToServer();
+				}
+				else if (response.status === 404) {
+					thread_not_found_dialog.showModal();
+				}
+				else {
+					generic_error_dialog_message.innerText = `${response.status} ${response.statusText}\nCould not open thread.`;
+					generic_error_dialog.showModal();
+				}
 			}
 		}
 
@@ -635,6 +683,7 @@ main {
 			let file_information_element = file_element.querySelector(".FileInformation");
 			let file_progress_element = file_element.querySelector("progress");
 			let file_img_element = file_element.querySelector("img");
+			let received_error = false;
 			let request = new XMLHttpRequest();
 			file_progress_element.max = file_object.size;
 			console.log(file_object);
@@ -644,13 +693,34 @@ main {
 			request.responseType = "text";
 			request.open("POST", "_ROOT_URL" + api_url + "upload/");
 			request.timeout = 10000;
+			request.onreadystatechange = () => {
+				console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
+				if (!(request.status >= 200 && request.status < 400) && request.status != 0 && !received_error) {
+					file_element.classList.add("Errored");
+					received_error = true;
+					console.log("Aporting");
+					request.abort();
+						const error_message = request.getResponseHeader("message");
+						// if (error_message) {
+						// 	file_upload_error_dialog_message.innerText = error_message;
+						// }
+						file_upload_error_dialog_message.innerText = 
+							`Status: ${request.status} ${request.statusText}\n` + 
+							(error_message || "An unknown error occured.");
+						file_upload_error_dialog.showModal();
+						const upload_failed_indicator = document.createElement("span");
+						upload_failed_indicator.classList.add("UploadFailedIndicator");
+						upload_failed_indicator.textContent = "Upload failed";
+						file_information_element.replaceChild(upload_failed_indicator, file_progress_element);
+						file_img_element.setAttribute("src", "x_icon.png");
+				}
+			}
 			request.send(formdata);
 			request.onload = () => {
+				console.log("Request onLoad fired");
 				if (request.readyState === request.DONE) {
+					console.log("Received response");
 			        if (request.status === 202) {
-						console.log("Received response");
-						const headers = request.getAllResponseHeaders();
-						console.log(headers);
 						const server_filename = request.getResponseHeader("File-Name");
 						console.log("server_filename: " + server_filename);
 						let decoded_filename = decode_utf8(server_filename);
@@ -667,28 +737,45 @@ main {
 						upload_complete_indicator.textContent = "Upload complete";
 						file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
 			        }
+					else {
+						const error_message = request.getResponseHeader("message");
+						// if (error_message) {
+						// 	file_upload_error_dialog_message.innerText = error_message;
+						// }
+						file_upload_error_dialog_message.innerText = 
+							`Status: ${request.status} ${request.statusText}\n` + 
+							(error_message || "An unknown error occured.");
+						file_upload_error_dialog.showModal();
+						const upload_failed_indicator = document.createElement("span");
+						upload_failed_indicator.classList.add("UploadfailedIndicator");
+						upload_failed_indicator.textContent = "Upload failed";
+						file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
+						file_img_element.setAttribute("src", "x_icon.png");
+					}
 			    }
-			};
+			}
 		}
 		file_upload.onchange = (event) => {
 			console.log("file changed.");
 			if (file_upload.files.length + file_post_list.childNodes.length > 4) {
-				alert("Error: 4 file limit reached");
+				generic_error_dialog_message.innerText = "Cannot attach more than 4 files.";
+				generic_error_dialog.showModal();
 				file_upload.value = "";
 			}
 			else {
 				for (let chosen_file of file_upload.files) {
 					if (chosen_file.size > file_size_limit) {
-						alert("Error: file size exceeds _FILE_SIZE_LIMIT_MB megabyte limit\n" +
-							"File: " + chosen_file.name);
+						file_size_limit_exceeded_dialog_file_size_bytes.textContent = chosen_file.size;
+						file_size_limit_exceeded_dialog_file_name.textContent = chosen_file.name;
+						file_size_limit_exceeded_dialog.showModal();
 						file_upload.value = "";
 					}
 					else {
 						const file_name_size = (new TextEncoder().encode(chosen_file.name)).length;
-						if (file_name_size > 255) {
-							alert("Error: file name too long. Limit: 255 bytes\n" + 
-								"Size of this file name: " + file_name_size + "\n" +
-								"File: " + chosen_file.name);
+						if (file_name_size > _POST_MAX_FILE_NAME) {
+							file_name_too_long_dialog_file_name.textContent = chosen_file.name;
+							file_name_too_long_dialog_name_length.textContent = file_name_size;
+							file_name_too_long_dialog.showModal();
 						}
 						else {
 							console.log("uploading...");
@@ -884,13 +971,18 @@ main {
 			}
 		}
 
-		function connectToServer(sock) {
-			if (sock) {
-				sock.close();
+		function connectToServer() {
+			let listening_to_thread = state.selected_thread_id;
+			let sock;
+			if (!websocket_connected) {
+				sock = new WebSocket("_WEBSOCKET_URL");	
+				websocket_connected = true;
 			}
-			sock = new WebSocket("_WEBSOCKET_URL");	
+			else {
+				return websocket;
+			}
 			sock.onopen = (event) => {
-				connection_status.textContent = "Connected 🙂";
+				// connection_status.textContent = "Connected 🙂";
 				console.log("Websocket connected.");
 				websocket_connected = true;
 				clearInterval(reconnect_websocket_interval);
@@ -927,37 +1019,33 @@ main {
 			// }
 	
 			sock.onclose = (event) => {
-				console.log("Websocket closed.");
-				const listening_thread = state.selected_thread_id;
-				if (websocket_connected === true) {
-					if (state.selected_thread_id !== -1) {
-						console.log("Websocket connection broken. Re-connecting will be attempted in 10 seconds.");
-					}
-					connection_status.textContent = "Closed \u{1F634}"
-					websocket_connected = false;
-					if (state.selected_thread_id !== -1 && reconnect_websocket_interval === null) {
-						reconnect_websocket_interval = setInterval(async() => {
-							console.log("Attempting websocket reconnect...");
-							if (listening_thread === state.selected_thread_id) {
-								connectToServer(sock);
-							}
-							else {
-								console.log("Cancelling websocket reconnect attempt; thread has changed.");
-								clearInterval(reconnect_websocket_interval);
-							}
-						}, 10000);
-					}
+				// connection_status.textContent = "Closed \u{1F634}"
+				websocket_connected = false;
+				if (state.selected_thread_id === listening_to_thread) {
+					console.log("Websocket connection closed. Re-connecting will be attempted in 30 seconds.");
+					setTimeout(() => {
+						if (state.selected_thread_id === listening_to_thread) {
+							websocket = connectToServer();
+						}
+					}, 30000);;
 				}
 			}
 			return sock
 		}
 
-		async function postMessage() {
-			console.log("posting message...");
+		function getFiles() {
 			let files = [];
 			for (let file of file_post_list.children) {
-				files.push(file.id.slice(5, file.id.length));
+				if (!file.classList.contains("Errored")) {
+					files.push(file.id.slice(5, file.id.length));
+				}
 			}
+			return files;
+		}
+
+		async function postMessage() {
+			console.log("posting message...");
+			let files = getFiles();
 			const data = {
 				post: {
 					name: name_field.value,
@@ -995,10 +1083,7 @@ main {
 	
 		async function postThread() {
 			console.log("posting thread...");
-			let files = [];
-			for (let file of file_post_list.children) {
-				files.push(file.id.slice(5, file.id.length));
-			}
+			let files = getFiles();
 			const data = {
 				type: "create_thread",
 				thread: {

@@ -22,7 +22,7 @@
 				<input id="account_username_input" type="text" name="account_username"  required><span></span>
 				<label for="account_password_input">Password</label>
 				<input id="account_password_input" type="password" name="account_password" required>
-				<input type="button" value="Show Password" id="toggle_password_visibility_button" class="RightAligned" onclick="togglePasswordVisibility()">
+				<input type="button" value="Show" id="toggle_password_visibility_button" class="RightAligned" onclick="togglePasswordVisibility()">
 				</div>
 				<!--<div class="FullWidth">
 				<label for="remain_logged_in">Remain logged in</label>
@@ -42,7 +42,7 @@
 		</dialog>
 		<dialog id="registration_success_dialog" closedby="any">
 			<h2>Success</h2>
-			<p>Registered as <i id="registered_as">some dude idk</i>.<br>You are now logged in.</p>
+			<p>Registered as <i id="registered_as">some dude idk</i>. You are now logged in.</p>
 			<div class="ToolBar"><a class="Button" href="_ROOT_URL">Proceed</a><button onclick="registration_success_dialog.close()">Close</button></div>
 		</dialog>
 	</body>
@@ -122,12 +122,12 @@ async function sendRegistrationFormData(endpoint) {
 function togglePasswordVisibility() {
 	if (password_is_visible) {
 		account_password_input.type="password";
-		toggle_password_visibility_button.value = "Show password";
+		toggle_password_visibility_button.value = "Show";
 		password_is_visible=false;
 	}
 	else {
 		account_password_input.type="text";
-		toggle_password_visibility_button.value = "Hide password";
+		toggle_password_visibility_button.value = "Hide";
 		password_is_visible=true;
 	}
 }

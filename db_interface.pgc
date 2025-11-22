@@ -107,7 +107,7 @@ void db_create_administrator(const char* _password) {
 	EXEC SQL COMMIT;
 }
 
-int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_NAME+1], time_t upload_timestamp_, const char* content_, char files[4][POST_MAX_FILE_NAME+1], int file_count, const char key_[KEY_LENGTH+1]) {
+int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_NAME+1], time_t upload_timestamp_, const char* content_, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key_[KEY_LENGTH+1]) {
     EXEC SQL BEGIN DECLARE SECTION;
 	int number_of_posts;
 	int post_id;
@@ -307,7 +307,7 @@ struct db_post_array* db_retrieve_history() {
 	VARCHAR post_name[POST_MAX_NAME+1];
 	timestamp upload_timestamp;
 	VARCHAR post_content[POST_MAX_CONTENT+1];
-	char files[4][POST_MAX_FILE_NAME+1]; int file_indicators[4];
+	char files[4][POST_MAX_FILE_NAME_WITH_UUID+1]; int file_indicators[4];
 	char deleted;
 	char key[KEY_LENGTH+1];
 	EXEC SQL END DECLARE SECTION;

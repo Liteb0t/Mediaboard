@@ -139,7 +139,7 @@ handle_request(
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(http::field::content_type, "text/html");
         res.keep_alive(req.keep_alive());
-        res.body() = std::string(why);
+        res.body() = "Bad request; " + std::string(why);
         res.prepare_payload();
         return res;
     };
@@ -289,17 +289,17 @@ handle_request(
     	http::file_body::value_type body;
 		std::cout << "Opening path: " << path << std::endl;
     	body.open(path.c_str(), beast::file_mode::scan, ec);
-		boost::filesystem::path filesystem_path(path);
 
     	// Handle the case where the file doesn't exist
-    	if(ec == boost::system::errc::no_such_file_or_directory)
+    	if (ec == boost::system::errc::no_such_file_or_directory)
     	    return not_found(req.target());
-		else if (!boost::filesystem::is_regular_file(filesystem_path))
-			return bad_request("Is a directory.");
-
-    	// Handle an unknown error
-    	if(ec)
+		else if (ec) // Handle an unknown error
 			return server_error(ec.message());
+
+		// Check if path leads to a directory
+		boost::filesystem::path filesystem_path(path);
+		if (!boost::filesystem::is_regular_file(filesystem_path))
+			return bad_request("Is a directory.");
 
 		std::string filename;
 		if (is_media) {
@@ -581,6 +581,13 @@ handle_request(
 				std::cerr << "Error! file name not found in POST header" << std::endl;
 				return server_error("Could not determine filename");
 			}
+			else if (out_filename.length() > POST_MAX_FILE_NAME) {
+				http::response<http::empty_body> res;
+				res.result(400);
+				res.set("message", "File name length exceeds the server-defined limit of " + std::to_string(POST_MAX_FILE_NAME) + ".");
+				res.prepare_payload();
+				return res;
+			}
 			sanitiseFileName(&out_filename);
 			std::cout << "Sanitised out_filename: " << out_filename << std::endl;
 			// std::cout << "START OF FILE" << std::endl;
@@ -639,8 +646,37 @@ handle_request(
 				// std::cout << req_line.length() << ", " << req_terminator.length() << std::endl;
 				// std::cout << req_line << std::endl;
 			}
+			// bool outfile_errored;
+			try {
+				outfile.exceptions(outfile.failbit);
+				outfile.close();
+				// outfile_errored = false;
+			}
+			catch (const std::ios_base::failure& exception) {
+				std::stringstream error_message;
+				error_message
+					<< "Reason: " << exception.what() << '\n'
+					<< "Error code: " << exception.code() << "\n";
+				std::cout << "Exception thrown when attempting to save uploaded file.\n" << error_message.str();
+				http::response<http::empty_body> res{http::status::internal_server_error, req.version()};
+				res.set("message", error_message.str());
+    			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+				// res.set("File-Name-UTF-8", filename_utf_8);
+				res.set("Access-Control-Allow-Origin", "*");
+				res.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, File-Name");
+    			res.set(http::field::content_type, "text/plain; charset=utf-8");
+    			res.content_length(0);
+    			res.keep_alive(req.keep_alive());
+    			return res;
+				// outfile_errored = true;
+				// http::response<http::empty_body> res;
+				// res.result(500);
+				// res.set("message", error_message.str());
+				// res.prepare_payload();
+				// std::cout << "Returning error for failed upoload" << std::endl;
+				// return res;
+			}
 			// std::cout << "END OF FILE" << std::endl;
-			outfile.close();
 
 			// Write thumbnail
 			if (fileIsImage(&out_filename)) {
@@ -798,8 +834,8 @@ do_read()
     // Apply a reasonable limit to the allowed size
     // of the body in bytes to prevent abuse.
 	// 6MB would match 4chins
-	// This is 25MB
-    parser_->body_limit(25 << 20);
+	// This is 100MB
+    parser_->body_limit(100 << 20);
 
     // Set the timeout.
     stream_.expires_after(std::chrono::seconds(30));

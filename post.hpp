@@ -24,7 +24,7 @@ private:
 	int id_in_thread;
 	// char upload_timestamp[20];
 	std::time_t upload_timestamp;
-	char files[4][POST_MAX_FILE_NAME+1];
+	char files[4][POST_MAX_FILE_NAME_WITH_UUID+1];
 	short files_i;
 	std::string name;
 	std::string content;

@@ -24,7 +24,7 @@ extern "C" {
 		char name[POST_MAX_NAME+1];
 		// char upload_timestamp[TIMESTAMP_LEN];
 		time_t upload_timestamp;
-		char files[4][POST_MAX_FILE_NAME+1];  // Maximum of 4 files per post
+		char files[4][POST_MAX_FILE_NAME_WITH_UUID+1];  // Maximum of 4 files per post
 		short number_of_files;
 		char* content;
 		char key[KEY_LENGTH+1];
@@ -42,7 +42,7 @@ extern "C" {
 	void initThreadArray(struct db_thread_array*, size_t);
 	void insertToThreadArray(struct db_thread_array*, struct db_thread_struct);
 	void freeThreadArray(struct db_thread_array*);
-	int db_store_post(int thread_id, int id_in_thread, const char name[POST_MAX_NAME+1], time_t upload_timestamp, const char*, char files[4][POST_MAX_FILE_NAME+1], int file_count, const char key[KEY_LENGTH+1]);
+	int db_store_post(int thread_id, int id_in_thread, const char name[POST_MAX_NAME+1], time_t upload_timestamp, const char*, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key[KEY_LENGTH+1]);
 	int db_store_thread(int number_of_posts);
 	// void db_mark_message_as_deleted(int thread_id, int message_id);
 	void db_mark_post_as_deleted(int post_id);

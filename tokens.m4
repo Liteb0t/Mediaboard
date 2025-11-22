@@ -13,7 +13,12 @@ define(`_ROOT_URL', `/')
 # Path must start and end with a '/'. For example:
 # define(`_ROOT_URL', `/mediaboard/')
 
-define(`_FILE_SIZE_LIMIT_MB', `25')
+# Also edit the parser_->body_limit in http_session.cpp
+define(`_FILE_SIZE_LIMIT_MB', `100')
+
+# Defined in field_lengths.h
+define(`_POST_MAX_NAME', `73')
+define(`_POST_MAX_FILE_NAME', `205')
 
 # To prevent javascript strings using the backtick character '`' from being interpreted as quotes in m4:
 changequote(`[[[', `]]]')

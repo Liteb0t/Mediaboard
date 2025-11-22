@@ -13,7 +13,7 @@
 
 #include "listener.hpp"
 #include "shared_state.hpp"
-#include "db_interface.h"
+// #include "db_interface.h"
 #include <Magick++.h>
 #include <boost/asio/signal_set.hpp>
 #include <boost/smart_ptr.hpp>

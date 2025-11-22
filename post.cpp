@@ -76,9 +76,11 @@ Post::Post(json post_json) {
 	std::vector<std::string>::iterator it = file_vector.begin();
 	this->files_i = 0;
 	while (it != file_vector.end()) {
-		if ((*it).length() <= POST_MAX_FILE_NAME) {
+		if ((*it).length() <= POST_MAX_FILE_NAME_WITH_UUID) {
 			strcpy(this->files[files_i++], (*it).c_str());
 		}
+		else
+			std::cerr << "File name too long to save to database. Length: " << (*it).length() << std::endl;
 		it++;
 	}
 	// ID and timestamp are not initially known
