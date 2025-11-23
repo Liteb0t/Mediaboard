@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict RNl7Ke5jlyM4xq6ybvGt6dpOoMjhUvdsgVnohL4Y9BaVeHWQ8GvvlPN658LhW6r
+\restrict N07JqJ0oG8Cjvyqhd4ztafAtaHKKyejqEs13jMbcWNszZTBa2XM8SFiJphjZWNk
 
 -- Dumped from database version 15.14 (Debian 15.14-0+deb12u1)
 -- Dumped by pg_dump version 15.14 (Debian 15.14-0+deb12u1)
@@ -45,7 +45,8 @@ CREATE TABLE public.account (
     password_hash text,
     created_at timestamp without time zone,
     last_logged_in timestamp without time zone,
-    administrator boolean DEFAULT false
+    administrator boolean DEFAULT false,
+    key text
 );
 
 
@@ -90,7 +91,8 @@ ALTER TABLE public.post_id_seq OWNER TO postgres;
 
 CREATE TABLE public.thread (
     id integer,
-    number_of_posts integer
+    number_of_posts integer,
+    deleted boolean DEFAULT false
 );
 
 
@@ -173,5 +175,5 @@ GRANT SELECT,USAGE ON SEQUENCE public.thread_id_seq TO mediaboard_server;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict RNl7Ke5jlyM4xq6ybvGt6dpOoMjhUvdsgVnohL4Y9BaVeHWQ8GvvlPN658LhW6r
+\unrestrict N07JqJ0oG8Cjvyqhd4ztafAtaHKKyejqEs13jMbcWNszZTBa2XM8SFiJphjZWNk
 
