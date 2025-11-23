@@ -72,7 +72,7 @@ void db_connect(const char* _database_name) {
 	if (password)
 		printf("Found environment variable \"%s\"\n", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	else {
-		fprintf(stderr, "Could not find environment variable \"%s\" required for the database connection password. Exiting.", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
+		fprintf(stderr, "Could not find environment variable \"%s\" required for the database connection password. Exiting.\n", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 		exit(2);
 	}
 	EXEC SQL CONNECT TO :database_name USER "mediaboard_server" USING :password;
