@@ -4,7 +4,8 @@
 #include <cstring>
 
 // Save thread when JSON is received
-Thread::Thread(json thread_json/*, bool save_to_database*/) {
+Thread::Thread(PermissionObjectBase* permission_parent, json thread_json/*, bool save_to_database*/) 
+			: PermissionManagedObject(permission_parent, db_get_unique_permission_object_id()) {
 	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
 	this->number_of_posts = 0;
@@ -22,7 +23,9 @@ Thread::Thread(json thread_json/*, bool save_to_database*/) {
 }
 
 // Cache thread using db_interface struct
-Thread::Thread(struct db_thread_struct* thread_struct) {
+Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct)
+			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id) {
+	// this->cacheAllPermissions();
 	this->id = thread_struct->id;
 	this->deleted = thread_struct->deleted;
 	this->number_of_posts = thread_struct->number_of_posts;

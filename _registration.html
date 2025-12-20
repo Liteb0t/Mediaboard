@@ -15,11 +15,11 @@
 	<body>
 		<!--Navbar can go here-->
 		<main>
-			<h1>Authentication - _SITE_NAME</h1>
+			<h2>Authentication - _SITE_NAME</h2>
 			<form action="" method="POST" autocomplete="account">
 				<div class="FormGrid">
 				<label for="account_username_input">Username</label>
-				<input id="account_username_input" type="text" name="account_username"  required><span></span>
+				<input id="account_username_input" type="text" name="account_username" maxlength="_ACCOUNT_MAX_USERNAME" required><span></span>
 				<label for="account_password_input">Password</label>
 				<input id="account_password_input" type="password" name="account_password" required>
 				<input type="button" value="Show" id="toggle_password_visibility_button" class="RightAligned" onclick="togglePasswordVisibility()">

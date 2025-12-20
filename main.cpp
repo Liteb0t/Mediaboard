@@ -23,7 +23,7 @@
 #include <string>
 #include <vector>
 
-const std::string version_string = "0.0.3";
+const std::string version_string = "0.0.5";
 
 int
 main(int argc, char* argv[])
@@ -38,16 +38,17 @@ main(int argc, char* argv[])
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
 		("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
-		("config,c", boost::program_options::value<std::string>(&config_file)->default_value("config.ini"), "location of configuration file")
-		("version,v", "show version string")
-		("help,h", "show list of options");
+		("make_migrations", "Add columns to database for faster migration to 0.0.5.")
+		("config,c", boost::program_options::value<std::string>(&config_file)->default_value("config.ini"), "location of configuration file.")
+		("version,v", "Show version string.")
+		("help,h", "Show list of options.");
 
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
 		("database,d", boost::program_options::value<std::string>(&database_name),  "Name of the postgresql database.")
-		("media_path,m", boost::program_options::value<std::string>(&doc_root),  "file path where user-submitted media is stored")
-		("port,p", boost::program_options::value<unsigned short>(&port), "the port which the server will serve")
-		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "number of async threads");
+		("media_path,m", boost::program_options::value<std::string>(&doc_root),  "File path where user-submitted media is stored.")
+		("port,p", boost::program_options::value<unsigned short>(&port), "The port which the server will serve.")
+		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.");
 
 	boost::program_options::options_description command_line_options;
 	command_line_options.add(command_line_specific_options).add(universal_options);
@@ -65,7 +66,7 @@ main(int argc, char* argv[])
 		return 0;
 	}
 
-
+	// Load config.ini
 	std::ifstream config_file_ifstream(config_file.c_str());
 	if (config_file_ifstream) {
 		std::cout << "Loaded config file" << std::endl;
@@ -75,15 +76,6 @@ main(int argc, char* argv[])
 	else {
 		std::cout << "Could not open config file: " << config_file << std::endl;
 	}
-    // if (argc != 5)
-    // {
-    //     std::cerr <<
-    //         "Usage: websocket-chat-multi <address> <port> <doc_root> <threads>\n" <<
-    //         "Example:\n" <<
-    //         "    websocket-chat-server 0.0.0.0 8080 . 5\n";
-    //     return EXIT_FAILURE;
-    // }
-    // auto port = static_cast<unsigned short>(std::atoi(argv[2]));
 	if (!variable_map.count("database")) {
 		database_name = "fuze_mediaboard";
 		std::cout << "\"database\" not found in config. Using default " << database_name << std::endl;
@@ -91,6 +83,7 @@ main(int argc, char* argv[])
 	else
 		std::cout << "Set the database to " << doc_root << std::endl;
 
+	// Establish database connection
 	db_connect(database_name.c_str());
 
 	if (variable_map.count("create_administrator")) {
@@ -98,7 +91,12 @@ main(int argc, char* argv[])
 		std::cout << "Created 'Administrator' account successfully" << std::endl;
 		return 0;
 	}
-    // auto doc_root = argv[3];
+	// TODO remove after 0.0.5 release
+	if (variable_map.count("make_migrations")) {
+		db_make_migrations();
+		std::cout << "permission_object_id added to threads. Do not run this command again." << std::endl;
+		return 0;
+	}
 	if (!variable_map.count("media_path")) {
 		doc_root = ".";
 	}
@@ -108,8 +106,6 @@ main(int argc, char* argv[])
 	std::cout << "Set port: " << port << std::endl;
 	std::cout << "Set doc_root:" << doc_root << std::endl;
 	std::cout << "Set threads: " << threads << std::endl;
-    // auto media_root = argv[4];
-	// std::string media_root = "/var/www/cdn-fuze-page/fuze-imageboard";
 
     auto address = net::ip::make_address("127.0.0.1");
     // The io_context is required for all I/O

@@ -121,6 +121,18 @@ path_cat(
     return result;
 }
 
+/*
+template <typename T> auto api_response_T(T status, beast::string_view message) {
+    http::response<http::empty_body> res;
+	res.result(status);
+    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+    res.set("message", std::string(message));
+    // res.keep_alive(req.keep_alive());
+    res.prepare_payload();
+    return res;
+};
+*/
+
 // Return a response for the given request.
 //
 // The concrete type of the response message (which depends on the
@@ -132,9 +144,7 @@ handle_request(
     boost::shared_ptr<shared_state> const& state,
     http::request<Body, http::basic_fields<Allocator>>&& req) {
     // Returns a bad request response
-    auto const bad_request =
-    [&req](beast::string_view why)
-    {
+    auto const bad_request = [&req](beast::string_view why) {
         http::response<http::string_body> res{http::status::bad_request, req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(http::field::content_type, "text/html");
@@ -144,10 +154,27 @@ handle_request(
         return res;
     };
 
+	auto const api_response = [&req](http::status status, beast::string_view message) {
+        http::response<http::empty_body> res{status, req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set("message", std::string(message));
+        res.keep_alive(req.keep_alive());
+        res.prepare_payload();
+        return res;
+	};
+
+	auto const api_response_json = [&req](http::status status, nlohmann::json json) {
+        http::response<http::string_body> res{status, req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.set(http::field::content_type, "application/json");
+        res.keep_alive(req.keep_alive());
+		res.body() = json.dump();
+        res.prepare_payload();
+        return res;
+	};
+
     // Returns a not found response
-    auto const not_found =
-    [&req](beast::string_view target)
-    {
+    auto const not_found = [&req](beast::string_view target) {
         http::response<http::string_body> res{http::status::not_found, req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(http::field::content_type, "text/html");
@@ -158,9 +185,7 @@ handle_request(
     };
 
     // Returns a server error response
-    auto const server_error =
-    [&req](beast::string_view what)
-    {
+    auto const server_error = [&req](beast::string_view what) {
         http::response<http::string_body> res{http::status::internal_server_error, req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
         res.set(http::field::content_type, "text/html");
@@ -171,6 +196,7 @@ handle_request(
     };
 
 	std::cout << "req target: " << req.target() << "\n";
+	std::cout << "req version: " << req.version() << "\n";
 	
 	// URL decoding in C http://www.geekhideout.com/urlcode.shtml
 	std::string decoded_url;
@@ -197,26 +223,27 @@ handle_request(
         decoded_url.find("..") != std::string::npos)
         return bad_request("Illegal request-target");
 
+	// req_location excludes URL parameters (stuff after '?')
+    std::string path, req_location;
+	int location_end_index;
+	int decoded_url_last_slash_index = decoded_url.rfind('/');
+	int decoded_url_last_questionmark_index = decoded_url.rfind('?');
+	if (decoded_url_last_slash_index < decoded_url_last_questionmark_index) {
+		location_end_index = decoded_url_last_questionmark_index;
+		req_location = decoded_url.substr(0, location_end_index);
+	}
+	else {
+	// 	location_end_index = decoded_url_last_slash_index;
+		req_location = req.target();
+	}
+	std::cout << "req_location: " << req_location << std::endl;
+
 		// Make sure we can handle the method
-   	if( req.method() == http::verb::get ||
-   	    req.method() == http::verb::head)
-	{
+   	if(		req.method() == http::verb::get || 
+			req.method() == http::verb::head) {
 		bool is_media = false;
         // return bad_request("Unknown HTTP-method");
     	// Build the path to the requested file
-    	std::string path, req_location;
-		int location_end_index;
-		int decoded_url_last_slash_index = decoded_url.rfind('/');
-		int decoded_url_last_questionmark_index = decoded_url.rfind('?');
-		if (decoded_url_last_slash_index < decoded_url_last_questionmark_index) {
-			location_end_index = decoded_url_last_questionmark_index;
-			req_location = decoded_url.substr(0, location_end_index);
-		}
-		else {
-		// 	location_end_index = decoded_url_last_slash_index;
-			req_location = req.target();
-		}
-		std::cout << "req_location: " << req_location << std::endl;
 		if (req_location.substr(0, 6) == "/media") {
 			is_media = true;
 			path = path_cat(state->doc_root(), decoded_url.substr(6));
@@ -229,7 +256,7 @@ handle_request(
 				res.result(http::status::ok);
 				// json response_json;
 				// res.body() = json::serialize(json_response);
-				res.body() = state->main_board.dumpAllThreads();
+				res.body() = state->main_board()->dumpAllThreads();
 			}
 			else if (req_location.substr(5, 8) == "threads/") {
 				std::size_t found = req_location.find_first_not_of("0123456789", 13);
@@ -243,9 +270,10 @@ handle_request(
 				}
 				else {
 					int thread_in_url;
+					// Get thread ID from URL substring
 					std::from_chars(req_location.substr(13, found).data(), req_location.substr(13, found).data() + req_location.substr(13, found).size(), thread_in_url);
 					// int thread_in_url = atoi(req_location.substr(13, found).c_str());
-					if (state->main_board.threadExists(thread_in_url)) {
+					if (state->main_board()->threadExists(thread_in_url)) {
 						std::cout << "[http_session] HEADERS:" << std::endl;
 						std::string key;
 
@@ -259,7 +287,7 @@ handle_request(
 								break;
 							}
 						}
-						res.body() = state->main_board.dumpPostsInThread(thread_in_url, key);
+						res.body() = state->main_board()->dumpPostsInThread(thread_in_url, key);
 						res.result(http::status::ok);
 					}
 					else {
@@ -268,9 +296,70 @@ handle_request(
 					}
 				}
 			}
+			else if (req_location.substr(5, 6) == "group/") { // TODO add /members/ to end of URL check
+				std::size_t found = req_location.find_first_not_of("0123456789", 11);
+				if (req_location[found] != '/') {
+					return api_response(http::status::bad_request, std::string("Invalid group ID; trailing '/' not found."));
+				}
+				else if (found == 11) {
+					return api_response(http::status::bad_request, std::string("Invalid group ID; cannot be empty."));
+				}
+				else {
+					int group_in_url;
+					// Get group ID from URL substring
+					std::from_chars(req_location.substr(11, found).data(), req_location.substr(11, found).data() + req_location.substr(11, found).size(), group_in_url);
+					std::cout << "group_id_url: " << group_in_url << std::endl;
+					if (state->groupExists(group_in_url)) {
+						res.body() = state->dumpMembersInGroup(group_in_url);
+						res.result(http::status::ok);
+					}
+					else
+						return api_response(http::status::bad_request, std::string("Group '") + std::to_string(group_in_url) + "' not found.");
+				}
+			}
+			else if (req_location.substr(5) == "groups/") {
+				std::string token;
+				for (auto it = req.begin(); it != req.end(); it++) {
+					if (it->name_string() == "Token") {
+						token = it->value();
+						std::cout << "Found Token in header. It is " << token << std::endl;
+						break;
+					}
+				}
+				if (token.length() < KEY_LENGTH+2) {
+					return api_response(http::status::bad_request, "Token too short");
+				}
+				std::string key = token.substr(0, KEY_LENGTH);
+				std::string username = token.substr(KEY_LENGTH+1);
+				std::cout << "[http_session] Key : Username from token: " << key << " : " << username << std::endl;
+				// TODO check if username and key exist + are correct
+				res.body() = state->dumpAllGroups(username, key);
+				res.result(http::status::ok);
+			}
+			else if (req_location.substr(5) == "users/") {
+				std::string token;
+				for (auto it = req.begin(); it != req.end(); it++) {
+					if (it->name_string() == "Token") {
+						token = it->value();
+						std::cout << "Found Token in header. It is " << token << std::endl;
+						break;
+					}
+				}
+				if (token.length() < KEY_LENGTH+2) {
+					return api_response(http::status::bad_request, "Token too short");
+				}
+				std::string key = token.substr(0, KEY_LENGTH);
+				std::string username = token.substr(KEY_LENGTH+1);
+				std::cout << "[http_session] Key : Username from token: " << key << " : " << username << std::endl;
+				// TODO check if username and key exist + are correct
+				res.body() = state->dumpAllUsers();
+				int user_id = state->getIdFromUsername(username);
+				int user_rank = state->getUserRank(user_id);
+				res.set("Client-Rank", std::to_string(user_id));
+				res.result(http::status::ok);
+			}
 			else {
-				res.result(404);
-				res.body() = "That API endpoint does not exist.";
+				return api_response(http::status::bad_request, "That API endpoint does not exist");
 			}
 			res.prepare_payload();
 			return res;
@@ -338,11 +427,11 @@ handle_request(
     	    std::make_tuple(std::move(body)),
     	    std::make_tuple(http::status::ok, req.version())
 		};
-		if (is_media) {
+		// if (is_media) {
 			// Only set when the filename is long enough to include the UUID.
 			// In other words, we know it's a user-uploaded file.
-			res.set("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-		}
+		// 	res.set("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+		// }
     	res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
     	res.set(http::field::content_type, mime_type(path));
     	res.content_length(size);
@@ -393,16 +482,16 @@ handle_request(
 					std::string message_content = post_json["content"].template get<std::string>();
 					if ((message_content.length() > 0 || post_json["files"].size() > 0) && message_content.length() < POST_MAX_CONTENT) {
 						if (is_thread) {
-							int new_thread_id = state->main_board.createThread(request_json["thread"]);
+							int new_thread_id = state->main_board()->createThread(request_json["thread"]);
 							res.set("New-Thread-Id", std::to_string(new_thread_id));
 							res.result(201);
 						}
 						else {
 							int new_message_thread_id = post_json["thread_id"].template get<int>();
 							std::string new_message_key = post_json["key"].template get<std::string>();
-							if (state->main_board.threadExists(new_message_thread_id)) {
-								int new_message_id = state->main_board.createPost(request_json["post"]);
-								std::string new_message_dump = state->main_board.dumpPost(new_message_thread_id, new_message_id, new_message_key);
+							if (state->main_board()->threadExists(new_message_thread_id)) {
+								int new_message_id = state->main_board()->createPost(request_json["post"]);
+								std::string new_message_dump = state->main_board()->dumpPost(new_message_thread_id, new_message_id, new_message_key);
 								state->sendToThread(new_message_dump, new_message_thread_id);
 								res.result(201);
 							}
@@ -426,85 +515,125 @@ handle_request(
 			res.prepare_payload();
 			return res;
 		}
-		else if (req.target().substr(5,9) == "register/") {
-			json request_json = json::parse(req.body());
-			if (       request_json.contains("username")
-					&& request_json.contains("password")
-					// && request_json.contains("remain_logged_in")
-					) {
-				std::string username = request_json["username"].template get<std::string>();
-				std::string password = request_json["password"].template get<std::string>();
-				if (db_store_account(username.c_str(), password.c_str())) {
-					http::response<http::empty_body> res;
-					res.result(400);
-					res.set("message", "Username already exists.");
-					res.prepare_payload();
-					return res;
+		else if (req.target() == "/api/create_group/") {
+			http::response<http::empty_body> res;
+			json request_json;
+			try {
+				request_json = json::parse(req.body());
+				if (	request_json.contains("group")
+					 && request_json["group"].contains("name")
+				   ) {
+					std::string token = "";
+					for (auto it = req.begin(); it != req.end(); it++) {
+						if (it->name_string() == "Token") {
+							token = it->value();
+							std::cout << "Found Token in header. It is " << token << std::endl;
+							break;
+						}
+					}
+					if (token.length() < KEY_LENGTH+2) {
+						return api_response(http::status::bad_request, "Token badly formed or missing from request header.");
+					}
+					std::string key = token.substr(0, KEY_LENGTH);
+					std::string username = token.substr(KEY_LENGTH+1);
+					std::string new_group_name = request_json["group"]["name"].template get<std::string>();
+					BasicResponse function_response = state->createGroup(username, key, new_group_name);
+					return api_response(function_response.status, function_response.message);
+					// TODO send new group ID to frontend
+					// int new_group_id = state->createGroup(request_json);
+					// res.set("New-Group-ID", std::to_string(new_group_id));
+					// res.result(201);
+					// res.prepare_payload();
+					// return res;
 				}
 				else {
-					char key[8+1];
-					db_fetch_key(key, username.c_str(), password.c_str());
-					http::response<http::string_body> res;
-					res.result(http::status::ok);
-					json response_json;
-					response_json["account_key"] = key;
-					res.body() = response_json.dump();
-					std::cout << "Logging user in automatically, Response: " << res.body() << std::endl;
-					res.prepare_payload();
-					return res;
+					return api_response(http::status::bad_request, "One or more JSON fields missing in group.");
 				}
 			}
-			else {
-				http::response<http::empty_body> res;
-				res.result(400);
-				res.set("message", "One or more JSON fields missing.");
-				res.prepare_payload();
-				return res;
+			catch (const json::exception& exception) {
+				return api_response(http::status::bad_request, exception.what());
 			}
+		}
+		// For now assume the URL ends with add_groups/
+		else if (req_location.substr(0, 10) == "/api/user/") {
+			std::size_t found = req_location.find_first_not_of("0123456789", 11);
+			if (req_location[found] != '/') {
+				return api_response(http::status::bad_request, std::string("Invalid user ID; trailing '/' not found."));
+			}
+			else if (found == 10) {
+				return api_response(http::status::bad_request, std::string("Invalid user ID; cannot be empty."));
+			}
+			else {
+				std::string token = "";
+				for (auto it = req.begin(); it != req.end(); it++) {
+					if (it->name_string() == "Token") {
+						token = it->value();
+						std::cout << "Found Token in header. It is " << token << std::endl;
+						break;
+					}
+				}
+				if (token.length() < KEY_LENGTH+2) {
+					return api_response(http::status::bad_request, "Token badly formed or missing from request header.");
+				}
+				std::string key = token.substr(0, KEY_LENGTH);
+				std::string username = token.substr(KEY_LENGTH+1);
+
+				int user_in_url;
+				// Get group ID from URL substring
+				std::from_chars(req_location.substr(10, found).data(), req_location.substr(10, found).data() + req_location.substr(10, found).size(), user_in_url);
+				std::cout << "user_id_url: " << user_in_url << std::endl;
+
+				json request_json;
+				std::vector<int> groups_to_add;
+				try {
+					request_json = json::parse(req.body());
+					groups_to_add = request_json["groups_by_id"].template get<std::vector<int>>();
+				}
+				catch (const json::exception& exception) {
+					return api_response(http::status::bad_request, exception.what());
+				}
+
+				BasicResponse function_response = state->addUserToGroups(username, key, user_in_url, groups_to_add);
+				return api_response(function_response.status, function_response.message);
+			}
+
+		}
+		else if (req.target().substr(5,9) == "register/") {
+			json request_json;
+			try {
+				request_json = json::parse(req.body());
+			}
+			catch (const json::exception& exception) {
+				return api_response(http::status::bad_request, exception.what());
+			}
+			BasicResponse function_response = state->createAccount(request_json);
+			if (function_response.json) {
+				return api_response_json(function_response.status, function_response.json.get());
+
+			}
+			else // The request was invalid
+				return api_response(function_response.status, function_response.message);
 		}
 		else if (req.target().substr(5,6) == "login/") {
-			json request_json = json::parse(req.body());
-			if (       request_json.contains("username")
-					&& request_json.contains("password")
-					// && request_json.contains("remain_logged_in")
-					) {
-				std::string username = request_json["username"].template get<std::string>();
-				std::string password = request_json["password"].template get<std::string>();
-				char key[8+1];
-				char passwords_match = db_fetch_key(key, username.c_str(), password.c_str());
-				if (passwords_match == 't') {
-					http::response<http::string_body> res;
-					json response_json;
-					response_json["account_key"] = key;
-					res.body() = response_json.dump();
-					std::cout << "Logging user in, Response: " << res.body() << std::endl;
-					res.result(http::status::ok);
-					res.prepare_payload();
-					return res;
-				}
-				else if (passwords_match == '\0') {
-					http::response<http::empty_body> res;
-					res.result(400);
-					res.set("message", "No account with that username exists.");
-					res.prepare_payload();
-					return res;
-				}
-				else {
-					http::response<http::empty_body> res;
-					res.result(400);
-					res.set("message", "Incorrect password.");
-					res.prepare_payload();
-					return res;
-				}
+			json request_json;
+			try {
+				request_json = json::parse(req.body());
 			}
-			else {
-				http::response<http::empty_body> res;
-				res.result(400);
-				res.set("message", "One or more JSON fields missing.");
-				res.prepare_payload();
-				return res;
+			catch (const json::exception& exception) {
+				return api_response(http::status::bad_request, exception.what());
+			}
+			BasicResponse function_response = state->getKeyFromPassword(request_json);
+			if (function_response.json) {
+				std::cout << "There is function response JSON" << std::endl;
+				return api_response_json(function_response.status, function_response.json.get());
+
+			}
+			else { // The request was invalid
+				std::cout << "There is NO function response JSON" << std::endl;
+				return api_response(function_response.status, function_response.message);
 			}
 		}
+		/*
 		else if (decoded_url == "/api/change_password/") {
 			http::response<http::empty_body> res;
 			json request_json = json::parse(req.body());
@@ -535,6 +664,7 @@ handle_request(
 			res.prepare_payload();
 			return res;
 		}
+		*/
 		else if (req.target() == "/api/upload/") {
 			// request_parser<empty_body> req_parser;
 			// std::string content_dispo =  req.get()[http::field::content_disposition] << std::endl;
@@ -714,8 +844,42 @@ handle_request(
 			return res;
 		}
 	}
+	else if (req.method() == http::verb::put) {
+		if (req.target() == "/api/group_heirarchy/") {
+			// TODO: authorize user with key
+			json request_json;
+			try {
+				request_json = json::parse(req.body());
+			}
+			catch (const json::exception& exception) {
+				return api_response(http::status::bad_request, exception.what());
+			}
+
+			if (request_json.contains("new_group_heirarchy")
+					 && request_json.contains("username")
+					 && request_json.contains("key")
+					) {
+				std::vector<int> new_group_heirarchy;
+				std::string username, key;
+				try {
+					new_group_heirarchy = request_json["new_group_heirarchy"].template get<std::vector<int>>();
+					username = request_json["username"].template get<std::string>();
+					key = request_json["key"].template get<std::string>();
+				}
+				catch (const json::exception& exception) {
+					return api_response(http::status::bad_request, exception.what());
+				}
+				BasicResponse function_response = state->setGroupHeirarchy(username, key, new_group_heirarchy);
+				return api_response(function_response.status, function_response.message);
+			}
+			else
+				return api_response(http::status::bad_request, "ordered_groups not found in JSON request");
+		}
+		else
+			return not_found(req.target());
+	}
 	else if (req.method() == http::verb::delete_) {
-		if (req.target().substr(0, 20) == "/api/delete_message/") {
+		if (req_location.substr(0, 20) == "/api/delete_message/") {
 			http::response<http::empty_body> res;
 			int slash_index, thread_id, message_id;
 			if ((slash_index = req.target().substr(20, req.target().length() - 20).find('/')) != std::string::npos) {
@@ -733,24 +897,24 @@ handle_request(
 					std::cout << "Out-of-range ID in delete_message URL" << std::endl;
 					goto prepare_response_payload;
 				}
-				if (state->main_board.threadExists(thread_id)) {
+				if (state->main_board()->threadExists(thread_id)) {
 					json request_json = json::parse(req.body());
 					if (request_json.contains("key")) {
 						std::cout << "Request contains key" << std::endl;
 						std::string user_key = request_json["key"].template get<std::string>();
 						bool is_administrator = db_key_matches_account(user_key.c_str(), "Administrator");
-						if (is_administrator || state->main_board.keyMatchesMessageInThread(user_key.c_str(), message_id, thread_id)) {
+						if (is_administrator || state->main_board()->keyMatchesMessageInThread(user_key.c_str(), message_id, thread_id)) {
 							if (message_id == 0) {
 								if (is_administrator) {
-									state->main_board.deleteThread(thread_id);
+									state->main_board()->deleteThread(thread_id);
 									res.result(http::status::ok);
 								}
 								else
 									return bad_request("Denied: User must be administrator to delete a thread");
 							}
 							else {
-								if (state->main_board.messageExistsInThread(message_id, thread_id)) {
-									state->main_board.deleteMessageFromThread(message_id, thread_id);
+								if (state->main_board()->messageExistsInThread(message_id, thread_id)) {
+									state->main_board()->deleteMessageFromThread(message_id, thread_id);
 									res.result(200);
 								}
 								else {
@@ -781,16 +945,47 @@ prepare_response_payload:
 			res.prepare_payload();
 			return res;
 		}
+		else if (req.target().substr(5, 6) == "group/") {
+			std::size_t found = req_location.find_first_not_of("0123456789", 11);
+			if (req_location[found] != '/') {
+				return api_response(http::status::bad_request, std::string("Invalid group ID; trailing '/' not found."));
+			}
+			else if (found == 6) {
+				return api_response(http::status::bad_request, std::string("Invalid group ID; cannot be empty."));
+			}
+			else {
+				std::string token = "";
+				for (auto it = req.begin(); it != req.end(); it++) {
+					if (it->name_string() == "Token") {
+						token = it->value();
+						std::cout << "Found Token in header. It is " << token << std::endl;
+						break;
+					}
+				}
+				if (token.length() < KEY_LENGTH+2) {
+					return api_response(http::status::bad_request, "Token badly formed or missing from request header.");
+				}
+				std::string key = token.substr(0, KEY_LENGTH);
+				std::string username = token.substr(KEY_LENGTH+1);
+
+				int group_in_url;
+				// Get group ID from URL substring
+				std::from_chars(req_location.substr(11, found).data(), req_location.substr(11, found).data() + req_location.substr(11, found).size(), group_in_url);
+				std::cout << "group_id_url: " << group_in_url << std::endl;
+				BasicResponse function_response = state->deleteGroup(username, key, group_in_url);
+				return api_response(function_response.status, function_response.message);
+			}
+		}
 		else {
-			std::cout << "Unknown target: " << req.target() << std::endl;
-			http::response<http::empty_body> res;
-			res.result(500);
-			res.prepare_payload();
-			return res;
+			return api_response(http::status::bad_request, std::string("Unknown target: ") + std::string(req.target()));
 		}
 	}
 	else {
-        return bad_request("Unknown HTTP-method");
+        http::response<http::empty_body> res{http::status::not_implemented, req.version()};
+        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+        res.keep_alive(req.keep_alive());
+        res.prepare_payload();
+        return res;
 	}
 }
 

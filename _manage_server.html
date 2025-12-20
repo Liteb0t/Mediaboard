@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<!--
+			include(`tokens.m4')
+		-->
+		<title>Manage server - _SITE_NAME</title>
+		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta charset="utf-8">
+		<base href="_ROOT_URL">
+		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
+		<link rel="stylesheet" href="styles.css">
+	</head>
+	<body>
+		<!--Navbar can go here-->
+		<main>
+			<div class="ControlPanelGrid">
+				<fieldset id="control_panel_tab_container">
+					<legend>Control panel</legend>
+					<ul class="MetroList">
+						<li class="ToolBar"><button class="ToolBarButton" onclick="showTab(manage_groups_container);">Manage groups</button></li>
+						<li class="ToolBar"><button class="ToolBarButton" onclick="showTab(manage_users_container);">Manage users</button></li>
+						<li class="ToolBar"><a class="Button ToolBarButton" href="_ROOT_URL">Return</a></li>
+					</ul>
+				</fieldset>
+				<div id="manage_groups_container">
+					<h2>Manage groups - _SITE_NAME</h2>
+					<div class="ToolBar">
+						<button onclick="create_group_dialog.showModal()">New group</button>
+						<div id="selected_group_indicator_container" class="RightAligned">
+							Group:&nbsp;<b id="selected_group_indicator">None selected</b>
+						</div>
+						<button id="group_rename_button" disabled>Rename</button>
+						<button id="group_delete_button" disabled>Delete</button>
+					</div>
+					<dialog id="create_group_dialog" closedby="any">
+						<h2>Create group</h2>
+						<form action="" method="POST">
+							<label for="create_group_form_group_name">Name</label>
+							<input type="text" id="create_group_form_group_name" name="group-name" minlength="1" maxlength="64">
+						</form>
+						<div class="ToolBar">
+							<input type="button" value="OK" onclick="the_group_list.createNewGroup();create_group_dialog.close()"><button onclick="create_group_dialog.close()">Cancel</button>
+						</div>
+					</dialog>
+					<div class="GroupManagerGrid">
+						<fieldset><legend>Groups</legend>
+							<ol id="group_list_element" class="MetroList"></ol>
+						</fieldset>
+						<fieldset><legend>Members</legend>
+							<ul id="member_list_element" class="MetroList"></ul>
+						</fieldset>
+					</div>
+				</div>
+				<div id="manage_users_container" style="display: none">
+					<h2>Manage users - _SITE_NAME</h2>
+					<ul id="user_list_element" class="MetroList"></ul>
+				</div>
+			</div>
+		</main>
+		<dialog id="error_dialog" closedby="any">
+			<h2>Error</h2>
+			<p id=error_message></p>
+			<div class="ToolBar"><button onclick="error_dialog.close()">Close</button></div>
+		</dialog>
+		<dialog id="add_user_to_group_dialog" closedby="any">
+			<h2>Add user to groups</h2>
+			<p>Select one or more groups below, to add <b id="add_user_to_group_dialog_username">this user</b> to.</p>
+			<fieldset id="add_user_to_group_dialog_group_list"><legend>Groups</legend>
+			</fieldset>
+			<div class="ToolBar"><button onclick="addUserToGroupDialogAction();add_user_to_group_dialog.close()">OK</button><button onclick="add_user_to_group_dialog.close()">Cancel</button></div>
+		</dialog>
+	</body>
+<style>
+.UneditableGroup {
+	color: #C00;
+}
+.Processing {
+	opacity: 0.5;
+}
+.MetroList {
+	margin: 0;
+	padding: 0;
+	>li {
+		border-top: 1px solid #888;
+		&.ToolBar {
+			>:first-child {
+				flex-grow: 1;
+			}
+		}
+		&:last-child {
+			border-bottom: 1px solid #888;
+		}
+	}
+	/*
+	.Selected {
+		background-color: #CCC;
+	}
+	*/
+	li::marker {
+		content: none;
+	}
+}
+@media (width >= 50rem) {
+	.GroupManagerGrid {
+		grid-template-columns: 20rem 1fr;
+	}
+}
+@media (width < 50rem) {
+	.GroupManagerGrid {
+		grid-template-columns: 1fr;
+	}
+}
+@media (width >= 35rem) {
+	.ControlPanelGrid {
+		grid-template-columns: 12rem 1fr;
+	}
+}
+@media (width < 35rem) {
+	.ControlPanelGrid {
+		grid-template-columns: 1fr;
+	}
+}
+.ControlPanelGrid {
+	display: grid;
+	gap: 10px;
+	min-height: 100vh;
+	padding: 10px;
+	box-sizing: border-box;
+}
+
+/*
+#control_panel_tab_container {
+	min-height: 100vh;
+}*/
+.GroupManagerGrid {
+	display: grid;
+	#group_list_element {
+		border-bottom: 1px solid #888; /* temporary hack because of hidden locked groups */
+	}
+	/*
+	#user_list {
+		grid-column: 2 / 3;
+	}*/
+}
+</style>
+<script>
+"use strict";
+const api_url = "api/";
+// const flex_separator = document.createElement("div");
+// flex_separator.classList.add("FlexSeparator");
+
+let groups = {};
+
+class PRESET_GROUPS {
+	static ADMINISTRATORS = 0;
+	static USERS = 1;
+	static PUBLIC = 2;
+}
+
+const control_panel_tabs = [manage_groups_container, manage_users_container];
+function showTab(element) {
+	for (let tab of control_panel_tabs) {
+		if (tab.id !== element.id) {
+			tab.style["display"] = "none";
+		}
+	}
+	element.style["display"] = "initial";
+}
+
+// class GroupWithMemberList extends Group {
+// 	constructor(group_list, group_json) {
+// 		super(group_list, group_json);
+// }
+
+class GroupList {
+	constructor(group_list_container) {
+		this.group_list_container = group_list_container;
+		this.json = null;
+		this.selected_group = null;
+		this.selected_group_indicator = selected_group_indicator;
+		this.rename_button = group_rename_button;
+		this.delete_button = group_delete_button;
+		this.delete_button.onclick = async() => {
+			this.delete_button.disabled = true;
+			// this.delete_button.classList.add("Processing");
+			let response = await sendAPIRequest("DELETE", `group/${this.selected_group.id}`);
+			if (response.ok) {
+				this.group_list_container.removeChild(document.getElementById(this.selected_group.element.id));
+				this.refreshGroups();
+				this.selected_group_indicator.textContent = "None selected";
+				this.rename_button.disabled = true;
+			}
+			else {
+				// error_message.innerText = `Could not delete group ${this.selected_group.name}`;
+				// error_dialog.showModal();
+				this.delete_button.disabled = false;
+			}
+			// this.delete_button.classList.remove("Processing");
+		}
+	}
+	appendGroup(group_json) {
+		let new_group = new Group(this, group_json);
+		this.group_list_container.appendChild(new_group.element);
+	}
+	createGroup(group_json) {
+		let new_group = new Group(this, group_json);
+		return new_group;
+	}
+	async createNewGroup() {
+		let new_group_data = {
+			"group": {
+				name: create_group_form_group_name.value
+			}
+		};
+		let response = await sendAPIRequest("POST", "create_group", {}, new_group_data);
+		if (response.ok) {
+			this.refreshGroups();
+			// const new_group_id = response.headers.get("New-Group-ID");
+			// console.log("New group ID: " + new_group_id);
+			// const new_group = new Group(new_group_id, new_group_data["group"].name, new_group_data["group"].permissions);
+			// groups[new_group_id] = new_group;
+			// new_group.moveUp();
+		}
+		create_group_form_group_name.value = "";
+	}
+	groupClickEvent(group_id) {
+		console.log(`Group ${group_id} clicked.`);
+	}
+	setSelectedGroupLabel() {
+		this.selected_group_indicator.textContent = this.selected_group.name;
+		if (this.selected_group.client_editable) {
+			this.rename_button.disabled = false;
+			this.delete_button.disabled = false;
+		}
+		else {
+			this.rename_button.disabled = true;
+			this.delete_button.disabled = true;
+		}
+	}
+	async refreshGroups() {
+		let response = await sendAPIRequest("GET", "groups");
+		if (response.ok) {
+			let response_json;
+			try {
+				response_json = await response.json()
+			}
+			catch (error) {
+				error_message.innerText = `Could not parse groups JSON;\n`;
+				error_dialog.showModal();
+				return null;
+			}
+			console.log(response_json);
+			const fragment = new DocumentFragment();
+			let previous_group_not_editable;
+			this.json = response_json;
+			for (let rank = 0; rank < response_json["group_heirarchy"].length; rank++) {
+				let group_id = response_json["group_heirarchy"][rank];
+				let group_json = response_json["groups"][group_id];
+				// console.log(group_json);
+				// TODO do not make new Group objects unnecessarily
+				// this.appendGroup(group_json);
+				let new_group = this.createGroup(group_json);
+				if (group_json.id === PRESET_GROUPS.USERS ||
+						group_json.id === PRESET_GROUPS.PUBLIC) {
+					new_group.element.style["display"] = "none";
+				}
+				else {
+					if (group_json.heirarchy_editable && previous_group_not_editable) {
+						new_group.up_button.disabled = true;
+					}
+					if (group_json.heirarchy_editable && rank === response_json["group_heirarchy"].length - 3) {
+						new_group.down_button.disabled = true;
+					}
+				}
+				if (!group_json.heirarchy_editable) {
+					previous_group_not_editable = true;
+				}
+				else {
+					previous_group_not_editable = false;
+				}
+				fragment.appendChild(new_group.element);
+			}
+			this.group_list_container.replaceChildren(fragment);
+			loadGroupsInGroupDialog();
+		}
+		else {
+			console.log(response);
+			console.error("Response is not ok");
+		}
+	}
+	async sendGroupHeirarchyToServer(new_group_heirarchy) {
+		let data_to_send = {
+			new_group_heirarchy: new_group_heirarchy,
+			username: localStorage.getItem("account_username"),
+			key: localStorage.getItem("account_key")
+		};
+		// for (let element of group_list.children) {
+		// 	let group_id = Number(element.id.substring("group-".length));
+		// 	data_to_send.new_group_heirarchy.push(group_id);
+		// }
+		let response = await sendAPIRequest("PUT", "group_heirarchy", {}, data_to_send);
+		return response;
+	}
+	getGroupIdFromElement(element) {
+		let group_id = Number(element.id.substring("group-".length));
+		return group_id;
+	}
+	getList() {
+		let as_list = [];
+		for (let group_list_entry of this.group_list_container.children) {
+			let group_id = this.getGroupIdFromElement(group_list_entry);
+			as_list.push(group_id);
+		}
+		return as_list;
+	}
+}
+
+class Member {
+	constructor (group_list, member_json) {
+		this.group_list = group_list;
+		this.id = member_json.id;
+		this.username = member_json.username;
+		this.element = document.createElement("li");
+		this.element.id = `group-${this.id}`;
+		this.element.classList.add("ToolBar", "WithBorders");
+		this.label = document.createElement("span");
+		this.label.style["flex-grow"] = 1;
+		this.label.textContent = this.username;
+		this.remove_button = document.createElement("button");
+		this.remove_button.classList.add("ToolBarButton");
+		this.remove_button.textContent = "Dismiss";
+		this.element.append(this.label, this.remove_button);
+	}
+}
+
+class GroupListWithMembers extends GroupList {
+	constructor(group_list_container, member_list_container) {
+		super(group_list_container);
+		this.member_list_container = member_list_container;
+	}
+	createMember(member_json) {
+		let new_member = new Member(this, member_json);
+		return new_member;
+	}
+	async showMembersInGroup(group_id) {
+		let response = await sendAPIRequest("GET", `group/${group_id}/members`);
+		if (response.ok) {
+			let response_json;
+			try {
+				response_json = await response.json()
+			}
+			catch (error) {
+				error_message.innerText = `Could not parse members JSON;\n`;
+				error_dialog.showModal();
+				return null;
+			}
+			console.log(response_json);
+			const fragment = new DocumentFragment();
+			for (let member_json of Object.values(response_json["members"])) {
+				// let member_json = response_json["members"][member_id];
+				// console.log(member_json);
+				// TODO do not make new member objects unnecessarily
+				// this.appendmember(member_json);
+				let new_member = this.createMember(member_json);
+				fragment.appendChild(new_member.element);
+			}
+			this.member_list_container.replaceChildren(fragment);
+		}
+	}
+	groupClickEvent(group_id) {
+		this.showMembersInGroup(group_id);
+	}
+}
+
+// class GroupWithMemberList extends Group {
+// 	constructor(group_list, group_json) {
+// 		super(group_list, group_json);
+// }
+class Group {
+	constructor(group_list, group_json) {
+		this.group_list = group_list;
+		this.id = group_json.id;
+		this.name = group_json.name;
+		this.client_editable = group_json["heirarchy_editable"];
+		this.element = document.createElement("li");
+		this.element.id = `group-${this.id}`;
+		this.element.classList.add("ToolBar");
+		this.label = document.createElement("button");
+		this.label.classList.add("ToolBarButton");
+		this.label.style["flex-grow"] = 1;
+		this.label.textContent = this.name;
+		this.label.onclick = () => {
+			this.group_list.selected_group = this;
+			this.group_list.groupClickEvent(this.id);
+			this.group_list.setSelectedGroupLabel();
+		}
+		this.element.append(this.label);
+		if (this.client_editable) {
+			this.up_button = document.createElement("button");
+			this.up_button.classList.add("RightAligned");
+			this.up_button.textContent = "\u2BC5";
+			this.up_button.onclick = () => { this.moveUp(); };
+			this.down_button = document.createElement("button");
+			// this.down_button.classList.add("ToolBarButton");
+			this.down_button.textContent = "\u2BC6";
+			this.down_button.onclick = () => { this.moveDown(); };
+			this.element.append(this.up_button, this.down_button);
+		}
+		// else {
+		// 	this.element.classList.add("UneditableGroup");
+
+		// }
+		// console.log(this.element);
+	}
+	moveUp() {
+		let previous_element = this.element.previousElementSibling;
+		if (previous_element !== null) {
+			previous_element.insertAdjacentElement("beforebegin", this.element);
+		}
+		this.updateHeirarchy();
+	}
+	moveDown() {
+		let next_element = this.element.nextElementSibling;
+		if (next_element !== null) {
+			next_element.insertAdjacentElement("afterend", this.element);
+		}
+		this.updateHeirarchy();
+	}
+	async updateHeirarchy() {
+		this.element.classList.add("Processing");
+		let heirarchy = this.group_list.getList();
+		// let group_to_move = this.element.previousElementSibling;
+		
+		let response = await this.group_list.sendGroupHeirarchyToServer(heirarchy);
+		console.log(response);
+		// console.log(response.ok);
+		// TODO don't call refresh unnecessarily
+		this.group_list.refreshGroups();
+	}
+}
+
+class UserList {
+	constructor(user_list_container) {
+		this.container_element = user_list_container;
+		this.client_rank = null;
+		this.selected_user = null;
+	}
+	createUser(user_json) {
+		let new_user = new User(this, user_json);
+		return new_user;
+	}
+	async refreshUsers() {
+		let response = await sendAPIRequest("GET", "users");
+		if (response.ok) {
+			let response_json;
+			try {
+				response_json = await response.json()
+			}
+			catch (error) {
+				error_message.innerText = `Could not parse users JSON;\n`;
+				error_dialog.showModal();
+				return null;
+			}
+			console.log(response);
+			console.log(response_json);
+			this.client_rank = Number(response.headers.get("Client-Rank"));
+			const fragment = new DocumentFragment();
+			for (let user_json of Object.values(response_json["users"])) {
+				// let user_json = response_json["users"][user_id];
+				// console.log(user_json);
+				// this.appenduser(user_json);
+				let new_user = this.createUser(user_json);
+				fragment.appendChild(new_user.element);
+			}
+			this.container_element.replaceChildren(fragment);
+		}
+		else {
+			console.log(response);
+			console.error("Response is not ok");
+		}
+	}
+}
+class User {
+	constructor(user_list, user_json) {
+		this.user_list = user_list;
+		this.id = user_json["id"];
+		this.rank = user_json["rank"];
+		this.element = document.createElement("li");
+		this.element.id = `user-${this.id}`;
+		this.element.classList.add("ToolBar", "WithBorders");
+		this.username = user_json["username"];
+		this.label = document.createElement("span");
+		this.label.textContent = this.username;
+		this.element.appendChild(this.label);
+		for (let group_json of user_json["groups"]) {
+			let group_element = document.createElement("span");
+			group_element.textContent = group_json["name"];
+			this.element.appendChild(group_element);
+		}
+		this.add_group_button = document.createElement("button");
+		this.add_group_button.classList.add("ToolBarButton", "RightAligned");
+		this.add_group_button.textContent = "Add group";
+		if (this.rank <= this.user_list.client_rank) {
+			this.add_group_button.disabled = true;
+		}
+		else {
+			this.add_group_button.onclick = () => {
+				this.user_list.selected_user = this;
+				add_user_to_group_dialog_username.textContent = this.username;
+				add_user_to_group_dialog.showModal();
+			}
+		}
+		this.element.append(this.add_group_button);
+		this.user_list.container_element.appendChild(this.element);
+	}
+}
+
+let the_group_list = new GroupListWithMembers(group_list_element, member_list_element);
+let the_user_list = new UserList(user_list_element);
+
+function loadGroupsInGroupDialog() {
+	const fragment = new DocumentFragment();
+	for (let rank = 0; rank < the_group_list.json["group_heirarchy"].length; rank++) {
+		let group_id = the_group_list.json["group_heirarchy"][rank];
+		let group_json = the_group_list.json["groups"][group_id];
+		console.log(group_json);
+		if (group_json.id !== PRESET_GROUPS.USERS &&
+				group_json.id !== PRESET_GROUPS.PUBLIC &&
+				rank > the_user_list.client_rank) {
+			let list_item = document.createElement("div");
+			let group_id_tag = `add_user_to_group_dialog_group_${group_id}`;
+			let group_checkbox_element = document.createElement("input");
+			group_checkbox_element.id = group_id_tag;
+			group_checkbox_element.type = "checkbox";
+			group_checkbox_element.name = "add_user_to_group_dialog_group_list_item";
+			let group_label_element = document.createElement("label");
+			group_label_element.setAttribute("for", group_id_tag);
+			group_label_element.innerText = group_json["name"];
+			list_item.append(group_checkbox_element, group_label_element);
+			fragment.appendChild(list_item);
+		}
+	}
+	add_user_to_group_dialog_group_list.replaceChildren(fragment);
+}
+
+async function initialLoad() {
+	await the_group_list.refreshGroups();
+	await the_user_list.refreshUsers();
+	// Below loop depends on the above two functions completing. TODO execute above two asynchronously
+	// loadGroupsInGroupDialog();
+}
+initialLoad(); 
+function addUserToGroupDialogAction() {
+	let groups_to_add = [];
+	add_user_to_group_dialog_group_list.querySelectorAll("input")
+		.forEach(input_element => {
+			if (input_element.checked) {
+				groups_to_add.push(Number(input_element.id.substring("add_user_to_group_dialog_group_".length)));
+			}
+		});
+	console.log(groups_to_add);
+	if (groups_to_add.length > 0) {
+		sendAPIRequest("POST", `user/${the_user_list.selected_user.id}/add_groups`, {}, {"groups_by_id":groups_to_add});
+		the_user_list.refreshUsers(); // TODO only refresh the user the groups were added to
+	}
+}
+
+function getAccountToken() {
+	return `${localStorage.getItem("account_key")}.${localStorage.getItem("account_username")}`;
+}
+
+async function sendAPIRequest(method, endpoint, headers = null, body = null) {
+	let fetch_response;
+	try {
+		fetch_response = await fetch("_ROOT_URL" + api_url + endpoint + "/", {
+			method: method,
+			headers: {"Token": getAccountToken(),
+				...headers
+			},
+			body: body && JSON.stringify(body)
+		});
+		if (!fetch_response.ok) {
+			let header_error_message = fetch_response.headers.get("message");
+			if (header_error_message == null) {
+				throw new Error(`ERROR ${fetch_response.status}\n${fetch_response.statusText}`);
+			}
+			else {
+				throw new Error(`ERROR ${fetch_response.status}\n${fetch_response.statusText}\n${header_error_message}`);
+			}
+		}
+	}
+	catch (error) {
+		error_message.innerText = error.message;
+		error_dialog.showModal();
+		console.error(error.message);
+	}
+	return fetch_response;
+}
+
+
+</script>
+</html>

@@ -20,7 +20,8 @@
 #include <vector>
 
 // Forward declaration
-class shared_state;
+// class shared_state;
+// class shared_state : public PermissionManager;
 
 /** Represents an active WebSocket connection to the server
 */

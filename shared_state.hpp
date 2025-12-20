@@ -15,14 +15,73 @@
 #include <mutex>
 #include <string>
 #include <unordered_set>
+#include "beast.hpp"
 #include "board.hpp"
+#include "permission_managed_object.hpp"
 
 // Forward declaration
 class websocket_session;
 
+// using json = nlohmann::json;
+
+class BasicResponse {
+public:
+	BasicResponse(http::status status, std::string message) :
+	   	status(status), message(message) {}
+	BasicResponse(http::status status, nlohmann::json json) :
+	   	status(status), json(json) {}
+	// BasicResponse(http::status status, std::string message, json json) :
+	//    	BasicResponse(status, message), json(json) {}
+	http::status status;
+	std::string message;
+	boost::optional<nlohmann::json> json;
+};
+
 // Represents the shared server state
-class shared_state
-{
+class shared_state : public PermissionManager {
+public:
+    explicit
+    shared_state(std::string doc_root /*, std::string media_root*/);
+
+    const std::string& doc_root() const noexcept { return doc_root_; }
+	// const std::string& media_root() const { return media_root_; }
+
+	// Board main_board;
+	Board* main_board() { return &(this->boards.at(0)); }
+
+	// int createGroup(nlohmann::json group_json);
+	BasicResponse createGroup(std::string username, std::string key, std::string new_group_name);
+	BasicResponse deleteGroup(std::string username, std::string key, int group_id);
+	// int createGroup(std::string new_group_name, int new_group_rank);
+	std::string dumpAllGroups(std::string username, std::string key) const;
+	BasicResponse setGroupHeirarchy(std::string username, std::string key, std::vector<int> ordered_groups);
+	BasicResponse createAccount(nlohmann::json user_json);
+	std::string dumpMembersInGroup(int group_id) const;
+	std::string dumpAllUsers() const;
+	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
+	BasicResponse getKeyFromPassword(nlohmann::json request_json) const;
+	BasicResponse addUserToGroups(std::string username, std::string key, int user_id, std::vector<int> groups_by_id);
+
+    void join  (websocket_session* session);
+    void leave (websocket_session* session);
+    void send  (std::string message);
+    void sendToThread (std::string message, int thread_id);
+	// struct group_order_comparator {
+	// 	bool operator() (std::pair<int, int> left, std::pair<int, int> right) const {
+	// 		if (left.first > right.first)
+	// 			return true;
+	// 		else if (left.first < right.first)
+	// 			return false;
+	// 		if (left.second > right.second)
+	// 			return true;
+	// 		else if (left.second < right.second)
+	// 			return false;
+	// 		else
+	// 			return false;
+	// 	}
+	// };
+
+private:
     const std::string doc_root_;
 	// const std::string media_root_;
 
@@ -32,19 +91,8 @@ class shared_state
     // Keep a list of all the connected clients
     std::unordered_set<websocket_session*> sessions_;
 
-public:
-    explicit
-    shared_state(std::string doc_root /*, std::string media_root*/);
-
-    const std::string& doc_root() const noexcept { return doc_root_; }
-	// const std::string& media_root() const { return media_root_; }
-
-	Board main_board;
-
-    void join  (websocket_session* session);
-    void leave (websocket_session* session);
-    void send  (std::string message);
-    void sendToThread (std::string message, int thread_id);
+	std::unordered_map<int, Board> boards;
+	// std::vector<int> ordered_boards;
 };
 
 #endif

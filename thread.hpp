@@ -1,6 +1,6 @@
 #include "post.hpp"
 #include "db_interface.h"
-// #include "websocket_session.hpp"
+#include "permission_managed_object.hpp"
 #include <ctime>
 #include <string>
 #include <unordered_set>
@@ -10,11 +10,11 @@ using json = nlohmann::json;
 
 class websocket_session;
 
-class Thread {
+class Thread : public PermissionManagedObject {
 public:
 	// Thread();
-	Thread(json thread_json/*, bool save_to_database*/);
-	Thread(struct db_thread_struct* thread_struct);
+	Thread(PermissionObjectBase* permission_parent, json thread_json/*, bool save_to_database*/);
+	Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct);
 	std::string dumpThread() const;
 	json asJson() const { return this->thread_as_json; };
 	// int getNumberOfPosts() const { return this->posts.size(); };

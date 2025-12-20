@@ -17,8 +17,10 @@ define(`_ROOT_URL', `/')
 define(`_FILE_SIZE_LIMIT_MB', `100')
 
 # Defined in field_lengths.h
-define(`_POST_MAX_NAME', `73')
+define(`_POST_MAX_NAME', `32')
 define(`_POST_MAX_FILE_NAME', `205')
+define(`_GROUP_MAX_NAME', `32')
+define(`_ACCOUNT_MAX_USERNAME', `32')
 
 # To prevent javascript strings using the backtick character '`' from being interpreted as quotes in m4:
 changequote(`[[[', `]]]')
