@@ -1,4 +1,5 @@
 #include "permission_managed_object.hpp"
+#include "db_interface.h"
 #include <iostream>
 
 PermissionObjectBase::PermissionObjectBase(int permission_object_id)
@@ -9,31 +10,89 @@ PermissionObjectBase::PermissionObjectBase(int permission_object_id)
 
 void PermissionObjectBase::cacheAllPermissions(/*int permission_object_id*/) {
 	// this->permission_object_id = permission_object_id;
-	std::cout << "[PermissionObjectBase] retrieving permissions for " << permission_object_id << ": ";
+	std::cout << "[PermissionObjectBase] retrieving permissions for " << this->permission_object_id << ": ";
 	// Permission Collections
 	db_permission_collection_array* permission_collection_array = db_retrieve_permission_collections_for_permission_object(this->permission_object_id);
 	for (int i = 0; i < permission_collection_array->used; i++) {
+		/*
 		int permission_collection_id = permission_collection_array->array[i].id;
 		std::cout << permission_collection_id << ", ";
-		PermissionCollection new_permission_collection(permission_collection_id);
+		USER_OR_GROUP user_or_group; int user_or_group_id;
+		if (permission_collection_array->array[i].group_id > -1) {
+			user_or_group = USER_OR_GROUP::GROUP;
+			user_or_group_id = permission_collection_array->array[i].group_id;
+		}
+		else {
+			user_or_group = USER_OR_GROUP::USER;
+			user_or_group_id = permission_collection_array->array[i].account_id;
+		}
+		*/
+		PermissionCollection new_permission_collection(this->permission_object_id, &permission_collection_array->array[i]);
 		// Get permission settings
 		db_permission_setting_array* permission_settings = db_retrieve_permission_settings_for_permission_collection(permission_collection_array->array[i].id);
 		for (int j = 0; j < permission_settings->used; j++) {
-			int permission_number = permission_settings->array[j].permission_number;
-			new_permission_collection.setPermission(static_cast<PERMISSION>(permission_number), static_cast<THREE_STATE_SETTING>(permission_settings->array[j].setting));
+			new_permission_collection.addPermissionSetting(&permission_settings->array[j]);
+			// int permission_number = permission_settings->array[j].permission_number;
+			// new_permission_collection.setPermission(static_cast<PERMISSION>(permission_number), static_cast<THREE_STATE_SETTING>(permission_settings->array[j].setting));
 		}
 		freePermissionSettingArray(permission_settings);
 
+		std::cout << "permission collection ID: " << permission_collection_array->array[i].id << std::endl;
+		std::cout << permission_collection_array->array[i].account_id << std::endl;
 		if (permission_collection_array->array[i].account_id != -1)
 			this->user_permissions.emplace(permission_collection_array->array[i].account_id, new_permission_collection);
 		else
 			this->group_permissions.emplace(permission_collection_array->array[i].group_id, new_permission_collection);
 	}
-	std::cout << "done." << std::endl;
 	freePermissionCollectionArray(permission_collection_array);
+	std::cout << "done." << std::endl;
+}
 
-	// Individual permission settings are added to permission collections
-	// for (std::unordered_map<int, PermissionCollection> user_permission_it = this->user_permissions.begin(); user_permission_it != this->user_permissions.end(); user_permission_it++) {
+nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_id) const {
+	nlohmann::json permission_collections_json;
+	// client_rank not used because client_editable status is given by dumpAllGroups()/dumpAllUsers()
+	// int client_rank = this->getUserRank(client_id);
+
+	nlohmann::json group_permissions_json = nlohmann::json::object();
+	for (int i = 0; i < this->getOrderedGroups()->size(); i++) {
+		// for (int group_id : *(this->getOrderedGroups())) {
+		int group_id = (*(this->getOrderedGroups()))[i];
+		std::unordered_map<int, PermissionCollection>::const_iterator group_permission_collection_it = this->group_permissions.find(group_id);
+		if (group_permission_collection_it != this->group_permissions.end()) {
+			const std::unordered_map<PERMISSION, PermissionSetting>* permission_settings = group_permission_collection_it->second.getPermissionMap();
+			nlohmann::json permission_collection_json = nlohmann::json::object();
+			for (std::unordered_map<PERMISSION, PermissionSetting>::const_iterator permission_it = permission_settings->begin(); permission_it != permission_settings->end(); permission_it++) {
+				permission_collection_json[std::to_string(static_cast<int>(permission_it->first))] = static_cast<int>(permission_it->second.get());
+			}
+			// bool group_permission_is_client_editable;
+			// if (this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS) && client_rank < i)
+			// 	group_permission_is_client_editable	= true;
+			// else
+			// 	group_permission_is_client_editable = false;
+			// group_permissions_json[std::to_string(group_id)]["client_editable"] = group_permission_is_client_editable;
+			group_permissions_json[std::to_string(group_id)]["permission_collection"] = permission_collection_json;
+		}
+	}
+	permission_collections_json["group_permissions"] = group_permissions_json;
+
+	nlohmann::json user_permissions_json = nlohmann::json::object();
+	// int user_rank = this->getUserRank(client_id);
+	// boost::shared_ptr<std::unordered_map<int, User>> users = this->getUsers();
+	for (const std::pair<int, User> user : *this->getUsers()) {
+		std::unordered_map<int, PermissionCollection>::const_iterator user_permission_collection_it = this->user_permissions.find(user.first);
+		if (user_permission_collection_it != this->user_permissions.end()) {
+			const std::unordered_map<PERMISSION, PermissionSetting>* permission_settings = user_permission_collection_it->second.getPermissionMap();
+			nlohmann::json permission_collection_json = nlohmann::json::object();
+			for (std::unordered_map<PERMISSION, PermissionSetting>::const_iterator permission_it = permission_settings->begin(); permission_it != permission_settings->end(); permission_it++) {
+				permission_collection_json[std::to_string(static_cast<int>(permission_it->first))] = static_cast<int>(permission_it->second.get());
+			}
+			user_permissions_json[std::to_string(user.first)]["permission_collection"] = permission_collection_json;
+		}
+	}
+
+	permission_collections_json["user_permissions"] = user_permissions_json;
+
+	return permission_collections_json;
 }
 
 void PermissionManager::cacheAllUsers() {

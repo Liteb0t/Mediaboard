@@ -4,5 +4,5 @@ INSERT INTO permission_group(id, name) VALUES (2, 'Public');
 INSERT INTO permission_group_heirarchy(rank, permission_group) VALUES (0, 0);
 INSERT INTO permission_group_heirarchy(rank, permission_group) VALUES (1, 1);
 INSERT INTO permission_group_heirarchy(rank, permission_group) VALUES (2, 2);
-INSERT INTO permission_collection(id, permission_object_id, permission_group_id) VALUES (nextval('permission_collection_id_seq'), 0, 0);
-INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (0, 0, 0, 1);
+INSERT INTO permission_collection(id, permission_object_id, permission_group_id) VALUES (0, 0, 0);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (0, 0, 0, 2);

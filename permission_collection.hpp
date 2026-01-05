@@ -1,24 +1,33 @@
 #include "permission_setting.hpp"
 #include "db_interface.h"
+#include <iostream>
 #include <unordered_map>
 
-enum struct PERMISSION {
-	MANAGE_PERMISSIONS = 0
-	// AUTHOR_DELETE_THREAD,
-	// NON_AUTHOR_DELETE_THREAD,
-	// NON_AUTHOR_VIEW_MESSAGE,
-	// NON_AUTHOR_VIEW_THREAD,
-	// UPLOAD_FILE,
-	// NON_AUTHOR_DELETE_FILE
-};
+enum struct USER_OR_GROUP {USER, GROUP};
 
 class PermissionCollection {
 public:
-	PermissionCollection() {
-		// TODO add entry to database
-		this->id = -1;
+	PermissionCollection(int permission_object_id, db_permission_collection_struct* permission_collection) {
+		this->id = permission_collection->id;
+		this->group_id = permission_collection->group_id;
+		this->user_id = permission_collection->account_id;
 	}
-	PermissionCollection(int id) : id(id) {}
+	PermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id)
+			: permission_object_id(permission_object_id), user_or_group(user_or_group) {
+		if (this->user_or_group == USER_OR_GROUP::USER)
+			this->user_id = user_or_group_id;
+		else
+			this->group_id = user_or_group_id;
+		this->id = db_store_permission_collection(this->permission_object_id, this->user_id, this->group_id);
+	}
+	/*
+	~PermissionCollection() {
+		db_delete_permission_collection(this->id);
+	}*/
+	void remove() {
+		db_delete_permission_collection(this->id);
+		// TODO clear permission settings from database
+	}
 	bool passPermission(PERMISSION permission_type, bool inherited_permission) const {
 		auto permission_iterator = permission_map.find(permission_type);
 		if (permission_iterator != permission_map.end()) {
@@ -27,16 +36,20 @@ public:
 		else
 			return inherited_permission;
 	}
+	void addPermissionSetting(db_permission_setting_struct* db_permission_setting) {
+		PermissionSetting permission_setting(db_permission_setting);
+		permission_map.emplace(static_cast<PERMISSION>(db_permission_setting->permission_number), db_permission_setting);
+	}
 	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting) {
-		auto permission_iterator = permission_map.find(permission_type);
-		if (permission_iterator == permission_map.end()) {
-			PermissionSetting permission_setting(setting);
-			permission_map.emplace(permission_type, permission_setting);
+		auto permission_iterator = this->permission_map.find(permission_type);
+		if (permission_iterator == this->permission_map.end()) {
+			std::cout << "PermissionCollection " << this->id << ": permission " << static_cast<int>(permission_type) << " not found" << std::endl;
+			PermissionSetting permission_setting(this->id, permission_type, setting);
+			this->permission_map.emplace(permission_type, permission_setting);
 		}
 		else {
 			permission_iterator->second.set(setting);
 		}
-		// TODO remove permission from map when there are no constrains and setting == INHERIT
 	}
 	/*
 	void deletePermission(PERMISSION permission_type) {
@@ -45,8 +58,15 @@ public:
 		db_delete_permission_setting(this->id, static_cast<int>(permission_type));
 		this->permission_map.erase(it);
 	}*/
+	const std::unordered_map<PERMISSION, PermissionSetting>* getPermissionMap() const {
+		return &(this->permission_map);
+	}
 
 private:
 	int id;
+	int permission_object_id;
+	USER_OR_GROUP user_or_group;
+	int user_id = -1;
+	int group_id = -1;
 	std::unordered_map<PERMISSION, PermissionSetting> permission_map;
 };

@@ -8,6 +8,7 @@
 //
 
 #include "http_session.hpp"
+#include "permission_managed_object.hpp"
 #include "websocket_session.hpp"
 #include "field_lengths.h"
 #include <boost/config.hpp>
@@ -71,7 +72,7 @@ const std::set<std::string, std::less<>> image_formats = {"gif", "jpg", "jpeg", 
 const bool fileIsImage(std::string* file_name) {
 	int dot_index = file_name->rfind('.');
 	if (dot_index != std::string::npos) {
-		std::string_view file_extension = file_name->substr(dot_index+1);
+		std::string file_extension = file_name->substr(dot_index+1);
 		if (image_formats.find(file_extension) != image_formats.end())
 			return true;
 		else
@@ -225,75 +226,130 @@ handle_request(
 
 	// req_location excludes URL parameters (stuff after '?')
     std::string path, req_location;
-	int location_end_index;
-	int decoded_url_last_slash_index = decoded_url.rfind('/');
+	// int decoded_url_last_slash_index = decoded_url.rfind('/');
 	int decoded_url_last_questionmark_index = decoded_url.rfind('?');
-	if (decoded_url_last_slash_index < decoded_url_last_questionmark_index) {
-		location_end_index = decoded_url_last_questionmark_index;
-		req_location = decoded_url.substr(0, location_end_index);
-	}
-	else {
-	// 	location_end_index = decoded_url_last_slash_index;
+	if (decoded_url_last_questionmark_index != std::string::npos)
+		req_location = decoded_url.substr(0, decoded_url_last_questionmark_index);
+	else
 		req_location = req.target();
-	}
 	std::cout << "req_location: " << req_location << std::endl;
 
+	auto const getNumberFromPath = [&req_location](int start_index) {
+		std::size_t found = req_location.find_first_not_of("0123456789", start_index+1);
+
+		if (found == start_index) {
+			throw (std::string("Invalid group ID; cannot be empty."));
+		}
+		else if (req_location[start_index] == '/') {
+			throw (std::string("First character cannot be a /. Try adding +1."));
+		}
+		else if (req_location[found] != '/') {
+			throw (std::string("Invalid group ID; trailing '/' not found."));
+		}
+		else {
+			int number_in_url;
+			// Get number ID from URL substring
+			std::cout << "Substring: " << req_location.substr(start_index, found - start_index) << std::endl;
+			std::from_chars(req_location.substr(start_index, found - start_index).data(), req_location.substr(start_index, found - start_index).data() + req_location.substr(start_index, found - start_index).size(), number_in_url);
+			return std::make_pair(number_in_url, found);
+		}
+		throw ("Program should not reach here.");
+		return std::make_pair(-1, found);
+	};
+
+	auto const getUserFromToken	= [&req, &state]() {
+		std::string token;
+		// boost::intrusive::list_iterator<boost::intrusive::bhtraits<boost::beast::http::basic_fields<std::allocator<char>>::element, boost::intrusive::list_node_traits<void*>, boost::intrusive::normal_link, boost::intrusive::dft_tag, 1>, true> it = req.begin();
+		// Iterates value_type. See: https://www.boost.org/doc/libs/boost_1_82_0/libs/beast/doc/html/beast/ref/boost__beast__http__basic_fields__value_type.html
+		for (auto it = req.begin(); it != req.end(); it++) {
+			if (it->name_string() == "Token") {
+				token = it->value();
+				std::cout << "Found Token in header. It is " << token << std::endl;
+				break;
+			}
+		}
+		if (token.length() < KEY_LENGTH+2) {
+			// api_response(http::status::bad_request, std::string("Token too short"));
+			throw(std::string("Token too short"));
+		}
+		std::string key = token.substr(0, KEY_LENGTH);
+		std::string username = token.substr(KEY_LENGTH+1);
+		if (key.length() == KEY_LENGTH) {
+			int client_id;
+			if (username == "Public") {
+				client_id = static_cast<int>(BUILTIN_USERS::PUBLIC);
+				return std::make_pair(client_id, key);
+			}
+			else {
+				if (state->userExists(username)) {
+					client_id = state->getIdFromUsername(username);
+					if (state->checkUserKey(client_id, key))
+						return std::make_pair(client_id, key);
+					else
+						throw (std::string("Key does not match user."));
+				}
+				else
+					throw (std::string("User ") + username + " not found.");
+			}
+		}
+		// client id -1 means there was an error
+		return std::make_pair(-1, key);
+	};
+
 		// Make sure we can handle the method
-   	if(		req.method() == http::verb::get || 
-			req.method() == http::verb::head) {
+	if 		(req.method() == http::verb::get) {
 		bool is_media = false;
-        // return bad_request("Unknown HTTP-method");
     	// Build the path to the requested file
 		if (req_location.substr(0, 6) == "/media") {
 			is_media = true;
 			path = path_cat(state->doc_root(), decoded_url.substr(6));
 		}
 		else if (req_location.substr(0, 5) == "/api/") {
+			std::pair<int, std::string> client;
+			try {
+				client = getUserFromToken();
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, error_text);
+			}
 			http::response<http::string_body> res;
 			res.set(http::field::content_type, "application/json");
 			// std::cout << req_location.substr(5, 13) << std::endl;
-			if (req_location.substr(5, 12) == "get_threads/") {
+			if (req_location.substr(5) == "threads/") {
 				res.result(http::status::ok);
-				// json response_json;
-				// res.body() = json::serialize(json_response);
-				res.body() = state->main_board()->dumpAllThreads();
+				// TODO check read permission
+				res.body() = state->main_board()->dumpAllThreads(client.first);
 			}
-			else if (req_location.substr(5, 8) == "threads/") {
-				std::size_t found = req_location.find_first_not_of("0123456789", 13);
-				if (req_location[found] != '/') {
-					std::cout << "Error: invalid thread ID" << std::endl;
-					res.result(500);
+			else if (req_location.substr(5, 7) == "server/") {
+				if (req_location.substr(12, 12) == "permissions/") {
+					res.body() = state->dumpPermissions(client.first);
+					res.result(http::status::ok);
 				}
-				else if (found == 13) {
-					std::cout << "Error: thread ID cannot be empty" << std::endl;
-					res.result(500);
-				}
-				else {
-					int thread_in_url;
-					// Get thread ID from URL substring
-					std::from_chars(req_location.substr(13, found).data(), req_location.substr(13, found).data() + req_location.substr(13, found).size(), thread_in_url);
-					// int thread_in_url = atoi(req_location.substr(13, found).c_str());
-					if (state->main_board()->threadExists(thread_in_url)) {
-						std::cout << "[http_session] HEADERS:" << std::endl;
-						std::string key;
-
-						// boost::intrusive::list_iterator<boost::intrusive::bhtraits<boost::beast::http::basic_fields<std::allocator<char>>::element, boost::intrusive::list_node_traits<void*>, boost::intrusive::normal_link, boost::intrusive::dft_tag, 1>, true> it = req.begin();
-						 // Iterates value_type. See: https://www.boost.org/doc/libs/boost_1_82_0/libs/beast/doc/html/beast/ref/boost__beast__http__basic_fields__value_type.html
-						for (auto it = req.begin(); it != req.end(); it++) {
-							std::cout << it->name_string() << ": " << it->value() << "\n";
-							if (it->name_string() == "key") {
-								key = it->value();
-								std::cout << "Found key in header. It is " << key << std::endl;
-								break;
-							}
-						}
-						res.body() = state->main_board()->dumpPostsInThread(thread_in_url, key);
-						res.result(http::status::ok);
+				else
+					return api_response(http::status::bad_request, std::string("Bad URL. Do better next time."));
+			}
+			else if (req_location.substr(5, 7) == "thread/") {
+				std::pair<int, int> thread_in_path = getNumberFromPath(12);
+				if (state->main_board()->threadExists(thread_in_path.first)) {
+					/*std::pair<int, std::string> client;
+					try {
+						client = getUserFromToken();
+					}
+					catch(std::string error_text) {
+						return api_response(http::status::bad_request, error_text);
+					}*/
+					// TODO check for /permissions/ in URL
+					if (req_location.substr(thread_in_path.second) == "/permissions/") {
+						res.body() = state->main_board()->dumpPermissionsInThread(thread_in_path.first, client.first);
 					}
 					else {
-						std::cout << "Error: thread '" << thread_in_url << "' does not exist" << std::endl;
-						res.result(404);
+						res.body() = state->main_board()->dumpPostsInThread(thread_in_path.first, client.second);
 					}
+					res.result(http::status::ok);
+				}
+				else {
+					std::cout << "Error: thread '" << thread_in_path.first << "' does not exist" << std::endl;
+					res.result(404);
 				}
 			}
 			else if (req_location.substr(5, 6) == "group/") { // TODO add /members/ to end of URL check
@@ -310,7 +366,8 @@ handle_request(
 					std::from_chars(req_location.substr(11, found).data(), req_location.substr(11, found).data() + req_location.substr(11, found).size(), group_in_url);
 					std::cout << "group_id_url: " << group_in_url << std::endl;
 					if (state->groupExists(group_in_url)) {
-						res.body() = state->dumpMembersInGroup(group_in_url);
+						// res.body() = state->dumpMembersInGroup(group_in_url);
+						res.body() = state->dumpMembersInGroupAsArray(group_in_url);
 						res.result(http::status::ok);
 					}
 					else
@@ -337,25 +394,17 @@ handle_request(
 				res.result(http::status::ok);
 			}
 			else if (req_location.substr(5) == "users/") {
-				std::string token;
-				for (auto it = req.begin(); it != req.end(); it++) {
-					if (it->name_string() == "Token") {
-						token = it->value();
-						std::cout << "Found Token in header. It is " << token << std::endl;
-						break;
-					}
+				/*std::pair<int, std::string> client;
+				try {
+					client = getUserFromToken();
 				}
-				if (token.length() < KEY_LENGTH+2) {
-					return api_response(http::status::bad_request, "Token too short");
-				}
-				std::string key = token.substr(0, KEY_LENGTH);
-				std::string username = token.substr(KEY_LENGTH+1);
-				std::cout << "[http_session] Key : Username from token: " << key << " : " << username << std::endl;
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, error_text);
+				}*/
 				// TODO check if username and key exist + are correct
-				res.body() = state->dumpAllUsers();
-				int user_id = state->getIdFromUsername(username);
-				int user_rank = state->getUserRank(user_id);
-				res.set("Client-Rank", std::to_string(user_id));
+				res.body() = state->dumpAllUsers(client.first);
+				int user_rank = state->getUserRank(client.first);
+				res.set("Client-Rank", std::to_string(user_rank));
 				res.result(http::status::ok);
 			}
 			else {
@@ -370,7 +419,7 @@ handle_request(
 		}
 		else {
 			// This is used to access files in the server's directory
-			path = decoded_url.substr(1);
+			path = req_location.substr(1);
 		}
 
     	// Attempt to open the file
@@ -439,16 +488,23 @@ handle_request(
     	return res;
 	}
 	else if (req.method() == http::verb::post) {
-		if (req.target() == "/api/create_message/" || req.target() == "/api/create_thread/") {
+		if (req_location == "/api/message/" || req_location == "/api/thread/") {
+			std::pair<int, std::string> client;
+			try {
+				client = getUserFromToken();
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, error_text);
+			}
 			http::response<http::empty_body> res;
 			json request_json = json::parse(req.body());
 			bool is_thread;
 			json post_json;
-			if (req.target() == "/api/create_thread/") {
+			if (req_location == "/api/thread/") {
+				is_thread = true;
 				if (request_json.contains("thread") && 
 					request_json["thread"].contains("post_zero")) {
 					post_json = request_json["thread"]["post_zero"];
-					is_thread = true;
 				}
 				else {
 					res.result(400);
@@ -458,9 +514,9 @@ handle_request(
 				}
 			}
 			else {
+				is_thread = false;
 				if (request_json.contains("post")) {
 					post_json = request_json["post"];
-					is_thread = false;
 				}
 				else {
 					res.result(400);
@@ -469,10 +525,9 @@ handle_request(
 					return res;
 				}
 			}
-			if (post_json.contains("files") && 
-					post_json.contains("name") && 
-					post_json.contains("content") && 
-					post_json.contains("key")) {
+			if (	post_json.contains("files") &&
+					post_json.contains("name") &&
+					post_json.contains("content")) {
 				if (post_json["files"].size() > 4) {
 					std::cerr << "Denied: More than 4 files in message\n";
 					res.set("message", "More than 4 files attatched.");
@@ -482,16 +537,19 @@ handle_request(
 					std::string message_content = post_json["content"].template get<std::string>();
 					if ((message_content.length() > 0 || post_json["files"].size() > 0) && message_content.length() < POST_MAX_CONTENT) {
 						if (is_thread) {
+							// if (state->userHasPermission())
+							request_json["thread"]["post_zero"]["key"] = client.second; // key is to identify the author of a post
 							int new_thread_id = state->main_board()->createThread(request_json["thread"]);
 							res.set("New-Thread-Id", std::to_string(new_thread_id));
 							res.result(201);
 						}
 						else {
 							int new_message_thread_id = post_json["thread_id"].template get<int>();
-							std::string new_message_key = post_json["key"].template get<std::string>();
+							// TODO authorize user
 							if (state->main_board()->threadExists(new_message_thread_id)) {
-								int new_message_id = state->main_board()->createPost(request_json["post"]);
-								std::string new_message_dump = state->main_board()->dumpPost(new_message_thread_id, new_message_id, new_message_key);
+								post_json["key"] = client.second;  // key is to identify the author of a post
+								int new_message_id = state->main_board()->createPost(post_json);
+								std::string new_message_dump = state->main_board()->dumpPost(new_message_thread_id, new_message_id, client.second);
 								state->sendToThread(new_message_dump, new_message_thread_id);
 								res.result(201);
 							}
@@ -514,6 +572,51 @@ handle_request(
 			}
 			res.prepare_payload();
 			return res;
+		}
+		// The URL extends past /thread/, used for permission management
+		else if (req_location.substr(0, 12) == "/api/thread/") {
+			std::pair<int, std::string> client;
+			try {
+				client = getUserFromToken();
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, error_text);
+			}
+			std::pair<int, int> thread_in_url;
+			try {
+				thread_in_url = getNumberFromPath(12);
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, std::string("Bad URL."));
+			}
+
+			boost::shared_ptr<Thread> thread = state->getThread(0, thread_in_url.first);
+
+			if (req_location.substr(thread_in_url.second, 19) == "/permissions/group/") {
+				int group_in_url;
+				try {
+					group_in_url = getNumberFromPath(thread_in_url.second+19).first;
+				}
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, std::string("Bad URL."));
+				}
+				if (thread->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS)) {
+					state->main_board()->addGroupPermissionCollectionToThread(group_in_url, thread_in_url.first);
+					// thread->addGroupPermissionCollection(group_in_url);
+					return api_response(http::status::ok, std::string("Group permission collection created"));
+				}
+				else
+					return api_response(http::status::forbidden, std::string("User lacks permission MANAGE_PERMISSIONS"));
+			}
+			else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
+				int user_in_url = getNumberFromPath(thread_in_url.second+18+1).first;
+				// TODO check permission
+				// if (shared_state->userHasPermission()
+				thread->addUserPermissionCollection(user_in_url);
+				return api_response(http::status::ok, std::string("User permission collection created"));
+			}
+			else
+				return api_response(http::status::not_found, std::string("/api/server sub-URL not found"));
 		}
 		else if (req.target() == "/api/create_group/") {
 			http::response<http::empty_body> res;
@@ -596,7 +699,6 @@ handle_request(
 				BasicResponse function_response = state->addUserToGroups(username, key, user_in_url, groups_to_add);
 				return api_response(function_response.status, function_response.message);
 			}
-
 		}
 		else if (req.target().substr(5,9) == "register/") {
 			json request_json;
@@ -632,6 +734,26 @@ handle_request(
 				std::cout << "There is NO function response JSON" << std::endl;
 				return api_response(function_response.status, function_response.message);
 			}
+		}
+		else if (req_location.substr(0, 12) == "/api/server/") {
+			std::cout << req_location.substr(12, 18) << std::endl;
+			if (req_location.substr(12, 18) == "permissions/group/") {
+				int group_in_url = getNumberFromPath(30).first;
+				// TODO get user from token and check his/her permission
+				// if (shared_state->userHasPermission()
+				state->addGroupPermissionCollection(group_in_url);
+				return api_response(http::status::ok, std::string("Group permission collection created"));
+				// return api_response(http::status::not_implemented, std::string("Group ID: " + std::to_string(group_in_url) + " but action not implemented"));
+			}
+			else if (req_location.substr(12, 17) == "permissions/user/") {
+				int user_in_url = getNumberFromPath(29).first;
+				// TODO get user from token and check his/her permission
+				// if (shared_state->userHasPermission()
+				state->addUserPermissionCollection(user_in_url);
+				return api_response(http::status::ok, std::string("User permission collection created"));
+			}
+			else
+				return api_response(http::status::not_found, std::string("/api/server sub-URL not found"));
 		}
 		/*
 		else if (decoded_url == "/api/change_password/") {
@@ -673,7 +795,6 @@ handle_request(
 			// std::cout << req_string << std::endl;
 			std::istringstream req_stream(req.body());
 			std::string req_line;
-			int i = 0;
 			std::getline(req_stream, req_line);
 			std::string req_terminator = req_line.substr(0, req_line.length()-1) + "--\r";
 			// std::cout << "Request ID: " << req_terminator << std::endl;
@@ -683,7 +804,6 @@ handle_request(
 				std::getline(req_stream, req_line, '\n');
 				if (req_line == "\r") {
 					empty_line = true;
-					// std::cout << "CR FOUND";
 				}
 				else if (req_line.substr(0, 19) == "Content-Disposition") {
 					int filename_i;
@@ -720,8 +840,6 @@ handle_request(
 			}
 			sanitiseFileName(&out_filename);
 			std::cout << "Sanitised out_filename: " << out_filename << std::endl;
-			// std::cout << "START OF FILE" << std::endl;
-			// std::string out_filename_bez_extension;
 
 			// Add UUID to filename
 			boost::uuids::uuid u = boost::uuids::random_generator()();
@@ -734,60 +852,43 @@ handle_request(
 
 			// Write to the file
 			std::ofstream outfile(state->doc_root() + out_filename, std::ios::binary);
-			bool terminator_found = false;
 			bool is_initial_line = true;
-			int previous_line_is_cr_return = false;
 			bool previous_line_ends_with_carriage_return = false;
 			while (std::getline(req_stream, req_line)) {
+				std::cout << req_line << std::endl;
+				std::cout << req_line.length() << ", " << req_terminator.length() << std::endl;
 				if (req_line != req_terminator) {
-					// std::cout << "this is not the terminator" << std::endl;
-					// if (is_initial_line) {
-					// 	outfile << req_line;
-					// 	is_initial_line = false;
-					// }
-					// else {
-					// else {
-						// while (previous_line_is_cr_return) {
-						// 	outfile << "\n\r";
-						// 	previous_line_is_cr_return--;
-						// }
 					if (previous_line_ends_with_carriage_return) {
 						previous_line_ends_with_carriage_return = false;
 						outfile << "\r";
 					}
 					if (!is_initial_line)
 						outfile << "\n";
-					if (req_line.back() == '\r') {
-						std::cout << "Req line ends with carriage return" << std::endl;
-						previous_line_is_cr_return++;
+					if (req_line.length() == 0)
+						continue;
+					else if (req_line.back() == '\r') {
 						previous_line_ends_with_carriage_return = true;
 						outfile << req_line.substr(0, req_line.length() - 1);
 					}
 					else
 						outfile << req_line;
-					// }
 					is_initial_line = false;
 				}
 				else {
-					// std::cout << "THE TERMINATOR" << std::endl;
-					terminator_found = true;
 					break;
 				}
-				// std::cout << req_line.length() << ", " << req_terminator.length() << std::endl;
-				// std::cout << req_line << std::endl;
 			}
-			// bool outfile_errored;
+			std::cout << "Finished reading data" << std::endl;
 			try {
 				outfile.exceptions(outfile.failbit);
 				outfile.close();
-				// outfile_errored = false;
 			}
 			catch (const std::ios_base::failure& exception) {
 				std::stringstream error_message;
 				error_message
 					<< "Reason: " << exception.what() << '\n'
 					<< "Error code: " << exception.code() << "\n";
-				std::cout << "Exception thrown when attempting to save uploaded file.\n" << error_message.str();
+				std::cerr << "Exception thrown when attempting to save uploaded file.\n" << error_message.str();
 				http::response<http::empty_body> res{http::status::internal_server_error, req.version()};
 				res.set("message", error_message.str());
     			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -798,15 +899,8 @@ handle_request(
     			res.content_length(0);
     			res.keep_alive(req.keep_alive());
     			return res;
-				// outfile_errored = true;
-				// http::response<http::empty_body> res;
-				// res.result(500);
-				// res.set("message", error_message.str());
-				// res.prepare_payload();
-				// std::cout << "Returning error for failed upoload" << std::endl;
-				// return res;
 			}
-			// std::cout << "END OF FILE" << std::endl;
+			std::cout << "END OF FILE" << std::endl;
 
 			// Write thumbnail
 			if (fileIsImage(&out_filename)) {
@@ -845,6 +939,13 @@ handle_request(
 		}
 	}
 	else if (req.method() == http::verb::put) {
+		std::pair<int, std::string> client;
+		try {
+			client = getUserFromToken();
+		}
+		catch(std::string error_text) {
+			return api_response(http::status::bad_request, error_text);
+		}
 		if (req.target() == "/api/group_heirarchy/") {
 			// TODO: authorize user with key
 			json request_json;
@@ -875,106 +976,278 @@ handle_request(
 			else
 				return api_response(http::status::bad_request, "ordered_groups not found in JSON request");
 		}
+		else if (req_location.substr(0, 12) == "/api/server/") {
+			std::cout << req_location.substr(12, 18) << std::endl;
+			bool is_group;
+			int group_or_user_in_url;
+			int rank_of_user_or_group;
+			if (req_location.substr(12, 18) == "permissions/group/") {
+				group_or_user_in_url = getNumberFromPath(30).first;
+				is_group = true;
+				rank_of_user_or_group = state->getGroupRank(group_or_user_in_url);
+			}
+			else if (req_location.substr(12, 17) == "permissions/user/") {
+				group_or_user_in_url = getNumberFromPath(29).first;
+				is_group = false;
+				rank_of_user_or_group = state->getUserRank(group_or_user_in_url);
+			}
+			else
+				return api_response(http::status::not_found, std::string("/api/server sub-URL not found"));
+
+			json request_json;
+			int _permission_number, _permission_setting;
+			try {
+				request_json = json::parse(req.body());
+				_permission_number = request_json["permission"].template get<int>();
+				_permission_setting = request_json["setting"].template get<int>();
+			}
+			catch (const json::exception& exception) {
+				return api_response(http::status::bad_request, exception.what());
+			}
+			// TODO check if ints are in range
+			PERMISSION permission = static_cast<PERMISSION>(_permission_number);
+			THREE_STATE_SETTING permission_setting = static_cast<THREE_STATE_SETTING>(_permission_setting);
+			if (state->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS) && state->getUserRank(client.first) < rank_of_user_or_group) {
+				std::cout << "permission_setting: " << static_cast<int>(permission_setting) << std::endl;
+				if (is_group) {
+					state->setGroupPermission(group_or_user_in_url, permission, permission_setting);
+					return api_response(http::status::ok, std::string("Group permission updated"));
+				}
+				else {
+					state->setUserPermission(group_or_user_in_url, permission, permission_setting);
+					return api_response(http::status::ok, std::string("User permission updated"));
+				}
+			}
+			else
+				return api_response(http::status::forbidden, std::string("Permission denied for this client"));
+		}
+		else if (req_location.substr(0, 12) == "/api/thread/") {
+			// Assume we edit permissions, because that is the only feature implemented for PUT /api/thread/
+			bool is_group;
+			int group_or_user_in_url;
+			int rank_of_user_or_group;
+			std::pair<int, int> thread_in_url;
+			try {
+				thread_in_url = getNumberFromPath(12);
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, std::string("Bad URL."));
+			}
+			boost::shared_ptr<Thread> thread = state->getThread(0, thread_in_url.first);
+
+			if (req_location.substr(thread_in_url.second, 19) == "/permissions/group/") {
+				group_or_user_in_url = getNumberFromPath(30).first;
+				is_group = true;
+				rank_of_user_or_group = state->getGroupRank(group_or_user_in_url);
+			}
+			else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
+				group_or_user_in_url = getNumberFromPath(29).first;
+				is_group = false;
+				rank_of_user_or_group = state->getUserRank(group_or_user_in_url);
+			}
+			else
+				return api_response(http::status::not_found, std::string("/api/thread/ sub-URL not found"));
+
+			json request_json;
+			int _permission_number, _permission_setting;
+			try {
+				request_json = json::parse(req.body());
+				_permission_number = request_json["permission"].template get<int>();
+				_permission_setting = request_json["setting"].template get<int>();
+			}
+			catch (const json::exception& exception) {
+				return api_response(http::status::bad_request, exception.what());
+			}
+			// TODO check if ints are in range
+			PERMISSION permission = static_cast<PERMISSION>(_permission_number);
+			THREE_STATE_SETTING permission_setting = static_cast<THREE_STATE_SETTING>(_permission_setting);
+			if (thread->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS) && state->getUserRank(client.first) < rank_of_user_or_group) {
+				std::cout << "permission_setting: " << static_cast<int>(permission_setting) << std::endl;
+				if (is_group) {
+					thread->setGroupPermission(group_or_user_in_url, permission, permission_setting);
+					return api_response(http::status::ok, std::string("Group permission updated"));
+				}
+				else {
+					thread->setUserPermission(group_or_user_in_url, permission, permission_setting);
+					return api_response(http::status::ok, std::string("User permission updated"));
+				}
+			}
+			else
+				return api_response(http::status::forbidden, std::string("Permission denied for this client"));
+		}
 		else
 			return not_found(req.target());
 	}
 	else if (req.method() == http::verb::delete_) {
-		if (req_location.substr(0, 20) == "/api/delete_message/") {
+		if (req_location.substr(0, 10) == "/api/post/") {
 			http::response<http::empty_body> res;
-			int slash_index, thread_id, message_id;
-			if ((slash_index = req.target().substr(20, req.target().length() - 20).find('/')) != std::string::npos) {
+			int thread_id, message_id;
+			bool is_thread;
+			std::pair<int, int> thread_in_url/*, message_in_url*/;
+			thread_in_url = getNumberFromPath(10);
+			thread_id = thread_in_url.first;
+			if (req_location.length() > thread_in_url.second) {
+				is_thread = false;
 				try {
-					thread_id = std::stoi(req.target().substr(20, slash_index));
-					message_id = std::stoi(req.target().substr(20 + slash_index + 1, req.target().length() - slash_index - 1 - 20));
+					message_id = getNumberFromPath(thread_in_url.second+1).first;
 				}
-				catch (std::invalid_argument const& exception) {
-					res.result(400);
-					std::cout << "Invalid ID in delete_message URL" << std::endl;
-					goto prepare_response_payload;
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, std::string("Bad URL."));
 				}
-				catch (std::out_of_range const& exception) {
-					res.result(400);
-					std::cout << "Out-of-range ID in delete_message URL" << std::endl;
-					goto prepare_response_payload;
+				std::cout << "Post to delete is not a thread. post ID: #" << thread_id << '/' << message_id << std::endl;
+			}
+			else {
+				is_thread = true;
+			}
+			if (state->main_board()->threadExists(thread_id)) {
+				std::pair<int, std::string> client;
+				try {
+					client = getUserFromToken();
 				}
-				if (state->main_board()->threadExists(thread_id)) {
-					json request_json = json::parse(req.body());
-					if (request_json.contains("key")) {
-						std::cout << "Request contains key" << std::endl;
-						std::string user_key = request_json["key"].template get<std::string>();
-						bool is_administrator = db_key_matches_account(user_key.c_str(), "Administrator");
-						if (is_administrator || state->main_board()->keyMatchesMessageInThread(user_key.c_str(), message_id, thread_id)) {
-							if (message_id == 0) {
-								if (is_administrator) {
-									state->main_board()->deleteThread(thread_id);
-									res.result(http::status::ok);
-								}
-								else
-									return bad_request("Denied: User must be administrator to delete a thread");
-							}
-							else {
-								if (state->main_board()->messageExistsInThread(message_id, thread_id)) {
-									state->main_board()->deleteMessageFromThread(message_id, thread_id);
-									res.result(200);
-								}
-								else {
-									std::cout << "Message " << message_id << " does not exist in thread " << thread_id << std::endl;
-									res.result(400);
-								}
-							}
-						}
-						else {
-							std::cout << "Permission denied for post deletion.\n";
-							res.result(400);
-						}
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, error_text);
+				}
+				bool is_administrator = db_key_matches_account(client.second.c_str(), "Administrator");
+				if (is_thread) {
+					if (is_administrator) {
+						state->main_board()->deleteThread(thread_id);
+						res.result(http::status::ok);
+					}
+					else
+						return bad_request("Denied: User must be administrator to delete a thread");
+				}
+				else if (is_administrator || state->main_board()->keyMatchesMessageInThread(client.second.c_str(), message_id, thread_id)) {
+					if (state->main_board()->messageExistsInThread(message_id, thread_id)) {
+						state->main_board()->deleteMessageFromThread(message_id, thread_id);
+						res.result(200);
 					}
 					else {
-						return bad_request("Denied: Request does not contain key\n");
+						std::cout << "Message " << message_id << " does not exist in thread " << thread_id << std::endl;
+						res.result(400);
 					}
 				}
 				else {
-					std::cout << "Thread " << thread_id << " does not exist\n";
+					std::cout << "Permission denied for post deletion.\n";
 					res.result(400);
 				}
 			}
 			else {
-				std::cout << "Could not get ID of message to delete; Badly formed URL" << std::endl;
+				std::cout << "Thread " << thread_id << " does not exist\n";
 				res.result(400);
 			}
-prepare_response_payload:
 			res.prepare_payload();
 			return res;
 		}
 		else if (req.target().substr(5, 6) == "group/") {
-			std::size_t found = req_location.find_first_not_of("0123456789", 11);
-			if (req_location[found] != '/') {
-				return api_response(http::status::bad_request, std::string("Invalid group ID; trailing '/' not found."));
+			std::pair<int, std::string> client;
+			try {
+				client = getUserFromToken();
 			}
-			else if (found == 6) {
-				return api_response(http::status::bad_request, std::string("Invalid group ID; cannot be empty."));
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, error_text);
 			}
-			else {
-				std::string token = "";
-				for (auto it = req.begin(); it != req.end(); it++) {
-					if (it->name_string() == "Token") {
-						token = it->value();
-						std::cout << "Found Token in header. It is " << token << std::endl;
-						break;
-					}
-				}
-				if (token.length() < KEY_LENGTH+2) {
-					return api_response(http::status::bad_request, "Token badly formed or missing from request header.");
-				}
-				std::string key = token.substr(0, KEY_LENGTH);
-				std::string username = token.substr(KEY_LENGTH+1);
 
-				int group_in_url;
-				// Get group ID from URL substring
-				std::from_chars(req_location.substr(11, found).data(), req_location.substr(11, found).data() + req_location.substr(11, found).size(), group_in_url);
-				std::cout << "group_id_url: " << group_in_url << std::endl;
-				BasicResponse function_response = state->deleteGroup(username, key, group_in_url);
-				return api_response(function_response.status, function_response.message);
+			std::pair<int, int> group_in_url = getNumberFromPath(11);
+			std::cout << "Group in URL: " << group_in_url.first << ", req_location.length(): " << req_location.length() << ", group.second: " << group_in_url.second << std::endl;
+			if (state->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS) && state->getUserRank(client.first) < state->getGroupRank(group_in_url.first)) {
+				if (req_location.length() > group_in_url.second+1) {
+					std::cout << req_location.substr(group_in_url.second+1, 7) << std::endl;
+					if (req_location.substr(group_in_url.second+1, 7) == "member/") {
+						std::pair<int, int> member_in_url = getNumberFromPath(group_in_url.second+1+7);
+						state->removeUserFromGroup(member_in_url.first, group_in_url.first);
+						return api_response(http::status::ok, std::string("Member dismissed from group"));
+						// return api_response(http::status::not_implemented, std::string("Group ID: " + std::to_string(group_in_url.first) + " but DELETE MEMBER action not implemented"));
+					}
+					else
+						return api_response(http::status::bad_request, std::string("Unknown permission group target: ") + std::string(req.target()));
+				}
+				else {
+					state->eraseGroup(group_in_url.first);
+					return api_response(http::status::ok, std::string("Group deleted"));
+				}
 			}
+			else
+				return api_response(http::status::unauthorized, std::string("Permission denied for this client"));
+			// BasicResponse function_response = state->deleteGroup(client.first, group_in_url.first);
+			// return api_response(function_response.status, function_response.message);
+		}
+		else if (req_location.substr(0, 12) == "/api/server/") {
+			std::cout << req_location.substr(12, 18) << std::endl;
+			if (req_location.substr(12, 18) == "permissions/group/") {
+				// TODO check if group exists
+				std::pair<int, std::string> client;
+				try {
+					client = getUserFromToken();
+				}
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, error_text);
+				}
+				std::pair<int, int> group_in_url = getNumberFromPath(30);
+				if (state->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS) && state->getUserRank(client.first) < state->getGroupRank(group_in_url.first)) {
+					state->removeGroupPermissionCollection(group_in_url.first);
+					return api_response(http::status::ok, std::string("Group permission collection removed"));
+				}
+				else
+					return api_response(http::status::unauthorized, std::string("Couldn't remove group permission collection; Permission denied for this client"));
+				// return api_response(http::status::not_implemented, std::string("Group ID: " + std::to_string(group_in_url.first) + " but action not implemented"));
+			}
+			else if (req_location.substr(12, 17) == "permissions/user/") {
+				int user_in_url = getNumberFromPath(29).first;
+				// TODO check if user exists
+				// TODO get user from token and check his/her permission
+				// if (shared_state->userHasPermission()
+				state->removeUserPermissionCollection(user_in_url);
+				return api_response(http::status::ok, std::string("User permission collection removed"));
+			}
+			else
+				return api_response(http::status::not_found, std::string("/api/server sub-URL not found"));
+		}
+		else if (req_location.substr(0, 12) == "/api/thread/") {
+			std::pair<int, std::string> client;
+			try {
+				client = getUserFromToken();
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, error_text);
+			}
+			// Assume we edit permissions, because that is the only feature implemented for PUT /api/thread/
+			bool is_group;
+			int group_or_user_in_url;
+			int rank_of_user_or_group;
+			std::pair<int, int> thread_in_url;
+			try {
+				thread_in_url = getNumberFromPath(12);
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, std::string("Bad URL."));
+			}
+			boost::shared_ptr<Thread> thread = state->getThread(0, thread_in_url.first);
+
+			if (req_location.substr(thread_in_url.second, 19) == "/permissions/group/") {
+				group_or_user_in_url = getNumberFromPath(30).first;
+				is_group = true;
+				rank_of_user_or_group = state->getGroupRank(group_or_user_in_url);
+			}
+			else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
+				group_or_user_in_url = getNumberFromPath(29).first;
+				is_group = false;
+				rank_of_user_or_group = state->getUserRank(group_or_user_in_url);
+			}
+			else
+				return api_response(http::status::not_found, std::string("/api/thread/ sub-URL not found"));
+
+			if (thread->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS) && state->getUserRank(client.first) < rank_of_user_or_group) {
+				if (is_group) {
+					state->main_board()->removeGroupPermissionCollectionFromThread(group_or_user_in_url, thread_in_url.first);
+					return api_response(http::status::ok, std::string("Group permission deleted"));
+				}
+				else {
+					state->main_board()->removeUserPermissionCollectionFromThread(group_or_user_in_url, thread_in_url.first);
+					return api_response(http::status::ok, std::string("User permission deleted"));
+				}
+			}
+			else
+				return api_response(http::status::forbidden, std::string("Permission denied for this client"));
 		}
 		else {
 			return api_response(http::status::bad_request, std::string("Unknown target: ") + std::string(req.target()));

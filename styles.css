@@ -1,3 +1,12 @@
+:root {
+	--side-margins: 0.5em;
+	--monospace-font: Noto Mono, DejaVu Sans Mono, Consolas, Monaco, Liberation Mono, monospace;
+	--name-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
+	--interactive-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
+	--content-font: DejaVu Serif, Cambria, Lucida Bright, Liberation Serif, serif;
+	/*--interactive-font: DejaVu Sans, Verdana, Liberation Sans, sans-serif;*/
+}
+
 body {
 	max-width: 80rem;
 	margin: 0 auto;
@@ -10,6 +19,13 @@ body {
 .FlexSeparator {
 	flex-grow: 1;
 	padding: 0 !important;
+}
+
+input {
+	font-family: var(--interactive-font);
+}
+label {
+	font-family: var(--interactive-font);
 }
 
 button, input[type=file]::file-selector-button, input[type=button], .Button {
@@ -72,6 +88,7 @@ dialog {
 		min-height: 2rem;
 		word-wrap: anywhere;
 		box-sizing: border-box;
+		font-family: var(--name-font);
 		&:not(button)&:not(.Button) {
 			padding: 0 0.25rem;
 		}

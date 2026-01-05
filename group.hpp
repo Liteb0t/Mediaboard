@@ -16,6 +16,7 @@ public:
 	int getId() const { return this->id; };
 	GroupLockPosition getLockPosition() const { return this->lock_position; };
 	void addMember(const int user_id) { this->members.insert(user_id); }
+	void removeMember(int user_id) { this->members.erase(user_id); }
 	bool containsMember(int user_id) const {
 		// In C++20 this can be replaced with this->members.contains(user_id)
 		std::unordered_set<int>::const_iterator member_iterator = this->members.find(user_id); 

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<!--
+			include(`tokens.m4')
+		-->
+		<title>Manage permissions - _SITE_NAME</title>
+		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta charset="utf-8">
+		<base href="_ROOT_URL">
+		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
+		<link rel="stylesheet" href="styles.css">
+		<link rel="stylesheet" href="permissions.css">
+	</head>
+	<body>
+		<main>
+			<h2>Manage permissions for <span id="location_indicator"></span></h2>
+			<div class="PermissionSettingsGrid">
+				<fieldset class="Groups">
+					<legend>Groups</legend>
+					<button id="permission_settings_add_group_button">Add group</button>
+					<dialog id="permission_settings_add_group_dialog" closedby="any">
+						<h3>Set permissions for group</h3>
+						<p>Click on a group to modify its permissions here.</p>
+						<ol id="permission_settings_add_group_dialog_group_list" class="MetroList"></ol>
+						<div class="ToolBar"><button onclick="permission_settings_add_group_dialog.close()">Close</button></div>
+					</dialog>
+					<ol id="permission_settings_group_list_element" class="MetroList"></ol>
+				</fieldset>
+				<fieldset class="Users">
+					<legend>Users</legend>
+					<button id="permission_settings_add_user_button">Add user</button>
+					<dialog id="permission_settings_add_user_dialog" closedby="any">
+						<h3>Set permissions for user</h3>
+						<p>Click on a user to modify its permissions here.</p>
+						<ol id="permission_settings_add_user_dialog_user_list" class="MetroList"></ol>
+						<div class="ToolBar"><button onclick="permission_settings_add_user_dialog.close()">Close</button></div>
+					</dialog>
+					<ul id="permission_settings_user_list_element" class="MetroList"></ul>
+				</fieldset>
+				<fieldset class="Permissions">
+					<legend>Permissions<span id="selected_permission_user_or_group_indicator"></span></legend>
+					<ol id="permission_settings_permission_list_element" class="MetroList"></ol>
+				</fieldset>
+			</div>
+		</main>
+		<dialog id="error_dialog" closedby="any">
+			<h2>Error</h2>
+			<p id="error_message">Something happened.</p>
+			<div class="ToolBar"><button onclick="gerror_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+	</body>
+<script src="api.js"></script>
+<script src="permissions.js"></script>
+<script>
+"use strict";
+
+const url_params = new URLSearchParams(location.search);
+let url_params_display_as_embed;
+let api_location = url_params.get("location");
+if (api_location === null) {
+	error_message.textContent = "\"location\" not found in URL search params";
+	error_dialog.showModal();
+	location_indicator.textContent = "nothing";
+}
+else {
+	location_indicator.textContent = api_location;
+}
+
+let permission_settings = new PermissionSettings(permission_settings_user_list_element, permission_settings_group_list_element, permission_settings_permission_list_element, selected_permission_user_or_group_indicator, api_location.substring(1));
+
+async function initialLoad() {
+	await permission_settings.refreshPermissions();
+	await user_list_factory.refreshUsers();
+	// user list and permission settings must be loaded before groups
+	await group_list_factory.refreshGroups();
+}
+initialLoad();
+// TODO
+// get pathname without search by finding index of '?'
+// then stick "permissions/" onto the end of the URL
+</script>
+</html>

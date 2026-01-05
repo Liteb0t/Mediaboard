@@ -1,10 +1,30 @@
-enum struct THREE_STATE_SETTING { DENY, ALLOW, INHERIT };
+#include "db_interface.h"
+enum struct PERMISSION {
+	MANAGE_PERMISSIONS = 0,
+	CREATE_THREAD = 1,
+	SEND_MESSAGE = 2
+	// AUTHOR_DELETE_THREAD,
+	// NON_AUTHOR_DELETE_THREAD,
+	// NON_AUTHOR_VIEW_MESSAGE,
+	// NON_AUTHOR_VIEW_THREAD,
+	// UPLOAD_FILE,
+	// NON_AUTHOR_DELETE_FILE
+};
+
+enum struct THREE_STATE_SETTING { DENY, INHERIT, ALLOW };
 
 // A seperate PermissionSetting class is used for futureproofing; 
 // in Permissions 2 custom constraints will be added.
 class PermissionSetting {
 public:
-	PermissionSetting(THREE_STATE_SETTING setting) : setting(setting) {}
+	PermissionSetting(db_permission_setting_struct* permission_setting) {
+		this->id = permission_setting->id;
+		this->setting = static_cast<THREE_STATE_SETTING>(permission_setting->setting);
+	}
+	PermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting)
+			: /*permission_collection_id(permission_collection_id), permission(permission),*/ setting(setting) {
+		this->id = db_store_permission_setting(permission_collection_id, static_cast<int>(permission), static_cast<int>(this->setting));
+	}
 	// ~PermissionSetting() {
 	// 	db_delete_permission_setting(this->id);
 	// }
@@ -16,7 +36,14 @@ public:
 			return this->setting == THREE_STATE_SETTING::ALLOW;
 		}
 	}
-	void set(THREE_STATE_SETTING setting) { this->setting = setting; }
+	THREE_STATE_SETTING get() const { return this->setting; }
+	void set(THREE_STATE_SETTING setting) {
+		this->setting = setting;
+		db_update_permission_setting(this->id, static_cast<int>(this->setting));
+	}
 private:
+	int id;
+	// int permission_collection_id;
+	// PERMISSION permission;
 	THREE_STATE_SETTING setting;
 };

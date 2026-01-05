@@ -3,14 +3,15 @@
 #include <sstream>
 #include <iostream>
 
-Board::Board(PermissionObjectBase* permission_parent) : PermissionManagedObject(permission_parent, 1 /* temporary ID until multi board update*/) {
+Board::Board(boost::shared_ptr<PermissionObjectBase> permission_parent) : PermissionManagedObject(permission_parent, 1 /* temporary ID until multi board update*/) {
 	// this->thread_limit=50; // MAX_THREADS_PER_BOARD
 	// this->post_limit = 100;
-	this->cacheAllThreads();
+	// this->cacheAllThreads();
 }
 
 int Board::createThread(json thread_json) {
-	Thread thread(this, thread_json);
+	int new_permission_object_id = db_get_unique_permission_object_id();
+	Thread thread(shared_from_this(), thread_json, new_permission_object_id);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(thread.getLastPostTime(), thread.getId()));
 	return thread.getId();
@@ -53,7 +54,7 @@ void Board::cacheAllThreads() {
 		// thread_json["id"] = thread_list->array[i].id;
 		// thread_json["number_of_posts"] = thread_list->array[i].number_of_posts;
 		// Thread thread(thread_json, false);
-		Thread thread(this, &thread_list->array[i]);
+		Thread thread(shared_from_this(), &thread_list->array[i]);
 		std::cout << thread.getId() << ", ";
 		this->threads.insert(std::make_pair(thread.getId(), thread));
 	}
@@ -77,13 +78,18 @@ void Board::cacheAllThreads() {
 	std::cout << "Finished retreiving threads and posts from the database." << std::endl;
 }
 
-std::string Board::dumpAllThreads() const {
+std::string Board::dumpAllThreads(int client_id) const {
 	json multiple_thread_json;
 	multiple_thread_json["type"] = "thread_catalog";
 	multiple_thread_json["threads"] = json::array();
 	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
 		if (!this->threads.at(it->second).isDeleted()) {
-			multiple_thread_json["threads"].push_back(this->threads.at(it->second).asJson());
+			nlohmann::json thread_json = this->threads.at(it->second).asJson();
+			if (this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS)) {
+				std::cout << "client with ID " << client_id << "has manage_permissions" << std::endl;
+				thread_json["permission_editable"] = true;
+			}
+			multiple_thread_json["threads"].push_back(thread_json);
 		}
 	}
 	return multiple_thread_json.dump();
@@ -91,6 +97,10 @@ std::string Board::dumpAllThreads() const {
 
 std::string Board::dumpPostsInThread(int thread_id, std::string key) const {
 	return this->threads.at(thread_id).dumpPosts(key);
+}
+
+std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {
+	return this->threads.at(thread_id).dumpPermissions(client_id);
 }
 
 void Board::addListenerToThread(websocket_session* listener, int thread_id) {

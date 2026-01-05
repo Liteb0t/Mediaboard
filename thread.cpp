@@ -4,14 +4,14 @@
 #include <cstring>
 
 // Save thread when JSON is received
-Thread::Thread(PermissionObjectBase* permission_parent, json thread_json/*, bool save_to_database*/) 
-			: PermissionManagedObject(permission_parent, db_get_unique_permission_object_id()) {
+Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json thread_json, int new_permission_object_id)
+			: PermissionManagedObject(permission_parent, new_permission_object_id) {
 	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
 	this->number_of_posts = 0;
 	// if (save_to_database) {
 		// ID and timestamp are not initially known
-		this->id = db_store_thread(1/* add subject later*/);
+		this->id = db_store_thread(1, new_permission_object_id);
 		std::cout << "this->id: " << this->id << std::endl;
 		this->thread_as_json["id"] = this->id;
 		thread_json["post_zero"]["thread_id"] = this->id;
@@ -23,7 +23,7 @@ Thread::Thread(PermissionObjectBase* permission_parent, json thread_json/*, bool
 }
 
 // Cache thread using db_interface struct
-Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct)
+Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, struct db_thread_struct* thread_struct)
 			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id) {
 	// this->cacheAllPermissions();
 	this->id = thread_struct->id;
@@ -94,6 +94,11 @@ std::string Thread::dumpPost(int message_id, std::string key) const {
 	json post_json = this->posts.at(message_id).asJson();
 	post_json["is_author"] = keyMatchesMessage(key, message_id);
 	return post_json.dump();
+}
+
+std::string Thread::dumpPermissions(int client_id) const {
+	return this->getPermissionCollectionsAsJson(client_id).dump();
+	// return "NOT IMPLEMENTED";
 }
 
 void Thread::markAsDeleted() {

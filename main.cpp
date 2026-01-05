@@ -113,10 +113,12 @@ main(int argc, char* argv[])
 
     // Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
+	boost::shared_ptr<shared_state> state(new shared_state(doc_root));
+	state->start();
     boost::make_shared<listener>(
         ioc,
         tcp::endpoint{address, port},
-        boost::make_shared<shared_state>(doc_root))->run();
+        state)->run();
 
     // Capture SIGINT and SIGTERM to perform a clean shutdown
 	std::cout << "Setting signals..." << std::endl;

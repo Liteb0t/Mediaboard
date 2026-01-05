@@ -1,0 +1,73 @@
+.Processing {
+	opacity: 0.5;
+}
+.MetroList {
+	margin: 0;
+	padding: 0;
+	>li {
+		border-top: 1px solid #888;
+		&.ToolBar {
+			>:first-child {
+				flex-grow: 1;
+			}
+		}
+		&:last-child {
+			border-bottom: 1px solid #888;
+		}
+	}
+	/*
+	.Selected {
+		background-color: #CCC;
+	}
+	*/
+	li::marker {
+		content: none;
+	}
+}
+
+.PermissionSettingsGrid {
+	display: grid;
+	@media (width < 50rem) {
+		grid-template:
+			"g" auto
+			"u" auto
+			"p" auto
+			/ 1fr;
+	}
+	@media (width >= 50rem) {
+		grid-template:
+			"g p" auto
+			"u p" auto
+			/ 20rem 1fr;
+	}
+	.Groups {
+		grid-area: g;
+	}
+	.Users {
+		grid-area: u;
+	}
+	.Permissions {
+		grid-area: p;
+	}
+}
+
+/*
+#control_panel_tab_container {
+	min-height: 100vh;
+}*/
+.GroupManagerGrid {
+	display: grid;
+	#group_list_element {
+		border-bottom: 1px solid #888; /* temporary hack because of hidden locked groups */
+	}
+	@media (width >= 50rem) {
+		grid-template-columns: 20rem 1fr;
+	}
+	@media (width < 50rem) {
+		grid-template-columns: 1fr;
+	}
+	/*
+	#user_list {
+		grid-column: 2 / 3;
+	}*/
+}

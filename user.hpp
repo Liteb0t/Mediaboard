@@ -1,8 +1,13 @@
 #include <string>
 #include "db_interface.h"
-#include <nlohmann/json.hpp>
+// #include <nlohmann/json.hpp>
 
-using json = nlohmann::json;
+// using json = nlohmann::json;
+
+enum BUILTIN_USERS {
+	PUBLIC = 0,
+	ADMINISTRATOR = 1
+};
 
 class User {
 public:
@@ -12,6 +17,9 @@ public:
 	// User(json user_json);
 	bool passwordMatches(std::string password) const {
 		return db_account_matches_password(this->id, password.c_str());
+	}
+	bool keyMatches(std::string key) const {
+		return key == this->key;
 	}
 	int getId() const { return this->id; }
 	std::string getUsername() const { return this->username; }

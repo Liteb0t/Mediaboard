@@ -8,13 +8,21 @@
 //
 
 #include "shared_state.hpp"
+#include "permission_managed_object.hpp"
 #include "websocket_session.hpp"
 #include <iostream>
 
 shared_state::shared_state(std::string doc_root /*, std::string media_root*/)
-    : doc_root_(std::move(doc_root)), PermissionManager(0)/*, media_root_(std::move(media_root))*/ {
-	Board main_board(this);
+    : PermissionManager(0), doc_root_(std::move(doc_root))/*, media_root_(std::move(media_root))*/ {
+}
+
+// shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
+// hence a seperate start() function is used
+void shared_state::start() {
+	// Board main_board(shared_from_this());
+	boost::shared_ptr<Board> main_board(new Board(shared_from_this()));
 	this->boards.emplace(0, main_board);
+	this->main_board()->cacheAllThreads();
 	this->cacheAllGroups();
 	this->cacheAllUsers();
 }
@@ -64,7 +72,7 @@ void shared_state::sendToThread(std::string message, int thread_id) {
     {
         std::lock_guard<std::mutex> lock(mutex_);
         v.reserve(sessions_.size());
-        for(auto p : this->boards.at(0).getListenersFromThread(thread_id))
+        for(auto p : this->main_board()->getListenersFromThread(thread_id))
             v.emplace_back(p->weak_from_this());
     }
 
@@ -94,6 +102,10 @@ std::string shared_state::dumpAllGroups(std::string username, std::string key) c
 		if (i >= group_editable_threshold) {
 			group_json["heirarchy_editable"] = true;
 			group_json["permission_editable"] = true;
+		}
+		else {
+			group_json["heirarchy_editable"] = false;
+			group_json["permission_editable"] = false;
 		}
 		/*if (group_id == static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS))
 			group_json["lock_position"] = "top";
@@ -128,10 +140,15 @@ std::string shared_state::dumpMembersInGroup(int group_id) const {
 	return members_json.dump();
 }
 
+std::string shared_state::dumpMembersInGroupAsArray(int group_id) const {
+	nlohmann::json members_json = this->getGroup(group_id)->getMembers();
+	return members_json.dump();
+}
+
 BasicResponse shared_state::createGroup(std::string username, std::string key, std::string new_group_name) {
 // int shared_state::createGroup(nlohmann::json request_json) {
 	int new_group_rank = this->getUserRank(this->getIdFromUsername(username)) + 1;
-	int new_group_id = this->addGroup(new_group_name, new_group_rank);
+	/*int new_group_id = */this->addGroup(new_group_name, new_group_rank);
 	return BasicResponse(http::status::ok, std::string("Group created"));
 }
 
@@ -276,7 +293,7 @@ BasicResponse shared_state::getKeyFromPassword(json request_json) const {
 	else
 		return BasicResponse(http::status::bad_request, std::string("One or more JSON fields missing from request"));
 }
-
+/*
 BasicResponse shared_state::deleteGroup(std::string username, std::string key, int group_id) {
 	// TODO refactor user authentication into one function
 	int user_id;
@@ -307,22 +324,26 @@ BasicResponse shared_state::deleteGroup(std::string username, std::string key, i
 	// Check if user rank is high enough to delete this group
 	int group_rank = this->getGroupRank(group_id);
 	if (group_rank <= user_rank)
-		return BasicResponse(http::status::bad_request, std::string("Permission denied; attempted to delete a group greater than or equal to your rank.") /*" group_rank: " + std::to_string(group_rank) + ", user_rank: " + std::to_string(user_rank)*/);
+		return BasicResponse(http::status::bad_request, std::string("Permission denied; attempted to delete a group greater than or equal to your rank."));
 	std::cout << "Group rank works. ";
 
 	this->eraseGroup(group_id);
 
 	return BasicResponse(http::status::ok, std::string("Updated group heirarchy")); // Success
 }
+*/
 
-std::string shared_state::dumpAllUsers() const {
+std::string shared_state::dumpAllUsers(int client_id) const {
 	json users_json;
 	users_json["users"] = json::object();
+	int client_rank = this->getUserRank(client_id);
+	bool client_has_manage_permissions_permission = this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS);
 	// for (int i = 0; i < this->getUsers()->size(); i++) {
 	// for (int user_id : *(this->getUsers())) {
-	// TODO use pointers or iterator instead of copying values
-	for (std::pair<const int, User> user_pair : *(this->getUsers())) {
-		const int user_id = user_pair.first;
+	// TODO dont use raw pointers
+	boost::shared_ptr<std::unordered_map<int, User>> _users = this->getUsers();
+	for (std::unordered_map<int, User>::const_iterator user_it = _users->begin(); user_it != _users->end(); user_it++) {
+		int user_id = user_it->first;
 		const User* user = this->getUser(user_id);
 		// int user_id = (*(this->getUsers()))[i];
 		std::cout << user_id << ", ";
@@ -330,24 +351,19 @@ std::string shared_state::dumpAllUsers() const {
 		nlohmann::json user_json = json::object();
 		user_json["id"] = user_id;
 		user_json["username"] = user->getUsername();
-		user_json["rank"] = this->getUserRank(user_id);
-		std::string user_id_as_string = std::to_string(user_id);
-		users_json["users"][user_id_as_string] = user_json;
-		users_json["users"][user_id_as_string]["groups"] = json::array();
+		int user_rank = this->getUserRank(user_id);
+		user_json["rank"] = user_rank;
+		user_json["groups"] = json::array();
 		// int group_rank = 0;
 		for (const int group_id : this->getOrderedGroupsContainingMember(user_id)) {
 			const Group* group = this->getGroup(group_id);
 			nlohmann::json group_json;
 			group_json["id"] = group->getId();
 			group_json["name"] = group->getName();
-			users_json["users"][user_id_as_string]["groups"].push_back(group_json);
-			// std::string group_id_as_string = std::to_string(group_id);
-			// users_json["users"][user_id_as_string]["groups"][group_id_as_string] = json::object();
-			// users_json["users"][user_id_as_string]["groups"][group_id_as_string]["name"] = group->getName();
-			// users_json["users"][user_id_as_string]["groups"][group_id_as_string]["rank"] = group_rank;
-			// group_rank++;
-
+			user_json["groups"].push_back(group_json);
 		}
+		user_json["permission_editable"] = client_has_manage_permissions_permission && client_rank < user_rank;
+		users_json["users"][std::to_string(user_id)] = user_json;
 	}
 	std::cout << " done." << std::endl;
 
@@ -362,20 +378,26 @@ BasicResponse shared_state::addUserToGroups(std::string username, std::string ke
 	else
 		return BasicResponse(http::status::bad_request, std::string("User with this username was not found."));
 	if (key != this->getUserKey(client_user_id))
-		return BasicResponse(http::status::bad_request, std::string("Incorrect key."));
+		return BasicResponse(http::status::forbidden, std::string("Incorrect key."));
 	int client_user_rank;
 	if (!this->userHasPermission(client_user_id, PERMISSION::MANAGE_PERMISSIONS))
-		return BasicResponse(http::status::bad_request, std::string("Cannot change group heirarchy; permission denied."));
+		return BasicResponse(http::status::forbidden, std::string("Cannot change group heirarchy; permission denied."));
 	else
 		client_user_rank = this->getUserRank(client_user_id);
 	std::cout << "User has permission. ";
+	for (int group_id : groups_by_id) {
+		if (	static_cast<BUILTIN_GROUPS>(group_id) == BUILTIN_GROUPS::USERS
+			||  static_cast<BUILTIN_GROUPS>(group_id) == BUILTIN_GROUPS::PUBLIC) {
+			return BasicResponse(http::status::bad_request, std::string("Attempted to add user to one or more groups to which no user can be added, namely, the \"USERS\" and \"PUBLIC\" groups."));
+		}
+	}
 	for (int group_id : groups_by_id) {
 		// const Group* group = this->getGroup(group_id);
 		if (client_user_rank < this->getGroupRank(group_id)) {
 			this->addUserToGroup(user_id, group_id);
 		}
 		else {
-			return BasicResponse(http::status::bad_request, std::string("Permission denied; Attempted to add user to group with a rank greater than or equal to your own."));
+			return BasicResponse(http::status::forbidden, std::string("Permission denied; Attempted to add user to group with a rank greater than or equal to your own."));
 		}
 	}
 	return BasicResponse(http::status::ok, std::string("Added user to groups")); // Success

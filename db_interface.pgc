@@ -198,9 +198,8 @@ void db_connect(const char* _database_name) {
 	const char* mark_thread_as_deleted_prepared_stmt = "UPDATE thread SET deleted = true WHERE id = ?;";
 	const char* create_account_prepared_stmt = "INSERT INTO account(id, username, password_hash, key) VALUES (?, ?, ?, ?);";
 	const char* create_permission_group_stmt = "INSERT INTO permission_group(id, name) VALUES (?, ?)";
-	const char* add_administrator_account_stmt = "INSERT INTO account(id, username, password_hash, key, administrator) VALUES (0, 'Administrator', ?, ?, 't');"
+	const char* add_administrator_account_stmt = "INSERT INTO account(id, username, password_hash, key, administrator) VALUES (1, 'Administrator', ?, ?, 't');"
 		;
-	char* data;
 	EXEC SQL END DECLARE SECTION;
 	// printf("password: %s\n", password);
 	if (password)
@@ -236,14 +235,13 @@ void db_create_administrator(const char* _password) {
 	char key[8+1];
 
 	EXEC SQL END DECLARE SECTION;
-	EXEC SQL DELETE FROM permission_group_account WHERE account_id = 0;
+	EXEC SQL DELETE FROM permission_group_account WHERE account_id = 1; // account id 0 is reserved for Public (unregistered users). Id 1 is reserved for Administrator
 	EXEC SQL DELETE FROM account WHERE username = 'Administrator';
 	EXEC SQL SELECT crypt(:password, gen_salt('bf')) INTO :hashed_password;
 	strncpy(key, &hashed_password[25], 8); // Copying 8 characters from the index 25 takes 4 characters from the salt and 4 from the hash
 	key[8] = '\0';
 	EXEC SQL EXECUTE add_administrator_account_stmt USING :hashed_password, :key;
-	EXEC SQL INSERT INTO permission_group_account(group_id, account_id) VALUES (0, 0);
-	EXEC SQL INSERT INTO permission_group_account(group_id, account_id) VALUES (1, 0);
+	EXEC SQL INSERT INTO permission_group_account(group_id, account_id) VALUES (0, 1); // Add to the Administrators group. Administrator account ID is always 1 (defined in user.hpp)
 	EXEC SQL COMMIT;
 }
 
@@ -277,14 +275,15 @@ int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_N
 	return post_id;
 }
 
-int db_store_thread(int number_of_posts_) {
+int db_store_thread(int number_of_posts_, int _new_permission_object_id) {
 	printf("Executing db_store_thread\n");
 	EXEC SQL BEGIN DECLARE SECTION;
 	int thread_id;
+	int new_permission_object_id = _new_permission_object_id;
 	// int number_of_posts = number_of_posts_;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL SELECT nextval('thread_id_seq') INTO :thread_id;
-	EXEC SQL EXECUTE create_thread_stmt USING :thread_id;
+	EXEC SQL EXECUTE create_thread_stmt USING :thread_id, :new_permission_object_id;
 	EXEC SQL COMMIT;
 	return thread_id;
 }
@@ -332,6 +331,7 @@ int db_store_account(const char* _username, const char* _password) {
 	EXEC SQL SELECT crypt(:password, gen_salt('bf')) INTO :hashed_password;
 	EXEC SQL COMMIT;
 	strncpy(key, &hashed_password[25], 8); // Copying 8 characters from the index 25 takes 4 characters from the salt and 4 from the hash
+	key[8] = '\0';
 	printf("hashed_password: %s\n", hashed_password);
 	printf("key: %s\n", key);
 	EXEC SQL SELECT nextval('account_id_seq') INTO :account_id;
@@ -645,6 +645,15 @@ void db_add_member_to_group(int _user_id, int _group_id) {
 	EXEC SQL COMMIT;
 }
 
+void db_remove_member_from_group(int _user_id, int _group_id) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int group_id = _group_id;
+	int user_id = _user_id;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL DELETE FROM permission_group_account WHERE group_id = :group_id AND account_id = :user_id;
+	EXEC SQL COMMIT;
+}
+
 struct db_group_member_array* db_retrieve_group_members(void) {
 	static struct db_group_member_array group_members;
 	initGroupMemberArray(&group_members, 500);
@@ -685,9 +694,9 @@ struct db_permission_collection_array* db_retrieve_permission_collections_for_pe
 	int id;
 	int permission_object_id = _permission_object_id;
 	int group_id;
-	int group_id_indicator;
+	// int group_id_indicator;
 	int account_id;
-	int account_id_indicator;
+	// int account_id_indicator;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL DECLARE permission_collection_getter CURSOR FOR
 		SELECT id, permission_group_id, account_id FROM permission_collection
@@ -695,10 +704,11 @@ struct db_permission_collection_array* db_retrieve_permission_collections_for_pe
 	EXEC SQL OPEN permission_collection_getter;
 	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `permission_collection_getter` has retreived all groups
 	while (true) {
-		EXEC SQL FETCH permission_collection_getter INTO :id, :group_id INDICATOR :group_id_indicator, :account_id INDICATOR :account_id_indicator;
+		EXEC SQL FETCH permission_collection_getter INTO :id, :group_id, :account_id;
 		struct db_permission_collection_struct permission_collection;
 		permission_collection.id = id;
 		// permission_collection.permission_object_id = permission_object_id;
+		/*
 		if (group_id_indicator == 0) {
 			permission_collection.group_id = group_id;
 			permission_collection.account_id = -1;
@@ -711,6 +721,9 @@ struct db_permission_collection_array* db_retrieve_permission_collections_for_pe
 			fprintf(stderr, "Error retrieving permission collection with ID %d (both group_id and account_id are null or truncated).\n", id);
 			continue;
 		}
+		*/
+		permission_collection.group_id = group_id;
+		permission_collection.account_id = account_id;
 		insertToPermissionCollectionArray(&permission_collections, permission_collection);
 	}
 	EXEC SQL CLOSE permission_collection_getter;
@@ -746,6 +759,50 @@ struct db_permission_setting_array* db_retrieve_permission_settings_for_permissi
 	EXEC SQL COMMIT;
 	EXEC SQL WHENEVER NOT FOUND CONTINUE;
 	return (&permission_settings);
+}
+
+int db_store_permission_collection(int _permission_object_id, int _user_id, int _group_id) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int new_permission_collection_id;
+	int permission_object_id = _permission_object_id;
+	int user_id = _user_id; 	int user_id_indicator = user_id > -1;
+	int group_id = _group_id; 	int group_id_indicator = group_id > -1;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL SELECT nextval('permission_collection_id_seq') INTO :new_permission_collection_id;
+	EXEC SQL INSERT INTO permission_collection(id, permission_object_id, account_id, permission_group_id) VALUES (:new_permission_collection_id, :permission_object_id, :user_id INDICATOR :user_id_indicator, :group_id INDICATOR :group_id_indicator);
+	EXEC SQL COMMIT;
+	return new_permission_collection_id;
+}
+
+void db_delete_permission_collection(int _permission_collection_id) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int permission_collection_id = _permission_collection_id;
+	EXEC SQL END DECLARE SECTION;
+	printf("deleting permission_collection %d`n", permission_collection_id);
+	EXEC SQL DELETE FROM permission_collection WHERE id = :permission_collection_id;
+	EXEC SQL COMMIT;
+}
+
+int db_store_permission_setting(int _permission_collection_id, int _permission_number, int _setting) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int new_permission_setting_id;
+	int permission_collection_id = _permission_collection_id;
+	int permission_number = _permission_number;
+	int setting = _setting;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL SELECT nextval('permission_setting_id_seq') INTO :new_permission_setting_id;
+	EXEC SQL INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (:new_permission_setting_id, :permission_collection_id, :permission_number, :setting);
+	EXEC SQL COMMIT;
+	return new_permission_setting_id;
+}
+
+void db_update_permission_setting(int _permission_setting_id, int _setting) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int permission_setting_id = _permission_setting_id;
+	int setting = _setting;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL UPDATE permission_setting SET setting = :setting WHERE id = :permission_setting_id;
+	EXEC SQL COMMIT;
 }
 
 // TODO delete after 0.0.5 release

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict I74CKyMdsafPqLGa3eFJrtFi2Jmz1Y66MrQEYKASEVMtG0pGvH5WxygnyuwgWNE
+\restrict SReJ01hgHOeaBdOx0NKTtyvTujkjH6zyCoCddTg83GwtxOlFRugErF2eLzAVAp1
 
 -- Dumped from database version 15.14 (Debian 15.14-0+deb12u1)
 -- Dumped by pg_dump version 15.14 (Debian 15.14-0+deb12u1)
@@ -74,8 +74,8 @@ ALTER TABLE public.account_id_seq OWNER TO postgres;
 CREATE TABLE public.permission_collection (
     id integer,
     permission_object_id integer,
-    account_id integer,
-    permission_group_id integer
+    account_id integer DEFAULT '-1'::integer,
+    permission_group_id integer DEFAULT '-1'::integer
 );
 
 
@@ -268,6 +268,54 @@ ALTER TABLE ONLY public.account
 
 
 --
+-- Name: permission_collection permission_collection_unique_id; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permission_collection
+    ADD CONSTRAINT permission_collection_unique_id UNIQUE (id);
+
+
+--
+-- Name: permission_group_heirarchy permission_group_heirarchy_permission_group_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permission_group_heirarchy
+    ADD CONSTRAINT permission_group_heirarchy_permission_group_key UNIQUE (permission_group);
+
+
+--
+-- Name: permission_group_heirarchy permission_group_heirarchy_rank_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permission_group_heirarchy
+    ADD CONSTRAINT permission_group_heirarchy_rank_key UNIQUE (rank);
+
+
+--
+-- Name: permission_group_heirarchy permission_group_heirarchy_rank_permission_group_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permission_group_heirarchy
+    ADD CONSTRAINT permission_group_heirarchy_rank_permission_group_key UNIQUE (rank, permission_group);
+
+
+--
+-- Name: permission_group permission_object_unique_id; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permission_group
+    ADD CONSTRAINT permission_object_unique_id UNIQUE (id);
+
+
+--
+-- Name: permission_setting permission_setting_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permission_setting
+    ADD CONSTRAINT permission_setting_id_key UNIQUE (id);
+
+
+--
 -- Name: thread thread_id_key; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -432,5 +480,5 @@ GRANT SELECT,USAGE ON SEQUENCE public.thread_id_seq TO mediaboard_server;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict I74CKyMdsafPqLGa3eFJrtFi2Jmz1Y66MrQEYKASEVMtG0pGvH5WxygnyuwgWNE
+\unrestrict SReJ01hgHOeaBdOx0NKTtyvTujkjH6zyCoCddTg83GwtxOlFRugErF2eLzAVAp1
 

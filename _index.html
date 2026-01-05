@@ -114,14 +114,6 @@
 		</dialog>
 	</body>
 	<style>
-:root {
-	--side-margins: 0.5em;
-	--monospace-font: Noto Mono, DejaVu Sans Mono, Consolas, Monaco, Liberation Mono, monospace;
-	--name-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
-	--content-font: DejaVu Serif, Cambria, Lucida Bright, Liberation Serif, serif;
-	--interactive-font: DejaVu Sans, Verdana, Liberation Sans, sans-serif;
-}
-
 html {
 	scrollbar-gutter: stable;
 }
@@ -206,11 +198,13 @@ main {
 #reply_container {
 	position: sticky;
 	bottom: 0;
-	background: #fffc;
+	background: #fffA;
+	backdrop-filter: blur(4px);
 	margin: 0 var(--side-margins);
 	summary {
 		border-top: 3px double #000;
-		padding: 8px 2px;
+		font-family: var(--interactive-font);
+		padding: 6px 2px;
 		cursor: pointer;
 		user-select: none;
 		&:hover {
@@ -229,7 +223,8 @@ main {
 		font-family: var(--name-font);
 	}
 	input[type=text], div[contenteditable] {
-		background: #FFF8;
+		background: #FFF4;
+		backdrop-filter: blur(8px);
 		font-size: inherit;
 		border-radius: 0;
 		border: 1px inset #bbb;
@@ -282,823 +277,811 @@ main {
 	background: #22D;
 }
 	</style>
-	<script>
-		"use strict";
-		const api_url = "api/"; // these will be managed by a central config file eventually
-		const media_url = "media/"; // so you wont need to reconfigure these every update
-		const thumbnail_url = "media/thumbnails/";
-		const file_size_limit = _FILE_SIZE_LIMIT_MB*1024*1024;
-		file_size_limit_exceeded_dialog_file_limit_bytes.textContent = file_size_limit;
-		// 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
-		const valid_uri_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-		const media_uuid_len = 36;
-		const localDate = new Date();
-		const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
-		const flex_separator = document.createElement("div");
-		flex_separator.classList.add("FlexSeparator");
-		let state = {selected_thread_id: null};
-		let websocket;
-		let websocket_connected = false;
-		let reconnect_websocket_interval;
-		let is_administrator = false;
-		console.log(websocket);
-		// loading_dialog.show();
+<script src="api.js"></script>
+<script>
+"use strict";
+const media_url = "media/";
+const thumbnail_url = "media/thumbnails/";
+const file_size_limit = _FILE_SIZE_LIMIT_MB*1024*1024;
+file_size_limit_exceeded_dialog_file_limit_bytes.textContent = file_size_limit;
+// 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
+const valid_uri_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+const media_uuid_len = 36;
+const localDate = new Date();
+const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
+const flex_separator = document.createElement("div");
+flex_separator.classList.add("FlexSeparator");
+let state = {selected_thread_id: null};
+let websocket;
+let websocket_connected = false;
+let reconnect_websocket_interval;
+let is_administrator = false;
+console.log(websocket);
 
-		// For embedding mediaboard within a webpage using an <iframe>.
-		// Hides everything except messages.
-		const url_params = new URLSearchParams(location.search);
-		let url_params_display_as_embed;
-		if (url_params.get("display") === "embed") {
-			header_bar.style["display"] = "none";
-			location_indicator.style["display"] = "none";
-			reply_container.style["display"] = "none";
-			url_params_display_as_embed = true;
+// For embedding Mediaboard within a webpage using an <iframe>.
+// Hides everything except messages.
+const url_params = new URLSearchParams(location.search);
+let url_params_display_as_embed;
+if (url_params.get("display") === "embed") {
+	header_bar.style["display"] = "none";
+	location_indicator.style["display"] = "none";
+	reply_container.style["display"] = "none";
+	url_params_display_as_embed = true;
+}
+else url_params_display_as_embed = false;
+
+if (window.location.pathname.startsWith("_ROOT_URL" + "thread/")) {
+	let second_slash_index = window.location.pathname.indexOf("/", "_ROOT_URL".length + 7);
+	if (second_slash_index > 0) {
+		let thread_number = parseInt(window.location.pathname.substring("_ROOT_URL".length + 7, second_slash_index));
+		if (!isNaN(thread_number)) {
+			state.selected_thread_id = thread_number;
 		}
-		else url_params_display_as_embed = false;
+		else {
+			alert("Error: thread_number is NaN");
+		}
+	}
+	else {
+		alert("Error: missing trailing / in URL for parsing thread number");
+	}
+}
+else {
+	state.selected_thread_id = -1;
+}
 
-		if (window.location.pathname.startsWith("_ROOT_URL" + "thread/")) {
-			let second_slash_index = window.location.pathname.indexOf("/", "_ROOT_URL".length + 7);
-			if (second_slash_index > 0) {
-				let thread_number = parseInt(window.location.pathname.substring("_ROOT_URL".length + 7, second_slash_index));
-				if (!isNaN(thread_number)) {
-					state.selected_thread_id = thread_number;
-				}
-				else {
-					alert("Error: thread_number is NaN");
-				}
+window.history.replaceState(state, null, ""); // Initial state
+
+window.onpopstate = function(event) {
+	if (event.state) {
+		state = event.state;
+	}
+	refresh_send();
+}
+
+class Format {
+	static IMAGE = 0;
+	static AUDIO = 1;
+	static OTHER = -1;
+	static image_formats = ["gif", "jpg", "jpeg", "jxl", "png", "webp", "bmp", "ico"];
+	static audio_formats = ["flac", "mp3", "ogg", "ogx", "opus", "wav", "m4a"];
+	static fromFileName(file_name) {
+		let dot_index = file_name.indexOf('.');
+		if (dot_index !== -1) {
+			let file_extension = file_name.substring(dot_index+1);
+			if (Format.image_formats.indexOf(file_extension) !== -1) {
+				return Format.IMAGE;
+			}
+			else if (Format.audio_formats.indexOf(file_extension) !== -1) {
+				return Format.AUDIO;
 			}
 			else {
-				alert("Error: missing trailing / in URL for parsing thread number");
+				return Format.OTHER;
 			}
 		}
 		else {
-			state.selected_thread_id = -1;
+			return Format.OTHER;
 		}
+	}
+}
 
-		window.history.replaceState(state, null, ""); // Initial state
+// Used to verify the author on deleting a message.
+let local_key = localStorage.getItem("local_key");
+let account_key = localStorage.getItem("account_key");
+if (local_key === null || local_key.length !== 8) {
+	local_key = '';
+	for (let i = 0; i < 8; i++) {
+		local_key += valid_uri_chars.charAt(Math.floor(Math.random() * valid_uri_chars.length));
+	}
+	localStorage.setItem("local_key", local_key);
+}
+// The value in the name field is set to the name used in the most recent post, if any.
+name_field.value = localStorage.getItem("name");
+if (account_key === null) {
+	registration_link.style["display"] = "inherit";
+}
+else {
+	let account_username = localStorage.getItem("account_username");
+	logged_in_as_username.textContent = account_username;
+	if (account_username === "Administrator")
+		is_administrator = true;
+	logout_button.style["display"] = "inherit";
+	logged_in_indicator.style["display"] = "inherit";
+	change_password_link.style["display"] = "inherit";
+}
 
-		window.onpopstate = function(event) {
-			if (event.state) {
-				state = event.state;
-			}
-			refresh_send();
-		}
+function logoutAction() {
+	logout_button.style["display"] = "none";
+	logged_in_indicator.style["display"] = "none";
+	registration_link.style["display"] = "inherit";
+	change_password_link.style["display"] = "none";
+	localStorage.removeItem("account_key");
+	account_key = null;
+	is_administrator = false;
+	refresh_send();
+}
 
-		class Format {
-			static IMAGE = 0;
-			static AUDIO = 1;
-			static OTHER = -1;
-			static image_formats = ["gif", "jpg", "jpeg", "jxl", "png", "webp", "bmp", "ico"];
-			static audio_formats = ["flac", "mp3", "ogg", "ogx", "opus", "wav"];
-			static fromFileName(file_name) {
-				let dot_index = file_name.indexOf('.');
-				if (dot_index !== -1) {
-					let file_extension = file_name.substring(dot_index+1);
-					if (Format.image_formats.indexOf(file_extension) !== -1) {
-						return Format.IMAGE;
-					}
-					else if (Format.audio_formats.indexOf(file_extension) !== -1) {
-						return Format.AUDIO;
-					}
-					else {
-						return Format.OTHER;
-					}
-				}
-				else {
-					return Format.OTHER;
-				}
-			}
-		}
-
-		// Used to verify the author on deleting a message.
-		let local_key = localStorage.getItem("local_key");
-		let account_key = localStorage.getItem("account_key");
-		if (local_key === null || local_key.length !== 8) {
-			local_key = '';
-			for (let i = 0; i < 8; i++) {
-				local_key += valid_uri_chars.charAt(Math.floor(Math.random() * valid_uri_chars.length));
-			}
-			localStorage.setItem("local_key", local_key);
-		}
-		// The value in the name field is set to the name used in the most recent post, if any.
-		name_field.value = localStorage.getItem("name");
-		if (account_key === null) {
-			registration_link.style["display"] = "inherit";
+async function postAction() {
+	let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
+	let content_length_bytes = (new TextEncoder().encode(content_field.innerText)).length;
+	console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
+	if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
+		post_content_empty_dialog.showModal();
+	}
+	else if (name_length_bytes > _POST_MAX_NAME) {
+		post_name_too_long_dialog_name_length.textContent = name_length_bytes;
+		post_name_too_long_dialog.showModal();
+	}
+	else if (content_length_bytes > 5000) {
+		post_content_too_long_dialog_content_length.textContent = content_length_bytes;
+		post_content_too_long_dialog.showModal();
+	}
+	else if (file_post_list.querySelector("progress")) {
+		post_file_upload_not_complete_dialog.showModal();
+	}
+	else {
+		let response;
+		if (state.selected_thread_id === -1) {
+			response = await postThread();
 		}
 		else {
-			let account_username = localStorage.getItem("account_username");
-			logged_in_as_username.textContent = account_username;
-			if (account_username === "Administrator")
-				is_administrator = true;
-			logout_button.style["display"] = "inherit";
-			logged_in_indicator.style["display"] = "inherit";
-			change_password_link.style["display"] = "inherit";
+			response = await postMessage();
 		}
-
-		function logoutAction() {
-			logout_button.style["display"] = "none";
-			logged_in_indicator.style["display"] = "none";
-			registration_link.style["display"] = "inherit";
-			change_password_link.style["display"] = "none";
-			localStorage.removeItem("account_key");
-			account_key = null;
-			is_administrator = false;
-			refresh_send();
+		if (response.ok) {
+			content_field.textContent = "";
+			file_upload.value = "";
+			file_post_list.textContent = "";
+			if (state.selected_thread_id === -1) {
+				let new_thread_id = Number(response.headers.get("new-thread-id"));
+				thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
+				thread_posted_dialog.showModal();
+			}
 		}
-
-		async function postAction() {
-			let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
-			let content_length_bytes = (new TextEncoder().encode(content_field.innerText)).length;
-			console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
-			if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
-				post_content_empty_dialog.showModal();
-			}
-			else if (name_length_bytes > _POST_MAX_NAME) {
-				post_name_too_long_dialog_name_length.textContent = name_length_bytes;
-				post_name_too_long_dialog.showModal();
-			}
-			else if (content_length_bytes > 5000) {
-				post_content_too_long_dialog_content_length.textContent = content_length_bytes;
-				post_content_too_long_dialog.showModal();
-			}
-			else if (file_post_list.querySelector("progress")) {
-				post_file_upload_not_complete_dialog.showModal();
+		else {
+			if (state.selected_thread_id === -1) {
+				post_failed_dialog_error_title.textContent = "Could not create thread";
 			}
 			else {
-				let response;
-				if (state.selected_thread_id === -1) {
-					response = await postThread();
-				}
-				else {
-					response = await postMessage();
-				}
-				if (response.ok) {
-					content_field.textContent = "";
-					file_upload.value = "";
-					file_post_list.textContent = "";
-					if (state.selected_thread_id === -1) {
-						let new_thread_id = Number(response.headers.get("new-thread-id"));
-						thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
-						thread_posted_dialog.showModal();
-					}
-				}
-				else {
-					if (state.selected_thread_id === -1) {
-						post_failed_dialog_error_title.textContent = "Could not create thread";
-					}
-					else {
-						post_failed_dialog_error_title.textContent = "Could not send message";
-					}
-					let header_error_message = response.headers.get("message");
-					if (header_error_message) {
-						post_failed_dialog_error_body.innerText = `Status: ${response.status} ${response.statusText}\n${header_error_message}`;
-					}
-					else {
-						post_failed_dialog_error_body = `Status: ${response.status} ${response.statusText}`;
-					}
-					post_failed_dialog.showModal();
-					console.log(response);
-				}
-				localStorage.setItem("name", name_field.value);
+				post_failed_dialog_error_title.textContent = "Could not send message";
 			}
+			let header_error_message = response.headers.get("message");
+			if (header_error_message) {
+				post_failed_dialog_error_body.innerText = `Status: ${response.status} ${response.statusText}\n${header_error_message}`;
+			}
+			else {
+				post_failed_dialog_error_body = `Status: ${response.status} ${response.statusText}`;
+			}
+			post_failed_dialog.showModal();
+			console.log(response);
+		}
+		localStorage.setItem("name", name_field.value);
+	}
+}
+
+function removeFileFromList(file_container) {
+	file_post_list.removeChild(file_container);
+	file_upload.disabled = false;
+}
+
+function openThreadList() {
+	state.selected_thread_id = -1;
+	history.pushState(state, "", "_ROOT_URL");
+	refresh_send();
+}
+
+function showThreads(message_json) {
+	location_indicator.textContent = "Threads";
+	threads_button.disabled = true;
+	reply_heading_text.textContent = "Create a thread";
+	const fragment = new DocumentFragment();
+	for (let thread of message_json.threads) {
+		// console.log(thread.id);
+		// console.log(thread.post_zero);
+		let post_zero_element = createPost(thread.post_zero);
+		// console.log(post_zero_element);
+		let thread_element = document.createElement("div");
+		thread_element.classList.add("Thread");
+		thread_element.appendChild(post_zero_element);
+
+		// Toolbar at the bottom of each thread
+		let thread_toolbar = document.createElement("div");
+		thread_toolbar.classList.add("ToolBar", "WithBorders");
+
+		const reply_count_container = document.createElement("div");
+		const reply_count = document.createElement("span");
+		reply_count.textContent = "Replies: " + (thread.number_of_posts - 1);
+		reply_count_container.appendChild(reply_count);
+
+		thread_toolbar.append(reply_count_container, flex_separator.cloneNode());
+
+		if (thread["permission_editable"] === true) {
+			let manage_thread_permissions_button = document.createElement("a");
+			manage_thread_permissions_button.classList.add("Button", "ToolBarButton");
+			manage_thread_permissions_button.textContent = "Manage permissions";
+			manage_thread_permissions_button.setAttribute("href", "_ROOT_URL" + `manage_permissions.html?location=/thread/${thread.id}/`);
+			thread_toolbar.append(manage_thread_permissions_button);
 		}
 
-		function removeFileFromList(file_container) {
-			file_post_list.removeChild(file_container);
-			file_upload.disabled = false;
+		let open_thread_button = document.createElement("button");
+		open_thread_button.classList.add("ToolBarButton");
+		open_thread_button.textContent = "\u21E8 Open thread";
+		open_thread_button.onclick = (event) => {
+			openThread(thread.id);
 		}
 
-		function openThreadList() {
-			state.selected_thread_id = -1;
-			history.pushState(state, "", "_ROOT_URL");
-			refresh_send();
-		}
+		thread_toolbar.append(open_thread_button);
+		// thread_toolbar.appendChild(open_thread_button);
+		thread_element.appendChild(thread_toolbar);
+		fragment.appendChild(thread_element);
+	}
+	post_container.replaceChildren(fragment);
+}
 
-		function showThreads(message_json) {
-			location_indicator.textContent = "Threads";
-			threads_button.disabled = true;
-			reply_heading_text.textContent = "Create a thread";
-			const fragment = new DocumentFragment();
-			for (let thread of message_json.threads) {
-				// console.log(thread.id);
-				// console.log(thread.post_zero);
-				let post_zero_element = createPost(thread.post_zero);
-				// console.log(post_zero_element);
-				let thread_element = document.createElement("div");
-				thread_element.classList.add("Thread");
-				thread_element.appendChild(post_zero_element);
+function showPosts(message_json) {
+	location_indicator.textContent = `Viewing thread ${state.selected_thread_id}`;
+	threads_button.disabled = false;
+	reply_heading_text.textContent = "Leave a reply";
+	const fragment = new DocumentFragment();
+	// for (let i = 0; i < 1000; ++i) {
+	for (let post of message_json.posts) {
+		fragment.appendChild(createPost(post));
+	}
+	// }
+	post_container.replaceChildren(fragment);
+}
 
-				// Toolbar at the bottom of each thread
-				let thread_toolbar = document.createElement("div");
-				thread_toolbar.classList.add("ToolBar", "WithBorders");
-
-				const reply_count_container = document.createElement("div");
-				const reply_count = document.createElement("span");
-				reply_count.textContent = "Replies: " + (thread.number_of_posts - 1);
-				reply_count_container.appendChild(reply_count);
-
-				let open_thread_button = document.createElement("button");
-				open_thread_button.classList.add("ToolBarButton");
-				open_thread_button.textContent = "\u21E8 Open thread";
-				open_thread_button.onclick = (event) => {
-					openThread(thread.id);
-				}
-
-				thread_toolbar.append(reply_count_container, flex_separator.cloneNode(), open_thread_button);
-				// thread_toolbar.appendChild(open_thread_button);
-				thread_element.appendChild(thread_toolbar);
-				fragment.appendChild(thread_element);
-			}
-			post_container.replaceChildren(fragment);
-		}
-		function showPosts(message_json) {
-			location_indicator.textContent = `Viewing thread ${state.selected_thread_id}`;
-			threads_button.disabled = false;
-			reply_heading_text.textContent = "Leave a reply";
-			const fragment = new DocumentFragment();
-			// for (let i = 0; i < 1000; ++i) {
-			for (let post of message_json.posts) {
-				fragment.appendChild(createPost(post));
-			}
-			// }
-			post_container.replaceChildren(fragment);
-		}
-		async function getThreads() {
-			let response;
-			try {
-				response = await fetch("_ROOT_URL" + api_url + "get_threads/");
-			}
-			catch (error) {
-				generic_error_dialog_message.innerText = error.message + "\nThe server may be down";
-				generic_error_dialog.showModal();
-			}
-			if (response) {
-				if (response.ok) {
-					await response.json().then(response_obj => {
-						console.log(response_obj);
-						showThreads(response_obj);
-					});
-				}
-				else {
-					generic_error_dialog_message.innerText = `${response.status} ${response.statusText}\nCould not get threads.`;
-					generic_error_dialog.showModal();
-				}
-			}
-		}
-		function openThread(thread_id) {
-			state.selected_thread_id = thread_id;
-			history.pushState(state, "", "_ROOT_URL" + "thread/" + state.selected_thread_id + "/");
-			getThreadPosts();
-		}
-		async function getThreadPosts() {
-			let response;
-			try {
-				response = await fetch("_ROOT_URL" + api_url + "threads/" + state.selected_thread_id + "/get_posts/", {
-					headers: {
-						"key": account_key || local_key
-					}
-				});
-			}
-			catch (error) {
-				generic_error_dialog_message.innerText = error.message + "\nThe server may be down.";
-				generic_error_dialog.showModal();
-			}
-			if (response) {
-				if (response.ok) {
-					await response.json().then(response_obj => {
-						console.log(response_obj);
-						showPosts(response_obj);
-						console.log("1");
-					});
-					console.log("2");
-
-					websocket = connectToServer();
-				}
-				else if (response.status === 404) {
-					thread_not_found_dialog.showModal();
-				}
-				else {
-					generic_error_dialog_message.innerText = `${response.status} ${response.statusText}\nCould not open thread.`;
-					generic_error_dialog.showModal();
-				}
-			}
-		}
-
-		function addFileToList(filename) {
-			let file_container = document.createElement("div");
-			let file_thumbnail = document.createElement("img");
-			file_thumbnail.setAttribute("src", "placeholder.png");
-			file_thumbnail.setAttribute("width", "100px");
-			file_thumbnail.setAttribute("height", "100px");
-			const file_information_container = document.createElement("div");
-			file_information_container.classList.add("FileInformation");
-			let file_title = document.createElement("span");
-			// file_title.classList.add("FileTitle");
-			file_title.textContent = filename;
-			let file_delete_button = document.createElement("button");
-			file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
-			let progress_element = document.createElement("progress");
-			progress_element.value = 0;
-			file_information_container.append(file_title, document.createElement("br"), progress_element, document.createElement("br"), file_delete_button);
-			file_container.append(file_thumbnail, file_information_container);
-			file_post_list.appendChild(file_container);
-			file_delete_button.onclick = (event) => {
-				// Add delete to server later
-				// file_post_list.removeChild(document.getElementById("file_" + server_filename));
-				removeFileFromList(file_container);
-			}
-			return file_container;
-		}
-
-		content_field.oninput = () => {
-			// Remove leftover <br> tag so the placeholder appears again
-			if (content_field.childElementCount === 1 && content_field.children[0].tagName === "BR" && content_field.textContent.length === 0) {
-				content_field.removeChild(content_field.children[0]);
-			}
-		}
-
-		// "Scroll-lock" feature - when a user is scrolled to the bottom of the messages list, adding content in the reply container will push the messages up so that the latest messages are not obstructed.
-		let lock_scroll_to_bottom = false;
-		const reply_container_resize_observer = new ResizeObserver(() => {
-			if (lock_scroll_to_bottom) {
-				bottom_marker.scrollIntoView(false);
-			}
+async function getThreads() {
+	let response = await API.sendRequest("GET", "threads");
+	console.log(response);
+	if (response.ok) {
+		await response.json().then(response_obj => {
+			console.log(response_obj);
+			showThreads(response_obj);
 		});
-		reply_container_resize_observer.observe(reply_container);
-		const options = {
-			// root: document.body,
-			rootMargin: "5px",
-			scrollMargin: "5px",
-			threshold: 0.5,
-		};
-		const callback = (entries, observer) => {
-			for (let entry of entries) {
-				if (entry.target === bottom_marker) {
-					lock_scroll_to_bottom = entry.isIntersecting;
-				}
-			}
+	}
+}
 
-			console.log(entries);
-		}
-		const observer = new IntersectionObserver(callback, options);
-		observer.observe(bottom_marker);
+function openThread(thread_id) {
+	state.selected_thread_id = thread_id;
+	history.pushState(state, "", "_ROOT_URL" + "thread/" + state.selected_thread_id + "/");
+	getThreadPosts();
+}
 
-		function sanitiseFileName(file_name) {
-			let sanitised_file_name = "";
-			for (let i = 0; i < file_name.length; i++) {
-				if (valid_uri_chars.indexOf(file_name[i]) === -1) {
-					sanitised_file_name += "_";
-				}
-				else {
-					sanitised_file_name += file_name[i];
-				}
-			}
-			return sanitised_file_name;
-		}
-		function decode_utf8(s) {
-			return decodeURIComponent(escape(s));
-		}
+async function getThreadPosts() {
+	let response = await API.sendRequest("GET", `thread/${state.selected_thread_id}/posts`);
+	if (response.ok) {
+		await response.json().then(response_obj => {
+			console.log(response_obj);
+			showPosts(response_obj);
+			console.log("1");
+		});
+		console.log("2");
 
-		function uploadFile(file_object) {
-			let formdata = new FormData();
-			formdata.append("File_1", file_object);
-			// let file_name = sanitiseFileName(file_object.name);
-			// console.log("file_name: " + file_name);
-			let file_element = addFileToList(file_object.name);
-			let file_information_element = file_element.querySelector(".FileInformation");
-			let file_progress_element = file_element.querySelector("progress");
-			let file_img_element = file_element.querySelector("img");
-			let received_error = false;
-			let request = new XMLHttpRequest();
-			file_progress_element.max = file_object.size;
-			console.log(file_object);
-			request.upload.addEventListener("progress", (event) => {
-				file_progress_element.value = event.loaded;
-			});
-			request.responseType = "text";
-			request.open("POST", "_ROOT_URL" + api_url + "upload/");
-			request.timeout = 60*60*1000; // 1 hour
-			request.onreadystatechange = () => {
-				console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
-				if (!(request.status >= 200 && request.status < 400) && request.status != 0 && !received_error) {
-					file_element.classList.add("Errored");
-					received_error = true;
-					console.log("Aporting");
-					request.abort();
-						const error_message = request.getResponseHeader("message");
-						// if (error_message) {
-						// 	file_upload_error_dialog_message.innerText = error_message;
-						// }
-						file_upload_error_dialog_message.innerText = 
-							`Status: ${request.status} ${request.statusText}\n` + 
-							(error_message || "An unknown error occured.");
-						file_upload_error_dialog.showModal();
-						const upload_failed_indicator = document.createElement("span");
-						upload_failed_indicator.classList.add("UploadFailedIndicator");
-						upload_failed_indicator.textContent = "Upload failed";
-						file_information_element.replaceChild(upload_failed_indicator, file_progress_element);
-						file_img_element.setAttribute("src", "x_icon.png");
+		websocket = connectToServer();
+	}
+}
+
+function addFileToList(filename) {
+	let file_container = document.createElement("div");
+	let file_thumbnail = document.createElement("img");
+	file_thumbnail.setAttribute("src", "placeholder.png");
+	file_thumbnail.setAttribute("width", "100px");
+	file_thumbnail.setAttribute("height", "100px");
+	const file_information_container = document.createElement("div");
+	file_information_container.classList.add("FileInformation");
+	let file_title = document.createElement("span");
+	// file_title.classList.add("FileTitle");
+	file_title.textContent = filename;
+	let file_delete_button = document.createElement("button");
+	file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
+	let progress_element = document.createElement("progress");
+	progress_element.value = 0;
+	file_information_container.append(file_title, document.createElement("br"), progress_element, document.createElement("br"), file_delete_button);
+	file_container.append(file_thumbnail, file_information_container);
+	file_post_list.appendChild(file_container);
+	file_delete_button.onclick = (event) => {
+		// Add delete to server later
+		// file_post_list.removeChild(document.getElementById("file_" + server_filename));
+		removeFileFromList(file_container);
+	}
+	return file_container;
+}
+
+content_field.oninput = () => {
+	// Remove leftover <br> tag so the placeholder appears again
+	if (content_field.childElementCount === 1 && content_field.children[0].tagName === "BR" && content_field.textContent.length === 0) {
+		content_field.removeChild(content_field.children[0]);
+	}
+}
+
+// "Scroll-lock" feature - when a user is scrolled to the bottom of the messages list, adding content in the reply container will push the messages up so that the latest messages are not obstructed.
+let lock_scroll_to_bottom = false;
+const reply_container_resize_observer = new ResizeObserver(() => {
+	if (lock_scroll_to_bottom) {
+		bottom_marker.scrollIntoView(false);
+	}
+});
+reply_container_resize_observer.observe(reply_container);
+const options = {
+	// root: document.body,
+	rootMargin: "5px",
+	scrollMargin: "5px",
+	threshold: 0.5,
+};
+const callback = (entries, observer) => {
+	for (let entry of entries) {
+		if (entry.target === bottom_marker) {
+			lock_scroll_to_bottom = entry.isIntersecting;
+		}
+	}
+
+	console.log(entries);
+}
+const observer = new IntersectionObserver(callback, options);
+observer.observe(bottom_marker);
+
+function sanitiseFileName(file_name) {
+	let sanitised_file_name = "";
+	for (let i = 0; i < file_name.length; i++) {
+		if (valid_uri_chars.indexOf(file_name[i]) === -1) {
+			sanitised_file_name += "_";
+		}
+		else {
+			sanitised_file_name += file_name[i];
+		}
+	}
+	return sanitised_file_name;
+}
+function decode_utf8(s) {
+	return decodeURIComponent(escape(s));
+}
+
+function uploadFile(file_object) {
+	let formdata = new FormData();
+	formdata.append("File_1", file_object);
+	// let file_name = sanitiseFileName(file_object.name);
+	// console.log("file_name: " + file_name);
+	let file_element = addFileToList(file_object.name);
+	let file_information_element = file_element.querySelector(".FileInformation");
+	let file_progress_element = file_element.querySelector("progress");
+	let file_img_element = file_element.querySelector("img");
+	let received_error = false;
+	let request = new XMLHttpRequest();
+	file_progress_element.max = file_object.size;
+	console.log(file_object);
+	request.upload.addEventListener("progress", (event) => {
+		file_progress_element.value = event.loaded;
+	});
+	request.responseType = "text";
+	request.open("POST", "_ROOT_URL" + api_url + "upload/");
+	request.timeout = 60*60*1000; // 1 hour
+	request.onreadystatechange = () => {
+		console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
+		if (!(request.status >= 200 && request.status < 400) && request.status != 0 && !received_error) {
+			file_element.classList.add("Errored");
+			received_error = true;
+			console.log("Aporting");
+			request.abort();
+				const error_message = request.getResponseHeader("message");
+				// if (error_message) {
+				// 	file_upload_error_dialog_message.innerText = error_message;
+				// }
+				file_upload_error_dialog_message.innerText =
+					`Status: ${request.status} ${request.statusText}\n` +
+					(error_message || "An unknown error occured.");
+				file_upload_error_dialog.showModal();
+				const upload_failed_indicator = document.createElement("span");
+				upload_failed_indicator.classList.add("UploadFailedIndicator");
+				upload_failed_indicator.textContent = "Upload failed";
+				file_information_element.replaceChild(upload_failed_indicator, file_progress_element);
+				file_img_element.setAttribute("src", "x_icon.png");
+		}
+	}
+	request.send(formdata);
+	request.onload = () => {
+		console.log("Request onLoad fired");
+		if (request.readyState === request.DONE) {
+			console.log("Received response");
+			if (request.status === 202) {
+				const server_filename = request.getResponseHeader("File-Name");
+				console.log("server_filename: " + server_filename);
+				let decoded_filename = decode_utf8(server_filename);
+				console.log("server_filename decoded: " + decoded_filename);
+				// const utf8array = new TextEncoder().encode(server_filename);
+				// var newdecoded = new TextDecoder().decode(utf8array);
+				// console.log("server_filename dec new: " + newdecoded);
+				file_element.setAttribute("id", "file_" + decoded_filename);
+				if (Format.fromFileName(server_filename) === Format.IMAGE) {
+					file_img_element.setAttribute("src", "_ROOT_URL" + media_url + decoded_filename);
 				}
+				const upload_complete_indicator = document.createElement("span");
+				upload_complete_indicator.classList.add("UploadCompleteIndicator");
+				upload_complete_indicator.textContent = "Upload complete";
+				file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
 			}
-			request.send(formdata);
-			request.onload = () => {
-				console.log("Request onLoad fired");
-				if (request.readyState === request.DONE) {
-					console.log("Received response");
-			        if (request.status === 202) {
-						const server_filename = request.getResponseHeader("File-Name");
-						console.log("server_filename: " + server_filename);
-						let decoded_filename = decode_utf8(server_filename);
-						console.log("server_filename decoded: " + decoded_filename);
-						// const utf8array = new TextEncoder().encode(server_filename);
-						// var newdecoded = new TextDecoder().decode(utf8array);
-						// console.log("server_filename dec new: " + newdecoded);
-						file_element.setAttribute("id", "file_" + decoded_filename);
-						if (Format.fromFileName(server_filename) === Format.IMAGE) {
-							file_img_element.setAttribute("src", "_ROOT_URL" + media_url + decoded_filename);
-						}
-						const upload_complete_indicator = document.createElement("span");
-						upload_complete_indicator.classList.add("UploadCompleteIndicator");
-						upload_complete_indicator.textContent = "Upload complete";
-						file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
-			        }
-					else {
-						const error_message = request.getResponseHeader("message");
-						// if (error_message) {
-						// 	file_upload_error_dialog_message.innerText = error_message;
-						// }
-						file_upload_error_dialog_message.innerText = 
-							`Status: ${request.status} ${request.statusText}\n` + 
-							(error_message || "An unknown error occured.");
-						file_upload_error_dialog.showModal();
-						const upload_failed_indicator = document.createElement("span");
-						upload_failed_indicator.classList.add("UploadfailedIndicator");
-						upload_failed_indicator.textContent = "Upload failed";
-						file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
-						file_img_element.setAttribute("src", "x_icon.png");
-					}
-			    }
+			else {
+				const error_message = request.getResponseHeader("message");
+				// if (error_message) {
+				// 	file_upload_error_dialog_message.innerText = error_message;
+				// }
+				file_upload_error_dialog_message.innerText =
+					`Status: ${request.status} ${request.statusText}\n` +
+					(error_message || "An unknown error occured.");
+				file_upload_error_dialog.showModal();
+				const upload_failed_indicator = document.createElement("span");
+				upload_failed_indicator.classList.add("UploadfailedIndicator");
+				upload_failed_indicator.textContent = "Upload failed";
+				file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
+				file_img_element.setAttribute("src", "x_icon.png");
 			}
 		}
-		file_upload.onchange = (event) => {
-			console.log("file changed.");
-			if (file_upload.files.length + file_post_list.childNodes.length > 4) {
-				generic_error_dialog_message.innerText = "Cannot attach more than 4 files.";
-				generic_error_dialog.showModal();
+	}
+}
+file_upload.onchange = (event) => {
+	console.log("file changed.");
+	if (file_upload.files.length + file_post_list.childNodes.length > 4) {
+		generic_error_dialog_message.innerText = "Cannot attach more than 4 files.";
+		generic_error_dialog.showModal();
+		file_upload.value = "";
+	}
+	else {
+		for (let chosen_file of file_upload.files) {
+			if (chosen_file.size > file_size_limit) {
+				file_size_limit_exceeded_dialog_file_size_bytes.textContent = chosen_file.size;
+				file_size_limit_exceeded_dialog_file_name.textContent = chosen_file.name;
+				file_size_limit_exceeded_dialog.showModal();
 				file_upload.value = "";
 			}
 			else {
-				for (let chosen_file of file_upload.files) {
-					if (chosen_file.size > file_size_limit) {
-						file_size_limit_exceeded_dialog_file_size_bytes.textContent = chosen_file.size;
-						file_size_limit_exceeded_dialog_file_name.textContent = chosen_file.name;
-						file_size_limit_exceeded_dialog.showModal();
-						file_upload.value = "";
-					}
-					else {
-						const file_name_size = (new TextEncoder().encode(chosen_file.name)).length;
-						if (file_name_size > _POST_MAX_FILE_NAME) {
-							file_name_too_long_dialog_file_name.textContent = chosen_file.name;
-							file_name_too_long_dialog_name_length.textContent = file_name_size;
-							file_name_too_long_dialog.showModal();
-						}
-						else {
-							console.log("uploading...");
-							uploadFile(chosen_file);
-						}
-					}
-				}
-			}
-		}
-
-		function createPost(data) {
-			// console.log(data);
-			let post_box_element = document.createElement("article");
-			post_box_element.classList.add("Post");
-	
-			let post_header_element = document.createElement("div");
-			// post_header_element.classList.add("PostHeader");
-			post_header_element.classList.add("ToolBar");
-	
-			let post_name_element = document.createElement("b");
-			post_name_element.classList.add("Username");
-			post_name_element.textContent = data.name;
-
-			let post_timestamp_element = document.createElement("time");
-			let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
-			post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
-			post_timestamp_element.textContent = post_date;
-			post_timestamp_element.classList.add("Timestamp");
-
-			let post_id_element = document.createElement("span");
-			post_id_element.classList.add("ID");
-			let post_id;
-			if (state.selected_thread_id > -1) {
-				post_id = `#${data.thread_id}/${data.id_in_thread}`;
-			}
-			else {
-				post_id = "#" + data.thread_id;
-			}
-			post_id_element.textContent = post_id;
-
-			post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
-			const right_aligned_toolbar_group = document.createElement("div");
-			right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
-
-			// Delete button
-			if ((is_administrator === true || data.is_author) && !url_params_display_as_embed) {
-				let delete_button_element = document.createElement("button");
-				delete_button_element.textContent = "\u{1F5D1} Delete";
-				delete_button_element.onclick = async() => { 
-					let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
-					console.log(server_response);
-					if (server_response.ok) {
-						post_box_element.classList.add("Deleted");
-						delete_button_element.disabled = true;
-					}
-					else {
-						alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
-					}
-				}
-				// post_header_element.appendChild(delete_button_element);
-				right_aligned_toolbar_group.appendChild(delete_button_element);
-			}
-			// Reply button
-			if (state.selected_thread_id > -1 && !url_params_display_as_embed) { // Reply button will not appear on catalog (thread list)
-				let reply_button = document.createElement("button");
-				reply_button.style["margin-left"] = "0.5em";
-				reply_button.textContent = "\u{2BA9} Reply";
-				reply_button.onclick = () => {
-					let reply_link_node = document.createTextNode(post_id + " ");
-					// Add reply tag at caret position, if focused on content_field
-					let range, selection;
-					selection = window.getSelection();
-					if (content_field.contains(selection.focusNode)) {
-						range = selection.getRangeAt(0);
-						console.log(range);
-						range.insertNode(reply_link_node);
-					}
-					else
-						content_field.append(reply_link_node);
-
-					// Move caret position to end of reply tag
-					range = document.createRange();
-					console.log(reply_link_node);
-					range.setStartAfter(reply_link_node);
-					range.collapse(true);
-					selection.removeAllRanges();
-					selection.addRange(range);
-					// content_field.focus();
-				}
-				right_aligned_toolbar_group.appendChild(reply_button);
-			}
-			right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
-			post_header_element.append(right_aligned_toolbar_group);
-
-			let post_content_element = document.createElement("div");
-			post_content_element.classList.add("Content");
-
-			// Highlight reply links by wrapping them in a <span> element
-			const message_content_split = data.content.split(/#\d*\/(\d+)\b/g);
-			for (let i = 0; i < message_content_split.length; i+=2) {
-				post_content_element.appendChild(document.createTextNode(message_content_split[i]));
-				if (i+1 !== message_content_split.length) {
-					let reply_link = document.createElement("span");
-					reply_link.classList.add("PostLink");
-					reply_link.textContent = `#${data.thread_id}/${message_content_split[i+1]}`;
-					post_content_element.appendChild(reply_link);
-				}
-			}
-	
-			let post_files_element = document.createElement("div");
-			post_files_element.classList.add("Files");
-			for (const filename of data.files) {
-				let figure_element = document.createElement("figure");
-				figure_element.classList.add("EmbedFigure");
-				let filename_extension_i = filename.lastIndexOf(".");
-				let file_format = Format.fromFileName(filename); // Format enum
-				if (file_format === Format.IMAGE) {
-					let thumbnail_element = document.createElement("img");
-					thumbnail_element.classList.add("EmbedThumbnail");
-					let thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
-					thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
-					let image_opened = false;
-					let img_element = document.createElement("img");
-					img_element.classList.add("EmbedImage");
-					thumbnail_element.onclick = (event) => {
-						if (!image_opened) {
-							image_opened = true;
-							img_element.onload = (event) => {
-								img_element.style["display"] = "inherit";
-								thumbnail_element.style["display"] = "none";
-							}
-							img_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
-						}
-						else {
-							thumbnail_element.style["display"] = "none";
-							img_element.style["display"] = "inherit";
-						}
-					}
-					img_element.style["display"] = "none";
-					img_element.onclick = (event) => {
-						thumbnail_element.style["display"] = "inherit";
-						img_element.style["display"] = "none";
-					}
-					figure_element.appendChild(img_element);
-					thumbnail_element.setAttribute("loading", "lazy");
-					thumbnail_element.setAttribute("width", "150px");
-					thumbnail_element.setAttribute("height", "150px");
-					figure_element.appendChild(thumbnail_element);
-				}
-				else if (file_format === Format.AUDIO) {
-					let audio_element = document.createElement("audio");
-					audio_element.controls = true;
-					audio_element.setAttribute("controlslist", "nofullscreen nodownload");
-					audio_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
-					figure_element.appendChild(audio_element);
-				}
-				// else {
-					// thumbnail_element.setAttribute("src", "_ROOT_URL" + "placeholder.png");
-				// }
-				let pretty_filename;
-				if (filename_extension_i == -1) {
-					pretty_filename = filename.slice(0, filename.length - media_uuid_len);
+				const file_name_size = (new TextEncoder().encode(chosen_file.name)).length;
+				if (file_name_size > _POST_MAX_FILE_NAME) {
+					file_name_too_long_dialog_file_name.textContent = chosen_file.name;
+					file_name_too_long_dialog_name_length.textContent = file_name_size;
+					file_name_too_long_dialog.showModal();
 				}
 				else {
-					pretty_filename = filename.slice(0, filename_extension_i - media_uuid_len) + filename.slice(filename_extension_i, filename.length);
-				}
-				let figcaption_element = document.createElement("figcaption");
-				let media_src = "_ROOT_URL" + media_url + filename.replace(" ", "%20");
-				let figcaption_element_a = document.createElement("a");
-				figcaption_element_a.setAttribute("href", media_src);
-				figcaption_element_a.setAttribute("target", "_blank");
-				figcaption_element_a.textContent = pretty_filename;
-
-				let file_download_button = document.createElement("a");
-				file_download_button.setAttribute("href", media_src);
-				file_download_button.setAttribute("download", pretty_filename);
-				file_download_button.innerText = "\ud83d\udce5\ufe0e";
-
-				figcaption_element.append(figcaption_element_a, document.createTextNode("\u00A0"), file_download_button);
-				figure_element.appendChild(figcaption_element);
-				post_files_element.appendChild(figure_element);
-	
-			}
-	
-			post_box_element.appendChild(post_header_element);
-			post_box_element.appendChild(post_content_element);
-			post_box_element.appendChild(post_files_element);
-			// post_container_element.appendChild(post_box_element);
-			return post_box_element;
-		}
-	
-		function refresh_send() {
-			if (typeof websocket !== "undefined") {
-				websocket.close();
-			}
-			if (state.selected_thread_id === -1) {
-				getThreads();
-			}
-			else {
-				getThreadPosts();
-			}
-		}
-
-		function connectToServer() {
-			let listening_to_thread = state.selected_thread_id;
-			let sock;
-			if (!websocket_connected) {
-				sock = new WebSocket("_WEBSOCKET_URL");	
-				websocket_connected = true;
-			}
-			else {
-				return websocket;
-			}
-			sock.onopen = (event) => {
-				// connection_status.textContent = "Connected 🙂";
-				console.log("Websocket connected.");
-				websocket_connected = true;
-				clearInterval(reconnect_websocket_interval);
-				reconnect_websocket_interval = null;
-				if (state.selected_thread_id > -1) {
-					sock.send(JSON.stringify({
-						"type": "listen_to_thread",
-						"thread_id": state.selected_thread_id
-					}));
+					console.log("uploading...");
+					uploadFile(chosen_file);
 				}
 			}
-	
-			sock.onmessage = (event) => {
-				console.log("Message received: " + event.data);
-				let message_json = JSON.parse(event.data);
-				if (message_json.type === "post") {
-					// auto-scroll to new message if window was scrolled near the bottom already
-					// would be nice if window.scrollMaxY was standard! document.body.scrollHeight - document.body.clientHeight will be used instead
-					let do_scroll = window.scrollY >= document.body.scrollHeight - document.body.clientHeight - 10;
+		}
+	}
+}
 
-					post_container.appendChild(createPost(JSON.parse(event.data)));
+function createPost(data) {
+	// console.log(data);
+	let post_box_element = document.createElement("article");
+	post_box_element.classList.add("Post");
 
-					if (do_scroll) {
-						window.scrollTo(0, post_container.scrollHeight);
+	let post_header_element = document.createElement("div");
+	// post_header_element.classList.add("PostHeader");
+	post_header_element.classList.add("ToolBar");
+
+	let post_name_element = document.createElement("b");
+	post_name_element.classList.add("Username");
+	post_name_element.textContent = data.name;
+
+	let post_timestamp_element = document.createElement("time");
+	let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
+	post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
+	post_timestamp_element.textContent = post_date;
+	post_timestamp_element.classList.add("Timestamp");
+
+	let post_id_element = document.createElement("span");
+	post_id_element.classList.add("ID");
+	let post_id;
+	if (state.selected_thread_id > -1) {
+		post_id = `#${data.thread_id}/${data.id_in_thread}`;
+	}
+	else {
+		post_id = "#" + data.thread_id;
+	}
+	post_id_element.textContent = post_id;
+
+	post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
+	const right_aligned_toolbar_group = document.createElement("div");
+	right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
+
+	// Delete button
+	if ((is_administrator === true || data.is_author) && !url_params_display_as_embed) {
+		let delete_button_element = document.createElement("button");
+		delete_button_element.textContent = "\u{1F5D1} Delete";
+		delete_button_element.onclick = async() => {
+			let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
+			console.log(server_response);
+			if (server_response.ok) {
+				post_box_element.classList.add("Deleted");
+				delete_button_element.disabled = true;
+			}
+			else {
+				alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
+			}
+		}
+		// post_header_element.appendChild(delete_button_element);
+		right_aligned_toolbar_group.appendChild(delete_button_element);
+	}
+	// Reply button
+	if (state.selected_thread_id > -1 && !url_params_display_as_embed) { // Reply button will not appear on catalog (thread list)
+		let reply_button = document.createElement("button");
+		reply_button.style["margin-left"] = "0.5em";
+		reply_button.textContent = "\u{2BA9} Reply";
+		reply_button.onclick = () => {
+			let reply_link_node = document.createTextNode(post_id + " ");
+			// Add reply tag at caret position, if focused on content_field
+			let range, selection;
+			selection = window.getSelection();
+			if (content_field.contains(selection.focusNode)) {
+				range = selection.getRangeAt(0);
+				console.log(range);
+				range.insertNode(reply_link_node);
+			}
+			else
+				content_field.append(reply_link_node);
+
+			// Move caret position to end of reply tag
+			range = document.createRange();
+			console.log(reply_link_node);
+			range.setStartAfter(reply_link_node);
+			range.collapse(true);
+			selection.removeAllRanges();
+			selection.addRange(range);
+			// content_field.focus();
+		}
+		right_aligned_toolbar_group.appendChild(reply_button);
+	}
+	right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
+	post_header_element.append(right_aligned_toolbar_group);
+
+	let post_content_element = document.createElement("div");
+	post_content_element.classList.add("Content");
+
+	// Highlight reply links by wrapping them in a <span> element
+	const message_content_split = data.content.split(/#\d*\/(\d+)\b/g);
+	for (let i = 0; i < message_content_split.length; i+=2) {
+		post_content_element.appendChild(document.createTextNode(message_content_split[i]));
+		if (i+1 !== message_content_split.length) {
+			let reply_link = document.createElement("span");
+			reply_link.classList.add("PostLink");
+			reply_link.textContent = `#${data.thread_id}/${message_content_split[i+1]}`;
+			post_content_element.appendChild(reply_link);
+		}
+	}
+
+	let post_files_element = document.createElement("div");
+	post_files_element.classList.add("Files");
+	for (const filename of data.files) {
+		let figure_element = document.createElement("figure");
+		figure_element.classList.add("EmbedFigure");
+		let filename_extension_i = filename.lastIndexOf(".");
+		let file_format = Format.fromFileName(filename); // Format enum
+		if (file_format === Format.IMAGE) {
+			let thumbnail_element = document.createElement("img");
+			thumbnail_element.classList.add("EmbedThumbnail");
+			let thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
+			thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+			let image_opened = false;
+			let img_element = document.createElement("img");
+			img_element.classList.add("EmbedImage");
+			thumbnail_element.onclick = (event) => {
+				if (!image_opened) {
+					image_opened = true;
+					img_element.onload = (event) => {
+						img_element.style["display"] = "inherit";
+						thumbnail_element.style["display"] = "none";
 					}
+					img_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
 				}
 				else {
-					console.error("message_json type " + message_json.type + " not recognised.");
+					thumbnail_element.style["display"] = "none";
+					img_element.style["display"] = "inherit";
 				}
 			}
-	
-			// sock.onerror = (event) => {
-				// connection_status.textContent = "Errored 😤"
-			// }
-	
-			sock.onclose = (event) => {
-				// connection_status.textContent = "Closed \u{1F634}"
-				websocket_connected = false;
+			img_element.style["display"] = "none";
+			img_element.onclick = (event) => {
+				thumbnail_element.style["display"] = "inherit";
+				img_element.style["display"] = "none";
+			}
+			figure_element.appendChild(img_element);
+			thumbnail_element.setAttribute("loading", "lazy");
+			thumbnail_element.setAttribute("width", "150px");
+			thumbnail_element.setAttribute("height", "150px");
+			figure_element.appendChild(thumbnail_element);
+		}
+		else if (file_format === Format.AUDIO) {
+			let audio_element = document.createElement("audio");
+			audio_element.controls = true;
+			audio_element.setAttribute("controlslist", "nofullscreen nodownload");
+			audio_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
+			figure_element.appendChild(audio_element);
+		}
+		// else {
+			// thumbnail_element.setAttribute("src", "_ROOT_URL" + "placeholder.png");
+		// }
+		let pretty_filename;
+		if (filename_extension_i == -1) {
+			pretty_filename = filename.slice(0, filename.length - media_uuid_len);
+		}
+		else {
+			pretty_filename = filename.slice(0, filename_extension_i - media_uuid_len) + filename.slice(filename_extension_i, filename.length);
+		}
+		let figcaption_element = document.createElement("figcaption");
+		let media_src = "_ROOT_URL" + media_url + filename.replace(" ", "%20");
+		let figcaption_element_a = document.createElement("a");
+		figcaption_element_a.setAttribute("href", media_src);
+		figcaption_element_a.setAttribute("target", "_blank");
+		figcaption_element_a.textContent = pretty_filename;
+
+		let file_download_button = document.createElement("a");
+		file_download_button.setAttribute("href", media_src);
+		file_download_button.setAttribute("download", pretty_filename);
+		file_download_button.innerText = "\ud83d\udce5\ufe0e";
+
+		figcaption_element.append(figcaption_element_a, document.createTextNode("\u00A0"), file_download_button);
+		figure_element.appendChild(figcaption_element);
+		post_files_element.appendChild(figure_element);
+
+	}
+
+	post_box_element.appendChild(post_header_element);
+	post_box_element.appendChild(post_content_element);
+	post_box_element.appendChild(post_files_element);
+	// post_container_element.appendChild(post_box_element);
+	return post_box_element;
+}
+
+function refresh_send() {
+	if (typeof websocket !== "undefined") {
+		websocket.close();
+	}
+	if (state.selected_thread_id === -1) {
+		getThreads();
+	}
+	else {
+		getThreadPosts();
+	}
+}
+
+function connectToServer() {
+	let listening_to_thread = state.selected_thread_id;
+	let sock;
+	if (!websocket_connected) {
+		sock = new WebSocket("_WEBSOCKET_URL");
+		websocket_connected = true;
+	}
+	else {
+		return websocket;
+	}
+	sock.onopen = (event) => {
+		// connection_status.textContent = "Connected 🙂";
+		console.log("Websocket connected.");
+		websocket_connected = true;
+		clearInterval(reconnect_websocket_interval);
+		reconnect_websocket_interval = null;
+		if (state.selected_thread_id > -1) {
+			sock.send(JSON.stringify({
+				"type": "listen_to_thread",
+				"thread_id": state.selected_thread_id
+			}));
+		}
+	}
+
+	sock.onmessage = (event) => {
+		console.log("Message received: " + event.data);
+		let message_json = JSON.parse(event.data);
+		if (message_json.type === "post") {
+			// auto-scroll to new message if window was scrolled near the bottom already
+			// would be nice if window.scrollMaxY was standard! document.body.scrollHeight - document.body.clientHeight will be used instead
+			let do_scroll = window.scrollY >= document.body.scrollHeight - document.body.clientHeight - 10;
+
+			post_container.appendChild(createPost(JSON.parse(event.data)));
+
+			if (do_scroll) {
+				window.scrollTo(0, post_container.scrollHeight);
+			}
+		}
+		else {
+			console.error("message_json type " + message_json.type + " not recognised.");
+		}
+	}
+
+	// sock.onerror = (event) => {
+		// connection_status.textContent = "Errored 😤"
+	// }
+
+	sock.onclose = (event) => {
+		// connection_status.textContent = "Closed \u{1F634}"
+		websocket_connected = false;
+		if (state.selected_thread_id === listening_to_thread) {
+			console.log("Websocket connection closed. Re-connecting will be attempted in 30 seconds.");
+			setTimeout(() => {
 				if (state.selected_thread_id === listening_to_thread) {
-					console.log("Websocket connection closed. Re-connecting will be attempted in 30 seconds.");
-					setTimeout(() => {
-						if (state.selected_thread_id === listening_to_thread) {
-							websocket = connectToServer();
-						}
-					}, 30000);;
+					websocket = connectToServer();
 				}
+			}, 30000);;
+		}
+	}
+	return sock
+}
+
+function getFiles() {
+	let files = [];
+	for (let file of file_post_list.children) {
+		if (!file.classList.contains("Errored")) {
+			files.push(file.id.slice(5, file.id.length));
+		}
+	}
+	return files;
+}
+
+async function postMessage() {
+	console.log("posting message...");
+	let files = getFiles();
+	const data = {
+		post: {
+			name: name_field.value,
+			content: content_field.innerText,
+			files: files,
+			thread_id: state.selected_thread_id
+		}
+	};
+	console.log(data);
+	const fetch_response = await API.sendRequest("POST", "message", {}, data);
+
+	/*
+	const fetch_response = await fetch("_ROOT_URL" + "api/" + "create_message/", {
+		method: "POST",
+		headers: {"Token": API.getAccountToken()},
+		body: JSON.stringify(data)
+	});
+	*/
+	return fetch_response;
+}
+
+async function deleteMessage(thread_id, message_id) {
+	console.log("deleting message...");
+	const data = {
+		key: account_key || local_key
+		,thread_id: thread_id
+		,id_in_thread: message_id
+	};
+	const fetch_response = await API.sendRequest("DELETE", `post/${thread_id}/${message_id}`)
+	/*
+	fetch("_ROOT_URL" + api_url + "delete_message/" + `${thread_id}/${message_id}/`, {
+		method: "DELETE",
+		headers: {"Token": API.getAccountToken()},
+		// ,headers: {
+			// "auth-scheme": "token",
+		// 	"key": account_key || local_key
+		// }
+		body: JSON.stringify(data)
+	});
+	*/
+	return fetch_response;
+}
+
+async function postThread() {
+	console.log("posting thread...");
+	let files = getFiles();
+	const data = {
+		thread: {
+			post_zero: {
+				name: name_field.value,
+				content: content_field.innerText,
+				files: files
 			}
-			return sock
+			// ,key: account_key || local_key
 		}
+	};
+	console.log(data)
+	const fetch_response = API.sendRequest("POST", "thread", null, data);
+	//await fetch("_ROOT_URL" + api_url + "create_thread/", {
+	//	method: "POST",
+	//	body: JSON.stringify(data)
+	//});
+	return fetch_response;
+}
 
-		function getFiles() {
-			let files = [];
-			for (let file of file_post_list.children) {
-				if (!file.classList.contains("Errored")) {
-					files.push(file.id.slice(5, file.id.length));
-				}
-			}
-			return files;
-		}
-
-		async function postMessage() {
-			console.log("posting message...");
-			let files = getFiles();
-			const data = {
-				post: {
-					name: name_field.value,
-					content: content_field.innerText,
-					files: files,
-					thread_id: state.selected_thread_id
-					,key: account_key || local_key
-				}
-			};
-			console.log(data);
-			const fetch_response = await fetch("_ROOT_URL" + api_url + "create_message/", {
-				method: "POST",
-				body: JSON.stringify(data)
-			});
-			return fetch_response;
-		}
-
-		async function deleteMessage(thread_id, message_id) {
-			console.log("deleting message...");
-			const data = {
-				key: account_key || local_key
-				,thread_id: thread_id
-				,id_in_thread: message_id
-			};
-			const fetch_response = await fetch("_ROOT_URL" + api_url + "delete_message/" + `${thread_id}/${message_id}/`, {
-				method: "DELETE"
-				// ,headers: {
-					// "auth-scheme": "token",
-				// 	"key": account_key || local_key
-				// }
-				,body: JSON.stringify(data)
-			});
-			return fetch_response;
-		}
-	
-		async function postThread() {
-			console.log("posting thread...");
-			let files = getFiles();
-			const data = {
-				type: "create_thread",
-				thread: {
-					post_zero: {
-						name: name_field.value,
-						content: content_field.innerText,
-						files: files
-						,key: account_key || local_key
-					}
-					// ,key: account_key || local_key
-				}
-			};
-			console.log(data)
-			const fetch_response = await fetch("_ROOT_URL" + api_url + "create_thread/", {
-				method: "POST",
-				body: JSON.stringify(data)
-			});
-			return fetch_response;
-		}
-	
-		refresh_send();
-		loading_dialog.close();
-		// websocket = connectToServer();
-	</script>
+refresh_send();
+loading_dialog.close();
+// websocket = connectToServer();
+</script>
 </html>

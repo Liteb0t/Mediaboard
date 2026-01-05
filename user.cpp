@@ -1,9 +1,12 @@
 #include "user.hpp"
+#include <iostream>
 
 User::User(struct db_account_struct* account_struct) {
 	this->id = account_struct->id;
 	this->username = account_struct->username;
-	this->key = account_struct->key;
+	this->key = std::string(account_struct->key);
+	if (this->key.length() != KEY_LENGTH)
+		std::cerr << "User key length " << this->key.length() << " does not match macro KEY_LENGTH" << std::endl;
 }
 
 // User::User(int id, std::string username) 

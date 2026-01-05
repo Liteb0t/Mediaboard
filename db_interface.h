@@ -7,8 +7,8 @@
 #define DATABASE_PASSWORD_ENVIRONMENT_VARIABLE "FUZE_MEDIABOARD_PASSWORD"
 #define NUMBER_OF_PERMISSIONS 10
 #define GROUP_DENY 0
-#define GROUP_ALLOW 1
-#define GROUP_INHERIT 2
+#define GROUP_INHERIT 1
+#define GROUP_ALLOW 2
 
 #define GROUP_ADMINISTRATORS 0
 #define GROUP_USERS 1
@@ -142,13 +142,13 @@ extern "C" {
 	// Database functions
 		// Posts
 	int db_store_post(int thread_id, int id_in_thread, const char name[POST_MAX_NAME+1], time_t upload_timestamp, const char*, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key[KEY_LENGTH+1]);
-	int db_store_thread(int number_of_posts);
+	int db_store_thread(int number_of_posts, int _new_permission_object_id);
 	void db_mark_post_as_deleted(int post_id);
 	void db_mark_thread_as_deleted(int _thread_id);
 		// Accounts
 	int db_account_username_exists(const char* _username);
 	int db_store_account(const char* username, const char* password);
-	char db_fetch_key(char* key, const char* username, const char* password);
+	const char db_fetch_key(char* key, const char* username, const char* password);
 	int db_key_matches_account(const char* _key, const char* _username);
 	int db_account_matches_password(int _account_id, const char* _password);
 	char db_change_password(const char* username, const char* old_password, const char* new_password);
@@ -157,8 +157,13 @@ extern "C" {
 	int db_store_group(const char name_[GROUP_MAX_NAME+1]);
 	void db_delete_group(int _group_id);
 	void db_add_member_to_group(int _user_id, int _group_id);
+	void db_remove_member_from_group(int _user_id, int _group_id);
 	void db_update_group_heirarchy(struct db_group_heirarchy_array* group_heirarchy);
 	int db_get_unique_permission_object_id();
+	int db_store_permission_collection(int _permission_object_id, int _user_id, int _group_id);
+	void db_delete_permission_collection(int _permission_collection_id);
+	int db_store_permission_setting(int _permission_collection_id, int _permission_number, int _setting);
+	void db_update_permission_setting(int _permission_setting_id, int _setting);
 
 	// Read from database into dynamic array
 	struct db_post_struct db_retrieve_last_post(void);
