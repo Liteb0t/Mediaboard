@@ -678,7 +678,10 @@ class PermissionCollection {
 		permission_collection_container.textContent = "Select a group or user to view or modify its permission settings.";
 	}
 	static permissions = {
-		0: "Manage permissions"
+		0: "Manage permissions",
+		1: "View thread",
+		2: "Create thread",
+		3: "Send message"
 	};
 	static three_state_settings = {
 		0: "Deny",

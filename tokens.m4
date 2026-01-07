@@ -12,6 +12,7 @@ define(`_SITE_NAME', `Fuze Mediaboard')
 define(`_ROOT_URL', `/')
 # Path must start and end with a '/'. For example:
 # define(`_ROOT_URL', `/mediaboard/')
+define(`_FAVICON_URL', `https://fuze.page/favicon.ico')
 
 # Also edit the parser_->body_limit in http_session.cpp
 define(`_FILE_SIZE_LIMIT_MB', `100')
@@ -19,6 +20,7 @@ define(`_FILE_SIZE_LIMIT_MB', `100')
 # Defined in field_lengths.h
 define(`_POST_MAX_NAME', `32')
 define(`_POST_MAX_FILE_NAME', `205')
+define(`_POST_MAX_CONTENT', `5000')
 define(`_GROUP_MAX_NAME', `32')
 define(`_ACCOUNT_MAX_USERNAME', `32')
 

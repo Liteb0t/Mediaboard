@@ -5,17 +5,6 @@
 #include <time.h>
 #include "field_lengths.h"
 #define DATABASE_PASSWORD_ENVIRONMENT_VARIABLE "FUZE_MEDIABOARD_PASSWORD"
-#define NUMBER_OF_PERMISSIONS 10
-#define GROUP_DENY 0
-#define GROUP_INHERIT 1
-#define GROUP_ALLOW 2
-
-#define GROUP_ADMINISTRATORS 0
-#define GROUP_USERS 1
-#define GROUP_PUBLIC 2
-#define STR_GROUP_ADMINISTRATORS "0"
-#define STR_GROUP_USERS "1"
-#define STR_GROUP_PUBLIC "2"
 
 #ifdef __cplusplus
 extern "C" {

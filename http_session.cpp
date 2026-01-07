@@ -474,17 +474,6 @@ handle_request(
     	// Cache the size since we need it after the move
     	auto const size = body.size();
 
-    	// Respond to HEAD request
-    	if(req.method() == http::verb::head)
-    	{
-    	    http::response<http::empty_body> res{http::status::ok, req.version()};
-    	    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    	    res.set(http::field::content_type, mime_type(path));
-    	    res.content_length(size);
-    	    res.keep_alive(req.keep_alive());
-    	    return res;
-    	}
-
     	// Respond to GET request
     	http::response<http::file_body> res{
     	    std::piecewise_construct,
@@ -550,7 +539,7 @@ handle_request(
 				}
 				else {
 					std::string message_content = post_json["content"].template get<std::string>();
-					if ((message_content.length() > 0 || post_json["files"].size() > 0) && message_content.length() < POST_MAX_CONTENT) {
+					if ((message_content.length() > 0 || post_json["files"].size() > 0) && message_content.length() <= POST_MAX_CONTENT) {
 						if (is_thread) {
 							// if (state->userHasPermission())
 							request_json["thread"]["post_zero"]["key"] = client.second; // key is to identify the author of a post
@@ -615,19 +604,28 @@ handle_request(
 				catch(std::string error_text) {
 					return api_response(http::status::bad_request, std::string("Bad URL."));
 				}
-				if (thread->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS)) {
+				if (thread->userHasPermissionForGroup(client.first, PERMISSION::MANAGE_PERMISSIONS, group_in_url)) {
 					state->main_board()->addGroupPermissionCollectionToThread(group_in_url, thread_in_url.first);
-					// thread->addGroupPermissionCollection(group_in_url);
+					// thread->addGroupPermissionCollection(group_in_url); // Not used because pointer is read-only
 					return api_response(http::status::ok, std::string("Group permission collection created"));
 				}
 				else
 					return api_response(http::status::forbidden, std::string("User lacks permission MANAGE_PERMISSIONS"));
 			}
 			else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
-				int user_in_url = getNumberFromPath(thread_in_url.second+18+1).first;
-				// TODO check permission
-				// if (shared_state->userHasPermission()
-				thread->addUserPermissionCollection(user_in_url);
+				int user_in_url;
+				try {
+					user_in_url = getNumberFromPath(thread_in_url.second+18+1).first;
+				}
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, std::string("Bad URL."));
+				}
+				if (thread->userHasPermissionForUser(client.first, PERMISSION::MANAGE_PERMISSIONS, user_in_url)) {
+					state->main_board()->addUserPermissionCollectionToThread(user_in_url, thread_in_url.first);
+					return api_response(http::status::ok, std::string("Group permission collection created"));
+				}
+				else
+					return api_response(http::status::forbidden, std::string("User lacks permission MANAGE_PERMISSIONS"));
 				return api_response(http::status::ok, std::string("User permission collection created"));
 			}
 			else
@@ -1038,9 +1036,6 @@ handle_request(
 		}
 		else if (req_location.substr(0, 12) == "/api/thread/") {
 			// Assume we edit permissions, because that is the only feature implemented for PUT /api/thread/
-			bool is_group;
-			int group_or_user_in_url;
-			int rank_of_user_or_group;
 			std::pair<int, int> thread_in_url;
 			try {
 				thread_in_url = getNumberFromPath(12);
@@ -1049,19 +1044,6 @@ handle_request(
 				return api_response(http::status::bad_request, std::string("Bad URL."));
 			}
 			boost::shared_ptr<Thread> thread = state->getThread(0, thread_in_url.first);
-
-			if (req_location.substr(thread_in_url.second, 19) == "/permissions/group/") {
-				group_or_user_in_url = getNumberFromPath(30).first;
-				is_group = true;
-				rank_of_user_or_group = state->getGroupRank(group_or_user_in_url);
-			}
-			else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
-				group_or_user_in_url = getNumberFromPath(29).first;
-				is_group = false;
-				rank_of_user_or_group = state->getUserRank(group_or_user_in_url);
-			}
-			else
-				return api_response(http::status::not_found, std::string("/api/thread/ sub-URL not found"));
 
 			json request_json;
 			int _permission_number, _permission_setting;
@@ -1073,22 +1055,45 @@ handle_request(
 			catch (const json::exception& exception) {
 				return api_response(http::status::bad_request, exception.what());
 			}
-			// TODO check if ints are in range
+			if (_permission_number < 0 || _permission_number >= static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS))
+				return api_response(http::status::bad_request, std::string("Invalid permission number in JSON"));
 			PERMISSION permission = static_cast<PERMISSION>(_permission_number);
+			if (_permission_setting < 0 || _permission_setting >= 3)
+				return api_response(http::status::bad_request, std::string("Invalid permission setting in JSON"));
 			THREE_STATE_SETTING permission_setting = static_cast<THREE_STATE_SETTING>(_permission_setting);
-			if (thread->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS) && state->getUserRank(client.first) < rank_of_user_or_group) {
-				std::cout << "permission_setting: " << static_cast<int>(permission_setting) << std::endl;
-				if (is_group) {
-					thread->setGroupPermission(group_or_user_in_url, permission, permission_setting);
+
+			if (req_location.substr(thread_in_url.second, 19) == "/permissions/group/") {
+				std::pair<int, int> group_in_url;
+				try {
+					group_in_url = getNumberFromPath(12);
+				}
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, std::string("Bad URL."));
+				}
+				if (thread->userHasPermissionForGroup(client.first, PERMISSION::MANAGE_PERMISSIONS, group_in_url.first)) {
+					thread->setGroupPermission(group_in_url.first, permission, permission_setting);
 					return api_response(http::status::ok, std::string("Group permission updated"));
 				}
-				else {
-					thread->setUserPermission(group_or_user_in_url, permission, permission_setting);
+				else
+					return api_response(http::status::forbidden, std::string("Permission denied for this client"));
+			}
+			else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
+				std::pair<int, int> user_in_url;
+				try {
+					user_in_url = getNumberFromPath(12);
+				}
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, std::string("Bad URL."));
+				}
+				if (thread->userHasPermissionForUser(client.first, PERMISSION::MANAGE_PERMISSIONS, user_in_url.first)) {
+					thread->setUserPermission(user_in_url.first, permission, permission_setting);
 					return api_response(http::status::ok, std::string("User permission updated"));
 				}
+				else
+					return api_response(http::status::forbidden, std::string("Permission denied for this client"));
 			}
 			else
-				return api_response(http::status::forbidden, std::string("Permission denied for this client"));
+				return api_response(http::status::not_found, std::string("/api/thread/ sub-URL not found"));
 		}
 		else
 			return not_found(req.target());
@@ -1164,7 +1169,7 @@ handle_request(
 
 			std::pair<int, int> group_in_url = getNumberFromPath(11);
 			std::cout << "Group in URL: " << group_in_url.first << ", req_location.length(): " << req_location.length() << ", group.second: " << group_in_url.second << std::endl;
-			if (state->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS) && state->getUserRank(client.first) < state->getGroupRank(group_in_url.first)) {
+			if (state->userHasPermissionForGroup(client.first, PERMISSION::MANAGE_PERMISSIONS, group_in_url.first)) {
 				if (req_location.length() > group_in_url.second+1) {
 					std::cout << req_location.substr(group_in_url.second+1, 7) << std::endl;
 					if (req_location.substr(group_in_url.second+1, 7) == "member/") {
@@ -1198,7 +1203,7 @@ handle_request(
 					return api_response(http::status::bad_request, error_text);
 				}
 				std::pair<int, int> group_in_url = getNumberFromPath(30);
-				if (state->userHasPermission(client.first, PERMISSION::MANAGE_PERMISSIONS) && state->getUserRank(client.first) < state->getGroupRank(group_in_url.first)) {
+				if (state->userHasPermissionForGroup(client.first, PERMISSION::MANAGE_PERMISSIONS, group_in_url.first)) {
 					state->removeGroupPermissionCollection(group_in_url.first);
 					return api_response(http::status::ok, std::string("Group permission collection removed"));
 				}
@@ -1207,12 +1212,23 @@ handle_request(
 				// return api_response(http::status::not_implemented, std::string("Group ID: " + std::to_string(group_in_url.first) + " but action not implemented"));
 			}
 			else if (req_location.substr(12, 17) == "permissions/user/") {
+				std::pair<int, std::string> client;
+				try {
+					client = getUserFromToken();
+				}
+				catch(std::string error_text) {
+					return api_response(http::status::bad_request, error_text);
+				}
 				int user_in_url = getNumberFromPath(29).first;
 				// TODO check if user exists
 				// TODO get user from token and check his/her permission
 				// if (shared_state->userHasPermission()
-				state->removeUserPermissionCollection(user_in_url);
-				return api_response(http::status::ok, std::string("User permission collection removed"));
+				if (state->userHasPermissionForUser(client.first, PERMISSION::MANAGE_PERMISSIONS, user_in_url)) {
+					state->removeUserPermissionCollection(user_in_url);
+					return api_response(http::status::ok, std::string("User permission collection removed"));
+				}
+				else
+					return api_response(http::status::unauthorized, std::string("Couldn't remove group permission collection; Permission denied for this client"));
 			}
 			else
 				return api_response(http::status::not_found, std::string("/api/server sub-URL not found"));
@@ -1268,6 +1284,16 @@ handle_request(
 			return api_response(http::status::bad_request, std::string("Unknown target: ") + std::string(req.target()));
 		}
 	}
+	/*
+	else if(req.method() == http::verb::head) {
+		http::response<http::empty_body> res{http::status::ok, req.version()};
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		res.set(http::field::content_type, mime_type(path));
+		res.content_length(size);
+		res.keep_alive(req.keep_alive());
+		return res;
+	}
+	*/
 	else {
         http::response<http::empty_body> res{http::status::not_implemented, req.version()};
         res.set(http::field::server, BOOST_BEAST_VERSION_STRING);

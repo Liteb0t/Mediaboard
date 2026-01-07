@@ -57,6 +57,7 @@ public:
 	virtual std::vector<int> getOrderedGroupsContainingMember(int user_id) const = 0;
 	virtual bool getInheritedPermission(int user_id, PERMISSION permission) const = 0;
 	virtual int getUserRank(int user_id) const = 0;
+	virtual int getGroupRank(int group_id) const = 0;
 	bool userHasPermission(int user_id, PERMISSION permission) const {
 		bool inherited_permission = this->getInheritedPermission(user_id, permission);
 		inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::PUBLIC));
@@ -74,6 +75,16 @@ public:
 		}
 
 		return inherited_permission;
+	}
+	bool userHasPermissionForGroup(int user_id, PERMISSION permission, int group_id) const {
+		if (!this->userHasPermission(user_id, permission))
+			return false;
+		return this->getUserRank(user_id) < this->getGroupRank(group_id);
+	}
+	bool userHasPermissionForUser(int user_id, PERMISSION permission, int _user_id) const {
+		if (!this->userHasPermission(user_id, permission))
+			return false;
+		return this->getUserRank(user_id) < this->getUserRank(_user_id);
 	}
 	virtual const boost::shared_ptr<std::unordered_map<int, User>> getUsers() const = 0;
 protected:
@@ -219,6 +230,9 @@ public:
 	}
 	int getUserRank(int user_id) const {
 		return this->parent_object->getUserRank(user_id);
+	}
+	int getGroupRank(int group_id) const {
+		return this->parent_object->getGroupRank(group_id);
 	}
 	const boost::shared_ptr<std::unordered_map<int, User>> getUsers() const {
 		return this->parent_object->getUsers();

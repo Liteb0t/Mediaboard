@@ -9,7 +9,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
 		<base href="_ROOT_URL">
-		<!--<link rel="icon" type="image/x-icon" href="/static/favicon.ico">-->
+		<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
 		<link rel="stylesheet" href="styles.css">
 	</head>
 	<body>
@@ -34,7 +34,6 @@
 				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.5</a>
 			</div>
 			<h3 id="location_indicator"></h3>
-			<dialog id="loading_dialog" open><p>Loading. Please wait...</p></dialog>
 			<noscript>
 				<dialog open><h2>Error</h2><p><b>Enable Javascript</b>, you fucking autist neckbeard. It's not gonna hurt you.</p></dialog>
 			</noscript>
@@ -42,7 +41,7 @@
 		</main>
 		<div id="body_separator" class="FlexSeparator"></div>
 		<details id="reply_container" open="">
-			<summary id="reply_heading_text"></summary>
+			<summary><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator"></span></div></summary>
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
 			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Username" maxlength="_POST_MAX_NAME" />
@@ -57,6 +56,7 @@
 			</form>
 		</details>
 		<div id="bottom_marker"></div>
+		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="thread_posted_dialog" closedby="any">
 			<h2>Thread posted!</h2>
 			<p>Click outside this box or hit the <kbd>Esc</kbd> key to close this dialog.</p>
@@ -209,7 +209,16 @@ main {
 		cursor: pointer;
 		user-select: none;
 		&:hover {
-			background: #dddc;
+			background: #DDDB;
+		}
+		>div {
+			display: inline-flex;
+		}
+	}
+	#content_length_indicator {
+		color: #880;
+		&.LimitExceeded {
+			color: #B00;
 		}
 	}
 }
@@ -224,8 +233,8 @@ main {
 		font-family: var(--name-font);
 	}
 	input[type=text], div[contenteditable] {
-		background: #FFF6;
-		backdrop-filter: blur(8px);
+		background: #FFF8;
+		backdrop-filter: blur(10px);
 		font-size: inherit;
 		border-radius: 0;
 		border: 1px inset #bbb;
@@ -281,6 +290,7 @@ main {
 <script src="api.js"></script>
 <script>
 "use strict";
+loading_dialog.showModal();
 const media_url = "media/";
 const thumbnail_url = "media/thumbnails/";
 const file_size_limit = _FILE_SIZE_LIMIT_MB*1024*1024;
@@ -297,6 +307,7 @@ let websocket;
 let websocket_connected = false;
 let reconnect_websocket_interval;
 let is_administrator = false;
+const content_field_text_encoder = new TextEncoder();
 console.log(websocket);
 
 // For embedding Mediaboard within a webpage using an <iframe>.
@@ -404,7 +415,7 @@ function logoutAction() {
 
 async function postAction() {
 	let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
-	let content_length_bytes = (new TextEncoder().encode(content_field.innerText)).length;
+	let content_length_bytes = (content_field_text_encoder.encode(content_field.innerText)).length;
 	console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
 	if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
 		post_content_empty_dialog.showModal();
@@ -413,7 +424,7 @@ async function postAction() {
 		post_name_too_long_dialog_name_length.textContent = name_length_bytes;
 		post_name_too_long_dialog.showModal();
 	}
-	else if (content_length_bytes > 5000) {
+	else if (content_length_bytes > _POST_MAX_CONTENT) {
 		post_content_too_long_dialog_content_length.textContent = content_length_bytes;
 		post_content_too_long_dialog.showModal();
 	}
@@ -432,6 +443,7 @@ async function postAction() {
 			content_field.textContent = "";
 			file_upload.value = "";
 			file_post_list.textContent = "";
+			content_length_indicator.style["display"] = "none";
 			if (state.selected_thread_id === -1) {
 				let new_thread_id = Number(response.headers.get("new-thread-id"));
 				thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
@@ -589,9 +601,32 @@ function addFileToList(filename) {
 }
 
 content_field.oninput = () => {
-	// Remove leftover <br> tag so the placeholder appears again
+	// Remove leftover <br> tag from contenteditable so the 'Content' placeholder appears again
 	if (content_field.childElementCount === 1 && content_field.children[0].tagName === "BR" && content_field.textContent.length === 0) {
 		content_field.removeChild(content_field.children[0]);
+	}
+
+	let content_field_length = (content_field_text_encoder.encode(content_field.innerText)).length;
+	if (content_field_length > Math.round(_POST_MAX_CONTENT * 0.8)) {
+		if (content_length_indicator.style["display"] === "none") {
+			content_length_indicator.style["display"] = "inherit";
+		}
+		content_length_indicator.textContent = `${content_field_length}/${_POST_MAX_CONTENT}`;
+		if (content_field_length > _POST_MAX_CONTENT) {
+			if (!content_length_indicator.classList.contains("LimitExceeded")) {
+				content_length_indicator.classList.add("LimitExceeded");
+			}
+		}
+		else {
+			if (content_length_indicator.classList.contains("LimitExceeded")) {
+				content_length_indicator.classList.remove("LimitExceeded");
+			}
+		}
+	}
+	else {
+		if (content_length_indicator.style["display"] !== "none") {
+			content_length_indicator.style["display"] = "none";
+		}
 	}
 }
 
@@ -618,8 +653,7 @@ const callback = (entries, observer) => {
 
 	console.log(entries);
 }
-const observer = new IntersectionObserver(callback, options);
-observer.observe(bottom_marker);
+const scrolled_to_bottom_observer = new IntersectionObserver(callback, options);
 
 function sanitiseFileName(file_name) {
 	let sanitised_file_name = "";
@@ -932,15 +966,15 @@ function createPost(data) {
 	return post_box_element;
 }
 
-function refresh_send() {
+async function refresh_send() {
 	if (typeof websocket !== "undefined") {
 		websocket.close();
 	}
 	if (state.selected_thread_id === -1) {
-		getThreads();
+		await getThreads();
 	}
 	else {
-		getThreadPosts();
+		await getThreadPosts();
 	}
 }
 
@@ -1083,8 +1117,7 @@ async function postThread() {
 	return fetch_response;
 }
 
-refresh_send();
-loading_dialog.close();
+
 // websocket = connectToServer();
 async function getClientInfo() {
 	const response = await API.sendRequest("GET", `user/client`);
@@ -1099,5 +1132,9 @@ async function getClientInfo() {
 	}
 }
 getClientInfo();
+refresh_send().then(() => {
+	loading_dialog.close();
+	scrolled_to_bottom_observer.observe(bottom_marker);
+})
 </script>
 </html>
