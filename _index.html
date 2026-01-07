@@ -19,6 +19,7 @@
 				<div id="WebsiteName"><b>_SITE_NAME</b></div>
 				<button id="threads_button" class="ToolBarButton" onclick="openThreadList()">&#x1F5D0; Threads</button>
 				<button id="refresh_button" class="ToolBarButton" onclick="refresh_send()">&#x2B6E; Refresh</button>
+				<a id="manage_server_button" class="Button ToolBarButton" href="manage_server.html" style="display: none;">Manage server</a>
 				<div class="FlexSeparator"></div>
 				<div id="warning_outdated_browser" style="color: #D00">Warning: outdated browser</div>
 				<!--
@@ -35,7 +36,7 @@
 			<h3 id="location_indicator"></h3>
 			<dialog id="loading_dialog" open><p>Loading. Please wait...</p></dialog>
 			<noscript>
-				<dialog open><h2>Error</h2><p><b>Enable javascript</b> you fucking autist neckbeard, it's not gonna hurt you.</p></dialog>
+				<dialog open><h2>Error</h2><p><b>Enable Javascript</b>, you fucking autist neckbeard. It's not gonna hurt you.</p></dialog>
 			</noscript>
 			<div id="post_container"></div>
 		</main>
@@ -44,7 +45,7 @@
 			<summary id="reply_heading_text"></summary>
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
-			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Name" maxlength="_POST_MAX_NAME" />
+			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Username" maxlength="_POST_MAX_NAME" />
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned Button" onclick="postAction()">
 			</div>
 			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content"></div>
@@ -223,7 +224,7 @@ main {
 		font-family: var(--name-font);
 	}
 	input[type=text], div[contenteditable] {
-		background: #FFF4;
+		background: #FFF6;
 		backdrop-filter: blur(8px);
 		font-size: inherit;
 		border-radius: 0;
@@ -394,6 +395,7 @@ function logoutAction() {
 	logged_in_indicator.style["display"] = "none";
 	registration_link.style["display"] = "inherit";
 	change_password_link.style["display"] = "none";
+	manage_server_button.style["display"] = "none";
 	localStorage.removeItem("account_key");
 	account_key = null;
 	is_administrator = false;
@@ -573,9 +575,9 @@ function addFileToList(filename) {
 	file_title.textContent = filename;
 	let file_delete_button = document.createElement("button");
 	file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
-	let progress_element = document.createElement("progress");
-	progress_element.value = 0;
-	file_information_container.append(file_title, document.createElement("br"), progress_element, document.createElement("br"), file_delete_button);
+	let progress_bar = document.createElement("progress");
+	progress_bar.value = 0;
+	file_information_container.append(file_title, document.createElement("br"), progress_bar, document.createElement("br"), file_delete_button);
 	file_container.append(file_thumbnail, file_information_container);
 	file_post_list.appendChild(file_container);
 	file_delete_button.onclick = (event) => {
@@ -652,7 +654,7 @@ function uploadFile(file_object) {
 		file_progress_element.value = event.loaded;
 	});
 	request.responseType = "text";
-	request.open("POST", "_ROOT_URL" + api_url + "upload/");
+	request.open("POST", "_ROOT_URL" + "api/upload/");
 	request.timeout = 60*60*1000; // 1 hour
 	request.onreadystatechange = () => {
 		console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
@@ -782,6 +784,7 @@ function createPost(data) {
 	right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
 
 	// Delete button
+	// TODO replace is_administrator with client permission
 	if ((is_administrator === true || data.is_author) && !url_params_display_as_embed) {
 		let delete_button_element = document.createElement("button");
 		delete_button_element.textContent = "\u{1F5D1} Delete";
@@ -811,7 +814,7 @@ function createPost(data) {
 			selection = window.getSelection();
 			if (content_field.contains(selection.focusNode)) {
 				range = selection.getRangeAt(0);
-				console.log(range);
+				// console.log(range);
 				range.insertNode(reply_link_node);
 			}
 			else
@@ -819,7 +822,7 @@ function createPost(data) {
 
 			// Move caret position to end of reply tag
 			range = document.createRange();
-			console.log(reply_link_node);
+			// console.log(reply_link_node);
 			range.setStartAfter(reply_link_node);
 			range.collapse(true);
 			selection.removeAllRanges();
@@ -913,6 +916,7 @@ function createPost(data) {
 		let file_download_button = document.createElement("a");
 		file_download_button.setAttribute("href", media_src);
 		file_download_button.setAttribute("download", pretty_filename);
+		file_download_button.setAttribute("title", "Download");
 		file_download_button.innerText = "\ud83d\udce5\ufe0e";
 
 		figcaption_element.append(figcaption_element_a, document.createTextNode("\u00A0"), file_download_button);
@@ -1018,7 +1022,7 @@ async function postMessage() {
 	const data = {
 		post: {
 			name: name_field.value,
-			content: content_field.innerText,
+			content: content_field.innerText.trim(),
 			files: files,
 			thread_id: state.selected_thread_id
 		}
@@ -1065,14 +1069,13 @@ async function postThread() {
 		thread: {
 			post_zero: {
 				name: name_field.value,
-				content: content_field.innerText,
+				content: content_field.innerText.trim(),
 				files: files
 			}
-			// ,key: account_key || local_key
 		}
 	};
 	console.log(data)
-	const fetch_response = API.sendRequest("POST", "thread", null, data);
+	const fetch_response = await API.sendRequest("POST", "thread", null, data);
 	//await fetch("_ROOT_URL" + api_url + "create_thread/", {
 	//	method: "POST",
 	//	body: JSON.stringify(data)
@@ -1083,5 +1086,18 @@ async function postThread() {
 refresh_send();
 loading_dialog.close();
 // websocket = connectToServer();
+async function getClientInfo() {
+	const response = await API.sendRequest("GET", `user/client`);
+	console.log(response);
+	if (response.ok) {
+		await response.json().then(response_json => {
+			console.log(response_json);
+			if (response_json["server_permissions"]["manage_permissions"] === true) {
+				manage_server_button.style["display"] = "inherit";
+			}
+		});
+	}
+}
+getClientInfo();
 </script>
 </html>

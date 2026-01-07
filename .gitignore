@@ -1,5 +1,6 @@
 *.o
 *.swp
+.cache/
 server
 index.html
 registration.html

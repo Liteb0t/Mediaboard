@@ -11,6 +11,7 @@
 #include "permission_managed_object.hpp"
 #include "websocket_session.hpp"
 #include "field_lengths.h"
+#include <boost/beast/http/status.hpp>
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/locale.hpp>
@@ -393,15 +394,29 @@ handle_request(
 				res.body() = state->dumpAllGroups(username, key);
 				res.result(http::status::ok);
 			}
-			else if (req_location.substr(5) == "users/") {
-				/*std::pair<int, std::string> client;
-				try {
-					client = getUserFromToken();
+			// Currently only used for checking if the client has MANAGE_PERMISSIONS on the server level, so the frontend can determine whether to show the "manage server" tab
+			else if (req_location.substr(5, 5) == "user/") {
+				int user_id;
+				if (req_location.substr(10) == "client/")
+					user_id = client.first;
+				else {
+					return api_response(http::status::not_implemented, std::string("only /user/client/ is implemented"));
+					/*
+					std::pair<int, int> user_in_url;
+					try {
+						user_in_url = getNumberFromPath(10);
+					}
+					catch(std::string error_text) {
+						return api_response(http::status::bad_request, std::string("Couldn't get client ID from URL ") + req_location);
+					}
+					user_id = user_in_url.first;
+					*/
 				}
-				catch(std::string error_text) {
-					return api_response(http::status::bad_request, error_text);
-				}*/
-				// TODO check if username and key exist + are correct
+				nlohmann::json response_json;
+				response_json["server_permissions"]["manage_permissions"] = state->userHasPermission(user_id, PERMISSION::MANAGE_PERMISSIONS);
+				return api_response_json(http::status::ok, response_json);
+			}
+			else if (req_location.substr(5) == "users/") {
 				res.body() = state->dumpAllUsers(client.first);
 				int user_rank = state->getUserRank(client.first);
 				res.set("Client-Rank", std::to_string(user_rank));
@@ -1306,7 +1321,7 @@ do_read()
     parser_->body_limit(100 << 20);
 
     // Set the timeout.
-    stream_.expires_after(std::chrono::seconds(30));
+    stream_.expires_after(std::chrono::minutes(60));
 
     // Read a request
     http::async_read(
