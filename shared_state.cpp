@@ -83,15 +83,14 @@ void shared_state::sendToThread(std::string message, int thread_id) {
             sp->send(ss);
 }
 
-std::string shared_state::dumpAllGroups(std::string username, std::string key) const {
+std::string shared_state::dumpAllGroups(int client_id) const {
 	std::cout << "Dumping from ordered_groups_vec: ";
 
 	json groups_json;
 	groups_json["groups"] = json::object();
-	int user_id = this->getIdFromUsername(username);
 	int group_editable_threshold;
-	if (this->userHasPermission(user_id, PERMISSION::MANAGE_PERMISSIONS))
-		group_editable_threshold = this->getUserRank(user_id) + 1;
+	if (this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS))
+		group_editable_threshold = this->getUserRank(client_id) + 1;
 	else
 		group_editable_threshold = this->getOrderedGroups()->size();
 	for (int i = 0; i < this->getOrderedGroups()->size(); i++) {
@@ -145,48 +144,20 @@ std::string shared_state::dumpMembersInGroupAsArray(int group_id) const {
 	return members_json.dump();
 }
 
-BasicResponse shared_state::createGroup(std::string username, std::string key, std::string new_group_name) {
+BasicResponse shared_state::createGroup(int client_id, std::string new_group_name) {
 // int shared_state::createGroup(nlohmann::json request_json) {
-	int new_group_rank = this->getUserRank(this->getIdFromUsername(username)) + 1;
+	int new_group_rank = this->getUserRank(client_id) + 1;
 	/*int new_group_id = */this->addGroup(new_group_name, new_group_rank);
 	return BasicResponse(http::status::ok, std::string("Group created"));
 }
 
-/*
-BasicResponse shared_state::setGroupHeirarchy(nlohmann::json request_json) {
-	if (request_json.contains("new_group_heirarchy")) {
-		std::vector<int> new_group_heirarchy;
-		try {
-			new_group_heirarchy = request_json["new_group_heirarchy"].template get<std::vector<int>>();
-		}
-		catch (const json::exception& exception) {
-			return api_response(http::status::bad_request, exception.what());
-		}
-		try {
-			this->setGroupHeirarchy(new_group_heirarchy);
-		}
-		catch 
-		// BasicResponse function_response = state->setGroupHeirarchy(new_group_heirarchy);
-		return api_response(function_response.status, function_response.message);
-	}
-	else
-		return api_response(http::status::bad_request, "ordered_groups not found in JSON request");
-*/
 // Return non-zero when action is rejected. An error is returned to the user from http_session
-BasicResponse shared_state::setGroupHeirarchy(std::string username, std::string key, std::vector<int> ordered_groups) {
-	// TODO refactor user authentication into one function
-	int user_id;
-	if (this->userExists(username))
-		user_id = this->getIdFromUsername(username);
-	else
-		return BasicResponse(http::status::bad_request, std::string("User with this username was not found."));
-	if (key != this->getUserKey(user_id))
-		return BasicResponse(http::status::bad_request, std::string("Incorrect key."));
+BasicResponse shared_state::setGroupHeirarchy(int client_id, std::vector<int> ordered_groups) {
 	int user_rank;
-	if (!this->userHasPermission(user_id, PERMISSION::MANAGE_PERMISSIONS))
+	if (!this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::bad_request, std::string("Cannot change group heirarchy; permission denied."));
 	else
-		user_rank = this->getUserRank(user_id);
+		user_rank = this->getUserRank(client_id);
 
 	if (ordered_groups.size() != this->getOrderedGroups()->size()) {
 		return BasicResponse(http::status::bad_request, std::string("Number of groups does not match."));
@@ -225,25 +196,6 @@ BasicResponse shared_state::setGroupHeirarchy(std::string username, std::string 
 
 	return BasicResponse(http::status::ok, std::string("Updated group heirarchy")); // Success
 }
-/*
-void shared_state::updateGroupHeirarchy() {
-	std::cout << "[shared_state] running updateGroupHeirarchy" << std::endl;
-	std::cout << "Logging from ordered_groups_vec: ";
-	for (int i = 0; i < this->ordered_groups_vec.size(); i++)
-		std::cout << i << ": " << this->ordered_groups_vec[i] << ", ";
-	std::cout << "done." << std::endl;
-
-	struct db_group_heirarchy_array group_heirarchy;
-	initGroupHeirarchyArray(&group_heirarchy, this->ordered_groups_vec.size());
-	for (int i = 0; i < this->ordered_groups_vec.size(); i++) {
-		struct db_group_heirarchy_struct group;
-		group.rank = i;
-		group.group_id = ordered_groups_vec[i];
-		insertToGroupHeirarchyArray(&group_heirarchy, group);
-	}
-	db_update_group_heirarchy(&group_heirarchy);
-	freeGroupHeirarchyArray(&group_heirarchy);
-}*/
 
 BasicResponse shared_state::createAccount(json account_json) {
 	if (       account_json.contains("username")
@@ -293,59 +245,16 @@ BasicResponse shared_state::getKeyFromPassword(json request_json) const {
 	else
 		return BasicResponse(http::status::bad_request, std::string("One or more JSON fields missing from request"));
 }
-/*
-BasicResponse shared_state::deleteGroup(std::string username, std::string key, int group_id) {
-	// TODO refactor user authentication into one function
-	int user_id;
-	if (this->userExists(username))
-		user_id = this->getIdFromUsername(username);
-	else
-		return BasicResponse(http::status::bad_request, std::string("User with this username was not found."));
-	if (key != this->getUserKey(user_id))
-		return BasicResponse(http::status::bad_request, std::string("Incorrect key."));
-	int user_rank;
-	if (!this->userHasPermission(user_id, PERMISSION::MANAGE_PERMISSIONS))
-		return BasicResponse(http::status::bad_request, std::string("Cannot change group heirarchy; permission denied."));
-	else
-		user_rank = this->getUserRank(user_id);
-	std::cout << "User has permission. ";
-
-	// Check if group exists
-	if (!this->groupExists(group_id)) {
-		return BasicResponse(http::status::bad_request, "Group " + std::to_string(group_id) + " does not exist."); // Group does not exist
-	}
-	std::cout << "Group exists. ";
-
-	if (group_id == static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS) ||
-			group_id == static_cast<int>(BUILTIN_GROUPS::USERS) ||
-			group_id == static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
-		return BasicResponse(http::status::bad_request, std::string("Attempted to delete a locked group"));
-	}
-	// Check if user rank is high enough to delete this group
-	int group_rank = this->getGroupRank(group_id);
-	if (group_rank <= user_rank)
-		return BasicResponse(http::status::bad_request, std::string("Permission denied; attempted to delete a group greater than or equal to your rank."));
-	std::cout << "Group rank works. ";
-
-	this->eraseGroup(group_id);
-
-	return BasicResponse(http::status::ok, std::string("Updated group heirarchy")); // Success
-}
-*/
 
 std::string shared_state::dumpAllUsers(int client_id) const {
 	json users_json;
 	users_json["users"] = json::object();
 	int client_rank = this->getUserRank(client_id);
 	bool client_has_manage_permissions_permission = this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS);
-	// for (int i = 0; i < this->getUsers()->size(); i++) {
-	// for (int user_id : *(this->getUsers())) {
-	// TODO dont use raw pointers
 	boost::shared_ptr<std::unordered_map<int, User>> _users = this->getUsers();
 	for (std::unordered_map<int, User>::const_iterator user_it = _users->begin(); user_it != _users->end(); user_it++) {
 		int user_id = user_it->first;
 		const User* user = this->getUser(user_id);
-		// int user_id = (*(this->getUsers()))[i];
 		std::cout << user_id << ", ";
 		// json user_json = this->getUser(user_id)->asJson();
 		nlohmann::json user_json = json::object();
@@ -370,20 +279,12 @@ std::string shared_state::dumpAllUsers(int client_id) const {
 	return users_json.dump();
 }
 
-BasicResponse shared_state::addUserToGroups(std::string username, std::string key, int user_id, std::vector<int> groups_by_id) {
-	// TODO refactor user authentication into one function
-	int client_user_id;
-	if (this->userExists(username))
-		client_user_id = this->getIdFromUsername(username);
-	else
-		return BasicResponse(http::status::bad_request, std::string("User with this username was not found."));
-	if (key != this->getUserKey(client_user_id))
-		return BasicResponse(http::status::forbidden, std::string("Incorrect key."));
-	int client_user_rank;
-	if (!this->userHasPermission(client_user_id, PERMISSION::MANAGE_PERMISSIONS))
+BasicResponse shared_state::addUserToGroups(int client_id, int user_id, std::vector<int> groups_by_id) {
+	int client_rank;
+	if (!this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::forbidden, std::string("Cannot change group heirarchy; permission denied."));
 	else
-		client_user_rank = this->getUserRank(client_user_id);
+		client_rank = this->getUserRank(client_id);
 	std::cout << "User has permission. ";
 	for (int group_id : groups_by_id) {
 		if (	static_cast<BUILTIN_GROUPS>(group_id) == BUILTIN_GROUPS::USERS
@@ -393,7 +294,7 @@ BasicResponse shared_state::addUserToGroups(std::string username, std::string ke
 	}
 	for (int group_id : groups_by_id) {
 		// const Group* group = this->getGroup(group_id);
-		if (client_user_rank < this->getGroupRank(group_id)) {
+		if (client_rank < this->getGroupRank(group_id)) {
 			this->addUserToGroup(user_id, group_id);
 		}
 		else {

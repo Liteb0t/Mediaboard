@@ -77,18 +77,23 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 
 	nlohmann::json user_permissions_json = nlohmann::json::object();
 	// int user_rank = this->getUserRank(client_id);
-	// boost::shared_ptr<std::unordered_map<int, User>> users = this->getUsers();
-	for (const std::pair<int, User> user : *this->getUsers()) {
-		std::unordered_map<int, PermissionCollection>::const_iterator user_permission_collection_it = this->user_permissions.find(user.first);
+	std::cout << "getting user_permissions_json..." << std::endl;
+	// for (const std::pair<int, User> user : *this->getUsers()) {
+	boost::shared_ptr<std::unordered_map<int, User>> _users = this->getUsers();
+	for (std::unordered_map<int, User>::const_iterator user_it = _users->begin(); user_it != _users->end(); user_it++) {
+		int user_id = user_it->first;
+		std::cout << user_id << ", ";
+		std::unordered_map<int, PermissionCollection>::const_iterator user_permission_collection_it = this->user_permissions.find(user_id);
 		if (user_permission_collection_it != this->user_permissions.end()) {
 			const std::unordered_map<PERMISSION, PermissionSetting>* permission_settings = user_permission_collection_it->second.getPermissionMap();
 			nlohmann::json permission_collection_json = nlohmann::json::object();
 			for (std::unordered_map<PERMISSION, PermissionSetting>::const_iterator permission_it = permission_settings->begin(); permission_it != permission_settings->end(); permission_it++) {
 				permission_collection_json[std::to_string(static_cast<int>(permission_it->first))] = static_cast<int>(permission_it->second.get());
 			}
-			user_permissions_json[std::to_string(user.first)]["permission_collection"] = permission_collection_json;
+			user_permissions_json[std::to_string(user_id)]["permission_collection"] = permission_collection_json;
 		}
 	}
+	std::cout << "done." << std::endl;
 
 	permission_collections_json["user_permissions"] = user_permissions_json;
 

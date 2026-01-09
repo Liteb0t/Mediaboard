@@ -57,6 +57,13 @@ input[type=file]::file-selector-button:active {
 	border-style: inset;
 }
 
+input[type=text], input[type=password], div[contenteditable] {
+	font-size: inherit;
+	border-radius: 0;
+	border: 1px inset #bbb;
+	min-height: 1.5em;
+}
+
 dialog {
 	box-shadow: 8px 8px #0008;
 	width: min(25em, calc(90vw - 2em));
@@ -121,5 +128,19 @@ dialog {
 		&:not(:first-child) {
 			border-left: 1px solid #888 !important;
 		}
+	}
+}
+
+#error_messages { /* Used in _change_password.html and _registration.html */
+	color: #800;
+}
+.FormGrid {
+	display: grid;
+	grid-template-columns: auto auto auto;
+	gap: 0.25em 0.5em;
+	margin: 4px 0;
+	width: fit-content;
+	.FullWidth {
+		grid-column: 1 / 4;
 	}
 }

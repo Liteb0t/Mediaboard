@@ -58,6 +58,7 @@ public:
 	virtual bool getInheritedPermission(int user_id, PERMISSION permission) const = 0;
 	virtual int getUserRank(int user_id) const = 0;
 	virtual int getGroupRank(int group_id) const = 0;
+	virtual const boost::shared_ptr<std::unordered_map<int, User>> getUsers() const = 0;
 	bool userHasPermission(int user_id, PERMISSION permission) const {
 		bool inherited_permission = this->getInheritedPermission(user_id, permission);
 		inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::PUBLIC));
@@ -86,7 +87,6 @@ public:
 			return false;
 		return this->getUserRank(user_id) < this->getUserRank(_user_id);
 	}
-	virtual const boost::shared_ptr<std::unordered_map<int, User>> getUsers() const = 0;
 protected:
 	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
 private:

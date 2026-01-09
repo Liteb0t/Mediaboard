@@ -51,11 +51,10 @@ public:
 	boost::shared_ptr<Board> main_board() const { return this->boards.at(0); }
 
 	// int createGroup(nlohmann::json group_json);
-	BasicResponse createGroup(std::string username, std::string key, std::string new_group_name);
-	// BasicResponse deleteGroup(std::string username, std::string key, int group_id);
+	BasicResponse createGroup(int client_id, std::string new_group_name);
 	// int createGroup(std::string new_group_name, int new_group_rank);
-	std::string dumpAllGroups(std::string username, std::string key) const;
-	BasicResponse setGroupHeirarchy(std::string username, std::string key, std::vector<int> ordered_groups);
+	std::string dumpAllGroups(int client_id) const;
+	BasicResponse setGroupHeirarchy(int client_id, std::vector<int> ordered_groups);
 	BasicResponse createAccount(nlohmann::json user_json);
 	std::string dumpMembersInGroup(int group_id) const;
 	std::string dumpMembersInGroupAsArray(int group_id) const;
@@ -64,7 +63,7 @@ public:
 	boost::shared_ptr<Thread> getThread(int board_id, int thread_id) const { return this->main_board()->getThread(thread_id); }
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
 	BasicResponse getKeyFromPassword(nlohmann::json request_json) const;
-	BasicResponse addUserToGroups(std::string username, std::string key, int user_id, std::vector<int> groups_by_id);
+	BasicResponse addUserToGroups(int client_id, int user_id, std::vector<int> groups_by_id);
 
     void join  (websocket_session* session);
     void leave (websocket_session* session);

@@ -140,7 +140,7 @@ extern "C" {
 	const char db_fetch_key(char* key, const char* username, const char* password);
 	int db_key_matches_account(const char* _key, const char* _username);
 	int db_account_matches_password(int _account_id, const char* _password);
-	char db_change_password(const char* username, const char* old_password, const char* new_password);
+	char db_change_password(int _account_id, const char* old_password, const char* new_password);
 	void db_create_administrator(const char* _password);
 		// Permissions
 	int db_store_group(const char name_[GROUP_MAX_NAME+1]);

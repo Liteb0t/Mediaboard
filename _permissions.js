@@ -79,6 +79,7 @@ class Group {
 		this.group_list = group_list;
 		this.id = group_json.id;
 		this.name = group_json.name;
+		this.permission_editable = group_json.permission_editable ?? false;
 		this.element = document.createElement("li");
 		this.element.id = `group-${this.id}`;
 		this.element.classList.add("ToolBar");
@@ -128,7 +129,7 @@ class HeirarchyEditableGroup extends Group {
 	constructor(group_list, group_json) {
 		super(group_list, group_json);
 		this.heirarchy_editable = group_json["heirarchy_editable"];
-		this.client_editable = group_json["permission_editable"];
+		// this.client_editable = group_json["permission_editable"];
 		if (this.heirarchy_editable) {
 			this.up_button = document.createElement("button");
 			this.up_button.classList.add("RightAligned");
@@ -291,6 +292,7 @@ class User {
 		this.element.id = `user-${this.id}`;
 		this.element.classList.add("ToolBar", "WithBorders");
 		this.username = user_json["username"];
+		this.permission_editable = user_json.permission_editable ?? false;
 
 		if (clickable) {
 			this.label = document.createElement("button");
@@ -393,6 +395,9 @@ class ManageGroupsUser extends User {
 		this.remove_button = document.createElement("button");
 		this.remove_button.classList.add("ToolBarButton");
 		this.remove_button.textContent = "Dismiss";
+		if (!this.permission_editable) {
+			this.remove_button.disabled = true;
+		}
 		this.remove_button.onclick = async() => {
 			// this.member_list.removeClickEvent();
 			let response = await API.sendRequest("DELETE", `group/${this.user_list.group_manager.group_list.selected_group.id}/member/${this.id}`);
@@ -533,8 +538,8 @@ class PermissionSettingsUser extends User {
 		this.remove_button = document.createElement("button");
 		this.remove_button.classList.add("RightAligned");
 		this.remove_button.textContent = "Remove";
-		this.client_editable = user_list_factory.users_json[this.id]["permission_editable"];
-		if (this.client_editable === false) {
+		this.permission_editable = user_list_factory.users_json[this.id]["permission_editable"];
+		if (this.permission_editable === false) {
 			this.remove_button.disabled = true;
 		}
 		else {
@@ -605,9 +610,9 @@ class PermissionSettingsAddGroupGroupList extends GroupList {
 			let group_json = groups_json["groups"][group_id];
 			console.log(group_id);
 			console.log(group_json);
-			if (this.permission_settings_object.permissions_json["group_permissions"][group_id] === undefined) {
+			if (this.permission_settings_object.permissions_json["group_permissions"][group_id] === undefined && group_list_factory.groups_json.groups[group_id]["permission_editable"]) {
 				let new_group = this.createGroup(group_json);
-				new_group.client_editable = group_list_factory.groups_json.groups[new_group.id]["permission_editable"];
+				// new_group.client_editable = group_list_factory.groups_json.groups[new_group.id]["permission_editable"];
 				console.log(new_group);
 				fragment.appendChild(new_group.element);
 			}
@@ -624,6 +629,7 @@ class PermissionSettingsAddGroupGroupList extends GroupList {
 			console.log(this.permission_settings_object.permissions_json["group_permissions"]);
 			this.permission_settings_object.add_group_group_list.refresh(group_list_factory.groups_json);
 			this.permission_settings_object.group_list.refresh(group_list_factory.groups_json);
+			console.log(this.permission_settings_object.permissions_json);
 			this.permission_settings_object.group_list.groupClickEvent(group);
 		}
 		this.add_group_dialog.close();
@@ -646,10 +652,10 @@ class PermissionSettingsAddUserUserList extends UserList {
 		console.log(users_json);
 		for (const user_json of Object.values(users_json)) {
 			console.log(user_json);
-			if (this.permission_settings_object.permissions_json["user_permissions"][user_json.id] === undefined) {
+			if (this.permission_settings_object.permissions_json["user_permissions"][user_json.id] === undefined && user_list_factory.client_rank < user_list_factory.users_json[user_json.id]["rank"]) {
 				let new_user = this.createUser(user_json);
 				console.log(new_user);
-				new_user.client_editable = user_list_factory.client_rank < user_list_factory.users_json[new_user.id]["rank"];
+				new_user.permission_editable = true;
 				fragment.appendChild(new_user.element);
 			}
 		}
@@ -672,12 +678,13 @@ class PermissionSettingsAddUserUserList extends UserList {
 }
 
 class PermissionCollection {
-	constructor(permission_settings_object, permission_collection_container) {
+	constructor(permission_settings_object, permission_collection_container, enabled_permissions) {
 		this.permission_collection_container = permission_collection_container;
 		this.permission_settings_object = permission_settings_object;
+		this.enabled_permissions = enabled_permissions; // There are different permissions available to be set for boards, threads, and server. Eg. setting the "create thread" permission within a thread would be pointless.
 		permission_collection_container.textContent = "Select a group or user to view or modify its permission settings.";
 	}
-	static permissions = {
+	static permissions = { // Mirrors PERMISSION enum in permission_setting.hpp
 		0: "Manage permissions",
 		1: "View thread",
 		2: "Create thread",
@@ -690,13 +697,13 @@ class PermissionCollection {
 	};
 	showPermissions(permission_collection_json, client_editable) {
 		const fragment = new DocumentFragment();
-		for (const [permission_id, permission_name] of Object.entries(PermissionCollection.permissions)) {
+		for (const permission_id of this.enabled_permissions) {
 			let current_setting; // Set to the threestatesetting of this permission
 			const permission_setting_container = document.createElement("li");
 			permission_setting_container.id = `user-${this.id}`;
 			permission_setting_container.classList.add("ToolBar", "WithBorders");
 			const permission_name_element = document.createElement("span");
-			permission_name_element.textContent = permission_name;
+			permission_name_element.textContent = PermissionCollection.permissions[permission_id];
 			permission_setting_container.appendChild(permission_name_element);
 
 			const permission_setting = permission_collection_json[permission_id] ?? 1;
@@ -742,7 +749,14 @@ class PermissionSettings {
 		group_list_factory.addGroupList(this.group_list);
 		this.user_list = new PermissionSettingsUserList(this, _user_list_element);
 		user_list_factory.addUserList(this.user_list);
-		this.permission_collection = new PermissionCollection(this, _permission_list_element); // PermissionCollection
+		let enabled_permissions;
+		if (api_location.substring(0, api_location.indexOf("/")) === "server") {
+			enabled_permissions = [0, 1, 2, 3];
+		}
+		else { // This is a thread
+			enabled_permissions = [3];
+		}
+		this.permission_collection = new PermissionCollection(this, _permission_list_element, enabled_permissions); // PermissionCollection
 		this.permission_list_element = _permission_list_element;
 		this.group_is_selected = null;
 		this.user_is_selected = null;
@@ -771,11 +785,11 @@ class PermissionSettings {
 		return new_group;
 	}
 	showPermissionsForGroup(group) {
-		this.permission_collection.showPermissions(this.permissions_json["group_permissions"][group.id]["permission_collection"] || {}, group.client_editable);
+		this.permission_collection.showPermissions(this.permissions_json["group_permissions"][group.id]["permission_collection"] || {}, group.permission_editable);
 		this.selected_permission_user_or_group_indicator.textContent = ` for group ${group.name}`;
 	}
 	showPermissionsForUser(user) {
-		this.permission_collection.showPermissions(this.permissions_json["user_permissions"][user.id]["permission_collection"] || {}, user.client_editable);
+		this.permission_collection.showPermissions(this.permissions_json["user_permissions"][user.id]["permission_collection"] || {}, user.permission_editable);
 		this.selected_permission_user_or_group_indicator.textContent = ` for user ${user.username}`;
 	}
 	deselect() {
