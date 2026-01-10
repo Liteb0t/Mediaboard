@@ -20,13 +20,8 @@ public:
 			this->group_id = user_or_group_id;
 		this->id = db_store_permission_collection(this->permission_object_id, this->user_id, this->group_id);
 	}
-	/*
-	~PermissionCollection() {
+	void removeFromDatabase() {
 		db_delete_permission_collection(this->id);
-	}*/
-	void remove() {
-		db_delete_permission_collection(this->id);
-		// TODO clear permission settings from database
 	}
 	bool passPermission(PERMISSION permission_type, bool inherited_permission) const {
 		auto permission_iterator = permission_map.find(permission_type);

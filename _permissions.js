@@ -290,7 +290,7 @@ class User {
 		this.rank = user_json["rank"];
 		this.element = document.createElement("li");
 		this.element.id = `user-${this.id}`;
-		this.element.classList.add("ToolBar", "WithBorders");
+		this.element.classList.add("ToolBar");
 		this.username = user_json["username"];
 		this.permission_editable = user_json.permission_editable ?? false;
 
@@ -333,6 +333,7 @@ class ManageUsersUser extends User {
 	constructor(user_list, user_json) {
 		super(user_list, user_json);
 		this.element.appendChild(this.label);
+		this.element.classList.add("WithBorders");
 		for (let group_json of user_json["groups"]) {
 			let group_element = document.createElement("span");
 			group_element.textContent = group_json["name"];
@@ -378,20 +379,12 @@ class ManageUsersUserList extends UserList {
 		let new_user = new ManageUsersUser(this, user_json);
 		return new_user;
 	}
-/*
-	async refresh(users_json) {
-		const fragment = new DocumentFragment();
-		for (let user_json of Object.values(users_json)) {
-			let new_user = this.createUser(user_json);
-			fragment.appendChild(new_user.element);
-		}
-		this.user_list_container.replaceChildren(fragment);
-	}*/
 }
 
 class ManageGroupsUser extends User {
 	constructor (member_list, member_json) {
 		super(member_list, member_json);
+		this.element.classList.add("WithBorders");
 		this.remove_button = document.createElement("button");
 		this.remove_button.classList.add("ToolBarButton");
 		this.remove_button.textContent = "Dismiss";
@@ -754,7 +747,7 @@ class PermissionSettings {
 			enabled_permissions = [0, 1, 2, 3];
 		}
 		else { // This is a thread
-			enabled_permissions = [3];
+			enabled_permissions = [1, 3];
 		}
 		this.permission_collection = new PermissionCollection(this, _permission_list_element, enabled_permissions); // PermissionCollection
 		this.permission_list_element = _permission_list_element;

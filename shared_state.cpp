@@ -144,13 +144,6 @@ std::string shared_state::dumpMembersInGroupAsArray(int group_id) const {
 	return members_json.dump();
 }
 
-BasicResponse shared_state::createGroup(int client_id, std::string new_group_name) {
-// int shared_state::createGroup(nlohmann::json request_json) {
-	int new_group_rank = this->getUserRank(client_id) + 1;
-	/*int new_group_id = */this->addGroup(new_group_name, new_group_rank);
-	return BasicResponse(http::status::ok, std::string("Group created"));
-}
-
 // Return non-zero when action is rejected. An error is returned to the user from http_session
 BasicResponse shared_state::setGroupHeirarchy(int client_id, std::vector<int> ordered_groups) {
 	int user_rank;
@@ -190,7 +183,7 @@ BasicResponse shared_state::setGroupHeirarchy(int client_id, std::vector<int> or
 			ordered_groups[ordered_groups.size()-1] != static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
 		return BasicResponse(http::status::bad_request, std::string("Attempted to change heirarchy of locked groups"));
 	}
-			
+
 	// this->ordered_groups_vec = ordered_groups;
 	this->setOrderedGroups(ordered_groups);
 

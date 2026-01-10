@@ -29,9 +29,6 @@ public:
 			: /*permission_collection_id(permission_collection_id), permission(permission),*/ setting(setting) {
 		this->id = db_store_permission_setting(permission_collection_id, static_cast<int>(permission), static_cast<int>(this->setting));
 	}
-	// ~PermissionSetting() {
-	// 	db_delete_permission_setting(this->id);
-	// }
 	bool getBool(bool inherited_permission) const {
 		if (this->setting == THREE_STATE_SETTING::INHERIT)
 			return inherited_permission;

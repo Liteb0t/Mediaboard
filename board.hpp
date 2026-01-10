@@ -45,6 +45,8 @@ public:
 	boost::shared_ptr<Thread> getThread(int thread_id) const { return boost::make_shared<Thread>(this->threads.at(thread_id)); }
 	void addGroupPermissionCollectionToThread(int group_id, int thread_id) { this->threads.at(thread_id).addGroupPermissionCollection(group_id); }
 	void addUserPermissionCollectionToThread(int user_id, int thread_id) { this->threads.at(thread_id).addUserPermissionCollection(user_id); }
+	void setGroupPermissionForThread(int group_id, PERMISSION permission, THREE_STATE_SETTING setting, int thread_id) { this->threads.at(thread_id).setGroupPermission(group_id, permission, setting); }
+	void setUserPermissionForThread(int user_id, PERMISSION permission, THREE_STATE_SETTING setting, int thread_id) { this->threads.at(thread_id).setUserPermission(user_id, permission, setting); }
 	void removeGroupPermissionCollectionFromThread(int group_id, int thread_id) { this->threads.at(thread_id).removeGroupPermissionCollection(group_id); }
 	void removeUserPermissionCollectionFromThread(int user_id, int thread_id) { this->threads.at(thread_id).removeUserPermissionCollection(user_id); }
 private:

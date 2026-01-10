@@ -83,8 +83,9 @@ std::string Board::dumpAllThreads(int client_id) const {
 	multiple_thread_json["type"] = "thread_catalog";
 	multiple_thread_json["threads"] = json::array();
 	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
-		if (!this->threads.at(it->second).isDeleted()) {
-			nlohmann::json thread_json = this->threads.at(it->second).asJson();
+		boost::shared_ptr<Thread> thread = this->getThread(it->second);
+		if (!this->threads.at(it->second).isDeleted() && thread->userHasPermission(client_id, PERMISSION::VIEW_THREAD)) {
+			nlohmann::json thread_json = thread->asJson();
 			if (this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS)) {
 				std::cout << "client with ID " << client_id << "has manage_permissions" << std::endl;
 				thread_json["permission_editable"] = true;

@@ -779,6 +779,7 @@ void db_delete_permission_collection(int _permission_collection_id) {
 	int permission_collection_id = _permission_collection_id;
 	EXEC SQL END DECLARE SECTION;
 	printf("deleting permission_collection %d`n", permission_collection_id);
+	EXEC SQL DELETE FROM permission_setting WHERE permission_collection_id = :permission_collection_id;
 	EXEC SQL DELETE FROM permission_collection WHERE id = :permission_collection_id;
 	EXEC SQL COMMIT;
 }

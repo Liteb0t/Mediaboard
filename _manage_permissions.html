@@ -45,6 +45,7 @@
 				</fieldset>
 			</div>
 		</main>
+		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="error_dialog" closedby="any">
 			<h2>Error</h2>
 			<p id="error_message">Something happened.</p>
@@ -55,6 +56,7 @@
 <script src="permissions.js"></script>
 <script>
 "use strict";
+loading_dialog.showModal();
 
 const url_params = new URLSearchParams(location.search);
 let url_params_display_as_embed;
@@ -75,6 +77,7 @@ async function initialLoad() {
 	await user_list_factory.refreshUsers();
 	// user list and permission settings must be loaded before groups
 	await group_list_factory.refreshGroups();
+	loading_dialog.close();
 }
 initialLoad();
 </script>

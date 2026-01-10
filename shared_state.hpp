@@ -50,9 +50,6 @@ public:
 	// Board main_board;
 	boost::shared_ptr<Board> main_board() const { return this->boards.at(0); }
 
-	// int createGroup(nlohmann::json group_json);
-	BasicResponse createGroup(int client_id, std::string new_group_name);
-	// int createGroup(std::string new_group_name, int new_group_rank);
 	std::string dumpAllGroups(int client_id) const;
 	BasicResponse setGroupHeirarchy(int client_id, std::vector<int> ordered_groups);
 	BasicResponse createAccount(nlohmann::json user_json);

@@ -99,6 +99,7 @@
 			</fieldset>
 			<div class="ToolBar"><button id="add_user_to_group_dialog_ok_button">OK</button><button onclick="add_user_to_group_dialog.close()">Cancel</button></div>
 		</dialog>
+		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="error_dialog" closedby="any">
 			<h2>Error</h2>
 			<p id="error_message">Something happened.</p>
@@ -124,6 +125,7 @@
 <script src="permissions.js"></script>
 <script>
 "use strict";
+loading_dialog.showModal();
 
 const control_panel_tabs = [manage_permissions_container, manage_groups_container, manage_users_container];
 function showTab(element) {
@@ -150,6 +152,7 @@ async function initialLoad() {
 	await user_list_factory.refreshUsers();
 	// user list and permission settings must be loaded before groups
 	await group_list_factory.refreshGroups();
+	loading_dialog.close();
 }
 initialLoad();
 

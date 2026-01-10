@@ -27,11 +27,11 @@ public:
 		this->user_permissions.emplace(user_id, permission_collection);
 	}
 	void removeGroupPermissionCollection(int group_id) {
-		this->group_permissions.at(group_id).remove();
+		this->group_permissions.at(group_id).removeFromDatabase();
 		this->group_permissions.erase(group_id);
 	}
 	void removeUserPermissionCollection(int user_id) {
-		this->user_permissions.at(user_id).remove();
+		this->user_permissions.at(user_id).removeFromDatabase();
 		this->user_permissions.erase(user_id);
 	}
 	void setGroupPermission(int group_id, PERMISSION permission_type, THREE_STATE_SETTING setting) {
@@ -87,12 +87,18 @@ public:
 			return false;
 		return this->getUserRank(user_id) < this->getUserRank(_user_id);
 	}
+	bool permissionCollectionExistsForGroup(int group_id) const {
+		return this->group_permissions.find(group_id) != this->group_permissions.end();
+	}
+	bool permissionCollectionExistsForUser(int user_id) const {
+		return this->user_permissions.find(user_id) != this->user_permissions.end();
+	}
 protected:
 	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
 private:
 	int permission_object_id; // Used to identify this object in the database
-	std::unordered_map<int, PermissionCollection> user_permissions;
 	std::unordered_map<int, PermissionCollection> group_permissions;
+	std::unordered_map<int, PermissionCollection> user_permissions;
 };
 
 class PermissionManager : public PermissionObjectBase {
@@ -119,8 +125,12 @@ public:
 		return it != this->groups.end();
 	}
 	int getUserRank(int user_id) const {
+		if (user_id == static_cast<int>(BUILTIN_USERS::ADMINISTRATOR))
+			return 0;
+		else if (user_id == static_cast<int>(BUILTIN_USERS::PUBLIC))
+			return this->ordered_groups.size() - 1;
 		int i;
-		for (i = 0; i < this->ordered_groups.size(); i++) {
+		for (i = 0; i < this->ordered_groups.size() - 2; i++) {
 			if (this->groups.at(ordered_groups[i]).containsMember(user_id))
 				break;
 		}
@@ -162,11 +172,11 @@ public:
 		this->groups.at(group_id).removeMember(user_id);
 		db_remove_member_from_group(user_id, group_id);
 	}
+	int addGroup(std::string group_name, int group_rank);
 protected:
 	const Group* getGroup(int group_id) const {
 		return &(this->groups.at(group_id));
 	}
-	int addGroup(std::string group_name, int group_rank);
 	void addUserToGroup(int user_id, int group_id) {
 		this->groups.at(group_id).addMember(user_id);
 		db_add_member_to_group(user_id, group_id);

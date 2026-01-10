@@ -111,6 +111,9 @@ dialog {
 	.RightAligned {
 		margin-left: auto;
 	}
+	input[type=radio] {
+		margin: 0 4px 0 0;
+	}
 }
 
 .MessageBoxButtons button {
