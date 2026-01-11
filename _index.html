@@ -492,6 +492,10 @@ async function getAllThreads() {
 }
 
 function updateReplyContainer(selected_thread_id, permissions) {
+	if (url_params_display_as_embed) {
+		reply_container.style["display"] = "none";
+		return;
+	}
 	if (selected_thread_id === -1) {
 		if (permissions["create_thread"]) {
 			reply_heading_text.textContent = "Create a thread";
@@ -502,7 +506,7 @@ function updateReplyContainer(selected_thread_id, permissions) {
 		}
 	}
 	else {
-		if (permissions["send_message"]) {
+		if (permissions["send_message"] ) {
 			reply_heading_text.textContent = "Leave a reply";
 			reply_container.style["display"] = "inherit";
 		}
@@ -808,87 +812,90 @@ function createPost(data, client_permissions) {
 	let post_box_element = document.createElement("article");
 	post_box_element.classList.add("Post");
 
-	let post_header_element = document.createElement("div");
-	// post_header_element.classList.add("PostHeader");
-	post_header_element.classList.add("ToolBar");
+	let post_header_element
+	if (!url_params_display_as_embed) {
+		post_header_element = document.createElement("div");
+		// post_header_element.classList.add("PostHeader");
+		post_header_element.classList.add("ToolBar");
 
-	let post_name_element = document.createElement("b");
-	post_name_element.classList.add("Username");
-	post_name_element.textContent = data.name;
+		let post_name_element = document.createElement("b");
+		post_name_element.classList.add("Username");
+		post_name_element.textContent = data.name;
 
-	let post_timestamp_element = document.createElement("time");
-	let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
-	post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
-	post_timestamp_element.textContent = post_date;
-	post_timestamp_element.classList.add("Timestamp");
+		let post_timestamp_element = document.createElement("time");
+		let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
+		post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
+		post_timestamp_element.textContent = post_date;
+		post_timestamp_element.classList.add("Timestamp");
 
-	let post_id_element = document.createElement("span");
-	post_id_element.classList.add("ID");
-	let post_id;
-	if (state.selected_thread.id > -1) {
-		post_id = `#${data.thread_id}/${data.id_in_thread}`;
-	}
-	else {
-		post_id = "#" + data.thread_id;
-	}
-	post_id_element.textContent = post_id;
-
-	post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
-	const right_aligned_toolbar_group = document.createElement("div");
-	right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
-
-	// Delete button
-	// TODO replace is_administrator with client permission
-	if ((is_administrator === true || data.is_author) && !url_params_display_as_embed) {
-		let delete_button_element = document.createElement("button");
-		delete_button_element.textContent = "\u{1F5D1} Delete";
-		delete_button_element.onclick = async() => {
-			let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
-			console.log(server_response);
-			if (server_response.ok) {
-				post_box_element.classList.add("Deleted");
-				delete_button_element.disabled = true;
-			}
-			else {
-				alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
-			}
+		let post_id_element = document.createElement("span");
+		post_id_element.classList.add("ID");
+		let post_id;
+		if (state.selected_thread.id > -1) {
+			post_id = `#${data.thread_id}/${data.id_in_thread}`;
 		}
-		// post_header_element.appendChild(delete_button_element);
-		right_aligned_toolbar_group.appendChild(delete_button_element);
-	}
-	// Reply button
-	if (state.selected_thread.id > -1 && !url_params_display_as_embed && client_permissions["send_message"]) {
-		let reply_button = document.createElement("button");
-		reply_button.style["margin-left"] = "0.5em";
-		reply_button.textContent = "\u{2BA9} Reply";
-		reply_button.onclick = () => {
-			reply_container.open = true;
-
-			let reply_link_node = document.createTextNode(post_id + " ");
-			// Add reply tag at caret position, if focused on content_field
-			let range, selection;
-			selection = window.getSelection();
-			if (content_field.contains(selection.focusNode)) {
-				range = selection.getRangeAt(0);
-				// console.log(range);
-				range.insertNode(reply_link_node);
-			}
-			else
-				content_field.append(reply_link_node);
-
-			// Move caret position to end of reply tag
-			range = document.createRange();
-			// console.log(reply_link_node);
-			range.setStartAfter(reply_link_node);
-			range.collapse(true);
-			selection.removeAllRanges();
-			selection.addRange(range);
-			// content_field.focus();
+		else {
+			post_id = "#" + data.thread_id;
 		}
-		right_aligned_toolbar_group.appendChild(reply_button);
+		post_id_element.textContent = post_id;
+
+		post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
+		const right_aligned_toolbar_group = document.createElement("div");
+		right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
+
+		// Delete button
+		// TODO replace is_administrator with client permission
+		if ((is_administrator === true || data.is_author)) {
+			let delete_button_element = document.createElement("button");
+			delete_button_element.textContent = "\u{1F5D1} Delete";
+			delete_button_element.onclick = async() => {
+				let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
+				console.log(server_response);
+				if (server_response.ok) {
+					post_box_element.classList.add("Deleted");
+					delete_button_element.disabled = true;
+				}
+				else {
+					alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
+				}
+			}
+			// post_header_element.appendChild(delete_button_element);
+			right_aligned_toolbar_group.appendChild(delete_button_element);
+		}
+		// Reply button
+		if (state.selected_thread.id > -1 && client_permissions["send_message"]) {
+			let reply_button = document.createElement("button");
+			reply_button.style["margin-left"] = "0.5em";
+			reply_button.textContent = "\u{2BA9} Reply";
+			reply_button.onclick = () => {
+				reply_container.open = true;
+
+				let reply_link_node = document.createTextNode(post_id + " ");
+				// Add reply tag at caret position, if focused on content_field
+				let range, selection;
+				selection = window.getSelection();
+				if (content_field.contains(selection.focusNode)) {
+					range = selection.getRangeAt(0);
+					// console.log(range);
+					range.insertNode(reply_link_node);
+				}
+				else
+					content_field.append(reply_link_node);
+
+				// Move caret position to end of reply tag
+				range = document.createRange();
+				// console.log(reply_link_node);
+				range.setStartAfter(reply_link_node);
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				// content_field.focus();
+			}
+			right_aligned_toolbar_group.appendChild(reply_button);
+		}
+		right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
+		post_header_element.append(right_aligned_toolbar_group);
 	}
-	right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
-	post_header_element.append(right_aligned_toolbar_group);
 
 	let post_content_element = document.createElement("div");
 	post_content_element.classList.add("Content");
@@ -980,7 +987,9 @@ function createPost(data, client_permissions) {
 		post_files_element.appendChild(figure_element);
 	}
 
-	post_box_element.appendChild(post_header_element);
+	if (!url_params_display_as_embed) {
+		post_box_element.appendChild(post_header_element);
+	}
 	post_box_element.appendChild(post_content_element);
 	post_box_element.appendChild(post_files_element);
 	// post_container_element.appendChild(post_box_element);
