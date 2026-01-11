@@ -37,8 +37,8 @@ void PermissionObjectBase::cacheAllPermissions(/*int permission_object_id*/) {
 		}
 		freePermissionSettingArray(permission_settings);
 
-		std::cout << "permission collection ID: " << permission_collection_array->array[i].id << std::endl;
-		std::cout << permission_collection_array->array[i].account_id << std::endl;
+		// std::cout << "permission collection ID: " << permission_collection_array->array[i].id << std::endl;
+		// std::cout << permission_collection_array->array[i].account_id << std::endl;
 		if (permission_collection_array->array[i].account_id != -1)
 			this->user_permissions.emplace(permission_collection_array->array[i].account_id, new_permission_collection);
 		else

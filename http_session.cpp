@@ -479,7 +479,149 @@ handle_request(
     	return res;
 	}
 	else if (req.method() == http::verb::post) {
-		if (req_location.substr(0, 5) == "/api/") {
+		if (req.target() == "/api/upload/") {
+			// request_parser<empty_body> req_parser;
+			// std::string content_dispo =  req.get()[http::field::content_disposition] << std::endl;
+			// std::cout << req.body() << std::endl;
+			// std::string req_string = req.body();
+			// std::cout << req_string << std::endl;
+			std::istringstream req_stream(req.body());
+			std::string req_line;
+			std::getline(req_stream, req_line);
+			std::string req_terminator = req_line.substr(0, req_line.length()-1) + "--\r";
+			// std::cout << "Request ID: " << req_terminator << std::endl;
+			std::string out_filename;
+			bool empty_line = false;
+			while (!empty_line) {
+				std::getline(req_stream, req_line, '\n');
+				if (req_line == "\r") {
+					empty_line = true;
+				}
+				else if (req_line.substr(0, 19) == "Content-Disposition") {
+					int filename_i;
+					filename_i = req_line.find("filename", 20) + 10;
+					if (filename_i != std::string::npos) {
+						int filename_end_i;
+						if ((filename_end_i = req_line.find(";", filename_i)) == std::string::npos) {
+							filename_end_i = req_line.length() - filename_i - 2;
+						}
+						std::cout << filename_end_i << std::endl;
+						out_filename = req_line.substr(filename_i, filename_end_i);
+						std::cout << "out_filename: " << out_filename << std::endl;
+					}
+				}
+				// else if (req_line.substr(0, 13) == "Content-Type") {
+				// 	int boundary_i;
+				// 	if ((boundary_i = req_line.find("boundary", 13)) != std::string::npos) {
+				// 		std::cout << req_line.substr(boundary_i+1, req_line.length()) << std::endl;
+				// 	}
+				// }
+				// std::cout << "line: " << i++ << std::endl << req_line << std::endl;
+			}
+			if (out_filename.empty()) {
+				// out_filename = "UNKNOWN_NAME";
+				std::cerr << "Error! file name not found in POST header" << std::endl;
+				return server_error("Could not determine filename");
+			}
+			else if (out_filename.length() > POST_MAX_FILE_NAME) {
+				http::response<http::empty_body> res;
+				res.result(400);
+				res.set("message", "File name length exceeds the server-defined limit of " + std::to_string(POST_MAX_FILE_NAME) + ".");
+				res.prepare_payload();
+				return res;
+			}
+			sanitiseFileName(&out_filename);
+			std::cout << "Sanitised out_filename: " << out_filename << std::endl;
+
+			// Add UUID to filename
+			boost::uuids::uuid u = boost::uuids::random_generator()();
+			std::string uuid_str = boost::uuids::to_string(u);
+			int filename_uuid_index;
+			if ((filename_uuid_index = out_filename.rfind(".")) == -1) {
+				filename_uuid_index = out_filename.size();
+			}
+			out_filename.insert(filename_uuid_index, uuid_str);
+
+			// Write to the file
+			std::ofstream outfile(state->doc_root() + out_filename, std::ios::binary);
+			bool is_initial_line = true;
+			bool previous_line_ends_with_carriage_return = false;
+			while (std::getline(req_stream, req_line)) {
+				// std::cout << req_line << std::endl;
+				// std::cout << req_line.length() << ", " << req_terminator.length() << std::endl;
+				if (req_line != req_terminator) {
+					if (previous_line_ends_with_carriage_return) {
+						previous_line_ends_with_carriage_return = false;
+						outfile << "\r";
+					}
+					if (!is_initial_line)
+						outfile << "\n";
+					if (req_line.length() == 0)
+						continue;
+					else if (req_line.back() == '\r') {
+						previous_line_ends_with_carriage_return = true;
+						outfile << req_line.substr(0, req_line.length() - 1);
+					}
+					else
+						outfile << req_line;
+					is_initial_line = false;
+				}
+				else {
+					break;
+				}
+			}
+			std::cout << "Finished reading data" << std::endl;
+			try {
+				outfile.exceptions(outfile.failbit);
+				outfile.close();
+			}
+			catch (const std::ios_base::failure& exception) {
+				std::stringstream error_message;
+				error_message
+				<< "Reason: " << exception.what() << '\n'
+				<< "Error code: " << exception.code() << "\n";
+				std::cerr << "Exception thrown when attempting to save uploaded file.\n" << error_message.str();
+				http::response<http::empty_body> res{http::status::internal_server_error, req.version()};
+				res.set("message", error_message.str());
+				res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+				// res.set("File-Name-UTF-8", filename_utf_8);
+				res.set("Access-Control-Allow-Origin", "*");
+				res.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, File-Name");
+				res.set(http::field::content_type, "text/plain; charset=utf-8");
+				res.content_length(0);
+				res.keep_alive(req.keep_alive());
+				return res;
+			}
+			std::cout << "END OF FILE" << std::endl;
+
+			// Write thumbnail
+			if (fileIsImage(&out_filename)) {
+				Magick::Image thumbnail;
+				try {
+					thumbnail.read(state->doc_root() + out_filename);
+					thumbnail.strip(); // Removes metadata
+					thumbnail.resize("150x150");
+					thumbnail.quality(50);
+					thumbnail.write(state->doc_root() + "thumbnails/THUMBNAIL_" + out_filename + ".jxl");
+				}
+				catch (Magick::Error& magick_error) {
+					std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Thumbnail will therefore not be made." << std::endl;
+				}
+			}
+
+			// std::string filename_utf_8 = boost::locale::conv::to_utf(out_filename, "UTF-8");
+			http::response<http::empty_body> res{http::status::accepted, req.version()};
+			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+			res.set("File-Name", out_filename);
+			// res.set("File-Name-UTF-8", filename_utf_8);
+			res.set("Access-Control-Allow-Origin", "*");
+			res.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, File-Name");
+			res.set(http::field::content_type, "text/plain; charset=utf-8");
+			res.content_length(0);
+			res.keep_alive(req.keep_alive());
+			return res;
+		}
+		else if (req_location.substr(0, 5) == "/api/") {
 			std::pair<int, std::string> client;
 			try {
 				client = getUserFromToken();
@@ -714,148 +856,6 @@ handle_request(
 			}
 			else
 				return api_response(http::status::not_found, std::string("/api/ sub-URL not found."));
-		}
-		else if (req.target() == "/api/upload/") {
-			// request_parser<empty_body> req_parser;
-			// std::string content_dispo =  req.get()[http::field::content_disposition] << std::endl;
-			// std::cout << req.body() << std::endl;
-			// std::string req_string = req.body();
-			// std::cout << req_string << std::endl;
-			std::istringstream req_stream(req.body());
-			std::string req_line;
-			std::getline(req_stream, req_line);
-			std::string req_terminator = req_line.substr(0, req_line.length()-1) + "--\r";
-			// std::cout << "Request ID: " << req_terminator << std::endl;
-			std::string out_filename;
-			bool empty_line = false;
-			while (!empty_line) {
-				std::getline(req_stream, req_line, '\n');
-				if (req_line == "\r") {
-					empty_line = true;
-				}
-				else if (req_line.substr(0, 19) == "Content-Disposition") {
-					int filename_i;
-					filename_i = req_line.find("filename", 20) + 10;
-					if (filename_i != std::string::npos) {
-						int filename_end_i;
-						if ((filename_end_i = req_line.find(";", filename_i)) == std::string::npos) {
-							filename_end_i = req_line.length() - filename_i - 2;
-						}
-						std::cout << filename_end_i << std::endl;
-						out_filename = req_line.substr(filename_i, filename_end_i);
-						std::cout << "out_filename: " << out_filename << std::endl;
-					}
-				}
-				// else if (req_line.substr(0, 13) == "Content-Type") {
-				// 	int boundary_i;
-				// 	if ((boundary_i = req_line.find("boundary", 13)) != std::string::npos) {
-				// 		std::cout << req_line.substr(boundary_i+1, req_line.length()) << std::endl;
-				// 	}
-				// }
-				// std::cout << "line: " << i++ << std::endl << req_line << std::endl;
-			}
-			if (out_filename.empty()) {
-				// out_filename = "UNKNOWN_NAME";
-				std::cerr << "Error! file name not found in POST header" << std::endl;
-				return server_error("Could not determine filename");
-			}
-			else if (out_filename.length() > POST_MAX_FILE_NAME) {
-				http::response<http::empty_body> res;
-				res.result(400);
-				res.set("message", "File name length exceeds the server-defined limit of " + std::to_string(POST_MAX_FILE_NAME) + ".");
-				res.prepare_payload();
-				return res;
-			}
-			sanitiseFileName(&out_filename);
-			std::cout << "Sanitised out_filename: " << out_filename << std::endl;
-
-			// Add UUID to filename
-			boost::uuids::uuid u = boost::uuids::random_generator()();
-			std::string uuid_str = boost::uuids::to_string(u);
-			int filename_uuid_index;
-			if ((filename_uuid_index = out_filename.rfind(".")) == -1) {
-				filename_uuid_index = out_filename.size();
-			}
-			out_filename.insert(filename_uuid_index, uuid_str);
-
-			// Write to the file
-			std::ofstream outfile(state->doc_root() + out_filename, std::ios::binary);
-			bool is_initial_line = true;
-			bool previous_line_ends_with_carriage_return = false;
-			while (std::getline(req_stream, req_line)) {
-				// std::cout << req_line << std::endl;
-				// std::cout << req_line.length() << ", " << req_terminator.length() << std::endl;
-				if (req_line != req_terminator) {
-					if (previous_line_ends_with_carriage_return) {
-						previous_line_ends_with_carriage_return = false;
-						outfile << "\r";
-					}
-					if (!is_initial_line)
-						outfile << "\n";
-					if (req_line.length() == 0)
-						continue;
-					else if (req_line.back() == '\r') {
-						previous_line_ends_with_carriage_return = true;
-						outfile << req_line.substr(0, req_line.length() - 1);
-					}
-					else
-						outfile << req_line;
-					is_initial_line = false;
-				}
-				else {
-					break;
-				}
-			}
-			std::cout << "Finished reading data" << std::endl;
-			try {
-				outfile.exceptions(outfile.failbit);
-				outfile.close();
-			}
-			catch (const std::ios_base::failure& exception) {
-				std::stringstream error_message;
-				error_message
-					<< "Reason: " << exception.what() << '\n'
-					<< "Error code: " << exception.code() << "\n";
-				std::cerr << "Exception thrown when attempting to save uploaded file.\n" << error_message.str();
-				http::response<http::empty_body> res{http::status::internal_server_error, req.version()};
-				res.set("message", error_message.str());
-    			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-				// res.set("File-Name-UTF-8", filename_utf_8);
-				res.set("Access-Control-Allow-Origin", "*");
-				res.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, File-Name");
-    			res.set(http::field::content_type, "text/plain; charset=utf-8");
-    			res.content_length(0);
-    			res.keep_alive(req.keep_alive());
-    			return res;
-			}
-			std::cout << "END OF FILE" << std::endl;
-
-			// Write thumbnail
-			if (fileIsImage(&out_filename)) {
-				Magick::Image thumbnail;
-				try {
-					thumbnail.read(state->doc_root() + out_filename);
-					thumbnail.strip(); // Removes metadata
-					thumbnail.resize("150x150");
-					thumbnail.quality(50);
-					thumbnail.write(state->doc_root() + "thumbnails/THUMBNAIL_" + out_filename + ".jxl");
-				}
-				catch (Magick::Error& magick_error) {
-					std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Thumbnail will therefore not be made." << std::endl;
-				}
-			}
-
-			// std::string filename_utf_8 = boost::locale::conv::to_utf(out_filename, "UTF-8");
-    		http::response<http::empty_body> res{http::status::accepted, req.version()};
-    		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-			res.set("File-Name", out_filename);
-			// res.set("File-Name-UTF-8", filename_utf_8);
-			res.set("Access-Control-Allow-Origin", "*");
-			res.set("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, File-Name");
-    		res.set(http::field::content_type, "text/plain; charset=utf-8");
-    		res.content_length(0);
-    		res.keep_alive(req.keep_alive());
-    		return res;
 		}
 		else if (req_location.substr(0, 14) == "/registration/") {
 			json request_json;

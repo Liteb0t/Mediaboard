@@ -38,7 +38,7 @@ public:
 	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting) {
 		auto permission_iterator = this->permission_map.find(permission_type);
 		if (permission_iterator == this->permission_map.end()) {
-			std::cout << "PermissionCollection " << this->id << ": permission " << static_cast<int>(permission_type) << " not found" << std::endl;
+			// std::cout << "PermissionCollection " << this->id << ": permission " << static_cast<int>(permission_type) << " not found" << std::endl;
 			PermissionSetting permission_setting(this->id, permission_type, setting);
 			this->permission_map.emplace(permission_type, permission_setting);
 		}

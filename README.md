@@ -1,6 +1,7 @@
 # ![FUZE](https://fuze.page/static/fuze-min-hover.png) Mediaboard
 ### Required packages (Debian 12/Devuan 5)
 `postgresql`\
+`postgresql-contrib`\
 `ecpg`\
 `nlohmann-json3-dev`\
 `libboost1.81-dev`\
@@ -36,13 +37,11 @@ Use meson instead of make to build. To configure:/
 Currently there are two options: the `Makefile` and the `meson.build`.\
 To build using the Makefile, simply run `make`. \
 Do note that libraries may not link with `make` without manual intervention.
-Run the server: `./server`
 To build with meson, first run:\
 `meson setup build`\
 Then to build:\
 `cd build`\
 `ninja`\
-Run the server: `./build/server` - You must run the server from the Mediaboard directory, not inside `build`.
 ### Database setup
 Install postgresql.\
 \
@@ -54,14 +53,33 @@ To import the database template:\
 `psql fuze_mediaboard < fuze_mediaboard_template.sql`\
 `psql fuze_mediaboard < default_groups.sql`\
 \
-Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it high enough in the table so that it won't be overridden by other settings:\
+Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it at the top of the table so that it won't be overridden by other settings:\
 `local   fuze_mediaboard mediaboard_server                       password`\
 \
 `mediaboard_server` is the Postgres user which interacts with the database named `fuze_mediaboard`.\
-Set a password for this user. Set an environment variable `FUZE_MEDIABOARD_PASSWORD` with the same password.
+Set the environment variable `FUZE_MEDIABOARD_PASSWORD` with the same password used in the CREATE_USER statement earlier. Open a new terminal window or reboot your system to apply the change.
 ### Administrator account
 The administrator is able to delete posts from any user. To create the administrator account:\
-`./server create_administrator <password>`
+`./build/server --create_administrator <password>`\
+If you see the following output, that most likely means everything was set up correctly:\
+```
+Loaded config file
+Set the database to fuze_mediaboard
+Found environment variable "FUZE_MEDIABOARD_PASSWORD"
+Connected!
+Created 'Administrator' account successfully
+```
+If you ever forget the password, you can simply run the create_administrator command again.
+### Execute the program
+If you built using meson, run `./build/server` - You must run the server from the Mediaboard directory, not inside `build`.\
+If you built using make, run `./server`.\
+In a browser open `localhost:8300`\
+You should see an empty page with a toolbar at the top. You can login to the administrator account with username "Administrator" and the password you set in `./build/server --create_administrator`\
+![Login page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_login_page.png)
+### Manage permissions
+By default, users cannot view or create threads or send messages. To enable this, click on the "Manage server" tab in the toolbar as an administrator.\
+![Manage server permissions page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_manage_permissions.png)
+In the Manage permissions tab, click "Add group" and select "Public". Now set the desired permissions to "Allow".
 ### Deployment settings
 Example Nginx reverse proxy settings:
 ```

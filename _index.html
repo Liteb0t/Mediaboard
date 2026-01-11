@@ -862,6 +862,8 @@ function createPost(data, client_permissions) {
 		reply_button.style["margin-left"] = "0.5em";
 		reply_button.textContent = "\u{2BA9} Reply";
 		reply_button.onclick = () => {
+			reply_container.open = true;
+
 			let reply_link_node = document.createTextNode(post_id + " ");
 			// Add reply tag at caret position, if focused on content_field
 			let range, selection;
@@ -881,7 +883,6 @@ function createPost(data, client_permissions) {
 			range.collapse(true);
 			selection.removeAllRanges();
 			selection.addRange(range);
-			reply_container.open = true;
 			// content_field.focus();
 		}
 		right_aligned_toolbar_group.appendChild(reply_button);
