@@ -86,18 +86,24 @@ std::string Board::dumpAllThreads(int client_id) const {
 		boost::shared_ptr<Thread> thread = this->getThread(it->second);
 		if (!this->threads.at(it->second).isDeleted() && thread->userHasPermission(client_id, PERMISSION::VIEW_THREAD)) {
 			nlohmann::json thread_json = thread->asJson();
+			/*
 			if (this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS)) {
 				std::cout << "client with ID " << client_id << "has manage_permissions" << std::endl;
-				thread_json["permission_editable"] = true;
+				thread_json["client_permissions"]["manage_permissions"] = true;
 			}
+			thread_json["client_permissions"]["send_message"] = thread->userHasPermission(client_id, PERMISSION::SEND_MESSAGE);
+			*/
 			multiple_thread_json["threads"].push_back(thread_json);
 		}
 	}
 	return multiple_thread_json.dump();
 }
 
-std::string Board::dumpPostsInThread(int thread_id, std::string key) const {
-	return this->threads.at(thread_id).dumpPosts(key);
+std::string Board::dumpThread(int thread_id, int client_id, std::string key) const {
+	nlohmann::json thread_json;
+	thread_json["messages"] = this->threads.at(thread_id).getMessagesAsJson(key);
+	thread_json["client_permissions"]["send_message"] = this->threads.at(thread_id).userHasPermission(client_id, PERMISSION::SEND_MESSAGE);
+	return thread_json.dump();
 }
 
 std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {

@@ -49,8 +49,8 @@ To create the database:\
 `psql -d fuze_mediaboard`\
 `=# CREATE USER mediaboard_server WITH PASSWORD '<password>'`\
 To import the database template:\
-`psql -X fuze_mediaboard < fuze_mediaboard_template.sql`\
-`psql -x fuze_mediaboard < default_groups.sql`\
+`psql fuze_mediaboard < fuze_mediaboard_template.sql`\
+`psql fuze_mediaboard < default_groups.sql`\
 \
 Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it high enough in the table so that it won't be overridden by other settings:\
 `local   fuze_mediaboard mediaboard_server                       password`\

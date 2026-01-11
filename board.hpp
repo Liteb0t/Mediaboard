@@ -19,7 +19,7 @@ public:
 	// std::string dumpLastThread() const;
 	bool keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const;
 	std::string dumpAllThreads(int client_id) const;
-	std::string dumpPostsInThread(int thread_id, std::string key) const;
+	std::string dumpThread(int thread_id, int client_id, std::string key) const;
 	std::string dumpPermissionsInThread(int thread_id, int client_id) const;
 	bool threadExists(int thread_id) const { std::unordered_map<int, Thread>::const_iterator it = threads.find(thread_id); return it != threads.end(); };
 	bool messageExistsInThread(int message_id, int thread_id) const { return this->threads.at(thread_id).messageExists(message_id); }

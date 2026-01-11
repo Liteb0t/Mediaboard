@@ -316,7 +316,6 @@ handle_request(
 			res.set(http::field::content_type, "application/json");
 			if (req_location.substr(5) == "threads/") {
 				res.result(http::status::ok);
-				// TODO check read permission
 				res.body() = state->main_board()->dumpAllThreads(client.first);
 			}
 			else if (req_location.substr(5, 7) == "server/") {
@@ -342,7 +341,7 @@ handle_request(
 					else {
 						boost::shared_ptr<Thread> thread = state->main_board()->getThread(thread_in_path.first);
 						if (thread->userHasPermission(client.first, PERMISSION::VIEW_THREAD)) {
-							res.body() = state->main_board()->dumpPostsInThread(thread_in_path.first, client.second);
+							res.body() = state->main_board()->dumpThread(thread_in_path.first, client.first, client.second);
 						}
 						else {
 							return api_response(http::status::forbidden, std::string("You do not have permission to view this thread."));
@@ -401,6 +400,7 @@ handle_request(
 				}
 				nlohmann::json response_json;
 				response_json["server_permissions"]["manage_permissions"] = state->userHasPermission(user_id, PERMISSION::MANAGE_PERMISSIONS);
+				response_json["server_permissions"]["create_thread"] = state->userHasPermission(user_id, PERMISSION::CREATE_THREAD);
 				return api_response_json(http::status::ok, response_json);
 			}
 			else if (req_location.substr(5) == "users/") {
@@ -521,39 +521,34 @@ handle_request(
 						post_json.contains("name") &&
 						post_json.contains("content")) {
 					if (post_json["files"].size() > 4) {
-						std::cerr << "Denied: More than 4 files in message\n";
-						res.set("message", "More than 4 files attatched.");
-						res.result(400);
+						return api_response(http::status::bad_request, std::string("More than 4 files attatched."));
+					}
+					std::string message_content = post_json["content"].template get<std::string>();
+					if ((message_content.length() == 0 && post_json["files"].size() == 0) || message_content.length() > POST_MAX_CONTENT)
+						return api_response(http::status::bad_request, std::string("The post does not meet the constraints set by the server.\nThis could mean that the message content was empty and no files were uploaded, or the message content is too long."));
+					if (is_thread) {
+						if (!state->userHasPermission(client.first, PERMISSION::CREATE_THREAD))
+							return api_response(http::status::forbidden, std::string("User lacks permission CREATE_THREAD."));
+						request_json["thread"]["post_zero"]["key"] = client.second; // key is to identify the author of a post
+						int new_thread_id = state->main_board()->createThread(request_json["thread"]);
+						res.set("New-Thread-Id", std::to_string(new_thread_id));
+						res.result(201);
 					}
 					else {
-						std::string message_content = post_json["content"].template get<std::string>();
-						if ((message_content.length() > 0 || post_json["files"].size() > 0) && message_content.length() <= POST_MAX_CONTENT) {
-							if (is_thread) {
-								// if (state->userHasPermission())
-								request_json["thread"]["post_zero"]["key"] = client.second; // key is to identify the author of a post
-								int new_thread_id = state->main_board()->createThread(request_json["thread"]);
-								res.set("New-Thread-Id", std::to_string(new_thread_id));
-								res.result(201);
-							}
-							else {
-								int new_message_thread_id = post_json["thread_id"].template get<int>();
-								// TODO authorize user
-								if (state->main_board()->threadExists(new_message_thread_id)) {
-									post_json["key"] = client.second;  // key is to identify the author of a post
-									int new_message_id = state->main_board()->createPost(post_json);
-									std::string new_message_dump = state->main_board()->dumpPost(new_message_thread_id, new_message_id, client.second);
-									state->sendToThread(new_message_dump, new_message_thread_id);
-									res.result(201);
-								}
-								else {
-									std::cerr << "Couldn't create message because the thread with ID " << new_message_thread_id << " does not exist" << std::endl;
-									res.set("message", "thread with ID " + std::to_string(new_message_thread_id) + " does not exist");
-									res.result(400);
-								}
-							}
+						int new_message_thread_id = post_json["thread_id"].template get<int>();
+						// TODO authorize user
+						if (state->main_board()->threadExists(new_message_thread_id)) {
+							if (!state->main_board()->getThread(new_message_thread_id)->userHasPermission(client.first, PERMISSION::SEND_MESSAGE))
+								return api_response(http::status::forbidden, std::string("User lacks permission SEND_MESSAGE within this thread."));
+							post_json["key"] = client.second;  // key is to identify the author of a post
+							int new_message_id = state->main_board()->createPost(post_json);
+							std::string new_message_dump = state->main_board()->dumpPost(new_message_thread_id, new_message_id, client.second);
+							state->sendToThread(new_message_dump, new_message_thread_id);
+							res.result(201);
 						}
 						else {
-							res.set("message", "The post does not meet the constraints set by the server.\nThis could mean that the message content was empty and no files were uploaded, or the message content is too long.");
+							std::cerr << "Couldn't create message because the thread with ID " << new_message_thread_id << " does not exist" << std::endl;
+							res.set("message", "thread with ID " + std::to_string(new_message_thread_id) + " does not exist");
 							res.result(400);
 						}
 					}

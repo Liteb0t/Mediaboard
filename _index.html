@@ -40,7 +40,7 @@
 			<div id="post_container"></div>
 		</main>
 		<div id="body_separator" class="FlexSeparator"></div>
-		<details id="reply_container" open="">
+		<details id="reply_container" style="display: none">
 			<summary><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator"></span></div></summary>
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
@@ -114,7 +114,7 @@
 			<div class="ToolBar"><button onclick="file_upload_error_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 	</body>
-	<style>
+<style>
 html {
 	scrollbar-gutter: stable;
 }
@@ -283,7 +283,7 @@ main {
 	color: #FFF;
 	background: #22D;
 }
-	</style>
+</style>
 <script src="api.js"></script>
 <script>
 "use strict";
@@ -299,7 +299,13 @@ const localDate = new Date();
 const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 const flex_separator = document.createElement("div");
 flex_separator.classList.add("FlexSeparator");
-let state = {selected_thread_id: null};
+let state = {
+	selected_thread: {
+		// id
+		// client_permissions: {}
+	}
+	// server_permissions: {}
+};
 let websocket;
 let websocket_connected = false;
 let reconnect_websocket_interval;
@@ -324,7 +330,7 @@ if (window.location.pathname.startsWith("_ROOT_URL" + "thread/")) {
 	if (second_slash_index > 0) {
 		let thread_number = parseInt(window.location.pathname.substring("_ROOT_URL".length + 7, second_slash_index));
 		if (!isNaN(thread_number)) {
-			state.selected_thread_id = thread_number;
+			state.selected_thread.id = thread_number;
 		}
 		else {
 			alert("Error: thread_number is NaN");
@@ -335,10 +341,8 @@ if (window.location.pathname.startsWith("_ROOT_URL" + "thread/")) {
 	}
 }
 else {
-	state.selected_thread_id = -1;
+	state.selected_thread.id = -1;
 }
-
-window.history.replaceState(state, null, ""); // Initial state
 
 window.onpopstate = function(event) {
 	if (event.state) {
@@ -403,11 +407,13 @@ function logoutAction() {
 	logged_in_indicator.style["display"] = "none";
 	registration_link.style["display"] = "inherit";
 	change_password_link.style["display"] = "none";
-	manage_server_button.style["display"] = "none";
+	// manage_server_button.style["display"] = "none";
 	localStorage.removeItem("account_key");
+	// localStorage.removeItem("server_permissions");
 	account_key = null;
 	is_administrator = false;
 	refresh_send();
+	getClientInfo();
 }
 
 async function postAction() {
@@ -430,7 +436,7 @@ async function postAction() {
 	}
 	else {
 		let response;
-		if (state.selected_thread_id === -1) {
+		if (state.selected_thread.id === -1) {
 			response = await postThread();
 		}
 		else {
@@ -441,28 +447,11 @@ async function postAction() {
 			file_upload.value = "";
 			file_post_list.textContent = "";
 			content_length_indicator.style["display"] = "none";
-			if (state.selected_thread_id === -1) {
+			if (state.selected_thread.id === -1) {
 				let new_thread_id = Number(response.headers.get("new-thread-id"));
 				thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
 				thread_posted_dialog.showModal();
 			}
-		}
-		else {
-			if (state.selected_thread_id === -1) {
-				post_failed_dialog_error_title.textContent = "Could not create thread";
-			}
-			else {
-				post_failed_dialog_error_title.textContent = "Could not send message";
-			}
-			let header_error_message = response.headers.get("message");
-			if (header_error_message) {
-				post_failed_dialog_error_body.innerText = `Status: ${response.status} ${response.statusText}\n${header_error_message}`;
-			}
-			else {
-				post_failed_dialog_error_body = `Status: ${response.status} ${response.statusText}`;
-			}
-			post_failed_dialog.showModal();
-			console.log(response);
 		}
 		localStorage.setItem("name", name_field.value);
 	}
@@ -474,20 +463,67 @@ function removeFileFromList(file_container) {
 }
 
 function openThreadList() {
-	state.selected_thread_id = -1;
+	state.selected_thread.id = -1;
 	history.pushState(state, "", "_ROOT_URL");
 	refresh_send();
 }
 
-function showThreads(message_json) {
+async function refresh_send() {
+	if (typeof websocket !== "undefined") {
+		websocket.close();
+	}
+	if (state.selected_thread.id === -1) {
+		await getAllThreads();
+	}
+	else {
+		await getThread();
+	}
+}
+
+async function getAllThreads() {
+	let response = await API.sendRequest("GET", "threads");
+	console.log(response);
+	if (response.ok) {
+		await response.json().then(response_obj => {
+			console.log(response_obj);
+			showAllThreads(response_obj);
+		});
+	}
+}
+
+function updateReplyContainer(selected_thread_id, permissions) {
+	if (selected_thread_id === -1) {
+		if (permissions["create_thread"]) {
+			reply_heading_text.textContent = "Create a thread";
+			reply_container.style["display"] = "inherit";
+		}
+		else {
+			reply_container.style["display"] = "none";
+		}
+	}
+	else {
+		if (permissions["send_message"]) {
+			reply_heading_text.textContent = "Leave a reply";
+			reply_container.style["display"] = "inherit";
+		}
+		else {
+			reply_container.style["display"] = "none";
+		}
+	}
+}
+
+function showAllThreads(message_json) {
 	location_indicator.textContent = "Threads";
 	threads_button.disabled = true;
-	reply_heading_text.textContent = "Create a thread";
+	if (state.server_permissions) {
+		updateReplyContainer(state.selected_thread.id, state.server_permissions);
+	}
+
 	const fragment = new DocumentFragment();
 	for (let thread of message_json.threads) {
 		// console.log(thread.id);
 		// console.log(thread.post_zero);
-		let post_zero_element = createPost(thread.post_zero);
+		let post_zero_element = createPost(thread.post_zero, state.server_permissions);
 		// console.log(post_zero_element);
 		let thread_element = document.createElement("div");
 		thread_element.classList.add("Thread");
@@ -504,7 +540,7 @@ function showThreads(message_json) {
 
 		thread_toolbar.append(reply_count_container, flex_separator.cloneNode());
 
-		if (thread["permission_editable"] === true) {
+		if (state.server_permissions["manage_permissions"]/*thread["permission_editable"] === true*/) {
 			let manage_thread_permissions_button = document.createElement("a");
 			manage_thread_permissions_button.classList.add("Button", "ToolBarButton");
 			manage_thread_permissions_button.textContent = "Manage permissions";
@@ -527,74 +563,35 @@ function showThreads(message_json) {
 	post_container.replaceChildren(fragment);
 }
 
-function showPosts(message_json) {
-	location_indicator.textContent = `Viewing thread ${state.selected_thread_id}`;
-	threads_button.disabled = false;
-	reply_heading_text.textContent = "Leave a reply";
-	const fragment = new DocumentFragment();
-	// for (let i = 0; i < 1000; ++i) {
-	for (let post of message_json.posts) {
-		fragment.appendChild(createPost(post));
-	}
-	// }
-	post_container.replaceChildren(fragment);
-}
-
-async function getThreads() {
-	let response = await API.sendRequest("GET", "threads");
-	console.log(response);
-	if (response.ok) {
-		await response.json().then(response_obj => {
-			console.log(response_obj);
-			showThreads(response_obj);
-		});
-	}
-}
-
 function openThread(thread_id) {
-	state.selected_thread_id = thread_id;
-	history.pushState(state, "", "_ROOT_URL" + "thread/" + state.selected_thread_id + "/");
-	getThreadPosts();
+	state.selected_thread.id = thread_id;
+	history.pushState(state, "", "_ROOT_URL" + "thread/" + state.selected_thread.id + "/");
+	getThread();
 }
 
-async function getThreadPosts() {
-	let response = await API.sendRequest("GET", `thread/${state.selected_thread_id}/posts`);
+async function getThread() {
+	let response = await API.sendRequest("GET", `thread/${state.selected_thread.id}`);
 	if (response.ok) {
 		await response.json().then(response_obj => {
 			console.log(response_obj);
-			showPosts(response_obj);
-			console.log("1");
+			showThread(response_obj);
 		});
-		console.log("2");
-
 		websocket = connectToServer();
 	}
 }
 
-function addFileToList(filename) {
-	let file_container = document.createElement("div");
-	let file_thumbnail = document.createElement("img");
-	file_thumbnail.setAttribute("src", "placeholder.png");
-	file_thumbnail.setAttribute("width", "100px");
-	file_thumbnail.setAttribute("height", "100px");
-	const file_information_container = document.createElement("div");
-	file_information_container.classList.add("FileInformation");
-	let file_title = document.createElement("span");
-	// file_title.classList.add("FileTitle");
-	file_title.textContent = filename;
-	let file_delete_button = document.createElement("button");
-	file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
-	let progress_bar = document.createElement("progress");
-	progress_bar.value = 0;
-	file_information_container.append(file_title, document.createElement("br"), progress_bar, document.createElement("br"), file_delete_button);
-	file_container.append(file_thumbnail, file_information_container);
-	file_post_list.appendChild(file_container);
-	file_delete_button.onclick = (event) => {
-		// Add delete to server later
-		// file_post_list.removeChild(document.getElementById("file_" + server_filename));
-		removeFileFromList(file_container);
+function showThread(thread_json) {
+	location_indicator.textContent = `Viewing thread ${state.selected_thread.id}`;
+	threads_button.disabled = false;
+	updateReplyContainer(state.selected_thread.id, thread_json["client_permissions"]);
+	state.selected_thread.client_permissions = thread_json["client_permissions"]; // Needed for websocket posts coming in
+	header_bar.scrollIntoView(false); // Scroll back to top
+	const fragment = new DocumentFragment();
+	for (let message of thread_json["messages"]) {
+		fragment.appendChild(createPost(message, thread_json["client_permissions"]));
 	}
-	return file_container;
+	// }
+	post_container.replaceChildren(fragment);
 }
 
 content_field.oninput = () => {
@@ -689,7 +686,7 @@ function uploadFile(file_object) {
 	request.timeout = 60*60*1000; // 1 hour
 	request.onreadystatechange = () => {
 		console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
-		if (!(request.status >= 200 && request.status < 400) && request.status != 0 && !received_error) {
+		if (!(request.status >= 200 && request.status < 300) && request.status != 0 && !received_error) {
 			file_element.classList.add("Errored");
 			received_error = true;
 			console.log("Aporting");
@@ -714,7 +711,7 @@ function uploadFile(file_object) {
 		console.log("Request onLoad fired");
 		if (request.readyState === request.DONE) {
 			console.log("Received response");
-			if (request.status === 202) {
+			if (request.status >= 200 && request.status < 300) {
 				const server_filename = request.getResponseHeader("File-Name");
 				console.log("server_filename: " + server_filename);
 				let decoded_filename = decode_utf8(server_filename);
@@ -780,7 +777,33 @@ file_upload.onchange = (event) => {
 	}
 }
 
-function createPost(data) {
+function addFileToList(filename) {
+	let file_container = document.createElement("div");
+	let file_thumbnail = document.createElement("img");
+	file_thumbnail.setAttribute("src", "placeholder.png");
+	file_thumbnail.setAttribute("width", "100px");
+	file_thumbnail.setAttribute("height", "100px");
+	const file_information_container = document.createElement("div");
+	file_information_container.classList.add("FileInformation");
+	let file_title = document.createElement("span");
+	// file_title.classList.add("FileTitle");
+	file_title.textContent = filename;
+	let file_delete_button = document.createElement("button");
+	file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
+	let progress_bar = document.createElement("progress");
+	progress_bar.value = 0;
+	file_information_container.append(file_title, document.createElement("br"), progress_bar, document.createElement("br"), file_delete_button);
+	file_container.append(file_thumbnail, file_information_container);
+	file_post_list.appendChild(file_container);
+	file_delete_button.onclick = (event) => {
+		// Add delete to server later
+		// file_post_list.removeChild(document.getElementById("file_" + server_filename));
+		removeFileFromList(file_container);
+	}
+	return file_container;
+}
+
+function createPost(data, client_permissions) {
 	// console.log(data);
 	let post_box_element = document.createElement("article");
 	post_box_element.classList.add("Post");
@@ -802,7 +825,7 @@ function createPost(data) {
 	let post_id_element = document.createElement("span");
 	post_id_element.classList.add("ID");
 	let post_id;
-	if (state.selected_thread_id > -1) {
+	if (state.selected_thread.id > -1) {
 		post_id = `#${data.thread_id}/${data.id_in_thread}`;
 	}
 	else {
@@ -834,7 +857,7 @@ function createPost(data) {
 		right_aligned_toolbar_group.appendChild(delete_button_element);
 	}
 	// Reply button
-	if (state.selected_thread_id > -1 && !url_params_display_as_embed) { // Reply button will not appear on catalog (thread list)
+	if (state.selected_thread.id > -1 && !url_params_display_as_embed && client_permissions["send_message"]) {
 		let reply_button = document.createElement("button");
 		reply_button.style["margin-left"] = "0.5em";
 		reply_button.textContent = "\u{2BA9} Reply";
@@ -858,6 +881,7 @@ function createPost(data) {
 			range.collapse(true);
 			selection.removeAllRanges();
 			selection.addRange(range);
+			reply_container.open = true;
 			// content_field.focus();
 		}
 		right_aligned_toolbar_group.appendChild(reply_button);
@@ -953,7 +977,6 @@ function createPost(data) {
 		figcaption_element.append(figcaption_element_a, document.createTextNode("\u00A0"), file_download_button);
 		figure_element.appendChild(figcaption_element);
 		post_files_element.appendChild(figure_element);
-
 	}
 
 	post_box_element.appendChild(post_header_element);
@@ -963,20 +986,8 @@ function createPost(data) {
 	return post_box_element;
 }
 
-async function refresh_send() {
-	if (typeof websocket !== "undefined") {
-		websocket.close();
-	}
-	if (state.selected_thread_id === -1) {
-		await getThreads();
-	}
-	else {
-		await getThreadPosts();
-	}
-}
-
 function connectToServer() {
-	let listening_to_thread = state.selected_thread_id;
+	let listening_to_thread = state.selected_thread.id;
 	let sock;
 	if (!websocket_connected) {
 		sock = new WebSocket("_WEBSOCKET_URL");
@@ -991,10 +1002,10 @@ function connectToServer() {
 		websocket_connected = true;
 		clearInterval(reconnect_websocket_interval);
 		reconnect_websocket_interval = null;
-		if (state.selected_thread_id > -1) {
+		if (state.selected_thread.id > -1) {
 			sock.send(JSON.stringify({
 				"type": "listen_to_thread",
-				"thread_id": state.selected_thread_id
+				"thread_id": state.selected_thread.id
 			}));
 		}
 	}
@@ -1007,7 +1018,7 @@ function connectToServer() {
 			// would be nice if window.scrollMaxY was standard! document.body.scrollHeight - document.body.clientHeight will be used instead
 			let do_scroll = window.scrollY >= document.body.scrollHeight - document.body.clientHeight - 10;
 
-			post_container.appendChild(createPost(JSON.parse(event.data)));
+			post_container.appendChild(createPost(JSON.parse(event.data), state.selected_thread.client_permissions));
 
 			if (do_scroll) {
 				window.scrollTo(0, post_container.scrollHeight);
@@ -1025,10 +1036,10 @@ function connectToServer() {
 	sock.onclose = (event) => {
 		// connection_status.textContent = "Closed \u{1F634}"
 		websocket_connected = false;
-		if (state.selected_thread_id === listening_to_thread) {
+		if (state.selected_thread.id === listening_to_thread) {
 			console.log("Websocket connection closed. Re-connecting will be attempted in 30 seconds.");
 			setTimeout(() => {
-				if (state.selected_thread_id === listening_to_thread) {
+				if (state.selected_thread.id === listening_to_thread) {
 					websocket = connectToServer();
 				}
 			}, 30000);;
@@ -1055,7 +1066,7 @@ async function postMessage() {
 			name: name_field.value,
 			content: content_field.innerText.trim(),
 			files: files,
-			thread_id: state.selected_thread_id
+			thread_id: state.selected_thread.id
 		}
 	};
 	console.log(data);
@@ -1114,7 +1125,6 @@ async function postThread() {
 	return fetch_response;
 }
 
-
 // websocket = connectToServer();
 async function getClientInfo() {
 	const response = await API.sendRequest("GET", `user/client`);
@@ -1122,9 +1132,11 @@ async function getClientInfo() {
 	if (response.ok) {
 		await response.json().then(response_json => {
 			console.log(response_json);
-			if (response_json["server_permissions"]["manage_permissions"] === true) {
-				manage_server_button.style["display"] = "inherit";
-			}
+			state.server_permissions = response_json["server_permissions"];
+			window.history.replaceState(state, null, ""); // Initial state
+			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
+			updateReplyContainer(state.selected_thread.id, state.server_permissions);
+			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
 		});
 	}
 }

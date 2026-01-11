@@ -31,7 +31,7 @@ public:
 	void removeListener(websocket_session* listener);
 	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
 	std::string dumpLastPost() const;
-	std::string dumpPosts(std::string key) const;
+	nlohmann::json getMessagesAsJson(std::string key) const;
 	std::string dumpPost(int message_id, std::string key) const;
 	std::string dumpPermissions(int client_id) const;
 	void markAsDeleted();

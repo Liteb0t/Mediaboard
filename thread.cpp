@@ -71,23 +71,21 @@ void Thread::deleteMessage(int message_id) {
 }
 
 bool Thread::keyMatchesMessage(std::string key, int message_id) const {
-	std::cout << "[Thread] key :: message_key\n" << key << " :: " << this->posts.at(message_id).getKey() << std::endl;
+	// std::cout << "[Thread] key :: message_key\n" << key << " :: " << this->posts.at(message_id).getKey() << std::endl;
 	return message_id != 0 && this->posts.at(message_id).getKey() == key; // Don't match key to message 0, because threads can't be deleted by regular users (yet?)
 }
 
-std::string Thread::dumpPosts(std::string key) const {
-	json multiple_post_json;
-	multiple_post_json["type"] = "post_history";
-	multiple_post_json["posts"] = json::array();
+nlohmann::json Thread::getMessagesAsJson(std::string key) const {
+	json multiple_post_json = json::array();
 	for (auto it = this->posts.begin(); it != this->posts.end(); ++it) {
 		if (!it->second.isDeleted()) {
-			std::cout << "Dumping post " << this->id << "/" << it->second.getIdInThread() << std::endl;
+			// std::cout << "Dumping post " << this->id << "/" << it->second.getIdInThread() << std::endl;
 			json post_json = it->second.asJson();
 			post_json["is_author"] = keyMatchesMessage(key, it->first);
-			multiple_post_json["posts"].push_back(post_json);
+			multiple_post_json.push_back(post_json);
 		}
 	}
-	return multiple_post_json.dump();
+	return multiple_post_json;
 }
 
 std::string Thread::dumpPost(int message_id, std::string key) const {
