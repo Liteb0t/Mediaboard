@@ -27,12 +27,12 @@ Brew install: `nlohmann-json` `imagemagick` `boost` `postgresql@15` `meson`\
 add to ~/.zshrc:\
 `export PATH=/opt/homebrew/Cellar/postgresql@15/15.15/bin:$PATH`\
 The pkg-config for postgresql may not work out of the box. If that is the case, follow these instructions:
-`Brew ls postgresql | grep pkgconfig`
+`Brew ls postgresql | grep pkgconfig`\
 `export PATH=/opt/homebrew/Cellar/postgresql@15/15.15/bin:$PATH` - Adjust the postgresql version to match the result from `brew ls` in the line above.\
 `export PKG_CONFIG_PATH=/opt/homebrew/Cellar/postgresql@15/15.15/lib/pkgconfig/`\
-Use meson instead of make to build. To configure:/
+Use meson instead of make to build. To configure:\
 `meson setup build`\
-`meson configure --pkg-config-path $PKG_CONFIG_PATH build -Dcpp_std=c++17 -Dcpp_args=-stdlib=libc++`\
+`meson configure --pkg-config-path $PKG_CONFIG_PATH build -Dcpp_std=c++17 -Dcpp_args=-stdlib=libc++`
 ### Building
 Currently there are two options: the `Makefile` and the `meson.build`.\
 To build using the Makefile, simply run `make`. \
@@ -78,7 +78,7 @@ You should see an empty page with a toolbar at the top. You can login to the adm
 ![Login page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_login_page.png)
 ### Manage permissions
 By default, users cannot view or create threads or send messages. To enable this, click on the "Manage server" tab in the toolbar as an administrator.\
-![Manage server permissions page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_manage_permissions.png)
+![Permissions in the Manage Server page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_manage_permissions.png)
 In the Manage permissions tab, click "Add group" and select "Public". Now set the desired permissions to "Allow".
 ### Deployment settings
 Example Nginx reverse proxy settings:
