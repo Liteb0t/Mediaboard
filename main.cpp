@@ -81,7 +81,7 @@ main(int argc, char* argv[])
 		std::cout << "\"database\" not found in config. Using default " << database_name << std::endl;
 	}
 	else
-		std::cout << "Set the database to " << doc_root << std::endl;
+		std::cout << "Set the database to " << database_name << std::endl;
 
 	// Establish database connection
 	db_connect(database_name.c_str());

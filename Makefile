@@ -2,7 +2,7 @@ C++C=g++
 CC=gcc
 CFLAGS=-O0
 
-all: index.html registration.html change_password.html manage_server.html server
+all: index.html registration.html change_password.html manage_server.html manage_permissions.html api.js permissions.js server
 
 index.html: _index.html tokens.m4
 	m4 _index.html >index.html
@@ -18,6 +18,12 @@ manage_server.html: _manage_server.html tokens.m4
 
 manage_permissions.html: _manage_permissions.html tokens.m4
 	m4 _manage_permissions.html >manage_permissions.html
+
+api.js: _api.js tokens.m4
+	m4 _api.js >api.js
+
+permissions.js: _permissions.js tokens.m4
+	m4 _permissions.js >permissions.js
 
 server: main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o group.o user.o permission_managed_object.o
 	$(C++C) $(CFLAGS) `Magick++-config --cxxflags --cppflags` -o server main.o listener.o http_session.o shared_state.o websocket_session.o db_interface.o post.o thread.o board.o group.o user.o permission_managed_object.o -I/usr/include/postgresql -l:libecpg.so -l:libpgtypes.so `Magick++-config --ldflags --libs` -lboost_program_options -lboost_filesystem -lboost_system
