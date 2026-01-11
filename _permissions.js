@@ -800,9 +800,11 @@ class PermissionSettings {
 			"setting": three_state_setting
 		};
 		if (this.group_is_selected === true) {
+			this.permissions_json["group_permissions"][this.group_list.selected_group.id]["permission_collection"][request_json.permission] = request_json.setting;
 			response = await API.sendRequest("PUT", this.api_location + `permissions/group/${this.group_list.selected_group.id}`, {}, request_json);
 		}
 		else if (this.user_is_selected === true) {
+			this.permissions_json["user_permissions"][this.user_list.selected_user.id]["permission_collection"][request_json.permission] = request_json.setting;
 			response = await API.sendRequest("PUT", this.api_location + `permissions/user/${this.user_list.selected_user.id}`, {}, request_json);
 		}
 		else {
