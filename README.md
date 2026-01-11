@@ -15,7 +15,8 @@
 `postgresql15-server`\
 `nlohmann-json`\
 `boost-libs`
-### Postgres setup (FreeBSD 14.3)
+### Postgres setup
+This may be skipped on certain distros such as Debian.
 `doas pw groupmod postgres -M <user>`\
 `doas reboot`\
 `initdb -D /var/db/postgres/15/main/`\
@@ -29,14 +30,15 @@ The pkg-config for postgresql may not work out of the box. If that is the case, 
 `export PATH=/opt/homebrew/Cellar/postgresql@15/15.15/bin:$PATH` - Adjust the postgresql version to match the result from `brew ls` in the line above.\
 `export PKG_CONFIG_PATH=/opt/homebrew/Cellar/postgresql@15/15.15/lib/pkgconfig/`\
 Use meson instead of make to build. To configure:/
+`meson setup build`\
 `meson configure --pkg-config-path $PKG_CONFIG_PATH build -Dcpp_std=c++17 -Dcpp_args=-stdlib=libc++`\
 ### Building
 Currently there are two options: the `Makefile` and the `meson.build`.\
 To build using the Makefile, simply run `make`. \
 Do note that libraries may not link with `make` without manual intervention.
 Run the server: `./server`
-To build with meson, first configure:\
-`meson configure --pkg-config-path $PKG_CONFIG_PATH build -Dcpp_std=c++17 -Dcpp_args=-stdlib=libc++`\
+To build with meson, first run:\
+`meson setup build`\
 Then to build:\
 `cd build`\
 `ninja`\
@@ -45,9 +47,9 @@ Run the server: `./build/server` - You must run the server from the Mediaboard d
 Install postgresql.\
 \
 To create the database:\
-`createdb fuze_mediaboard`\
+`createdb fuze_mediaboard`\ - you may need to be logged into the user `postgres` first.\
 `psql -d fuze_mediaboard`\
-`=# CREATE USER mediaboard_server WITH PASSWORD '<password>'`\
+fuze_mediaboard=# `CREATE USER mediaboard_server WITH PASSWORD '<password>'`\
 To import the database template:\
 `psql fuze_mediaboard < fuze_mediaboard_template.sql`\
 `psql fuze_mediaboard < default_groups.sql`\

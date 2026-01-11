@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict SReJ01hgHOeaBdOx0NKTtyvTujkjH6zyCoCddTg83GwtxOlFRugErF2eLzAVAp1
+\restrict aph8XhoAwzNQ03iG8K5Ac3DVL7MMZGQDG0qnLlntRNoy6Folccbc0VEQC7Sgbe1
 
 -- Dumped from database version 15.14 (Debian 15.14-0+deb12u1)
 -- Dumped by pg_dump version 15.14 (Debian 15.14-0+deb12u1)
@@ -86,9 +86,9 @@ ALTER TABLE public.permission_collection OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.permission_collection_id_seq
-    START WITH 1
+    START WITH 100
     INCREMENT BY 1
-    NO MINVALUE
+    MINVALUE 100
     NO MAXVALUE
     CACHE 1;
 
@@ -178,9 +178,9 @@ ALTER TABLE public.permission_setting OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.permission_setting_id_seq
-    START WITH 1
+    START WITH 100
     INCREMENT BY 1
-    NO MINVALUE
+    MINVALUE 100
     NO MAXVALUE
     CACHE 1;
 
@@ -268,6 +268,14 @@ ALTER TABLE ONLY public.account
 
 
 --
+-- Name: permission_collection permission_collection_permission_object_id_account_id_permi_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permission_collection
+    ADD CONSTRAINT permission_collection_permission_object_id_account_id_permi_key UNIQUE (permission_object_id, account_id, permission_group_id);
+
+
+--
 -- Name: permission_collection permission_collection_unique_id; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -313,6 +321,14 @@ ALTER TABLE ONLY public.permission_group
 
 ALTER TABLE ONLY public.permission_setting
     ADD CONSTRAINT permission_setting_id_key UNIQUE (id);
+
+
+--
+-- Name: permission_setting permission_setting_permission_collection_id_permission_numb_key; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.permission_setting
+    ADD CONSTRAINT permission_setting_permission_collection_id_permission_numb_key UNIQUE (permission_collection_id, permission_number);
 
 
 --
@@ -480,5 +496,5 @@ GRANT SELECT,USAGE ON SEQUENCE public.thread_id_seq TO mediaboard_server;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict SReJ01hgHOeaBdOx0NKTtyvTujkjH6zyCoCddTg83GwtxOlFRugErF2eLzAVAp1
+\unrestrict aph8XhoAwzNQ03iG8K5Ac3DVL7MMZGQDG0qnLlntRNoy6Folccbc0VEQC7Sgbe1
 
