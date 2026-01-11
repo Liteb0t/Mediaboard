@@ -41,7 +41,7 @@ class API {
 		try {
 			fetch_response = await fetch("_ROOT_URL" + API.api_url + endpoint + "/", {
 				method: method,
-				headers: {"Token": API.getAccountToken(),
+				headers: {"token": API.getAccountToken(),
 					...headers
 				},
 				body: body && JSON.stringify(body)

@@ -262,8 +262,10 @@ handle_request(
 		std::string token;
 		// boost::intrusive::list_iterator<boost::intrusive::bhtraits<boost::beast::http::basic_fields<std::allocator<char>>::element, boost::intrusive::list_node_traits<void*>, boost::intrusive::normal_link, boost::intrusive::dft_tag, 1>, true> it = req.begin();
 		// Iterates value_type. See: https://www.boost.org/doc/libs/boost_1_82_0/libs/beast/doc/html/beast/ref/boost__beast__http__basic_fields__value_type.html
+		// std::cout << "[http_session] getUserFromToken headers" << std::endl;
 		for (auto it = req.begin(); it != req.end(); it++) {
-			if (it->name_string() == "Token") {
+			// std::cout << it->name_string() << ": " << it->value() << std::endl;
+			if (it->name_string() == "token") {
 				token = it->value();
 				std::cout << "Found Token in header. It is " << token << std::endl;
 				break;
