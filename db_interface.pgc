@@ -808,6 +808,8 @@ void db_update_permission_setting(int _permission_setting_id, int _setting) {
 
 // TODO delete after 0.0.5 release
 void db_make_migrations() {
+	EXEC SQL ALTER TABLE thread ADD COLUMN permission_object_id integer;
+	EXEC SQL ALTER TABLE account ADD COLUMN id integer;
 	EXEC SQL BEGIN DECLARE SECTION;
 	int thread_id;
 	int permission_object_id;

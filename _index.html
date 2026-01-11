@@ -514,7 +514,7 @@ function updateReplyContainer(selected_thread_id, permissions) {
 	if (selected_thread_id === -1) {
 		if (permissions["create_thread"]) {
 			reply_heading_text.textContent = "Create a thread";
-			reply_container.style["display"] = "inherit";
+			reply_container.style["display"] = "initial";
 		}
 		else {
 			reply_container.style["display"] = "none";
@@ -523,7 +523,7 @@ function updateReplyContainer(selected_thread_id, permissions) {
 	else {
 		if (permissions["send_message"] ) {
 			reply_heading_text.textContent = "Leave a reply";
-			reply_container.style["display"] = "inherit";
+			reply_container.style["display"] = "initial";
 		}
 		else {
 			reply_container.style["display"] = "none";

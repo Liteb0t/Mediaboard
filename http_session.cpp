@@ -267,7 +267,7 @@ handle_request(
 			// std::cout << it->name_string() << ": " << it->value() << std::endl;
 			if (it->name_string() == "token") {
 				token = it->value();
-				std::cout << "Found Token in header. It is " << token << std::endl;
+				std::cout << "Found token in header. It is " << token << std::endl;
 				break;
 			}
 		}
