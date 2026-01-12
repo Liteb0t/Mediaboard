@@ -7,10 +7,22 @@
 `libboost1.81-dev`\
 `libboost-program-options1.81-dev`\
 `libboost-filesystem1.81-dev`\
-`Imagemagick` build with the delegates for JPEG, PNG, WEBP, and JPEG-XL. On Debian/Devuan the apt build doesn't come with JPEG-XL so you need to build it yourself.\
 `make`\
 `g++`\
-`m4`
+`m4`\
+### Imagemagick
+Note: FreeBSD users can skip this step because the pkg contains all the required delegates.\
+Clone and configure [Imagemagick](https://github.com/ImageMagick/ImageMagick) with the delegates for JPEG, PNG, WEBP, and JPEG-XL.\
+You mau need to install dependencies first:\
+`libxml2-dev`\
+`libjxl-dev`\
+
+`./configure --with-jpeg --with-jxl --with-png --with-webp --with-xml`\
+Ensure the configure output ends with all the delegates listed:\
+`DELEGATES         = jng jpeg jxl lcms png webp xml zlib`\
+Then install:\
+`make`\
+`sudo make install`
 ### Required packages (FreeBSD 14.3)
 `ImageMagick6-nox11`\
 `postgresql15-server`\
@@ -23,6 +35,7 @@ This may be skipped on certain distros such as Debian.
 `initdb -D /var/db/postgres/15/main/`\
 `pg_ctl -D /var/db/postgres/15/main start`\
 ### Developing on MacOS
+Install [Homebrew](https://brew.sh/)\
 Brew install: `nlohmann-json` `imagemagick` `boost` `postgresql@15` `meson`\
 add to ~/.zshrc:\
 `export PATH=/opt/homebrew/Cellar/postgresql@15/15.15/bin:$PATH`\

@@ -606,6 +606,9 @@ handle_request(
 					thumbnail.quality(50);
 					thumbnail.write(state->doc_root() + "thumbnails/THUMBNAIL_" + out_filename + ".jxl");
 				}
+				catch( Magick::Warning& magick_warning ) {
+					std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Thumbnail might not be made." << std::endl;
+				}
 				catch (Magick::Error& magick_error) {
 					std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Thumbnail will therefore not be made." << std::endl;
 				}
