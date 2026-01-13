@@ -315,10 +315,10 @@ const flex_separator = document.createElement("div");
 flex_separator.classList.add("FlexSeparator");
 let state = {
 	selected_thread: {
-		// id
-		// client_permissions: {}
-	}
-	// server_permissions: {}
+		id: null,
+		client_permissions: {}
+	},
+	server_permissions: {}
 };
 let websocket;
 let websocket_connected = false;
@@ -559,6 +559,8 @@ function showAllThreads(message_json) {
 
 		thread_toolbar.append(reply_count_container, flex_separator.cloneNode());
 
+		// TODO ensure getClientInfo finishes before determining whether to show manage_permissions button on threads.
+		// This is a minor bug which causes the button to sometimes not show the first time a user with MANAGE_PERMISSIONS logs in. It will show after a refresh.
 		if (state.server_permissions["manage_permissions"]/*thread["permission_editable"] === true*/) {
 			let manage_thread_permissions_button = document.createElement("a");
 			manage_thread_permissions_button.classList.add("Button", "ToolBarButton");

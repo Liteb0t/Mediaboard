@@ -367,27 +367,6 @@ const char db_fetch_key(char* _key, const char* _username, const char* _password
 	}
 }
 
-int db_key_matches_account(const char* _key, const char* _username) {
-	EXEC SQL BEGIN DECLARE SECTION;
-	const char* username = _username;
-	char key[8+1];
-	char username_exists;
-	EXEC SQL END DECLARE SECTION;
-	printf("Calling db_key_matches_account with username: %s, key: %s\n", username, _key);
-	EXEC SQL SELECT exists (SELECT 1 FROM account WHERE username = :username LIMIT 1) INTO :username_exists;
-	EXEC SQL COMMIT;
-	if (username_exists == 't') {
-		EXEC SQL SELECT key INTO :key FROM account WHERE username = :username;
-		EXEC SQL COMMIT;
-		if (strcmp(key, _key) == 0)
-			return 1;
-		else
-			return 0;
-	}
-	else
-		return 0;
-}
-
 int db_account_matches_password(int _account_id, const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int account_id = _account_id;

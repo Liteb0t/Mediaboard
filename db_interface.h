@@ -138,7 +138,6 @@ extern "C" {
 	int db_account_username_exists(const char* _username);
 	int db_store_account(const char* username, const char* password);
 	const char db_fetch_key(char* key, const char* username, const char* password);
-	int db_key_matches_account(const char* _key, const char* _username);
 	int db_account_matches_password(int _account_id, const char* _password);
 	char db_change_password(int _account_id, const char* old_password, const char* new_password);
 	void db_create_administrator(const char* _password);
