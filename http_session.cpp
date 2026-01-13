@@ -1055,63 +1055,49 @@ handle_request(
 	}
 	else if (req.method() == http::verb::delete_) {
 		if (req_location.substr(0, 10) == "/api/post/") {
-			http::response<http::empty_body> res;
 			int thread_id, message_id;
-			bool is_thread;
 			std::pair<int, int> thread_in_url/*, message_in_url*/;
-			thread_in_url = getNumberFromPath(10);
+			try {
+				thread_in_url = getNumberFromPath(10);
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, std::string("Bad URL."));
+			}
 			thread_id = thread_in_url.first;
-			if (req_location.length() > thread_in_url.second) {
-				is_thread = false;
-				try {
-					message_id = getNumberFromPath(thread_in_url.second+1).first;
+			try {
+				message_id = getNumberFromPath(thread_in_url.second+1).first;
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, std::string("Bad URL."));
+			}
+			if (!state->main_board()->threadExists(thread_id))
+				return api_response(http::status::bad_request, std::string(std::string("Thread ") + std::to_string(thread_id) + " does not exist"));
+			std::pair<int, std::string> client;
+			try {
+				client = getUserFromToken();
+			}
+			catch(std::string error_text) {
+				return api_response(http::status::bad_request, error_text);
+			}
+			if (message_id == 0) { // Is a thread
+				if (state->main_board()->getThread(thread_id)->userHasPermission(client.first, PERMISSION::DELETE_POST)) {
+					state->main_board()->deleteThread(thread_id);
+					return api_response(http::status::ok, std::string("Deleting thread #") + std::to_string(thread_id));
 				}
-				catch(std::string error_text) {
-					return api_response(http::status::bad_request, std::string("Bad URL."));
-				}
-				std::cout << "Post to delete is not a thread. post ID: #" << thread_id << '/' << message_id << std::endl;
+				else
+					return api_response(http::status::forbidden, std::string("User does not have permission to delete this thread."));
 			}
 			else {
-				is_thread = true;
+				if (!state->main_board()->messageExistsInThread(message_id, thread_id)) {
+					return api_response(http::status::bad_request, std::string("Message ") + std::to_string(message_id) + " does not exist in thread " + std::to_string( thread_id));
+				}
+				if (state->main_board()->getThread(thread_id)->userHasPermission(client.first, PERMISSION::DELETE_POST) || state->main_board()->keyMatchesMessageInThread(client.second.c_str(), message_id, thread_id)) {
+					state->main_board()->deleteMessageFromThread(message_id, thread_id);
+					return api_response(http::status::ok, std::string("Deleting message #") + std::to_string(thread_id) + "/" + std::to_string(message_id));
+				}
+				else
+					return api_response(http::status::bad_request, std::string("Permission denied for message deletion."));
 			}
-			if (state->main_board()->threadExists(thread_id)) {
-				std::pair<int, std::string> client;
-				try {
-					client = getUserFromToken();
-				}
-				catch(std::string error_text) {
-					return api_response(http::status::bad_request, error_text);
-				}
-				bool is_administrator = db_key_matches_account(client.second.c_str(), "Administrator");
-				if (is_thread) {
-					if (is_administrator) {
-						state->main_board()->deleteThread(thread_id);
-						res.result(http::status::ok);
-					}
-					else
-						return bad_request("Denied: User must be administrator to delete a thread");
-				}
-				else if (is_administrator || state->main_board()->keyMatchesMessageInThread(client.second.c_str(), message_id, thread_id)) {
-					if (state->main_board()->messageExistsInThread(message_id, thread_id)) {
-						state->main_board()->deleteMessageFromThread(message_id, thread_id);
-						res.result(200);
-					}
-					else {
-						std::cout << "Message " << message_id << " does not exist in thread " << thread_id << std::endl;
-						res.result(400);
-					}
-				}
-				else {
-					std::cout << "Permission denied for post deletion.\n";
-					res.result(400);
-				}
-			}
-			else {
-				std::cout << "Thread " << thread_id << " does not exist\n";
-				res.result(400);
-			}
-			res.prepare_payload();
-			return res;
 		}
 		else if (req.target().substr(5, 6) == "group/") {
 			std::pair<int, std::string> client;

@@ -31,7 +31,9 @@ void PermissionObjectBase::cacheAllPermissions(/*int permission_object_id*/) {
 		// Get permission settings
 		db_permission_setting_array* permission_settings = db_retrieve_permission_settings_for_permission_collection(permission_collection_array->array[i].id);
 		for (int j = 0; j < permission_settings->used; j++) {
-			new_permission_collection.addPermissionSetting(&permission_settings->array[j]);
+			if (permission_settings->array[j].permission_number < static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS)) {
+				new_permission_collection.addPermissionSetting(&permission_settings->array[j]);
+			}
 			// int permission_number = permission_settings->array[j].permission_number;
 			// new_permission_collection.setPermission(static_cast<PERMISSION>(permission_number), static_cast<THREE_STATE_SETTING>(permission_settings->array[j].setting));
 		}

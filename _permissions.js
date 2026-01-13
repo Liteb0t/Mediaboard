@@ -681,7 +681,8 @@ class PermissionCollection {
 		0: "Manage permissions",
 		1: "View thread",
 		2: "Create thread",
-		3: "Send message"
+		3: "Send message",
+		4: "Delete post"
 	};
 	static three_state_settings = {
 		0: "Deny",
@@ -744,10 +745,10 @@ class PermissionSettings {
 		user_list_factory.addUserList(this.user_list);
 		let enabled_permissions;
 		if (api_location.substring(0, api_location.indexOf("/")) === "server") {
-			enabled_permissions = [0, 1, 2, 3];
+			enabled_permissions = [0, 1, 2, 3, 4];
 		}
 		else { // This is a thread
-			enabled_permissions = [1, 3];
+			enabled_permissions = [1, 3, 4];
 		}
 		this.permission_collection = new PermissionCollection(this, _permission_list_element, enabled_permissions); // PermissionCollection
 		this.permission_list_element = _permission_list_element;

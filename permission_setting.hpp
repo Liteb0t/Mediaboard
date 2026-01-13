@@ -6,6 +6,7 @@ enum struct PERMISSION {  // Mirrors PermissionCollection.permissions in _permis
 	VIEW_THREAD,
 	CREATE_THREAD,
 	SEND_MESSAGE,
+	DELETE_POST,
 	// AUTHOR_DELETE_THREAD,
 	// NON_AUTHOR_DELETE_THREAD,
 	// NON_AUTHOR_VIEW_MESSAGE,

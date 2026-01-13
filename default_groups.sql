@@ -9,3 +9,16 @@ INSERT INTO permission_setting(id, permission_collection_id, permission_number, 
 INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (1, 0, 1, 2);
 INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (2, 0, 2, 2);
 INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (3, 0, 3, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (4, 0, 4, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (5, 0, 5, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (6, 0, 6, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (7, 0, 7, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (8, 0, 8, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (9, 0, 9, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (10, 0, 10, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (11, 0, 11, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (12, 0, 12, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (13, 0, 13, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (14, 0, 14, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (15, 0, 15, 2);
+INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES (16, 0, 16, 2);
