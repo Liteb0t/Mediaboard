@@ -93,6 +93,7 @@ std::string Board::dumpAllThreads(int client_id) const {
 			}
 			thread_json["client_permissions"]["send_message"] = thread->userHasPermission(client_id, PERMISSION::SEND_MESSAGE);
 			*/
+			// TODO place in JSON client permission status for DELETE_POST
 			multiple_thread_json["threads"].push_back(thread_json);
 		}
 	}

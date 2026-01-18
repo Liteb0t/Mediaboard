@@ -31,7 +31,7 @@
 				</div>
 				<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
 				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
-				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.5</a>
+				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.5+</a>
 			</div>
 			<h3 id="location_indicator"></h3>
 			<noscript>
@@ -484,14 +484,16 @@ function openThreadList() {
 }
 
 async function refresh_send() {
+	lock_scroll_to_bottom = false;
 	if (typeof websocket !== "undefined") {
 		websocket.close();
 	}
 	if (state.selected_thread.id === -1) {
-		await getAllThreads();
+		await getAllThreads(); // TODO scroll to previously viewed thread
 	}
 	else {
 		await getThread();
+		lock_scroll_to_bottom = true;
 	}
 }
 
@@ -648,7 +650,7 @@ content_field.oninput = () => {
 // "Scroll-lock" feature - when a user is scrolled to the bottom of the messages list, adding content in the reply container will push the messages up so that the latest messages are not obstructed.
 let lock_scroll_to_bottom = false;
 const reply_container_resize_observer = new ResizeObserver(() => {
-	if (lock_scroll_to_bottom) {
+	if (lock_scroll_to_bottom === true) {
 		bottom_marker.scrollIntoView(false);
 	}
 });
@@ -661,7 +663,7 @@ const options = {
 };
 const callback = (entries, observer) => {
 	for (let entry of entries) {
-		if (entry.target === bottom_marker) {
+		if (entry.target === bottom_marker && state.selected_thread.id > -1) {
 			lock_scroll_to_bottom = entry.isIntersecting;
 		}
 	}

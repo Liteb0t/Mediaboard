@@ -47,34 +47,40 @@ public:
 		this->user_permissions.at(user_id).setPermission(permission_type, setting);
 	}
 	bool passPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const {
+		inherited_permission = this->passInheritedPermissionForGroup(inherited_permission, permission, group_id);
 		// Check if a group permission is set for this object
 		std::unordered_map<int, PermissionCollection>::const_iterator group_iterator = this->group_permissions.find(group_id);
 		if (group_iterator != this->group_permissions.end())
 			inherited_permission = group_iterator->second.passPermission(permission, inherited_permission);
 		return inherited_permission;
 	}
+	bool passPermissionForUser(bool inherited_permission, PERMISSION permission, int user_id) const {
+		inherited_permission = this->passInheritedPermissionForUser(inherited_permission, permission, user_id);
+		// Check if a user permission is set for this object
+		std::unordered_map<int, PermissionCollection>::const_iterator user_iterator = this->user_permissions.find(user_id);
+		if (user_iterator != this->user_permissions.end())
+			inherited_permission = user_iterator->second.passPermission(permission, inherited_permission);
+		return inherited_permission;
+	}
 	virtual const std::vector<int>* getOrderedGroups() const = 0;
 	virtual std::vector<int> getOrderedGroupsContainingMember(int user_id) const = 0;
-	virtual bool getInheritedPermission(int user_id, PERMISSION permission) const = 0;
+	virtual bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const = 0;
+	virtual bool passInheritedPermissionForUser(bool inherited_permission, PERMISSION permission, int user_id) const = 0;
 	virtual int getUserRank(int user_id) const = 0;
 	virtual int getGroupRank(int group_id) const = 0;
 	virtual const boost::shared_ptr<std::unordered_map<int, User>> getUsers() const = 0;
 	bool userHasPermission(int user_id, PERMISSION permission) const {
-		bool inherited_permission = this->getInheritedPermission(user_id, permission);
+		bool inherited_permission = false;
+		// PUBLIC and USERS are built-in, that is, they are never placed in an account's group list. This is because every account is implicitly a part of these two groups
 		inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::PUBLIC));
-		inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::USERS));
-		std::vector<int> user_ordered_groups = this->getOrderedGroupsContainingMember(user_id);
-		for (std::vector<int>::const_reverse_iterator it = user_ordered_groups.rbegin(); it != user_ordered_groups.rend(); it++) {
-		// std::for_each(user_ordered_groups.rbegin(), user_ordered_groups.rend(), [permission](int &group_id) { passPermissionForGroup(group_id)
-		// for (int group_id : this->getOrderedGroupsContainingMember(user_id)) {
-			inherited_permission = this->passPermissionForGroup(inherited_permission, permission, *it);
+		if (user_id != static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
+			inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::USERS));
+			std::vector<int> user_ordered_groups = this->getOrderedGroupsContainingMember(user_id);
+			for (std::vector<int>::const_reverse_iterator it = user_ordered_groups.rbegin(); it != user_ordered_groups.rend(); it++) {
+				inherited_permission = this->passPermissionForGroup(inherited_permission, permission, *it);
+			}
+			inherited_permission = this->passPermissionForUser(inherited_permission, permission, user_id);
 		}
-		std::unordered_map<int, PermissionCollection>::const_iterator user_iterator = this->user_permissions.find(user_id);
-		if (user_iterator != this->user_permissions.end()) {
-			std::cout << "user Id found in user_permissions\n";
-			inherited_permission = user_iterator->second.passPermission(permission, inherited_permission);
-		}
-
 		return inherited_permission;
 	}
 	bool userHasPermissionForGroup(int user_id, PERMISSION permission, int group_id) const {
@@ -105,9 +111,6 @@ class PermissionManager : public PermissionObjectBase {
 public:
 	PermissionManager(int permission_object_id)
 			: PermissionObjectBase(0) {}
-	bool getInheritedPermission(int user_id, PERMISSION permission) const {
-		return false;
-	}
 	const std::vector<int>* getOrderedGroups() const {
 		return &(this->ordered_groups);
 	}
@@ -165,14 +168,16 @@ public:
 		this->groups.erase(group_id);
 		this->saveGroupHeirarchy();
 		db_delete_group(group_id);
-		// TODO apply erase group without requiring a server restart...
-		// ...This would involve finding all permission collections linked to the group and removing them.
 	}
 	void removeUserFromGroup(int user_id, int group_id) {
 		this->groups.at(group_id).removeMember(user_id);
 		db_remove_member_from_group(user_id, group_id);
 	}
 	int addGroup(std::string group_name, int group_rank);
+
+	// PermissionManager is the highest level, so there is no parent to inherit from
+	bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const { return inherited_permission; }
+	bool passInheritedPermissionForUser( bool inherited_permission, PERMISSION permission, int user_id ) const { return inherited_permission; }
 protected:
 	const Group* getGroup(int group_id) const {
 		return &(this->groups.at(group_id));
@@ -212,11 +217,6 @@ protected:
 		this->ordered_groups = ordered_groups;
 		this->saveGroupHeirarchy(); // Apply changes to the database
 	}
-	// TODO remove this duplicate of addUserToGroup
-	void toGroupAddMember(int group_id, int user_id) {
-		std::cout << "Adding user " << user_id << " to group " << group_id << std::endl;
-		this->groups.at(group_id).addMember(user_id);
-	}
 private:
 	void saveGroupHeirarchy() const;
 	std::unordered_map<int, User> users;
@@ -229,9 +229,6 @@ class PermissionManagedObject : public PermissionObjectBase {
 public:
 	PermissionManagedObject(boost::shared_ptr<PermissionObjectBase> parent_object, int permission_object_id)
 			: PermissionObjectBase(permission_object_id), parent_object(parent_object) {}
-	bool getInheritedPermission(int user_id, PERMISSION permission) const { 
-		return this->parent_object->userHasPermission(user_id, permission);
-	}
 	const std::vector<int>* getOrderedGroups() const {
 		return this->parent_object->getOrderedGroups();
 	}
@@ -246,6 +243,12 @@ public:
 	}
 	const boost::shared_ptr<std::unordered_map<int, User>> getUsers() const {
 		return this->parent_object->getUsers();
+	}
+	bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const {
+		return this->parent_object->passPermissionForGroup(inherited_permission, permission, group_id);
+	}
+	bool passInheritedPermissionForUser(bool inherited_permission, PERMISSION permission, int user_id) const {
+		return this->parent_object->passPermissionForUser(inherited_permission, permission, user_id);
 	}
 private:
 	boost::shared_ptr<PermissionObjectBase> parent_object;

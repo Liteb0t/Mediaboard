@@ -12,20 +12,20 @@
 `m4`\
 ### Imagemagick
 Note: FreeBSD users can skip this step because the pkg contains all the required delegates.\
-Clone and configure [Imagemagick](https://github.com/ImageMagick/ImageMagick) with the delegates for JPEG, PNG, WEBP, and JPEG-XL.\
+Clone and configure [Imagemagick](https://github.com/ImageMagick/ImageMagick) with the delegates for JPEG, PNG, WEBP, XML, and JPEG-XL.\
 You mau need to install dependencies first:\
 `libxml2-dev`\
 `libjxl-dev`\
-
+Configure:\
 `./configure --with-jpeg --with-jxl --with-png --with-webp --with-xml`\
 Ensure the configure output ends with all the delegates listed:\
 `DELEGATES         = jng jpeg jxl lcms png webp xml zlib`\
 Then install:\
 `make`\
 `sudo make install`
-### Required packages (FreeBSD 14.3)
-`ImageMagick6-nox11`\
-`postgresql15-server`\
+### Required packages (FreeBSD 15.0)
+`ImageMagick7-nox11`\
+`postgresql17-server`\
 `nlohmann-json`\
 `boost-libs`
 ### Postgres setup
@@ -128,3 +128,6 @@ Also change the definition of `_ROOT_URL` from `/` to `/mediaboard/`\
 Run `make` to apply the changes, or `sh build.sh` if using Meson.
 ### Storing user-submitted media in a different location
 By default, media is stored in `media/`. You can choose a different directory within the server's filesystem to store media. Open `config.ini` and set `media_path` to another location.
+### Dumping the database template
+After making changes to the database schema, dump it to the repository using this command:\
+`pg_dump --schema-only fuze_mediaboard >database_template.sql`

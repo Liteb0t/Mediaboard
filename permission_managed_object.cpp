@@ -133,7 +133,7 @@ void PermissionManager::cacheAllGroups() {
 	freeGroupHeirarchyArray(group_heirarchy);
 	struct db_group_member_array* group_member_array = db_retrieve_group_members();
 	for (int i = 0; i < group_member_array->used; i++) {
-		this->toGroupAddMember(group_member_array->array[i].group_id, group_member_array->array[i].account_id);
+		this->addUserToGroup(group_member_array->array[i].account_id, group_member_array->array[i].group_id);
 	}
 	freeGroupMemberArray(group_member_array);
 

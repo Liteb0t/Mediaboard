@@ -2,14 +2,15 @@
 -- PostgreSQL database dump
 --
 
-\restrict aph8XhoAwzNQ03iG8K5Ac3DVL7MMZGQDG0qnLlntRNoy6Folccbc0VEQC7Sgbe1
+\restrict rzOHDTlPZOgdAw3ORALnep3Wa79RscPRrC7SPgDjcpC6ehjfX13iW2uwGRmg5kA
 
--- Dumped from database version 15.14 (Debian 15.14-0+deb12u1)
--- Dumped by pg_dump version 15.14 (Debian 15.14-0+deb12u1)
+-- Dumped from database version 17.7 (Debian 17.7-0+deb13u1)
+-- Dumped by pg_dump version 17.7 (Debian 17.7-0+deb13u1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -58,14 +59,14 @@ ALTER TABLE public.account OWNER TO postgres;
 --
 
 CREATE SEQUENCE public.account_id_seq
-    START WITH 1
+    START WITH 4
     INCREMENT BY 1
-    NO MINVALUE
+    MINVALUE 4
     NO MAXVALUE
     CACHE 1;
 
 
-ALTER TABLE public.account_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.account_id_seq OWNER TO postgres;
 
 --
 -- Name: permission_collection; Type: TABLE; Schema: public; Owner: postgres
@@ -93,7 +94,7 @@ CREATE SEQUENCE public.permission_collection_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.permission_collection_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.permission_collection_id_seq OWNER TO postgres;
 
 --
 -- Name: permission_group; Type: TABLE; Schema: public; Owner: postgres
@@ -143,7 +144,7 @@ CREATE SEQUENCE public.permission_group_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.permission_group_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.permission_group_id_seq OWNER TO postgres;
 
 --
 -- Name: permission_object_id_seq; Type: SEQUENCE; Schema: public; Owner: postgres
@@ -157,7 +158,7 @@ CREATE SEQUENCE public.permission_object_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.permission_object_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.permission_object_id_seq OWNER TO postgres;
 
 --
 -- Name: permission_setting; Type: TABLE; Schema: public; Owner: postgres
@@ -185,7 +186,7 @@ CREATE SEQUENCE public.permission_setting_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.permission_setting_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.permission_setting_id_seq OWNER TO postgres;
 
 --
 -- Name: post; Type: TABLE; Schema: public; Owner: postgres
@@ -218,7 +219,7 @@ CREATE SEQUENCE public.post_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.post_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.post_id_seq OWNER TO postgres;
 
 --
 -- Name: test; Type: TABLE; Schema: public; Owner: postgres
@@ -257,7 +258,7 @@ CREATE SEQUENCE public.thread_id_seq
     CACHE 1;
 
 
-ALTER TABLE public.thread_id_seq OWNER TO postgres;
+ALTER SEQUENCE public.thread_id_seq OWNER TO postgres;
 
 --
 -- Name: account account_id_unique; Type: CONSTRAINT; Schema: public; Owner: postgres
@@ -391,7 +392,7 @@ ALTER TABLE ONLY public.post
 -- Name: TABLE account; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.account TO mediaboard_server;
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE public.account TO mediaboard_server;
 
 
 --
@@ -405,7 +406,7 @@ GRANT SELECT,USAGE ON SEQUENCE public.account_id_seq TO mediaboard_server;
 -- Name: TABLE permission_collection; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.permission_collection TO mediaboard_server;
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE public.permission_collection TO mediaboard_server;
 
 
 --
@@ -419,21 +420,21 @@ GRANT ALL ON SEQUENCE public.permission_collection_id_seq TO mediaboard_server;
 -- Name: TABLE permission_group; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.permission_group TO mediaboard_server;
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE public.permission_group TO mediaboard_server;
 
 
 --
 -- Name: TABLE permission_group_account; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.permission_group_account TO mediaboard_server;
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE public.permission_group_account TO mediaboard_server;
 
 
 --
 -- Name: TABLE permission_group_heirarchy; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.permission_group_heirarchy TO mediaboard_server;
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE public.permission_group_heirarchy TO mediaboard_server;
 
 
 --
@@ -454,7 +455,7 @@ GRANT ALL ON SEQUENCE public.permission_object_id_seq TO mediaboard_server;
 -- Name: TABLE permission_setting; Type: ACL; Schema: public; Owner: postgres
 --
 
-GRANT ALL ON TABLE public.permission_setting TO mediaboard_server;
+GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLE public.permission_setting TO mediaboard_server;
 
 
 --
@@ -496,5 +497,5 @@ GRANT SELECT,USAGE ON SEQUENCE public.thread_id_seq TO mediaboard_server;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aph8XhoAwzNQ03iG8K5Ac3DVL7MMZGQDG0qnLlntRNoy6Folccbc0VEQC7Sgbe1
+\unrestrict rzOHDTlPZOgdAw3ORALnep3Wa79RscPRrC7SPgDjcpC6ehjfX13iW2uwGRmg5kA
 
