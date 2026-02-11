@@ -35,7 +35,7 @@
 			</div>
 			<h3 id="location_indicator"></h3>
 			<noscript>
-				<dialog open><h2>Error</h2><p><b>Enable Javascript</b>, you fucking autist neckbeard. It's not gonna hurt you.</p></dialog>
+				<dialog open style="margin-top: 20vh"><h2>Error</h2><p><b>Enable Javascript</b>, you fucking autist neckbeard. It's not gonna hurt you.</p></dialog>
 			</noscript>
 			<div id="post_container"></div>
 		</main>
@@ -744,7 +744,7 @@ function uploadFile(file_object) {
 				// console.log("server_filename dec new: " + newdecoded);
 				file_element.setAttribute("id", "file_" + decoded_filename);
 				if (Format.fromFileName(server_filename) === Format.IMAGE) {
-					file_img_element.setAttribute("src", "_ROOT_URL" + media_url + decoded_filename);
+					file_img_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + ".jxl");
 				}
 				const upload_complete_indicator = document.createElement("span");
 				upload_complete_indicator.classList.add("UploadCompleteIndicator");

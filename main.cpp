@@ -91,12 +91,6 @@ main(int argc, char* argv[])
 		std::cout << "Created 'Administrator' account successfully" << std::endl;
 		return 0;
 	}
-	// TODO remove after 0.0.5 release
-	if (variable_map.count("make_migrations")) {
-		db_make_migrations();
-		std::cout << "permission_object_id added to threads. Do not run this command again." << std::endl;
-		return 0;
-	}
 	if (!variable_map.count("media_path")) {
 		doc_root = ".";
 	}

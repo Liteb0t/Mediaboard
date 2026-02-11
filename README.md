@@ -49,12 +49,13 @@ Use meson instead of make to build. To configure:\
 ### Building
 Currently there are two options: the `Makefile` and the `meson.build`.\
 To build using the Makefile, simply run `make`. \
-Do note that libraries may not link with `make` without manual intervention.
+Do note that libraries may not link with `make` without manual intervention.\
 To build with meson, first run:\
 `meson setup build`\
 Then to build:\
+`sh build.sh`\
 `cd build`\
-`ninja`\
+`ninja`
 ### Database setup
 Install postgresql.\
 \
