@@ -26,6 +26,7 @@
 						<li class="ToolBar"><a class="Button ToolBarButton" href="_ROOT_URL">Return</a></li>
 					</nav>
 				</fieldset>
+				<!-- Manage permissions -->
 				<div id="manage_permissions_container">
 					<h2>Manage permissions - _SITE_NAME</h2>
 					<div class="PermissionSettingsGrid">
@@ -57,6 +58,7 @@
 						</fieldset>
 					</div>
 				</div>
+				<!-- Manage groups -->
 				<div id="manage_groups_container" style="display: none">
 					<h2>Manage groups - _SITE_NAME</h2>
 					<div class="ToolBar">
@@ -86,6 +88,7 @@
 						</fieldset>
 					</div>
 				</div>
+				<!-- Manage users -->
 				<div id="manage_users_container" style="display: none">
 					<h2>Manage users - _SITE_NAME</h2>
 					<ul id="user_list_element" class="MetroList"></ul>
@@ -137,12 +140,9 @@ function showTab(element) {
 	element.style["display"] = "initial";
 }
 
-// const flex_separator = document.createElement("div");
-// flex_separator.classList.add("FlexSeparator");
-
 let permission_settings = new PermissionSettings(permission_settings_user_list_element, permission_settings_group_list_element, permission_settings_permission_list_element, selected_permission_user_or_group_indicator, "server/");
 let the_user_list = new ManageUsersUserList(user_list_element);
-let group_manager = new GroupManager(group_list_element, member_list_element);
+let group_manager = new GroupManager(group_list_element, member_list_element, group_delete_button, group_rename_button);
 user_list_factory.addUserList(the_user_list);
 let add_user_to_groups_group_list = new addUserToGroupsGroupList(add_user_to_group_dialog, add_user_to_group_dialog_group_list_element, add_user_to_group_dialog_ok_button);
 group_list_factory.addGroupList(add_user_to_groups_group_list);

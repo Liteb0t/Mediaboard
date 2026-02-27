@@ -170,13 +170,13 @@ class HeirarchyEditableGroup extends Group {
 }
 
 class ManageGroupsGroupList extends GroupList {
-	constructor(group_list_container, group_manager) {
+	constructor(group_list_container, group_manager, delete_button, rename_button) {
 		super(group_list_container);
 		this.group_manager = group_manager;
 		this.selected_group = null;
 		this.selected_group_indicator = selected_group_indicator;
-		this.rename_button = group_rename_button;
-		this.delete_button = group_delete_button;
+		this.delete_button = delete_button;
+		this.rename_button = rename_button;
 		this.delete_button.onclick = async() => {
 			this.delete_button.disabled = true;
 			let response = await API.sendRequest("DELETE", `group/${this.selected_group.id}`);
@@ -241,7 +241,7 @@ class ManageGroupsGroupList extends GroupList {
 	}
 	setSelectedGroupLabel() {
 		this.selected_group_indicator.textContent = this.selected_group.name;
-		if (this.selected_group.client_editable) {
+		if (this.selected_group.permission_editable) {
 			this.rename_button.disabled = false;
 			this.delete_button.disabled = false;
 		}
@@ -451,8 +451,8 @@ class ManageGroupsMemberList extends UserList {
 }
 
 class GroupManager {
-	constructor(group_list_element, member_list_element) {
-		this.group_list = new ManageGroupsGroupList(group_list_element, this);
+	constructor(group_list_element, member_list_element, delete_button, rename_button) {
+		this.group_list = new ManageGroupsGroupList(group_list_element, this, delete_button, rename_button);
 		group_list_factory.addGroupList(this.group_list);
 		this.member_list = new ManageGroupsMemberList(member_list_element, this);
 		user_list_factory.addUserList(this.member_list);
@@ -465,8 +465,8 @@ class PermissionSettingsGroup extends Group {
 		this.remove_button = document.createElement("button");
 		this.remove_button.classList.add("RightAligned");
 		this.remove_button.textContent = "Remove";
-		this.client_editable = group_list_factory.groups_json.groups[this.id]["permission_editable"];
-		if (this.client_editable === false) {
+		// this.client_editable = group_list_factory.groups_json.groups[this.id]["permission_editable"];
+		if (this.permission_editable === false) {
 			this.remove_button.disabled = true;
 		}
 		else {
@@ -689,7 +689,7 @@ class PermissionCollection {
 		1: "Inherit",
 		2: "Allow"
 	};
-	showPermissions(permission_collection_json, client_editable) {
+	showPermissions(permission_collection_json, permission_editable_by_client) {
 		const fragment = new DocumentFragment();
 		for (const permission_id of this.enabled_permissions) {
 			let current_setting; // Set to the threestatesetting of this permission
@@ -708,7 +708,7 @@ class PermissionCollection {
 				radio_element.type = "radio";
 				radio_element.id = input_id;
 				radio_element.name = `permission-${permission_id}`;
-				if (client_editable) {
+				if (permission_editable_by_client) {
 					radio_element.onclick = async() => {
 						if (current_setting != three_state_setting_id) {
 							current_setting = Number(three_state_setting_id);
