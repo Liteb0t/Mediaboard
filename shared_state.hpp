@@ -30,8 +30,6 @@ public:
 	   	status(status), message(message) {}
 	BasicResponse(http::status status, nlohmann::json json) :
 	   	status(status), json(json) {}
-	// BasicResponse(http::status status, std::string message, json json) :
-	//    	BasicResponse(status, message), json(json) {}
 	http::status status;
 	std::string message;
 	boost::optional<nlohmann::json> json;
@@ -40,11 +38,11 @@ public:
 // Represents the shared server state
 class shared_state : public PermissionManager {
 public:
-    explicit
-    shared_state(std::string doc_root /*, std::string media_root*/);
+	explicit
+	shared_state(std::string doc_root /*, std::string media_root*/);
 	void start();
 
-    const std::string& doc_root() const noexcept { return doc_root_; }
+	const std::string& doc_root() const noexcept { return doc_root_; }
 	// const std::string& media_root() const { return media_root_; }
 
 	// Board main_board;
@@ -62,34 +60,20 @@ public:
 	BasicResponse getKeyFromPassword(nlohmann::json request_json) const;
 	BasicResponse addUserToGroups(int client_id, int user_id, std::vector<int> groups_by_id);
 
-    void join  (websocket_session* session);
-    void leave (websocket_session* session);
-    void send  (std::string message);
-    void sendToThread (std::string message, int thread_id);
-	// struct group_order_comparator {
-	// 	bool operator() (std::pair<int, int> left, std::pair<int, int> right) const {
-	// 		if (left.first > right.first)
-	// 			return true;
-	// 		else if (left.first < right.first)
-	// 			return false;
-	// 		if (left.second > right.second)
-	// 			return true;
-	// 		else if (left.second < right.second)
-	// 			return false;
-	// 		else
-	// 			return false;
-	// 	}
-	// };
+	void join  (websocket_session* session);
+	void leave (websocket_session* session);
+	void send  (std::string message);
+	void sendToThread (std::string message, int thread_id);
 
 private:
-    const std::string doc_root_;
+	const std::string doc_root_;
 	// const std::string media_root_;
 
-    // This mutex synchronizes all access to sessions_
-    std::mutex mutex_;
+	// This mutex synchronizes all access to sessions_
+	std::mutex mutex_;
 
-    // Keep a list of all the connected clients
-    std::unordered_set<websocket_session*> sessions_;
+	// Keep a list of all the connected clients
+	std::unordered_set<websocket_session*> sessions_;
 
 	// std::unordered_map<int, Board> boards;
 	std::unordered_map<int, boost::shared_ptr<Board>> boards;

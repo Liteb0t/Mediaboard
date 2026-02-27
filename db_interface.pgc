@@ -220,12 +220,12 @@ void db_connect(const char* _database_name) {
 }
 
 void db_test() {
-    EXEC SQL BEGIN DECLARE SECTION;
-    char dbname[1024];
-    EXEC SQL END DECLARE SECTION;
+	EXEC SQL BEGIN DECLARE SECTION;
+	char dbname[1024];
+	EXEC SQL END DECLARE SECTION;
 
-    EXEC SQL SELECT current_database() INTO :dbname;
-    printf("current_database = %s\n", dbname);
+	EXEC SQL SELECT current_database() INTO :dbname;
+	printf("current_database = %s\n", dbname);
 }
 
 void db_create_administrator(const char* _password) {
@@ -246,7 +246,7 @@ void db_create_administrator(const char* _password) {
 }
 
 int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_NAME+1], time_t upload_timestamp_, const char* content_, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key_[KEY_LENGTH+1]) {
-    EXEC SQL BEGIN DECLARE SECTION;
+	EXEC SQL BEGIN DECLARE SECTION;
 	int number_of_posts;
 	int post_id;
 	int thread_id = thread_id_;
@@ -259,7 +259,7 @@ int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_N
 	const char* file_3 = files[2]; const int file_3_indicator = file_count - 3;
 	const char* file_4 = files[3]; const int file_4_indicator = file_count - 4;
 	const char* key = key_;
-    EXEC SQL END DECLARE SECTION;
+	EXEC SQL END DECLARE SECTION;
 	EXEC SQL SELECT number_of_posts INTO :number_of_posts FROM thread WHERE id = :thread_id;
 	EXEC SQL COMMIT;
 	number_of_posts++;
@@ -490,10 +490,10 @@ struct db_post_array* db_retrieve_history() {
 }
 
 int db_store_group(const char name_[GROUP_MAX_NAME+1]) {
-    EXEC SQL BEGIN DECLARE SECTION;
+	EXEC SQL BEGIN DECLARE SECTION;
 	int group_id;
 	const char* name = name_;
-    EXEC SQL END DECLARE SECTION;
+	EXEC SQL END DECLARE SECTION;
 	EXEC SQL WHENEVER NOT FOUND CONTINUE;
 	printf("[DB Interface] Storing permission_group %s\n", name);
 	EXEC SQL SELECT nextval('permission_group_id_seq') INTO :group_id;
@@ -504,10 +504,10 @@ int db_store_group(const char name_[GROUP_MAX_NAME+1]) {
 }
 
 void db_delete_group(int _group_id) {
-    EXEC SQL BEGIN DECLARE SECTION;
+	EXEC SQL BEGIN DECLARE SECTION;
 	int permission_collection_id;
 	int group_id = _group_id;
-    EXEC SQL END DECLARE SECTION;
+	EXEC SQL END DECLARE SECTION;
 	EXEC SQL DECLARE permission_collection_getter_to_delete_group CURSOR FOR
 		SELECT id FROM permission_collection
 		WHERE permission_group_id = :group_id;
@@ -809,17 +809,17 @@ void db_disconnect(void) {
 }
 
 void print_sqlca() {
-    fprintf(stderr, "==== sqlce ====\n");
-    fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
-    fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
-    fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
-    fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
-                                                          sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
-    fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
-                                                          sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
-                                                          sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
-    fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
-    fprintf(stderr, "===============\n");
+	fprintf(stderr, "==== sqlce ====\n");
+	fprintf(stderr, "sqlcode: %ld\n", sqlca.sqlcode);
+	fprintf(stderr, "sqlerrm.sqlerrml: %d\n", sqlca.sqlerrm.sqlerrml);
+	fprintf(stderr, "sqlerrm.sqlerrmc: %s\n", sqlca.sqlerrm.sqlerrmc);
+	fprintf(stderr, "sqlerrd: %ld %ld %ld %ld %ld %ld\n", sqlca.sqlerrd[0],sqlca.sqlerrd[1],sqlca.sqlerrd[2],
+														  sqlca.sqlerrd[3],sqlca.sqlerrd[4],sqlca.sqlerrd[5]);
+	fprintf(stderr, "sqlwarn: %d %d %d %d %d %d %d %d\n", sqlca.sqlwarn[0], sqlca.sqlwarn[1], sqlca.sqlwarn[2],
+					 									  sqlca.sqlwarn[3], sqlca.sqlwarn[4], sqlca.sqlwarn[5],
+														  sqlca.sqlwarn[6], sqlca.sqlwarn[7]);
+	fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
+	fprintf(stderr, "===============\n");
 	printf("Terminating the program...\n");
 	exit(1); // Stop the server when an SQL error is encountered. This is likely due to incorrect setup.
 }

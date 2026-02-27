@@ -2,11 +2,11 @@
 // https://github.com/vinniefalco/CppCon2018
 //------------------------------------------------------------------------------
 /*
-    WebSocket chat server, multi-threaded
+	WebSocket chat server, multi-threaded
 
-    This implements a multi-user chat room using WebSocket. The
-    `io_context` runs on any number of threads, specified at
-    the command line.
+	This implements a multi-user chat room using WebSocket. The
+	`io_context` runs on any number of threads, specified at
+	the command line.
 
 */
 //------------------------------------------------------------------------------
@@ -23,14 +23,12 @@
 #include <string>
 #include <vector>
 
-const std::string version_string = "0.0.5+";
+const std::string version_string = "0.0.6";
 
-int
-main(int argc, char* argv[])
-{
+int main(int argc, char* argv[]) {
 	Magick::InitializeMagick(*argv);  // Required on Windows and MacOS
 
-    // Check command line arguments.
+	// Check command line arguments.
 	std::string config_file;
 	unsigned short port;
 	std::string admin_password, doc_root, database_name;
@@ -101,49 +99,49 @@ main(int argc, char* argv[])
 	std::cout << "Set doc_root:" << doc_root << std::endl;
 	std::cout << "Set threads: " << threads << std::endl;
 
-    auto address = net::ip::make_address("127.0.0.1");
-    // The io_context is required for all I/O
-    net::io_context ioc;
+	auto address = net::ip::make_address("127.0.0.1");
+	// The io_context is required for all I/O
+	net::io_context ioc;
 
-    // Create and launch a listening port
+	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
 	boost::shared_ptr<shared_state> state(new shared_state(doc_root));
 	state->start();
-    boost::make_shared<listener>(
-        ioc,
-        tcp::endpoint{address, port},
-        state)->run();
+	boost::make_shared<listener>(
+		ioc,
+		tcp::endpoint{address, port},
+		state)->run();
 
-    // Capture SIGINT and SIGTERM to perform a clean shutdown
+	// Capture SIGINT and SIGTERM to perform a clean shutdown
 	std::cout << "Setting signals..." << std::endl;
-    net::signal_set signals(ioc, SIGINT, SIGTERM);
-    signals.async_wait(
-        [&ioc](boost::system::error_code const&, int)
-        {
-            // Stop the io_context. This will cause run()
-            // to return immediately, eventually destroying the
-            // io_context and any remaining handlers in it.
-            ioc.stop();
-        });
+	net::signal_set signals(ioc, SIGINT, SIGTERM);
+	signals.async_wait(
+		[&ioc](boost::system::error_code const&, int) {
+			// Stop the io_context. This will cause run()
+			// to return immediately, eventually destroying the
+			// io_context and any remaining handlers in it.
+			ioc.stop();
+		}
+	);
 
-    // Run the I/O service on the requested number of threads
+	// Run the I/O service on the requested number of threads
 	std::cout << "Running the I/O service..." << std::endl;
-    std::vector<std::thread> v;
-    v.reserve(threads - 1);
-    for(auto i = threads - 1; i > 0; --i)
-        v.emplace_back(
-        [&ioc]
-        {
-            ioc.run();
-        });
-    ioc.run();
+	std::vector<std::thread> v;
+	v.reserve(threads - 1);
+	for(auto i = threads - 1; i > 0; --i)
+		v.emplace_back(
+			[&ioc] {
+				ioc.run();
+			}
+		);
+	ioc.run();
 
-    // (If we get here, it means we got a SIGINT or SIGTERM)
+	// (If we get here, it means we got a SIGINT or SIGTERM)
 
-    // Block until all the threads exit
-    for(auto& t : v)
-        t.join();
+	// Block until all the threads exit
+	for(auto& t : v)
+		t.join();
 	db_disconnect();
 
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }

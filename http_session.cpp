@@ -32,39 +32,37 @@ using json = nlohmann::json;
 
 // Return a reasonable mime type based on the extension of a file.
 beast::string_view
-mime_type(beast::string_view path)
-{
-    using beast::iequals;
-    auto const ext = [&path]
-    {
-        auto const pos = path.rfind(".");
-        if(pos == beast::string_view::npos)
-            return beast::string_view{};
-        return path.substr(pos);
-    }();
-    if(iequals(ext, ".htm"))  return "text/html";
-    if(iequals(ext, ".html")) return "text/html";
-    if(iequals(ext, ".php"))  return "text/html";
-    if(iequals(ext, ".css"))  return "text/css";
-    if(iequals(ext, ".txt"))  return "text/plain";
-    if(iequals(ext, ".js"))   return "application/javascript";
-    if(iequals(ext, ".json")) return "application/json";
-    if(iequals(ext, ".xml"))  return "application/xml";
-    if(iequals(ext, ".swf"))  return "application/x-shockwave-flash";
-    if(iequals(ext, ".flv"))  return "video/x-flv";
-    if(iequals(ext, ".png"))  return "image/png";
-    if(iequals(ext, ".jpe"))  return "image/jpeg";
-    if(iequals(ext, ".jpeg")) return "image/jpeg";
-    if(iequals(ext, ".jpg"))  return "image/jpeg";
-    if(iequals(ext, ".jxl"))  return "image/jxl";
-    if(iequals(ext, ".gif"))  return "image/gif";
-    if(iequals(ext, ".bmp"))  return "image/bmp";
-    if(iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
-    if(iequals(ext, ".tiff")) return "image/tiff";
-    if(iequals(ext, ".tif"))  return "image/tiff";
-    if(iequals(ext, ".svg"))  return "image/svg+xml";
-    if(iequals(ext, ".svgz")) return "image/svg+xml";
-    return "application/text";
+mime_type(beast::string_view path) {
+	using beast::iequals;
+	auto const ext = [&path] 	{
+		auto const pos = path.rfind(".");
+		if(pos == beast::string_view::npos)
+			return beast::string_view{};
+		return path.substr(pos);
+	}();
+	if(iequals(ext, ".htm"))  return "text/html";
+	if(iequals(ext, ".html")) return "text/html";
+	if(iequals(ext, ".php"))  return "text/html";
+	if(iequals(ext, ".css"))  return "text/css";
+	if(iequals(ext, ".txt"))  return "text/plain";
+	if(iequals(ext, ".js"))   return "application/javascript";
+	if(iequals(ext, ".json")) return "application/json";
+	if(iequals(ext, ".xml"))  return "application/xml";
+	if(iequals(ext, ".swf"))  return "application/x-shockwave-flash";
+	if(iequals(ext, ".flv"))  return "video/x-flv";
+	if(iequals(ext, ".png"))  return "image/png";
+	if(iequals(ext, ".jpe"))  return "image/jpeg";
+	if(iequals(ext, ".jpeg")) return "image/jpeg";
+	if(iequals(ext, ".jpg"))  return "image/jpeg";
+	if(iequals(ext, ".jxl"))  return "image/jxl";
+	if(iequals(ext, ".gif"))  return "image/gif";
+	if(iequals(ext, ".bmp"))  return "image/bmp";
+	if(iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
+	if(iequals(ext, ".tiff")) return "image/tiff";
+	if(iequals(ext, ".tif"))  return "image/tiff";
+	if(iequals(ext, ".svg"))  return "image/svg+xml";
+	if(iequals(ext, ".svgz")) return "image/svg+xml";
+	return "application/text";
 }
 
 const std::string forbidden_file_name_chars = "#?";
@@ -98,40 +96,38 @@ char from_hex(char ch) {
 
 // Append an HTTP rel-path to a local filesystem path.
 // The returned path is normalized for the platform.
-std::string
-path_cat(
-    beast::string_view base,
-    beast::string_view path)
-{
-    if(base.empty())
-        return std::string(path);
-    std::string result(base);
+std::string path_cat(
+	beast::string_view base,
+	beast::string_view path) {
+	if(base.empty())
+		return std::string(path);
+	std::string result(base);
 #ifdef BOOST_MSVC
-    char constexpr path_separator = '\\';
-    if(result.back() == path_separator)
-        result.resize(result.size() - 1);
-    result.append(path.data(), path.size());
-    for(auto& c : result)
-        if(c == '/')
-            c = path_separator;
+	char constexpr path_separator = '\\';
+	if(result.back() == path_separator)
+		result.resize(result.size() - 1);
+	result.append(path.data(), path.size());
+	for(auto& c : result)
+		if(c == '/')
+			c = path_separator;
 #else
-    char constexpr path_separator = '/';
-    if(result.back() == path_separator)
-        result.resize(result.size() - 1);
-    result.append(path.data(), path.size());
+	char constexpr path_separator = '/';
+	if(result.back() == path_separator)
+		result.resize(result.size() - 1);
+	result.append(path.data(), path.size());
 #endif
-    return result;
+	return result;
 }
 
 /*
 template <typename T> auto api_response_T(T status, beast::string_view message) {
-    http::response<http::empty_body> res;
+	http::response<http::empty_body> res;
 	res.result(status);
-    res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    res.set("message", std::string(message));
-    // res.keep_alive(req.keep_alive());
-    res.prepare_payload();
-    return res;
+	res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+	res.set("message", std::string(message));
+	// res.keep_alive(req.keep_alive());
+	res.prepare_payload();
+	return res;
 };
 */
 
@@ -140,62 +136,60 @@ template <typename T> auto api_response_T(T status, beast::string_view message) 
 // The concrete type of the response message (which depends on the
 // request), is type-erased in message_generator.
 template <class Body, class Allocator>
-http::message_generator
-handle_request(
-    // beast::string_view doc_root,
-    boost::shared_ptr<shared_state> const& state,
-    http::request<Body, http::basic_fields<Allocator>>&& req) {
-    // Returns a bad request response
-    auto const bad_request = [&req](beast::string_view why) {
-        http::response<http::string_body> res{http::status::bad_request, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/html");
-        res.keep_alive(req.keep_alive());
-        res.body() = "Bad request; " + std::string(why);
-        res.prepare_payload();
-        return res;
-    };
+http::message_generator handle_request(
+		boost::shared_ptr<shared_state> const& state,
+		http::request<Body, http::basic_fields<Allocator>>&& req) {
+	// Returns a bad request response
+	auto const bad_request = [&req](beast::string_view why) {
+		http::response<http::string_body> res{http::status::bad_request, req.version()};
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		res.set(http::field::content_type, "text/html");
+		res.keep_alive(req.keep_alive());
+		res.body() = "Bad request; " + std::string(why);
+		res.prepare_payload();
+		return res;
+	};
 
 	auto const api_response = [&req](http::status status, beast::string_view message) {
-        http::response<http::empty_body> res{status, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set("message", std::string(message));
-        res.keep_alive(req.keep_alive());
-        res.prepare_payload();
-        return res;
+		http::response<http::empty_body> res{status, req.version()};
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		res.set("message", std::string(message));
+		res.keep_alive(req.keep_alive());
+		res.prepare_payload();
+		return res;
 	};
 
 	auto const api_response_json = [&req](http::status status, nlohmann::json json) {
-        http::response<http::string_body> res{status, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "application/json");
-        res.keep_alive(req.keep_alive());
+		http::response<http::string_body> res{status, req.version()};
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		res.set(http::field::content_type, "application/json");
+		res.keep_alive(req.keep_alive());
 		res.body() = json.dump();
-        res.prepare_payload();
-        return res;
+		res.prepare_payload();
+		return res;
 	};
 
-    // Returns a not found response
-    auto const not_found = [&req](beast::string_view target) {
-        http::response<http::string_body> res{http::status::not_found, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/html");
-        res.keep_alive(req.keep_alive());
-        res.body() = "The resource '" + std::string(target) + "' was not found.";
-        res.prepare_payload();
-        return res;
-    };
+	// Returns a not found response
+	auto const not_found = [&req](beast::string_view target) {
+		http::response<http::string_body> res{http::status::not_found, req.version()};
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		res.set(http::field::content_type, "text/html");
+		res.keep_alive(req.keep_alive());
+		res.body() = "The resource '" + std::string(target) + "' was not found.";
+		res.prepare_payload();
+		return res;
+	};
 
-    // Returns a server error response
-    auto const server_error = [&req](beast::string_view what) {
-        http::response<http::string_body> res{http::status::internal_server_error, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.set(http::field::content_type, "text/html");
-        res.keep_alive(req.keep_alive());
-        res.body() = "An error occurred: '" + std::string(what) + "'";
-        res.prepare_payload();
-        return res;
-    };
+	// Returns a server error response
+	auto const server_error = [&req](beast::string_view what) {
+		http::response<http::string_body> res{http::status::internal_server_error, req.version()};
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		res.set(http::field::content_type, "text/html");
+		res.keep_alive(req.keep_alive());
+		res.body() = "An error occurred: '" + std::string(what) + "'";
+		res.prepare_payload();
+		return res;
+	};
 
 	std::cout << "req target: " << req.target() << "\n";
 	std::cout << "req version: " << req.version() << "\n";
@@ -219,14 +213,14 @@ handle_request(
 
 	std::cout << "Decoded URL: " << decoded_url << std::endl;
 
-    // Request path must be absolute and not contain "..".
-    if( decoded_url.empty() ||
-        decoded_url[0] != '/' ||
-        decoded_url.find("..") != std::string::npos)
-        return bad_request("Illegal request-target");
+	// Request path must be absolute and not contain "..".
+	if( decoded_url.empty() ||
+		decoded_url[0] != '/' ||
+		decoded_url.find("..") != std::string::npos)
+		return bad_request("Illegal request-target");
 
 	// req_location excludes URL parameters (stuff after '?')
-    std::string path, req_location;
+	std::string path, req_location;
 	// int decoded_url_last_slash_index = decoded_url.rfind('/');
 	int decoded_url_last_questionmark_index = decoded_url.rfind('?');
 	if (decoded_url_last_questionmark_index != std::string::npos)
@@ -298,10 +292,11 @@ handle_request(
 		// client id -1 means there was an error
 		return std::make_pair(-1, key);
 	};
+
 		// Make sure we can handle the method
 	if 		(req.method() == http::verb::get) {
 		bool is_media = false;
-    	// Build the path to the requested file
+		// Build the path to the requested file
 		if (req_location.substr(0, 6) == "/media") {
 			is_media = true;
 			path = path_cat(state->doc_root(), decoded_url.substr(6));
@@ -426,15 +421,15 @@ handle_request(
 			path = req_location.substr(1);
 		}
 
-    	// Attempt to open the file
-    	beast::error_code ec;
-    	http::file_body::value_type body;
+		// Attempt to open the file
+		beast::error_code ec;
+		http::file_body::value_type body;
 		std::cout << "Opening path: " << path << std::endl;
-    	body.open(path.c_str(), beast::file_mode::scan, ec);
+		body.open(path.c_str(), beast::file_mode::scan, ec);
 
-    	// Handle the case where the file doesn't exist
+		// Handle the case where the file doesn't exist
 		if (ec == boost::system::errc::no_such_file_or_directory)
-    	    return not_found(req.target());
+			return not_found(req.target());
 		else if (ec) // Handle an unknown error
 			return server_error(ec.message());
 
@@ -460,25 +455,25 @@ handle_request(
 			std::cout << "Is media. Filename: " << filename << std::endl;
 		}
 
-    	// Cache the size since we need it after the move
-    	auto const size = body.size();
+		// Cache the size since we need it after the move
+		auto const size = body.size();
 
-    	// Respond to GET request
-    	http::response<http::file_body> res{
-    	    std::piecewise_construct,
-    	    std::make_tuple(std::move(body)),
-    	    std::make_tuple(http::status::ok, req.version())
+		// Respond to GET request
+		http::response<http::file_body> res{
+			std::piecewise_construct,
+			std::make_tuple(std::move(body)),
+			std::make_tuple(http::status::ok, req.version())
 		};
 		// if (is_media) {
 			// Only set when the filename is long enough to include the UUID.
 			// In other words, we know it's a user-uploaded file.
 		// 	res.set("Content-Disposition", "attachment; filename=\"" + filename + "\"");
 		// }
-    	res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-    	res.set(http::field::content_type, mime_type(path));
-    	res.content_length(size);
-    	res.keep_alive(req.keep_alive());
-    	return res;
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		res.set(http::field::content_type, mime_type(path));
+		res.content_length(size);
+		res.keep_alive(req.keep_alive());
+		return res;
 	}
 	else if (req.method() == http::verb::post) {
 		if (req.target() == "/api/upload/") {
@@ -1240,130 +1235,105 @@ handle_request(
 	}
 	*/
 	else {
-        http::response<http::empty_body> res{http::status::not_implemented, req.version()};
-        res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-        res.keep_alive(req.keep_alive());
-        res.prepare_payload();
-        return res;
+		http::response<http::empty_body> res{http::status::not_implemented, req.version()};
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		res.keep_alive(req.keep_alive());
+		res.prepare_payload();
+		return res;
 	}
 }
 
 //------------------------------------------------------------------------------
 
-http_session::
-http_session(
-    tcp::socket&& socket,
-    boost::shared_ptr<shared_state> const& state)
-    : stream_(std::move(socket))
-    , state_(state)
-{
+http_session::http_session(tcp::socket&& socket, boost::shared_ptr<shared_state> const& state)
+		: stream_(std::move(socket)), state_(state) {
 }
 
-void
-http_session::
-run()
-{
-    do_read();
+void http_session::run() {
+	do_read();
 }
 
 // Report a failure
-void
-http_session::
-fail(beast::error_code ec, char const* what)
-{
-    // Don't report on canceled operations
-    if(ec == net::error::operation_aborted)
-        return;
+void http_session::fail(beast::error_code ec, char const* what) {
+	// Don't report on canceled operations
+	if(ec == net::error::operation_aborted)
+		return;
 
-    std::cerr << what << ": " << ec.message() << "\n";
+	std::cerr << what << ": " << ec.message() << "\n";
 }
 
-void
-http_session::
-do_read()
-{
-    // Construct a new parser for each message
-    parser_.emplace();
+void http_session::do_read() {
+	// Construct a new parser for each message
+	parser_.emplace();
 
-    // Apply a reasonable limit to the allowed size
-    // of the body in bytes to prevent abuse.
+	// Apply a reasonable limit to the allowed size
+	// of the body in bytes to prevent abuse.
 	// 6MB would match 4chins
 	// This is 100MB
-    parser_->body_limit(100 << 20);
+	parser_->body_limit(100 << 20);
 
-    // Set the timeout.
-    stream_.expires_after(std::chrono::minutes(60));
+	// Set the timeout.
+	stream_.expires_after(std::chrono::minutes(60));
 
-    // Read a request
-    http::async_read(
-        stream_,
-        buffer_,
-        *parser_,
-        beast::bind_front_handler(
-            &http_session::on_read,
-            shared_from_this()));
+	// Read a request
+	http::async_read(
+		stream_,
+		buffer_,
+		*parser_,
+		beast::bind_front_handler(
+			&http_session::on_read,
+			shared_from_this()));
 }
 
-void
-http_session::
-on_read(beast::error_code ec, std::size_t)
-{
-    // This means they closed the connection
-    if(ec == http::error::end_of_stream)
-    {
-        stream_.socket().shutdown(tcp::socket::shutdown_send, ec);
-        return;
-    }
+void http_session::on_read(beast::error_code ec, std::size_t) {
+	// This means they closed the connection
+	if(ec == http::error::end_of_stream) {
+		stream_.socket().shutdown(tcp::socket::shutdown_send, ec);
+		return;
+	}
 
-    // Handle the error, if any
-    if(ec)
-        return fail(ec, "read");
+	// Handle the error, if any
+	if(ec)
+		return fail(ec, "read");
 
-    // See if it is a WebSocket Upgrade
-    if(websocket::is_upgrade(parser_->get()))
-    {
-        // Create a websocket session, transferring ownership
-        // of both the socket and the HTTP request.
-        boost::make_shared<websocket_session>(
-            stream_.release_socket(),
-                state_)->run(parser_->release());
-        return;
-    }
+	// See if it is a WebSocket Upgrade
+	if(websocket::is_upgrade(parser_->get())) {
+		// Create a websocket session, transferring ownership
+		// of both the socket and the HTTP request.
+		boost::make_shared<websocket_session>(stream_.release_socket(), state_)->run(parser_->release());
+		return;
+	}
 
-    // Handle request
-    http::message_generator msg = handle_request(state_, parser_->release());
-    // http::message_generator msg = handle_request(state_->doc_root(), parser_->release());
+	// Handle request
+	http::message_generator msg = handle_request(state_, parser_->release());
+	// http::message_generator msg = handle_request(state_->doc_root(), parser_->release());
 
-    // Determine if we should close the connection
-    bool keep_alive = msg.keep_alive();
+	// Determine if we should close the connection
+	bool keep_alive = msg.keep_alive();
 
-    auto self = shared_from_this();
+	auto self = shared_from_this();
 
-    // Send the response
-    beast::async_write(
-        stream_, std::move(msg),
-        [self, keep_alive](beast::error_code ec, std::size_t bytes)
-        {
-            self->on_write(ec, bytes, keep_alive);
-        });
+	// Send the response
+	beast::async_write(
+		stream_, std::move(msg),
+		[self, keep_alive](beast::error_code ec, std::size_t bytes) {
+			self->on_write(ec, bytes, keep_alive);
+		}
+	);
 }
 
-void
-http_session::
-on_write(beast::error_code ec, std::size_t, bool keep_alive)
-{
-    // Handle the error, if any
-    if(ec)
-        return fail(ec, "write");
+void http_session::on_write(beast::error_code ec, std::size_t, bool keep_alive) {
+	// Handle the error, if any
+	if(ec)
+		return fail(ec, "write");
 
-    if(! keep_alive)
-    {
-        // This means we should close the connection, usually because
-        // the response indicated the "Connection: close" semantic.
-        stream_.socket().shutdown(tcp::socket::shutdown_send, ec);
-        return;
-    }
+	if(! keep_alive) 	{
+		// This means we should close the connection, usually because
+		// the response indicated the "Connection: close" semantic.
+		stream_.socket().shutdown(tcp::socket::shutdown_send, ec);
+		return;
+	}
 
-    // Read another request
-    do_read();
+	// Read another request
+	do_read();
 }

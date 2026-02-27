@@ -1,4 +1,10 @@
-project('Mediaboard', 'c', 'cpp', default_options: ['default_library=static', 'cpp_std=c++17'], version : '0.0.5')
+project('Mediaboard',
+	'c', 'cpp',
+	default_options: [
+		'default_library=static', 'cpp_std=c++17'
+	],
+	version : '0.0.6'
+)
 # >>
 
 # sources = ['main.cpp', 'shared_state.cpp', 'thread.cpp', 'websocket_session.cpp', 'listener.cpp']
@@ -16,9 +22,11 @@ do_ecpg = run_command('bash', 'build.sh')
 # http_session = library('http_session', 'http_session.cpp', link_with : [shared_state], dependencies : [dependency('boost'), dependency('Magick++')])
 # listener = library('listener', 'listener.cpp', link_with : http_session, dependencies : [dependency('boost'), dependency('Magick++')])
 deps = [dependency('boost', modules : ['program_options', 'filesystem']),
-        dependency('Magick++'),
-        dependency('nlohmann_json'),
-	dependency('libecpg')]
+	dependency('Magick++'),
+	dependency('nlohmann_json'),
+	dependency('libecpg')
+]
+
 # executable('server', 'main.cpp', link_with : [listener, shared_state, websocket_session], dependencies : deps)
 executable('server',
 	'main.cpp',

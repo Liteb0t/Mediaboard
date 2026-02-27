@@ -13,7 +13,7 @@
 #include <iostream>
 
 shared_state::shared_state(std::string doc_root /*, std::string media_root*/)
-    : PermissionManager(0), doc_root_(std::move(doc_root))/*, media_root_(std::move(media_root))*/ {
+	: PermissionManager(0), doc_root_(std::move(doc_root))/*, media_root_(std::move(media_root))*/ {
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
@@ -28,59 +28,61 @@ void shared_state::start() {
 }
 
 void shared_state::join(websocket_session* session) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    sessions_.insert(session);
+	std::lock_guard<std::mutex> lock(mutex_);
+	sessions_.insert(session);
 }
 
 void shared_state::leave(websocket_session* session) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    sessions_.erase(session);
+	std::lock_guard<std::mutex> lock(mutex_);
+	sessions_.erase(session);
 }
 
 // Broadcast a message to all websocket client sessions
-void shared_state::send(std::string message) {
-    // Put the message in a shared pointer so we can re-use it for each client
-    auto const ss = boost::make_shared<std::string const>(std::move(message));
-
-    // Make a local list of all the weak pointers representing
-    // the sessions, so we can do the actual sending without
-    // holding the mutex:
-    std::vector<boost::weak_ptr<websocket_session>> v;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        v.reserve(sessions_.size());
-        for(auto p : sessions_)
-            v.emplace_back(p->weak_from_this());
-    }
-
-    // For each session in our local list, try to acquire a strong
-    // pointer. If successful, then send the message on that session.
-    for(auto const& wp : v)
-        if(auto sp = wp.lock())
-            sp->send(ss);
-}
+// void shared_state::send(std::string message) {
+// 	// Put the message in a shared pointer so we can re-use it for each client
+// 	auto const ss = boost::make_shared<std::string const>(std::move(message));
+//
+// 	// Make a local list of all the weak pointers representing
+// 	// the sessions, so we can do the actual sending without
+// 	// holding the mutex:
+// 	std::vector<boost::weak_ptr<websocket_session>> v;
+// 	{
+// 		std::lock_guard<std::mutex> lock(mutex_);
+// 		v.reserve(sessions_.size());
+// 		for(auto p : sessions_)
+// 			v.emplace_back(p->weak_from_this());
+// 	}
+//
+// 	// For each session in our local list, try to acquire a strong
+// 	// pointer. If successful, then send the message on that session.
+// 	for(auto const& wp : v) {
+// 		if(auto sp = wp.lock())
+// 			sp->send(ss);
+// 	}
+// }
 
 // Broadcast a message to all websocket client sessions
 void shared_state::sendToThread(std::string message, int thread_id) {
-    // Put the message in a shared pointer so we can re-use it for each client
-    auto const ss = boost::make_shared<std::string const>(std::move(message));
+	// Put the message in a shared pointer so we can re-use it for each client
+	auto const ss = boost::make_shared<std::string const>(std::move(message));
 
-    // Make a local list of all the weak pointers representing
-    // the sessions, so we can do the actual sending without
-    // holding the mutex:
-    std::vector<boost::weak_ptr<websocket_session>> v;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        v.reserve(sessions_.size());
-        for(auto p : this->main_board()->getListenersFromThread(thread_id))
-            v.emplace_back(p->weak_from_this());
-    }
+	// Make a local list of all the weak pointers representing
+	// the sessions, so we can do the actual sending without
+	// holding the mutex:
+	std::vector<boost::weak_ptr<websocket_session>> v;
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		v.reserve(sessions_.size());
+		for(auto p : this->main_board()->getListenersFromThread(thread_id))
+			v.emplace_back(p->weak_from_this());
+	}
 
-    // For each session in our local list, try to acquire a strong
-    // pointer. If successful, then send the message on that session.
-    for(auto const&wp : v)
-        if(auto sp = wp.lock())
-            sp->send(ss);
+	// For each session in our local list, try to acquire a strong
+	// pointer. If successful, then send the message on that session.
+	for(auto const&wp : v) {
+		if(auto sp = wp.lock())
+			sp->send(ss);
+	}
 }
 
 std::string shared_state::dumpAllGroups(int client_id) const {
@@ -191,7 +193,7 @@ BasicResponse shared_state::setGroupHeirarchy(int client_id, std::vector<int> or
 }
 
 BasicResponse shared_state::createAccount(json account_json) {
-	if (       account_json.contains("username")
+	if (	   account_json.contains("username")
 			&& account_json.contains("password")
 			) {
 		std::string username = account_json["username"].template get<std::string>();
@@ -215,7 +217,7 @@ BasicResponse shared_state::createAccount(json account_json) {
 }
 
 BasicResponse shared_state::getKeyFromPassword(json request_json) const {
-	if (       request_json.contains("username")
+	if (	   request_json.contains("username")
 			&& request_json.contains("password")
 			) {
 		std::string username = request_json["username"].template get<std::string>();
