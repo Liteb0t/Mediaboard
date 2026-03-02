@@ -99,28 +99,29 @@ int main(int argc, char* argv[]) {
 	std::cout << "Set doc_root:" << doc_root << std::endl;
 	std::cout << "Set threads: " << threads << std::endl;
 
-	auto address = net::ip::make_address("127.0.0.1");
-	// The io_context is required for all I/O
-	net::io_context ioc;
+	auto address = boost::asio::ip::make_address("127.0.0.1");
+	// The io_context is required for all I/O - see https://www.boost.org/doc/libs/latest/doc/html/boost_asio/overview/basics.html
+	boost::asio::io_context io_context;
 
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
 	boost::shared_ptr<shared_state> state(new shared_state(doc_root));
 	state->start();
 	boost::make_shared<listener>(
-		ioc,
-		tcp::endpoint{address, port},
-		state)->run();
+		io_context,
+		boost::asio::ip::tcp::endpoint{address, port},
+		state
+	)->run();
 
 	// Capture SIGINT and SIGTERM to perform a clean shutdown
 	std::cout << "Setting signals..." << std::endl;
-	net::signal_set signals(ioc, SIGINT, SIGTERM);
+	boost::asio::signal_set signals(io_context, SIGINT, SIGTERM);
 	signals.async_wait(
-		[&ioc](boost::system::error_code const&, int) {
+		[&io_context](boost::system::error_code const&, int) {
 			// Stop the io_context. This will cause run()
 			// to return immediately, eventually destroying the
 			// io_context and any remaining handlers in it.
-			ioc.stop();
+			io_context.stop();
 		}
 	);
 
@@ -128,13 +129,14 @@ int main(int argc, char* argv[]) {
 	std::cout << "Running the I/O service..." << std::endl;
 	std::vector<std::thread> v;
 	v.reserve(threads - 1);
-	for(auto i = threads - 1; i > 0; --i)
+	for(auto i = threads - 1; i > 0; --i) {
 		v.emplace_back(
-			[&ioc] {
-				ioc.run();
+			[&io_context] {
+				io_context.run();
 			}
 		);
-	ioc.run();
+	}
+	io_context.run();
 
 	// (If we get here, it means we got a SIGINT or SIGTERM)
 

@@ -10,10 +10,11 @@
 #ifndef BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_HTTP_SESSION_HPP
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_HTTP_SESSION_HPP
 
-#include "net.hpp"
 #include "beast.hpp"
 #include "shared_state.hpp"
 #include "FuzeHttpController.hpp"
+
+#include <boost/asio.hpp>
 #include <boost/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstdlib>
@@ -23,7 +24,7 @@
 
 class http_session : public boost::enable_shared_from_this<http_session> {
 public:
-	http_session(tcp::socket&& socket, boost::shared_ptr<shared_state> const& state);
+	http_session(boost::asio::ip::tcp::socket&& socket, boost::shared_ptr<shared_state> const& state);
 
 	void run();
 private:

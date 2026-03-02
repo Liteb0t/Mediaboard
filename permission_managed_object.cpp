@@ -4,7 +4,6 @@
 
 PermissionObjectBase::PermissionObjectBase(int permission_object_id)
 		: permission_object_id(permission_object_id) {
-	std::cout << "PermissionObjectBase constructor called" << std::endl;
 	this->cacheAllPermissions();
 }
 
@@ -103,7 +102,7 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 }
 
 void PermissionManager::cacheAllUsers() {
-	std::cout << "Retreiving accounts from database..." << std::endl;
+	std::cout << "Retreiving accounts from database... ";
 	struct db_account_array* account_array = db_retrieve_accounts();
 	for (int i = 0; i < account_array->used; i++) {
 		std::cout << account_array->array[i].id << ", ";
@@ -116,26 +115,28 @@ void PermissionManager::cacheAllUsers() {
 }
 
 void PermissionManager::cacheAllGroups() {
-	std::cout << "Retreiving groups from database..." << std::endl;
+	std::cout << "[PermissionManager] Retreiving groups from database... ";
 	struct db_group_array* group_array = db_retrieve_groups();
 	for (int i = 0; i < group_array->used; i++) {
 		Group group(&group_array->array[i]);
 		this->groups.emplace(group_array->array[i].id, group);
 		std::cout << group_array->array[i].id << ", ";
 	}
-	std::cout << "added " << this->groups.size() << " groups." << std::endl;
 	freeGroupArray(group_array);
+	std::cout << "added " << this->groups.size() << " groups";
 	struct db_group_heirarchy_array* group_heirarchy = db_retrieve_group_heirarchy();
 	this->ordered_groups.reserve(group_heirarchy->used + 4);
 	for (int i = 0; i < group_heirarchy->used; i++) {
 		this->ordered_groups.push_back(group_heirarchy->array[i].group_id);
 	}
 	freeGroupHeirarchyArray(group_heirarchy);
+	std::cout << ", established heirarchy";
 	struct db_group_member_array* group_member_array = db_retrieve_group_members();
 	for (int i = 0; i < group_member_array->used; i++) {
 		this->addUserToGroup(group_member_array->array[i].account_id, group_member_array->array[i].group_id);
 	}
 	freeGroupMemberArray(group_member_array);
+	std::cout << ", added users to groups." << std::endl;
 
 	// Check that the permission_group table is consistent with the permission_group_heirarchy table
 	std::cout << "[PermissionManager] Checking consistency between groups and heirarchy..." << std::endl;
@@ -179,8 +180,7 @@ int PermissionManager::addGroup(std::string group_name, int group_rank) {
 }
 
 void PermissionManager::saveGroupHeirarchy() const {
-	std::cout << "[PermissionManager] running setOrderedGroups" << std::endl;
-	std::cout << "Logging from ordered_groups: ";
+	std::cout << "[PermissionManager] Saving new group heirarchy: ";
 	for (int i = 0; i < this->ordered_groups.size(); i++)
 		std::cout << i << ": " << this->ordered_groups[i] << ", ";
 	std::cout << "done." << std::endl;

@@ -1245,7 +1245,7 @@ http::message_generator handle_request(
 
 //------------------------------------------------------------------------------
 
-http_session::http_session(tcp::socket&& socket, boost::shared_ptr<shared_state> const& state)
+http_session::http_session(boost::asio::ip::tcp::socket&& socket, boost::shared_ptr<shared_state> const& state)
 		: stream_(std::move(socket)), state_(state) {
 }
 
@@ -1256,7 +1256,7 @@ void http_session::run() {
 // Report a failure
 void http_session::fail(beast::error_code ec, char const* what) {
 	// Don't report on canceled operations
-	if(ec == net::error::operation_aborted)
+	if(ec == boost::asio::error::operation_aborted)
 		return;
 
 	std::cerr << what << ": " << ec.message() << "\n";
@@ -1288,7 +1288,7 @@ void http_session::do_read() {
 void http_session::on_read(beast::error_code ec, std::size_t) {
 	// This means they closed the connection
 	if(ec == http::error::end_of_stream) {
-		stream_.socket().shutdown(tcp::socket::shutdown_send, ec);
+		stream_.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
 		return;
 	}
 
@@ -1330,7 +1330,7 @@ void http_session::on_write(beast::error_code ec, std::size_t, bool keep_alive) 
 	if(! keep_alive) 	{
 		// This means we should close the connection, usually because
 		// the response indicated the "Connection: close" semantic.
-		stream_.socket().shutdown(tcp::socket::shutdown_send, ec);
+		stream_.socket().shutdown(boost::asio::ip::tcp::socket::shutdown_send, ec);
 		return;
 	}
 

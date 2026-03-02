@@ -19,7 +19,6 @@ shared_state::shared_state(std::string doc_root /*, std::string media_root*/)
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
 // hence a seperate start() function is used
 void shared_state::start() {
-	// Board main_board(shared_from_this());
 	boost::shared_ptr<Board> main_board(new Board(shared_from_this()));
 	this->boards.emplace(0, main_board);
 	this->main_board()->cacheAllThreads();

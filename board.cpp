@@ -23,9 +23,6 @@ int Board::createPost(json post_json) {
 	std::time_t old_post_time = thread->getLastPostTime();
 	int new_post_id =  thread->createPostFromJson(post_json);
 	std::time_t new_post_time = thread->getLastPostTime();
-	if (old_post_time == new_post_time) {
-		std::cerr << "POST TIMES ARE THE SAME" << std::endl;
-	}
 	this->ordered_threads.erase(std::make_pair(old_post_time, thread_id));
 	this->ordered_threads.insert(std::make_pair(new_post_time, thread_id));
 	return new_post_id;
@@ -37,7 +34,7 @@ void Board::deleteThread(int thread_id) {
 
 void Board::deleteMessageFromThread(int message_id, int thread_id) {
 	if (message_id != 0) {
-		std::cout << "Deleting message " << message_id << " in thread " << thread_id << std::endl;
+		std::cout << "[Board] Deleting message " << message_id << " in thread " << thread_id << std::endl;
 		this->threads.at(thread_id).deleteMessage(message_id);
 	}
 }
@@ -47,7 +44,7 @@ bool Board::keyMatchesMessageInThread(std::string key, int message_id, int threa
 }
 
 void Board::cacheAllThreads() {
-	std::cout << "Retrieving threads from database..." << std::endl;
+	std::cout << "[Board] Retrieving threads from database..." << std::endl;
 	struct db_thread_array* thread_list = db_retrieve_threads();
 	for (int i = 0; i < thread_list->used; i++) {
 		// json thread_json;
@@ -61,7 +58,7 @@ void Board::cacheAllThreads() {
 	freeThreadArray(thread_list);
 	std::cout << "done." << std::endl;
 
-	std::cout << "Retrieving posts from database..." << std::endl;
+	std::cout << "[Board] Retrieving posts from database..." << std::endl;
 	struct db_post_array* post_history = db_retrieve_history();
 	for (int i = 0; i < post_history->used; i++) {
 		std::cout << "#" << post_history->array[i].thread_id << '/' << post_history->array[i].id_in_thread << ", ";
@@ -75,7 +72,7 @@ void Board::cacheAllThreads() {
 		this->ordered_threads.insert(std::make_pair(it->second.getLastPostTime(), it->first));
 	}
 
-	std::cout << "Finished retreiving threads and posts from the database." << std::endl;
+	std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 }
 
 std::string Board::dumpAllThreads(int client_id) const {
@@ -114,19 +111,19 @@ std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {
 void Board::addListenerToThread(websocket_session* listener, int thread_id) {
 	if (threadExists(thread_id)) {
 		this->threads.at(thread_id).addListener(listener);
-		std::cout << "Listener added to thread " << thread_id << std::endl;
+		std::cout << "[Board] Listener added to thread " << thread_id << std::endl;
 	}
 	else
-		std::cout << "Warning: could not add listener to thread " << thread_id << " because the thread does not exist." << std::endl;
+		std::cout << "[Board] Warning: could not add listener to thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
 void Board::removeListenerFromThread(websocket_session* listener, int thread_id) {
 	if (threadExists(thread_id)) {
 		this->threads.at(thread_id).removeListener(listener);
-		std::cout << "Listener removed from thread " << thread_id << std::endl;
+		std::cout << "[Board] Listener removed from thread " << thread_id << std::endl;
 	}
 	else
-		std::cout << "Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
+		std::cout << "[Board] Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
 std::string Board::dumpPost(int thread_id, int post_id, std::string key) const {

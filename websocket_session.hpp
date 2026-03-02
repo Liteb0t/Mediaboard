@@ -10,10 +10,10 @@
 #ifndef BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_WEBSOCKET_SESSION_HPP
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_WEBSOCKET_SESSION_HPP
 
-#include "net.hpp"
 #include "beast.hpp"
 #include "shared_state.hpp"
 
+#include <boost/asio.hpp>
 #include <cstdlib>
 #include <memory>
 #include <string>
@@ -27,7 +27,7 @@
 */
 class websocket_session : public boost::enable_shared_from_this<websocket_session> {
 public:
-	websocket_session(	tcp::socket&& socket, boost::shared_ptr<shared_state> const& state);
+	websocket_session(boost::asio::ip::tcp::socket&& socket, boost::shared_ptr<shared_state> const& state);
 	~websocket_session();
 
 	template<class Body, class Allocator>
