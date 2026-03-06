@@ -1,6 +1,8 @@
 *.o
 *.swp
+*.kate-swp
 .cache/
+build/
 server
 index.html
 registration.html

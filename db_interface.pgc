@@ -187,10 +187,12 @@ void freePermissionSettingArray(struct db_permission_setting_array* a) {
 	a->used = a->size = 0;
 }
 
-void db_connect(const char* _database_name) {
+void db_connect(const char* _database_name, unsigned short port) {
+	char _connection_target[256];
+	sprintf(_connection_target, "%s@%s:%d", _database_name, "localhost", port);
 	EXEC SQL BEGIN DECLARE SECTION;
-	const char* database_name = _database_name;
-	const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
+	// const char* database_name = _database_name;
+	// const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	// const char* password = "watermelone";
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts, permission_object_id) VALUES (?, 0, ?);";
@@ -198,10 +200,13 @@ void db_connect(const char* _database_name) {
 	const char* mark_thread_as_deleted_prepared_stmt = "UPDATE thread SET deleted = true WHERE id = ?;";
 	const char* create_account_prepared_stmt = "INSERT INTO account(id, username, password_hash, key) VALUES (?, ?, ?, ?);";
 	const char* create_permission_group_stmt = "INSERT INTO permission_group(id, name) VALUES (?, ?)";
-	const char* add_administrator_account_stmt = "INSERT INTO account(id, username, password_hash, key, administrator) VALUES (1, 'Administrator', ?, ?, 't');"
-		;
+	const char* add_administrator_account_stmt = "INSERT INTO account(id, username, password_hash, key, administrator) VALUES (1, 'Administrator', ?, ?, 't');";
+	// char connection_target[256];
+	const char* connection_target = _connection_target;
 	EXEC SQL END DECLARE SECTION;
+	printf("connection_target: %s\n", connection_target);
 	// printf("password: %s\n", password);
+	/*
 	if (password)
 		printf("Found environment variable \"%s\"\n", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	else {
@@ -209,6 +214,8 @@ void db_connect(const char* _database_name) {
 		exit(2);
 	}
 	EXEC SQL CONNECT TO :database_name USER "mediaboard_server" USING :password;
+	*/
+	EXEC SQL CONNECT TO :connection_target USER "mediaboard_server";
 	printf("Connected!\n");
 	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;

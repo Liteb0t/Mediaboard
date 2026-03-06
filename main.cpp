@@ -30,22 +30,24 @@ int main(int argc, char* argv[]) {
 
 	// Check command line arguments.
 	std::string config_file;
-	unsigned short port;
+	unsigned short port, database_port;
 	std::string admin_password, doc_root, database_name;
 	int threads;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
 		("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
-		("make_migrations", "Add columns to database for faster migration to 0.0.5.")
+		("initdb,i", "Initialise the Postgres database")
 		("config,c", boost::program_options::value<std::string>(&config_file)->default_value("config.ini"), "location of configuration file.")
 		("version,v", "Show version string.")
 		("help,h", "Show list of options.");
 
+	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
 		("database,d", boost::program_options::value<std::string>(&database_name),  "Name of the postgresql database.")
+		("database_port,P", boost::program_options::value<unsigned short>(&database_port),  "The port which the database serves.")
 		("media_path,m", boost::program_options::value<std::string>(&doc_root),  "File path where user-submitted media is stored.")
-		("port,p", boost::program_options::value<unsigned short>(&port), "The port which the server will serve.")
+		("port,p", boost::program_options::value<unsigned short>(&port), "The port which the server will serve. Make sure it isn't in use by another service.")
 		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.");
 
 	boost::program_options::options_description command_line_options;
@@ -78,16 +80,23 @@ int main(int argc, char* argv[]) {
 		database_name = "fuze_mediaboard";
 		std::cout << "\"database\" not found in config. Using default " << database_name << std::endl;
 	}
-	else
-		std::cout << "Set the database to " << database_name << std::endl;
+
+	if (!variable_map.count("database_port")) {
+		database_port = 5400;
+		std::cout << "\"database_port\" not found in config. Using default " << 5400 << std::endl;
+	}
 
 	// Establish database connection
-	db_connect(database_name.c_str());
+	db_connect(database_name.c_str(), database_port);
 
 	if (variable_map.count("create_administrator")) {
 		db_create_administrator(admin_password.c_str());
-		std::cout << "Created 'Administrator' account successfully" << std::endl;
+		std::cout << "Created 'Administrator' account successfully. Click on \"Log-in or Register\" and log in as 'Administrator' using the same password you entered here." << std::endl;
 		return 0;
+	}
+	if (variable_map.count("initdb")) { // TODO rectify
+		std::cout << "argv[0]: " << argv[0] << std::endl;
+		std::system("pg_ctl -D database start");
 	}
 	if (!variable_map.count("media_path")) {
 		doc_root = ".";

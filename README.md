@@ -1,4 +1,5 @@
 # ![FUZE](https://fuze.page/static/fuze-min-hover.png) Mediaboard
+## Note: This README is for the 0.0.5 release. The deployment process is being simplified for 0.1 and the updated README will be coming shortly.
 ### Required packages (Debian 12/Devuan 5)
 `postgresql`\
 `postgresql-contrib`\
@@ -13,7 +14,7 @@
 ### Imagemagick
 Note: FreeBSD users can skip this step because the pkg contains all the required delegates.\
 Clone and configure [Imagemagick](https://github.com/ImageMagick/ImageMagick) with the delegates for JPEG, PNG, WEBP, XML, and JPEG-XL.\
-You mau need to install dependencies first:\
+You may need to install dependencies first:\
 `libxml2-dev`\
 `libjxl-dev`\
 Configure:\
@@ -25,15 +26,18 @@ Then install:\
 `sudo make install`
 ### Required packages (FreeBSD 15.0)
 `ImageMagick7-nox11`\
-`postgresql17-server`\
 `nlohmann-json`\
-`boost-libs`
+`boost-libs`\
+`postgresql18-server`   Versions 15-17 work too\
+`postgresql18-contrib`   ^\
+Add the following line to `/etc/rc.conf`:\
+`postgresql_enable="YES"`
 ### Postgres setup
 This may be skipped on certain distros such as Debian.
-`doas pw groupmod postgres -M <user>`\
-`doas reboot`\
-`initdb -D /var/db/postgres/15/main/`\
-`pg_ctl -D /var/db/postgres/15/main start`\
+`pw groupmod postgres -M <user>`\
+`reboot`\
+`initdb -D /var/db/postgres/18/main/`\
+`pg_ctl -D /var/db/postgres/18/main start`\
 ### Developing on MacOS
 Install [Homebrew](https://brew.sh/)\
 Brew install: `nlohmann-json` `imagemagick` `boost` `postgresql@15` `meson`\
@@ -45,7 +49,7 @@ The pkg-config for postgresql may not work out of the box. If that is the case, 
 `export PKG_CONFIG_PATH=/opt/homebrew/Cellar/postgresql@15/15.15/lib/pkgconfig/`\
 Use meson instead of make to build. To configure:\
 `meson setup build`\
-`meson configure --pkg-config-path $PKG_CONFIG_PATH build -Dcpp_std=c++17 -Dcpp_args=-stdlib=libc++`
+`meson configure --pkg-config-path $PKG_CONFIG_PATH build -Dcpp_std=c++20 -Dcpp_args=-stdlib=libc++`
 ### Building
 Currently there are two options: the `Makefile` and the `meson.build`.\
 To build using the Makefile, simply run `make`. \
@@ -64,7 +68,7 @@ To create the database:\
 `psql -d fuze_mediaboard`\
 fuze_mediaboard=# `CREATE USER mediaboard_server WITH PASSWORD '<password>'`\
 To import the database template:\
-`psql fuze_mediaboard < fuze_mediaboard_template.sql`\
+`psql fuze_mediaboard < database_template.sql`\
 `psql fuze_mediaboard < default_groups.sql`\
 \
 Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it at the top of the table so that it won't be overridden by other settings:\

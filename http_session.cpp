@@ -216,17 +216,18 @@ http::message_generator handle_request(
 	// Request path must be absolute and not contain "..".
 	if( decoded_url.empty() ||
 		decoded_url[0] != '/' ||
+		decoded_url[0] == '?' ||
 		decoded_url.find("..") != std::string::npos)
 		return bad_request("Illegal request-target");
 
 	// req_location excludes URL parameters (stuff after '?')
-	std::string path, req_location;
+	std::string req_location;
 	// int decoded_url_last_slash_index = decoded_url.rfind('/');
 	int decoded_url_last_questionmark_index = decoded_url.rfind('?');
 	if (decoded_url_last_questionmark_index != std::string::npos)
 		req_location = decoded_url.substr(0, decoded_url_last_questionmark_index);
 	else
-		req_location = req.target();
+		req_location = decoded_url;
 	std::cout << "req_location: " << req_location << std::endl;
 
 	auto const getNumberFromPath = [&req_location](int start_index) {
@@ -295,11 +296,11 @@ http::message_generator handle_request(
 
 		// Make sure we can handle the method
 	if 		(req.method() == http::verb::get) {
-		bool is_media = false;
+		bool is_media;
 		// Build the path to the requested file
 		if (req_location.substr(0, 6) == "/media") {
 			is_media = true;
-			path = path_cat(state->doc_root(), decoded_url.substr(6));
+			req_location = path_cat(state->doc_root(), decoded_url.substr(6));
 		}
 		else if (req_location.substr(0, 5) == "/api/") {
 			std::pair<int, std::string> client;
@@ -412,31 +413,29 @@ http::message_generator handle_request(
 			res.prepare_payload();
 			return res;
 		}
-		else if (req_location.back() == '/') {
-			path = "index.html";
-			std::cout << "/path: " << path << std::endl;
-		}
 		else {
-			// This is used to access files in the server's directory
-			path = req_location.substr(1);
+			is_media = false;
+			if (req_location == "/")
+				req_location = "frontend/index.html";
+			else
+				req_location = "frontend" + req_location;
+			std::cout << "Opening non-media location: " << req_location << std::endl;
 		}
+		// Check if path leads to a directory
+		boost::filesystem::path filesystem_path(req_location);
+		if (!boost::filesystem::is_regular_file(filesystem_path))
+			return bad_request("Is a directory.");
 
 		// Attempt to open the file
 		beast::error_code ec;
 		http::file_body::value_type body;
-		std::cout << "Opening path: " << path << std::endl;
-		body.open(path.c_str(), beast::file_mode::scan, ec);
+		body.open(req_location.c_str(), beast::file_mode::scan, ec);
 
 		// Handle the case where the file doesn't exist
 		if (ec == boost::system::errc::no_such_file_or_directory)
 			return not_found(req.target());
 		else if (ec) // Handle an unknown error
 			return server_error(ec.message());
-
-		// Check if path leads to a directory
-		boost::filesystem::path filesystem_path(path);
-		if (!boost::filesystem::is_regular_file(filesystem_path))
-			return bad_request("Is a directory.");
 
 		std::string filename;
 		if (is_media) {
@@ -470,7 +469,7 @@ http::message_generator handle_request(
 		// 	res.set("Content-Disposition", "attachment; filename=\"" + filename + "\"");
 		// }
 		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-		res.set(http::field::content_type, mime_type(path));
+		res.set(http::field::content_type, mime_type(req_location));
 		res.content_length(size);
 		res.keep_alive(req.keep_alive());
 		return res;

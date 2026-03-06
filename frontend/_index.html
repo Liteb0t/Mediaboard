@@ -10,7 +10,7 @@
 		<meta charset="utf-8">
 		<base href="_ROOT_URL">
 		<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
-		<link rel="stylesheet" href="styles.css">
+		<link rel="stylesheet" href="static/styles.css">
 	</head>
 	<body>
 		<!--Navbar can go here-->
@@ -31,7 +31,7 @@
 				</div>
 				<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
 				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
-				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.6</a>
+				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.1</a>
 			</div>
 			<h3 id="location_indicator"></h3>
 			<noscript>
@@ -688,6 +688,7 @@ function decode_utf8(s) {
 	return decodeURIComponent(escape(s));
 }
 
+// TODO refactor upload file into a class File
 function uploadFile(file_object) {
 	let formdata = new FormData();
 	formdata.append("File_1", file_object);
@@ -712,7 +713,6 @@ function uploadFile(file_object) {
 		if (!(request.status >= 200 && request.status < 300) && request.status != 0 && !received_error) {
 			file_element.classList.add("Errored");
 			received_error = true;
-			console.log("Aporting");
 			request.abort();
 				const error_message = request.getResponseHeader("message");
 				// if (error_message) {
@@ -726,7 +726,7 @@ function uploadFile(file_object) {
 				upload_failed_indicator.classList.add("UploadFailedIndicator");
 				upload_failed_indicator.textContent = "Upload failed";
 				file_information_element.replaceChild(upload_failed_indicator, file_progress_element);
-				file_img_element.setAttribute("src", "x_icon.png");
+				file_img_element.setAttribute("src", "static/x_icon.png");
 		}
 	}
 	request.send(formdata);
@@ -764,7 +764,7 @@ function uploadFile(file_object) {
 				upload_failed_indicator.classList.add("UploadfailedIndicator");
 				upload_failed_indicator.textContent = "Upload failed";
 				file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
-				file_img_element.setAttribute("src", "x_icon.png");
+				file_img_element.setAttribute("src", "static/x_icon.png");
 			}
 		}
 	}
@@ -803,7 +803,7 @@ file_upload.onchange = (event) => {
 function addFileToList(filename) {
 	let file_container = document.createElement("div");
 	let file_thumbnail = document.createElement("img");
-	file_thumbnail.setAttribute("src", "placeholder.png");
+	file_thumbnail.setAttribute("src", "static/placeholder.png");
 	file_thumbnail.setAttribute("width", "100px");
 	file_thumbnail.setAttribute("height", "100px");
 	const file_information_container = document.createElement("div");
@@ -978,9 +978,6 @@ function createPost(data, client_permissions) {
 			audio_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
 			figure_element.appendChild(audio_element);
 		}
-		// else {
-			// thumbnail_element.setAttribute("src", "_ROOT_URL" + "placeholder.png");
-		// }
 		let pretty_filename;
 		if (filename_extension_i == -1) {
 			pretty_filename = filename.slice(0, filename.length - media_uuid_len);

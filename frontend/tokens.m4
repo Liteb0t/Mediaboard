@@ -6,7 +6,7 @@ define(`_WEBSOCKET_URL', `ws://localhost:8300')
 # On HTTPS connections, the URL scheme is 'wss://'. The line below is an example:
 # define(`_WEBSOCKET_URL', `wss://example.com/mediaboard/')
 
-define(`_SITE_NAME', `Fuze Mediaboard')
+define(`_SITE_NAME', `Change SITE_NAME in frontend/tokens.m4')
 
 # The path where Fuze Mediaboard is hosted.
 define(`_ROOT_URL', `/')

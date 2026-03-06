@@ -12,7 +12,6 @@
 
 #include "beast.hpp"
 #include "shared_state.hpp"
-#include "FuzeHttpController.hpp"
 
 #include <boost/asio.hpp>
 #include <boost/optional.hpp>
