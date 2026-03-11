@@ -7,13 +7,13 @@
 // Official repository: https://github.com/vinniefalco/CppCon2018
 //
 
-#include "shared_state.hpp"
 #include "permission_managed_object.hpp"
+#include "shared_state.hpp"
 #include "websocket_session.hpp"
 #include <iostream>
 
-shared_state::shared_state(std::string doc_root /*, std::string media_root*/)
-	: PermissionManager(0), doc_root_(std::move(doc_root))/*, media_root_(std::move(media_root))*/ {
+shared_state::shared_state(std::string parent_directory, std::string doc_root /*, std::string media_root*/)
+	: PermissionManager(0), parent_directory(parent_directory), doc_root_(std::move(doc_root))/*, media_root_(std::move(media_root))*/ {
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error

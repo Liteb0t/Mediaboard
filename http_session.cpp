@@ -7,10 +7,11 @@
 // Official repository: https://github.com/vinniefalco/CppCon2018
 //
 
+#include "field_lengths.h"
 #include "http_session.hpp"
 #include "permission_managed_object.hpp"
 #include "websocket_session.hpp"
-#include "field_lengths.h"
+#include <boost/algorithm/string/replace.hpp>
 #include <boost/beast/http/status.hpp>
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
@@ -18,14 +19,13 @@
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
-#include <boost/algorithm/string/replace.hpp>
-#include <charconv>
-#include <string>
-#include <iostream>
-#include <sstream>
-#include <fstream>
 #include <Magick++.h>
 #include <nlohmann/json.hpp>
+#include <charconv>
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <string>
 using json = nlohmann::json;
 
 //------------------------------------------------------------------------------
@@ -303,6 +303,7 @@ http::message_generator handle_request(
 			req_location = path_cat(state->doc_root(), decoded_url.substr(6));
 		}
 		else if (req_location.substr(0, 5) == "/api/") {
+			is_media = false;
 			std::pair<int, std::string> client;
 			try {
 				client = getUserFromToken();
@@ -422,7 +423,9 @@ http::message_generator handle_request(
 			std::cout << "Opening non-media location: " << req_location << std::endl;
 		}
 		// Check if path leads to a directory
-		boost::filesystem::path filesystem_path(req_location);
+		boost::filesystem::path filesystem_path(std::format("{}/{}", state->parent_directory, req_location));
+		if (!boost::filesystem::exists(filesystem_path))
+			return not_found(req.target());
 		if (!boost::filesystem::is_regular_file(filesystem_path))
 			return bad_request("Is a directory.");
 

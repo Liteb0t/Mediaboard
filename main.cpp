@@ -12,18 +12,22 @@
 //------------------------------------------------------------------------------
 
 #include "listener.hpp"
+#include "migrations.hpp"
 #include "shared_state.hpp"
-// #include "db_interface.h"
-#include <Magick++.h>
 #include <boost/asio/signal_set.hpp>
-#include <boost/smart_ptr.hpp>
+#include <boost/dll.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>
+#include <boost/smart_ptr.hpp>
+#include <Magick++.h>
+#include <format>
 #include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
 
-const std::string version_string = "0.0.6";
+const std::string current_version = "0.1";
 
 int main(int argc, char* argv[]) {
 	Magick::InitializeMagick(*argv);  // Required on Windows and MacOS
@@ -31,12 +35,13 @@ int main(int argc, char* argv[]) {
 	// Check command line arguments.
 	std::string config_file;
 	unsigned short port, database_port;
-	std::string admin_password, doc_root, database_name;
+	std::string admin_password, doc_root, database_name, database_host;
 	int threads;
+	bool manage_cluster;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
 		("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
-		("initdb,i", "Initialise the Postgres database")
+		// ("initdb,i", "Initialise the Postgres database")
 		("config,c", boost::program_options::value<std::string>(&config_file)->default_value("config.ini"), "location of configuration file.")
 		("version,v", "Show version string.")
 		("help,h", "Show list of options.");
@@ -44,10 +49,12 @@ int main(int argc, char* argv[]) {
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
-		("database,d", boost::program_options::value<std::string>(&database_name),  "Name of the postgresql database.")
-		("database_port,P", boost::program_options::value<unsigned short>(&database_port),  "The port which the database serves.")
-		("media_path,m", boost::program_options::value<std::string>(&doc_root),  "File path where user-submitted media is stored.")
-		("port,p", boost::program_options::value<unsigned short>(&port), "The port which the server will serve. Make sure it isn't in use by another service.")
+		("database,d", boost::program_options::value<std::string>(&database_name)->default_value("fuze_mediaboard"),  "Name of the postgresql database.")
+		("database_host,h", boost::program_options::value<std::string>(&database_host)->default_value("localhost"),  "Address of where the DB is hosted.")
+		("database_port,P", boost::program_options::value<unsigned short>(&database_port)->default_value(5400),  "The port which the database serves.")
+		("manage_cluster,c", boost::program_options::value<bool>(&manage_cluster)->default_value(true), "Whether the database will be managed by Fuze Mediaboard.")
+		("media_path,m", boost::program_options::value<std::string>(&doc_root)->default_value("."),  "File path where user-submitted media is stored.")
+		("port,p", boost::program_options::value<unsigned short>(&port)->default_value(8300), "The port which the server will serve. Make sure it isn't in use by another service.")
 		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.");
 
 	boost::program_options::options_description command_line_options;
@@ -62,7 +69,7 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	if (variable_map.count("version")) {
-		std::cout << version_string << std::endl;
+		std::cout << current_version << std::endl;
 		return 0;
 	}
 
@@ -76,14 +83,66 @@ int main(int argc, char* argv[]) {
 	else {
 		std::cout << "Could not open config file: " << config_file << std::endl;
 	}
-	if (!variable_map.count("database")) {
-		database_name = "fuze_mediaboard";
-		std::cout << "\"database\" not found in config. Using default " << database_name << std::endl;
-	}
 
-	if (!variable_map.count("database_port")) {
-		database_port = 5400;
-		std::cout << "\"database_port\" not found in config. Using default " << 5400 << std::endl;
+	bool make_migrations, first_time_setup;
+	// Get the path to this program, so files can be read/written relative to the executable
+	std::error_code ec;
+	boost::filesystem::path location = boost::dll::program_location(ec);
+	if (ec)
+		throw("An error occured when attempting to get the current program's location.");
+	std::string parent_directory = location.parent_path().string();
+	if (!boost::filesystem::exists(parent_directory + "/database")) {
+		std::cout << parent_directory + "/database" << " doesn't exist. Creating..." << std::endl;
+		boost::filesystem::create_directory(parent_directory + "/database");
+	}
+	 // First time setup
+	if (!boost::filesystem::exists(parent_directory + "/database/MEDIABOARD_VERSION")) {
+		first_time_setup = true;
+		make_migrations = false;
+		writeDatabaseVersionFile(parent_directory, current_version);
+		if (manage_cluster) {
+			std::cout << "Performing first-time database setup..." << std::endl;
+			std::system(std::format("initdb -D {}/database/cluster", parent_directory).c_str());
+		}
+	}
+	else { // Not first time setup - the software may be out of sync with the database
+		first_time_setup = false;
+		boost::optional<std::string> database_version_string = getExistingDatabaseVersion(parent_directory);
+		if (database_version_string) {
+			std::cout << "Found database version: " << database_version_string.value() << std::endl;
+			if (database_version_string != current_version) {
+				writeMigrations(parent_directory, database_version_string.value(), current_version);
+				make_migrations = true;
+			}
+			else {
+				std::cout << "Database is up-to-date" << std::endl;
+				make_migrations = false;
+			}
+		}
+		else {
+			std::cerr << "Could not find database/MEDIABOARD_VERSION file. Creating a new one whilst assuming the DB is up-to-date..." << std::endl;
+			writeDatabaseVersionFile(parent_directory, current_version);
+			make_migrations = false;
+		}
+	}
+	if (manage_cluster) {
+		// TODO remove after DB interface is rewritten in C++
+		std::system(std::format("pg_ctl -D {}/database/cluster stop", parent_directory, database_port).c_str());
+
+		std::cout << "Starting database..." << std::endl;
+		std::cout << std::format("pg_ctl -D {}/database/cluster -o \"-p {}\" -l {}/database/log.txt start", parent_directory, database_port, parent_directory) << std::endl;
+		int ret = std::system(std::format("pg_ctl -D {}/database/cluster -o \"-p {}\" -l {}/database/log.txt start", parent_directory, database_port, parent_directory).c_str());
+		if (ret) // The database could not be started, so terminate the program
+			return ret;
+	}
+	if (first_time_setup) {
+		std::system(std::format("createuser --host={} --port={} mediaboard_server", database_host, database_port).c_str());
+		std::system(std::format("createdb --host={} --port={} fuze_mediaboard", database_host, database_port).c_str());
+		std::system(std::format("psql --host={} --port={} {} -f {}/database_template.sql", database_host, database_port, database_name, parent_directory).c_str());
+		std::system(std::format("psql --host={} --port={} {} -f {}/default_groups.sql", database_host, database_port, database_name, parent_directory).c_str());
+	}
+	if (make_migrations) {
+		std::system(std::format("psql --host={} --port={} {} -f {}/database/migrations.sql", database_host, database_port, database_name, parent_directory).c_str());
 	}
 
 	// Establish database connection
@@ -93,16 +152,6 @@ int main(int argc, char* argv[]) {
 		db_create_administrator(admin_password.c_str());
 		std::cout << "Created 'Administrator' account successfully. Click on \"Log-in or Register\" and log in as 'Administrator' using the same password you entered here." << std::endl;
 		return 0;
-	}
-	if (variable_map.count("initdb")) { // TODO rectify
-		std::cout << "argv[0]: " << argv[0] << std::endl;
-		std::system("pg_ctl -D database start");
-	}
-	if (!variable_map.count("media_path")) {
-		doc_root = ".";
-	}
-	if (!variable_map.count("port")) {
-		port = 8300;
 	}
 	std::cout << "Set port: " << port << std::endl;
 	std::cout << "Set doc_root:" << doc_root << std::endl;
@@ -114,7 +163,7 @@ int main(int argc, char* argv[]) {
 
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
-	boost::shared_ptr<shared_state> state(new shared_state(doc_root));
+	boost::shared_ptr<shared_state> state(new shared_state(parent_directory, doc_root));
 	state->start();
 	boost::make_shared<listener>(
 		io_context,
@@ -153,6 +202,11 @@ int main(int argc, char* argv[]) {
 	for(auto& t : v)
 		t.join();
 	db_disconnect();
+
+	if (manage_cluster) {
+		std::cout << "Stopping database..." << std::endl;
+		std::system(std::format("pg_ctl -D {}/database/cluster stop", parent_directory, database_port).c_str());
+	}
 
 	return EXIT_SUCCESS;
 }

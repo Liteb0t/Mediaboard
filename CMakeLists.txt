@@ -7,7 +7,7 @@ project(Mediaboard
   HOMEPAGE_URL "https://fuze.page/software/mediaboard"
 )
 
-find_package(Boost 1.81 COMPONENTS program_options filesystem REQUIRED)
+find_package(Boost 1.83 COMPONENTS filesystem program_options REQUIRED)
 find_package(nlohmann_json REQUIRED)
 find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
 add_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
@@ -15,9 +15,10 @@ add_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
 include_directories(${ImageMagick_INCLUDE_DIRS})
 find_library(ECPG_LIB ecpg)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Required on FreeBSD
+set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd to use
 
 add_executable(MediaboardServer)
-target_compile_features(MediaboardServer INTERFACE cxx_std_17)
+target_compile_features(MediaboardServer PUBLIC cxx_std_20)
 target_link_libraries(MediaboardServer
   PRIVATE
     Boost::filesystem
@@ -41,7 +42,9 @@ target_sources(MediaboardServer
     user.cpp
     websocket_session.cpp
 )
-configure_file(config.ini ${CMAKE_CURRENT_BINARY_DIR}/ COPYONLY)
+configure_file(config.ini ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
+configure_file(database_template.sql ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
+configure_file(default_groups.sql ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/db_interface.c
   COMMAND ecpg ${CMAKE_CURRENT_SOURCE_DIR}/db_interface.pgc

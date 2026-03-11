@@ -17,6 +17,7 @@
 #include <unordered_set>
 #include "beast.hpp"
 #include "board.hpp"
+#include "http_session.hpp"
 #include "permission_managed_object.hpp"
 
 // Forward declaration
@@ -39,8 +40,10 @@ public:
 class shared_state : public PermissionManager {
 public:
 	explicit
-	shared_state(std::string doc_root /*, std::string media_root*/);
+	shared_state(std::string parent_directory, std::string doc_root /*, std::string media_root*/);
 	void start();
+
+	const std::string parent_directory;
 
 	const std::string& doc_root() const noexcept { return doc_root_; }
 	// const std::string& media_root() const { return media_root_; }

@@ -1,14 +1,6 @@
-*.o
 *.swp
 *.kate-swp
 .cache/
+.qtcreator/
 build/
-server
-index.html
-registration.html
-change_password.html
-manage_server.html
-manage_permissions.html
-api.js
-permissions.js
 db_interface.c

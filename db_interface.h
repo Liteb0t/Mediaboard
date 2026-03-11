@@ -164,7 +164,6 @@ extern "C" {
 	struct db_permission_collection_array* db_retrieve_permission_collections_for_permission_object(int permission_object_id);
 	struct db_permission_setting_array* db_retrieve_permission_settings_for_permission_collection(int permission_collection_id);
 
-	void db_make_migrations();
 	void db_connect(const char* _database_name, unsigned short port);
 	void db_disconnect(void);
 #ifdef __cplusplus

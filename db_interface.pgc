@@ -792,25 +792,6 @@ void db_update_permission_setting(int _permission_setting_id, int _setting) {
 	EXEC SQL COMMIT;
 }
 
-// TODO delete after 0.0.5 release
-void db_make_migrations() {
-	EXEC SQL BEGIN DECLARE SECTION;
-	int thread_id;
-	int permission_object_id;
-	EXEC SQL END DECLARE SECTION;
-	EXEC SQL DECLARE thread_getter_migrater CURSOR FOR
-		SELECT id FROM thread
-		ORDER BY id;
-	EXEC SQL OPEN thread_getter_migrater;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `thread_getter_migrater` has retreived all threads
-	while (true) {
-		EXEC SQL SELECT nextval('permission_object_id_seq') INTO :permission_object_id;
-		EXEC SQL FETCH thread_getter_migrater INTO :thread_id;
-		EXEC SQL UPDATE thread SET permission_object_id = :permission_object_id WHERE id = :thread_id;
-	}
-	EXEC SQL COMMIT;
-}
-
 void db_disconnect(void) {
 	EXEC SQL DISCONNECT ALL;
 }
@@ -828,5 +809,6 @@ void print_sqlca() {
 	fprintf(stderr, "sqlstate: %5s\n", sqlca.sqlstate);
 	fprintf(stderr, "===============\n");
 	printf("Terminating the program...\n");
+	db_disconnect();
 	exit(1); // Stop the server when an SQL error is encountered. This is likely due to incorrect setup.
 }
