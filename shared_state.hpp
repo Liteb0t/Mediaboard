@@ -17,7 +17,6 @@
 #include <unordered_set>
 #include "beast.hpp"
 #include "board.hpp"
-#include "http_session.hpp"
 #include "permission_managed_object.hpp"
 
 // Forward declaration
