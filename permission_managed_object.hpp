@@ -109,8 +109,8 @@ private:
 
 class PermissionManager : public PermissionObjectBase {
 public:
-	PermissionManager(int permission_object_id)
-			: PermissionObjectBase(0) {}
+	PermissionManager(int permission_object_id);
+
 	const std::vector<int>* getOrderedGroups() const {
 		return &(this->ordered_groups);
 	}

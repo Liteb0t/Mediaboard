@@ -370,8 +370,8 @@ class Format {
 	static IMAGE = 0;
 	static AUDIO = 1;
 	static OTHER = -1;
-	static image_formats = ["gif", "jpg", "jpeg", "jxl", "png", "webp", "bmp", "ico"];
-	static audio_formats = ["flac", "mp3", "ogg", "ogx", "opus", "wav", "m4a"];
+	static image_formats = ["bmp", "gif", "ico", "jpg", "jpeg", "jxl", "png", "svg", "webp"];
+	static audio_formats = ["flac", "m4a", "mp3", "ogg", "ogx", "opus", "wav"];
 	static fromFileName(file_name) {
 		let dot_index = file_name.indexOf('.');
 		if (dot_index !== -1) {

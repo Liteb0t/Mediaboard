@@ -1,3 +1,5 @@
+// This code is deprecated, as the DB interface will be rewritten in C++ using libpqxx
+
 #ifndef DB_INTERFACE_H
 #define DB_INTERFACE_H
 

@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
 	// Check command line arguments.
 	std::string config_file;
 	unsigned short port, database_port;
-	std::string admin_password, doc_root, database_name, database_host;
+	std::string admin_password, media_location_relative_str, database_name, database_host;
 	int threads;
 	bool manage_cluster;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
 		("database_host,h", boost::program_options::value<std::string>(&database_host)->default_value("localhost"),  "Address of where the DB is hosted.")
 		("database_port,P", boost::program_options::value<unsigned short>(&database_port)->default_value(5400),  "The port which the database serves.")
 		("manage_cluster,c", boost::program_options::value<bool>(&manage_cluster)->default_value(true), "Whether the database will be managed by Fuze Mediaboard.")
-		("media_path,m", boost::program_options::value<std::string>(&doc_root)->default_value("."),  "File path where user-submitted media is stored.")
+		("media_path,m", boost::program_options::value<std::string>(&media_location_relative_str)->default_value("."),  "File path where user-submitted media is stored.")
 		("port,p", boost::program_options::value<unsigned short>(&port)->default_value(8300), "The port which the server will serve. Make sure it isn't in use by another service.")
 		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.");
 
@@ -150,12 +150,37 @@ int main(int argc, char* argv[]) {
 
 	if (variable_map.count("create_administrator")) {
 		db_create_administrator(admin_password.c_str());
-		std::cout << "Created 'Administrator' account successfully. Click on \"Log-in or Register\" and log in as 'Administrator' using the same password you entered here." << std::endl;
+		std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
+		db_disconnect();
+
+		if (manage_cluster) {
+			std::cout << "Stopping database..." << std::endl;
+			std::system(std::format("pg_ctl -D {}/database/cluster stop", parent_directory, database_port).c_str());
+		}
 		return 0;
 	}
 	std::cout << "Set port: " << port << std::endl;
-	std::cout << "Set doc_root:" << doc_root << std::endl;
+	boost::filesystem::path media_location_relative(media_location_relative_str);
+	boost::filesystem::path media_location;
+	try {
+		media_location = boost::filesystem::canonical(media_location_relative, location.parent_path());
+	}
+	catch (const std::exception* exception) {
+		std::cout << exception->what();
+	}
+	if (!boost::filesystem::exists(media_location.string() + "/media")) {
+		std::cout << media_location.string() + "/media" << " doesn't exist. Creating..." << std::endl;
+		boost::filesystem::create_directory(media_location.string() + "/media");
+	}
+	media_location += "/media";
+	if (!boost::filesystem::exists(media_location.string() + "/thumbnails")) {
+		std::cout << media_location.string() + "/thumbnails" << " doesn't exist. Creating..." << std::endl;
+		boost::filesystem::create_directory(media_location.string() + "/thumbnails");
+	}
+	std::cout << "Set media_location: " << media_location << std::endl;
 	std::cout << "Set threads: " << threads << std::endl;
+	if (threads > 1)
+		std::cout << "Warning: issues may arise from multi-threading" << std::endl;
 
 	auto address = boost::asio::ip::make_address("127.0.0.1");
 	// The io_context is required for all I/O - see https://www.boost.org/doc/libs/latest/doc/html/boost_asio/overview/basics.html
@@ -163,7 +188,7 @@ int main(int argc, char* argv[]) {
 
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
-	boost::shared_ptr<shared_state> state(new shared_state(parent_directory, doc_root));
+	boost::shared_ptr<shared_state> state(new shared_state(location.parent_path(), media_location));
 	state->start();
 	boost::make_shared<listener>(
 		io_context,
@@ -194,6 +219,7 @@ int main(int argc, char* argv[]) {
 			}
 		);
 	}
+	std::cout << "The server can now be accessed from http://localhost:" << port << std::endl;
 	io_context.run();
 
 	// (If we get here, it means we got a SIGINT or SIGTERM)

@@ -10,8 +10,8 @@
 #ifndef BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 
+#include <boost/filesystem.hpp>
 #include <boost/smart_ptr.hpp>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <unordered_set>
@@ -38,14 +38,13 @@ public:
 // Represents the shared server state
 class shared_state : public PermissionManager {
 public:
-	explicit
-	shared_state(std::string parent_directory, std::string doc_root /*, std::string media_root*/);
+	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative);
+	// shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
+	// hence a seperate start() function is used
 	void start();
 
-	const std::string parent_directory;
-
-	const std::string& doc_root() const noexcept { return doc_root_; }
-	// const std::string& media_root() const { return media_root_; }
+	const boost::filesystem::path* getMediaLocation() const { return &media_location; }
+	const boost::filesystem::path* getProgramLocation() const { return &program_location; }
 
 	// Board main_board;
 	boost::shared_ptr<Board> main_board() const { return this->boards.at(0); }
@@ -68,8 +67,8 @@ public:
 	void sendToThread (std::string message, int thread_id);
 
 private:
-	const std::string doc_root_;
-	// const std::string media_root_;
+	const boost::filesystem::path media_location;
+	const boost::filesystem::path program_location;
 
 	// This mutex synchronizes all access to sessions_
 	std::mutex mutex_;

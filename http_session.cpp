@@ -67,7 +67,7 @@ mime_type(beast::string_view path) {
 
 const std::string forbidden_file_name_chars = "#?";
 
-const std::set<std::string, std::less<>> image_formats = {"gif", "jpg", "jpeg", "jxl", "png", "webp", "bmp", "ico"};
+const std::set<std::string, std::less<>> image_formats = {"bmp", "gif", "ico", "jpg", "jpeg", "jxl", "png", "svg", "webp"};
 const bool fileIsImage(std::string* file_name) {
 	int dot_index = file_name->rfind('.');
 	if (dot_index != std::string::npos) {
@@ -190,9 +190,6 @@ http::message_generator handle_request(
 		res.prepare_payload();
 		return res;
 	};
-
-	std::cout << "req target: " << req.target() << "\n";
-	std::cout << "req version: " << req.version() << "\n";
 	
 	// URL decoding in C http://www.geekhideout.com/urlcode.shtml
 	std::string decoded_url;
@@ -298,9 +295,8 @@ http::message_generator handle_request(
 	if 		(req.method() == http::verb::get) {
 		bool is_media;
 		// Build the path to the requested file
-		if (req_location.substr(0, 6) == "/media") {
+		if (req_location.substr(0, 7) == "/media/") {
 			is_media = true;
-			req_location = path_cat(state->doc_root(), decoded_url.substr(6));
 		}
 		else if (req_location.substr(0, 5) == "/api/") {
 			is_media = false;
@@ -386,16 +382,6 @@ http::message_generator handle_request(
 					user_id = client.first;
 				else {
 					return api_response(http::status::not_implemented, std::string("only /user/client/ is implemented"));
-					/*
-					std::pair<int, int> user_in_url;
-					try {
-						user_in_url = getNumberFromPath(10);
-					}
-					catch(std::string error_text) {
-						return api_response(http::status::bad_request, std::string("Couldn't get client ID from URL ") + req_location);
-					}
-					user_id = user_in_url.first;
-					*/
 				}
 				nlohmann::json response_json;
 				response_json["server_permissions"]["manage_permissions"] = state->userHasPermission(user_id, PERMISSION::MANAGE_PERMISSIONS);
@@ -416,34 +402,40 @@ http::message_generator handle_request(
 		}
 		else {
 			is_media = false;
-			if (req_location == "/")
+			if (req_location.ends_with("/")) // So /thread/1/ and such will redirect to index.html
 				req_location = "frontend/index.html";
 			else
 				req_location = "frontend" + req_location;
-			std::cout << "Opening non-media location: " << req_location << std::endl;
+			// std::cout << "Opening non-media location: " << req_location << std::endl;
 		}
 		// Check if path leads to a directory
-		boost::filesystem::path filesystem_path(std::format("{}/{}", state->parent_directory, req_location));
+		boost::filesystem::path filesystem_path;
+		if (is_media)
+			filesystem_path = std::format("{}/{}", state->getMediaLocation()->string(), req_location.substr(7));
+		else
+			filesystem_path = std::format("{}/{}", state->getProgramLocation()->string(), req_location);
+		std::cout << "Attempting to open " << filesystem_path << std::endl;
 		if (!boost::filesystem::exists(filesystem_path))
-			return not_found(req.target());
+			return not_found(req_location);
 		if (!boost::filesystem::is_regular_file(filesystem_path))
 			return bad_request("Is a directory.");
 
 		// Attempt to open the file
 		beast::error_code ec;
 		http::file_body::value_type body;
-		body.open(req_location.c_str(), beast::file_mode::scan, ec);
+		body.open(filesystem_path.c_str(), beast::file_mode::scan, ec);
 
 		// Handle the case where the file doesn't exist
 		if (ec == boost::system::errc::no_such_file_or_directory)
-			return not_found(req.target());
+			return not_found(req_location);
 		else if (ec) // Handle an unknown error
 			return server_error(ec.message());
 
+		/*
 		std::string filename;
 		if (is_media) {
-			int filename_start_index = req.target().rfind("/") + 1;
-			filename = req.target().substr(filename_start_index, req.target().length() - filename_start_index);
+			int filename_start_index = req_location.rfind("/") + 1;
+			filename = req_location.substr(filename_start_index, req_location.length() - filename_start_index);
 			int filename_extension_index;
 			if ((filename_extension_index = filename.rfind(".")) == -1) {
 				filename_extension_index = filename.size();
@@ -456,6 +448,7 @@ http::message_generator handle_request(
 				is_media = false;
 			std::cout << "Is media. Filename: " << filename << std::endl;
 		}
+		*/
 
 		// Cache the size since we need it after the move
 		auto const size = body.size();
@@ -542,7 +535,7 @@ http::message_generator handle_request(
 			out_filename.insert(filename_uuid_index, uuid_str);
 
 			// Write to the file
-			std::ofstream outfile(state->doc_root() + out_filename, std::ios::binary);
+			std::ofstream outfile(std::format("{}/{}", state->getMediaLocation()->string(), out_filename), std::ios::binary);
 			bool is_initial_line = true;
 			bool previous_line_ends_with_carriage_return = false;
 			while (std::getline(req_stream, req_line)) {
@@ -597,11 +590,11 @@ http::message_generator handle_request(
 			if (fileIsImage(&out_filename)) {
 				Magick::Image thumbnail;
 				try {
-					thumbnail.read(state->doc_root() + out_filename);
+					thumbnail.read(std::format("{}/{}", state->getMediaLocation()->string(), out_filename));
 					thumbnail.strip(); // Removes metadata
 					thumbnail.resize("150x150");
 					thumbnail.quality(50);
-					thumbnail.write(state->doc_root() + "thumbnails/THUMBNAIL_" + out_filename + ".jxl");
+					thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.jxl", state->getMediaLocation()->string(), out_filename));
 				}
 				catch( Magick::Warning& magick_warning ) {
 					std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Thumbnail might not be made." << std::endl;

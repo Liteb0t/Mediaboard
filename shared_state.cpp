@@ -12,8 +12,10 @@
 #include "websocket_session.hpp"
 #include <iostream>
 
-shared_state::shared_state(std::string parent_directory, std::string doc_root /*, std::string media_root*/)
-	: PermissionManager(0), parent_directory(parent_directory), doc_root_(std::move(doc_root))/*, media_root_(std::move(media_root))*/ {
+shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location)
+		: PermissionManager(0),
+		program_location(std::move(parent_directory)),
+		media_location(std::move(media_location)) {
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error

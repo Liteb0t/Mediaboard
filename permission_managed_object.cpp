@@ -78,7 +78,7 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 
 	nlohmann::json user_permissions_json = nlohmann::json::object();
 	// int user_rank = this->getUserRank(client_id);
-	std::cout << "getting user_permissions_json..." << std::endl;
+	std::cout << "[PermissionManager] getting user_permissions_json..." << std::endl;
 	// for (const std::pair<int, User> user : *this->getUsers()) {
 	boost::shared_ptr<std::unordered_map<int, User>> _users = this->getUsers();
 	for (std::unordered_map<int, User>::const_iterator user_it = _users->begin(); user_it != _users->end(); user_it++) {
@@ -101,8 +101,18 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 	return permission_collections_json;
 }
 
+PermissionManager::PermissionManager(int permission_object_id)
+		: PermissionObjectBase(0) {
+	// Grants all permissions to the Administrators group
+	if (!permissionCollectionExistsForGroup(0))
+		this->addGroupPermissionCollection(0);
+	for (int permission_number = 0; permission_number < static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS); permission_number++) {
+		this->setGroupPermission(0, static_cast<PERMISSION>(permission_number), THREE_STATE_SETTING::ALLOW);
+	}
+}
+
 void PermissionManager::cacheAllUsers() {
-	std::cout << "Retreiving accounts from database... ";
+	std::cout << "[PermissionManager] Retreiving accounts from database... ";
 	struct db_account_array* account_array = db_retrieve_accounts();
 	for (int i = 0; i < account_array->used; i++) {
 		std::cout << account_array->array[i].id << ", ";

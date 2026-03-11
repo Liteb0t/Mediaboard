@@ -40,8 +40,10 @@ public:
 	}
 	THREE_STATE_SETTING get() const { return this->setting; }
 	void set(THREE_STATE_SETTING setting) {
-		this->setting = setting;
-		db_update_permission_setting(this->id, static_cast<int>(this->setting));
+		if (setting != this->setting) {
+			this->setting = setting;
+			db_update_permission_setting(this->id, static_cast<int>(this->setting));
+		}
 	}
 private:
 	int id;
