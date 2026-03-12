@@ -349,7 +349,7 @@ int db_store_account(const char* _username, const char* _password) {
 	return account_id;
 }
 
-const char db_fetch_key(char* _key, const char* _username, const char* _password) {
+const char* db_fetch_key(const char* _username, const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	const char* username = _username;
 	const char* password = _password;
@@ -362,18 +362,17 @@ const char db_fetch_key(char* _key, const char* _username, const char* _password
 	EXEC SQL SELECT password_hash INTO :hashed_password FROM account WHERE username = :username;
 	EXEC SQL COMMIT;
 	if (hashed_password[0] == '\0')
-		return '\0';
+		key[0] = '\0';
 	else {
 		printf("Username exists. hashed_password: %s\n", hashed_password);
 		EXEC SQL SELECT (:hashed_password = crypt(:password, :hashed_password)) INTO :passwords_match;
 		if (passwords_match == 't') {
 			EXEC SQL SELECT key INTO :key FROM account WHERE username = :username;
 			EXEC SQL COMMIT;
-			strcpy(_key, key); // Copy fetched key into the pointer passed to db_fetch_key
 		}
 		EXEC SQL COMMIT;
-		return passwords_match;
 	}
+	return key;
 }
 
 int db_account_matches_password(int _account_id, const char* _password) {

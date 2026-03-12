@@ -43,8 +43,8 @@ public:
 	// hence a seperate start() function is used
 	void start();
 
-	const boost::filesystem::path* getMediaLocation() const { return &media_location; }
-	const boost::filesystem::path* getProgramLocation() const { return &program_location; }
+	const boost::filesystem::path& getMediaLocation() const { return media_location; }
+	const boost::filesystem::path& getProgramLocation() const { return program_location; }
 
 	// Board main_board;
 	boost::shared_ptr<Board> main_board() const { return this->boards.at(0); }

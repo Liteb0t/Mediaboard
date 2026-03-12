@@ -411,9 +411,9 @@ http::message_generator handle_request(
 		// Check if path leads to a directory
 		boost::filesystem::path filesystem_path;
 		if (is_media)
-			filesystem_path = std::format("{}/{}", state->getMediaLocation()->string(), req_location.substr(7));
+			filesystem_path = std::format("{}/{}", state->getMediaLocation().string(), req_location.substr(7));
 		else
-			filesystem_path = std::format("{}/{}", state->getProgramLocation()->string(), req_location);
+			filesystem_path = std::format("{}/{}", state->getProgramLocation().string(), req_location);
 		std::cout << "Attempting to open " << filesystem_path << std::endl;
 		if (!boost::filesystem::exists(filesystem_path))
 			return not_found(req_location);
@@ -535,7 +535,7 @@ http::message_generator handle_request(
 			out_filename.insert(filename_uuid_index, uuid_str);
 
 			// Write to the file
-			std::ofstream outfile(std::format("{}/{}", state->getMediaLocation()->string(), out_filename), std::ios::binary);
+			std::ofstream outfile(std::format("{}/{}", state->getMediaLocation().string(), out_filename), std::ios::binary);
 			bool is_initial_line = true;
 			bool previous_line_ends_with_carriage_return = false;
 			while (std::getline(req_stream, req_line)) {
@@ -590,11 +590,11 @@ http::message_generator handle_request(
 			if (fileIsImage(&out_filename)) {
 				Magick::Image thumbnail;
 				try {
-					thumbnail.read(std::format("{}/{}", state->getMediaLocation()->string(), out_filename));
+					thumbnail.read(std::format("{}/{}", state->getMediaLocation().string(), out_filename));
 					thumbnail.strip(); // Removes metadata
 					thumbnail.resize("150x150");
 					thumbnail.quality(50);
-					thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.jxl", state->getMediaLocation()->string(), out_filename));
+					thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.jxl", state->getMediaLocation().string(), out_filename));
 				}
 				catch( Magick::Warning& magick_warning ) {
 					std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Thumbnail might not be made." << std::endl;

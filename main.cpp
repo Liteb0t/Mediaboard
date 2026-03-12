@@ -111,8 +111,8 @@ int main(int argc, char* argv[]) {
 		if (database_version_string) {
 			std::cout << "Found database version: " << database_version_string.value() << std::endl;
 			if (database_version_string != current_version) {
-				writeMigrations(parent_directory, database_version_string.value(), current_version);
-				make_migrations = true;
+				std::cout << "Database is out-of-date. Checking if migrations need to be made..." << std::endl;
+				make_migrations = writeMigrations(parent_directory, database_version_string.value(), current_version);
 			}
 			else {
 				std::cout << "Database is up-to-date" << std::endl;
@@ -136,13 +136,17 @@ int main(int argc, char* argv[]) {
 			return ret;
 	}
 	if (first_time_setup) {
-		std::system(std::format("createuser --host={} --port={} mediaboard_server", database_host, database_port).c_str());
-		std::system(std::format("createdb --host={} --port={} fuze_mediaboard", database_host, database_port).c_str());
+		if (manage_cluster) {
+			std::system(std::format("createuser --host={} --port={} mediaboard_server", database_host, database_port).c_str());
+			std::system(std::format("createdb --host={} --port={} fuze_mediaboard", database_host, database_port).c_str());
+		}
 		std::system(std::format("psql --host={} --port={} {} -f {}/database_template.sql", database_host, database_port, database_name, parent_directory).c_str());
 		std::system(std::format("psql --host={} --port={} {} -f {}/default_groups.sql", database_host, database_port, database_name, parent_directory).c_str());
 	}
 	if (make_migrations) {
+		std::cout << "Migrating database..." << std::endl;
 		std::system(std::format("psql --host={} --port={} {} -f {}/database/migrations.sql", database_host, database_port, database_name, parent_directory).c_str());
+		std::cout << "Finished migrating database." << std::endl;
 	}
 
 	// Establish database connection
@@ -160,10 +164,9 @@ int main(int argc, char* argv[]) {
 		return 0;
 	}
 	std::cout << "Set port: " << port << std::endl;
-	boost::filesystem::path media_location_relative(media_location_relative_str);
 	boost::filesystem::path media_location;
 	try {
-		media_location = boost::filesystem::canonical(media_location_relative, location.parent_path());
+		media_location = boost::filesystem::canonical(media_location_relative_str, location.parent_path());
 	}
 	catch (const std::exception* exception) {
 		std::cout << exception->what();
