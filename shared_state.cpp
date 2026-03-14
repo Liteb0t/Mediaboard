@@ -12,18 +12,19 @@
 #include "websocket_session.hpp"
 #include <iostream>
 
-shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location)
+shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db)
 		: PermissionManager(0),
 		program_location(std::move(parent_directory)),
-		media_location(std::move(media_location)) {
+		media_location(std::move(media_location)),
+		db(db) {
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
 // hence a seperate start() function is used
 void shared_state::start() {
-	boost::shared_ptr<Board> main_board(new Board(shared_from_this()));
+	Board main_board(shared_from_this());
 	this->boards.emplace(0, main_board);
-	this->main_board()->cacheAllThreads();
+	this->boards.at(0).cacheAllThreads();
 	this->cacheAllGroups();
 	this->cacheAllUsers();
 }
@@ -37,30 +38,6 @@ void shared_state::leave(websocket_session* session) {
 	std::lock_guard<std::mutex> lock(mutex_);
 	sessions_.erase(session);
 }
-
-// Broadcast a message to all websocket client sessions
-// void shared_state::send(std::string message) {
-// 	// Put the message in a shared pointer so we can re-use it for each client
-// 	auto const ss = boost::make_shared<std::string const>(std::move(message));
-//
-// 	// Make a local list of all the weak pointers representing
-// 	// the sessions, so we can do the actual sending without
-// 	// holding the mutex:
-// 	std::vector<boost::weak_ptr<websocket_session>> v;
-// 	{
-// 		std::lock_guard<std::mutex> lock(mutex_);
-// 		v.reserve(sessions_.size());
-// 		for(auto p : sessions_)
-// 			v.emplace_back(p->weak_from_this());
-// 	}
-//
-// 	// For each session in our local list, try to acquire a strong
-// 	// pointer. If successful, then send the message on that session.
-// 	for(auto const& wp : v) {
-// 		if(auto sp = wp.lock())
-// 			sp->send(ss);
-// 	}
-// }
 
 // Broadcast a message to all websocket client sessions
 void shared_state::sendToThread(std::string message, int thread_id) {

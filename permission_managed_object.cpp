@@ -104,8 +104,8 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 PermissionManager::PermissionManager(int permission_object_id)
 		: PermissionObjectBase(0) {
 	// Grants all permissions to the Administrators group
-	if (!permissionCollectionExistsForGroup(0))
-		this->addGroupPermissionCollection(0);
+	if (!permissionCollectionExistsForGroup(static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS)))
+		this->addGroupPermissionCollection(static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS));
 	for (int permission_number = 0; permission_number < static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS); permission_number++) {
 		this->setGroupPermission(0, static_cast<PERMISSION>(permission_number), THREE_STATE_SETTING::ALLOW);
 	}
@@ -124,8 +124,11 @@ void PermissionManager::cacheAllUsers() {
 	freeAccountArray(account_array);
 }
 
-void PermissionManager::cacheAllGroups() {
+void PermissionManager::cacheAllGroups(DatabaseConnection* db) {
 	std::cout << "[PermissionManager] Retreiving groups from database... ";
+	// Refactor DB interface code like so:
+	// for (auto [group_id, group_name] : db->getGroups())
+	// Group group(group_id, group_name);
 	struct db_group_array* group_array = db_retrieve_groups();
 	for (int i = 0; i < group_array->used; i++) {
 		Group group(&group_array->array[i]);

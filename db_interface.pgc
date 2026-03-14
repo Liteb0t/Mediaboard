@@ -193,9 +193,8 @@ void db_connect(const char* _database_name, unsigned short port) {
 	char _connection_target[256];
 	sprintf(_connection_target, "%s@%s:%d", _database_name, "localhost", port);
 	EXEC SQL BEGIN DECLARE SECTION;
-	// const char* database_name = _database_name;
-	// const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
-	// const char* password = "watermelone";
+	const char* database_name = _database_name;
+	const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts, permission_object_id) VALUES (?, 0, ?);";
 	const char* mark_post_as_deleted_prepared_stmt = "UPDATE post SET deleted = true WHERE id = ?;";
@@ -207,8 +206,6 @@ void db_connect(const char* _database_name, unsigned short port) {
 	const char* connection_target = _connection_target;
 	EXEC SQL END DECLARE SECTION;
 	printf("connection_target: %s\n", connection_target);
-	// printf("password: %s\n", password);
-	/*
 	if (password)
 		printf("Found environment variable \"%s\"\n", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	else {
@@ -216,8 +213,6 @@ void db_connect(const char* _database_name, unsigned short port) {
 		exit(2);
 	}
 	EXEC SQL CONNECT TO :database_name USER "mediaboard_server" USING :password;
-	*/
-	EXEC SQL CONNECT TO :connection_target USER "mediaboard_server";
 	printf("Connected!\n");
 	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;
@@ -353,7 +348,7 @@ const char* db_fetch_key(const char* _username, const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	const char* username = _username;
 	const char* password = _password;
-	char key[8+1];
+	static char key[8+1];
 	char hashed_password[61];
 	char passwords_match;
 	EXEC SQL END DECLARE SECTION;

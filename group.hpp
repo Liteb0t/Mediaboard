@@ -9,6 +9,7 @@ enum GroupLockPosition { NONE, LOCK_TO_TOP, LOCK_TO_BOTTOM };
 
 class Group {
 public:
+	// Group::Group(int id, std::string name)
 	Group(struct db_group_struct* group_struct);
 	// Group(json group_json);
 	Group(std::string name);

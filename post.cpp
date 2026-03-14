@@ -1,5 +1,6 @@
 #include "post.hpp"
 #include "db_interface.h"
+#include "DatabaseConnection.hpp"
 #include <string>
 #include <iostream>
 #include <ctime>

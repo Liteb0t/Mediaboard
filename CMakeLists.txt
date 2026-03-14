@@ -35,6 +35,7 @@ target_link_libraries(MediaboardServer
 target_sources(MediaboardServer
   PRIVATE
     board.cpp
+    DatabaseConnectionPostgres.cpp
     db_interface.c
     group.cpp
     http_session.cpp

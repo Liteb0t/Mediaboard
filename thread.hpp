@@ -1,6 +1,6 @@
-#include "post.hpp"
 #include "db_interface.h"
 #include "permission_managed_object.hpp"
+#include "post.hpp"
 #include <ctime>
 #include <string>
 #include <unordered_set>

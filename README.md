@@ -5,11 +5,10 @@
 `postgresql-contrib`\
 `ecpg`\
 `nlohmann-json3-dev`\
-`libboost1.81-dev`\
-`libboost-program-options1.81-dev`\
-`libboost-filesystem1.81-dev`\
-`make`\
-`g++`\
+`libboost1.88-dev`\
+`libboost-program-options1.88-dev`\
+`libboost-filesystem1.88-dev`\
+`cmake`\
 `m4`\
 ### Imagemagick
 Note: FreeBSD users can skip this step because the pkg contains all the required delegates.\
@@ -32,12 +31,6 @@ Then install:\
 `postgresql18-contrib`   ^\
 Add the following line to `/etc/rc.conf`:\
 `postgresql_enable="YES"`
-### Postgres setup
-This may be skipped on certain distros such as Debian.
-`pw groupmod postgres -M <user>`\
-`reboot`\
-`initdb -D /var/db/postgres/18/main/`\
-`pg_ctl -D /var/db/postgres/18/main start`\
 ### Developing on MacOS
 Install [Homebrew](https://brew.sh/)\
 Brew install: `nlohmann-json` `imagemagick` `boost` `postgresql@15` `meson`\
@@ -60,16 +53,22 @@ Then to build:\
 `sh build.sh`\
 `cd build`\
 `ninja`
-### Database setup
-Install postgresql.\
-\
+### Postgres setup
+#### Create the cluster
+*This may be skipped on certain Linux distros such as Debian. Check if the server is already running with `systemctl status postgresql` or `service postgresql status`*
+`initdb -D /var/db/postgres/18/main/`\
+`pg_ctl -D /var/db/postgres/18/main start`\
+#### And now that the cluster is running...
 To create the database:\
-`createdb fuze_mediaboard`\ - you may need to be logged into the user `postgres` first.\
+`su -`\
+`su postgres`\
+`createdb fuze_mediaboard`\
 `psql -d fuze_mediaboard`\
 fuze_mediaboard=# `CREATE USER mediaboard_server WITH PASSWORD '<password>'`\
-To import the database template:\
-`psql fuze_mediaboard < database_template.sql`\
-`psql fuze_mediaboard < default_groups.sql`\
+fuze_mediaboard=# `\q`\
+To import the database template, go back to your user account and run:\
+`psql -U postgres fuze_mediaboard < database_template.sql`\
+`psql -U postgres fuze_mediaboard < default_groups.sql`\
 \
 Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it at the top of the table so that it won't be overridden by other settings:\
 `local   fuze_mediaboard mediaboard_server                       password`\
@@ -79,27 +78,30 @@ Set the environment variable `FUZE_MEDIABOARD_PASSWORD` with the same password u
 ### Administrator account
 The administrator is able to delete posts from any user. To create the administrator account:\
 `./build/server --create_administrator <password>`\
-If you see the following output, that most likely means everything was set up correctly:\
-```
-Loaded config file
-Set the database to fuze_mediaboard
-Found environment variable "FUZE_MEDIABOARD_PASSWORD"
-Connected!
-Created 'Administrator' account successfully
-```
 If you ever forget the password, you can simply run the create_administrator command again.
 ### Execute the program
 If you built using meson, run `./build/server` - You must run the server from the Mediaboard directory, not inside `build`.\
 If you built using make, run `./server`.\
 In a browser open `localhost:8300`\
-You should see an empty page with a toolbar at the top. You can login to the administrator account with username "Administrator" and the password you set in `./build/server --create_administrator`\
+You should see an empty page with a toolbar at the top. You can login to the administrator account with username "Administrator" and the password you set earlier\
 ![Login page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_login_page.png)
 ### Manage permissions
 By default, users cannot view or create threads or send messages. To enable this, click on the "Manage server" tab in the toolbar as an administrator.\
 ![Permissions in the Manage Server page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_manage_permissions.png)
 In the Manage permissions tab, click "Add group" and select "Public". Now set the desired permissions to "Allow".
-### Deployment settings
-Example Nginx reverse proxy settings:
+### Deployment
+Let's say, for example, the Mediaboard will be accessible under `/mediaboard/`.\
+Open `tokens.m4` and locate the following line:
+```
+define(`_WEBSOCKET_URL', `ws://localhost:8300')
+```
+Set the value to the publicly accessible URL Mediaboard is proxied to.\
+In this example, if our domain is *fuze.page*, the value should be `wss://fuze.page/mediaboard/`. **Do not forget: if using HTTPS, set the scheme to `wss://`.**\
+Also change the definition of `_ROOT_URL` from `/` to `/mediaboard/`\
+Run `make` to apply the changes, or `sh build.sh` if using Meson.
+#### HTTPS support
+Fuze Mediaboard does not provide HTTPS. For that, you should use a reverse proxy like [NGINX](https://nginx.org/).\
+Example NGINX reverse proxy settings:
 ```
 location /mediaboard/ {
   proxy_pass http://localhost:8300/; # Fuze Mediaboard
@@ -122,17 +124,8 @@ location /mediaboard/media/ {
   alias /path/to/media/folder/;
 }
 ```
-In the example above, Fuze Mediaboard is hosted on `/mediaboard/`.\
-Open `tokens.m4` and locate the following line:
-```
-define(`_WEBSOCKET_URL', `ws://localhost:8300')
-```
-Set the value to the publicly accessible URL Mediaboard is proxied to.\
-In this example, if our domain is *fuze.page*, the value should be `wss://fuze.page/mediaboard/`. **Do not forget: if using HTTPS, set the scheme to `wss://`.**\
-Also change the definition of `_ROOT_URL` from `/` to `/mediaboard/`\
-Run `make` to apply the changes, or `sh build.sh` if using Meson.
 ### Storing user-submitted media in a different location
-By default, media is stored in `media/`. You can choose a different directory within the server's filesystem to store media. Open `config.ini` and set `media_path` to another location.
+User-uploaded content is stored in a subdirectory named `media/`. By default, this is in the same directory as the server executable. You can choose a different directory within the server's filesystem to store media; Open `config.ini` and set `media_path` to another location.
 ### Dumping the database template
 After making changes to the database schema, dump it to the repository using this command:\
 `pg_dump --schema-only fuze_mediaboard >database_template.sql`

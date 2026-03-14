@@ -11,6 +11,7 @@
 */
 //------------------------------------------------------------------------------
 
+#include "DatabaseConnectionPostgres.hpp"
 #include "listener.hpp"
 #include "migrations.hpp"
 #include "shared_state.hpp"
@@ -148,14 +149,13 @@ int main(int argc, char* argv[]) {
 		std::system(std::format("psql --host={} --port={} {} -f {}/database/migrations.sql", database_host, database_port, database_name, parent_directory).c_str());
 		std::cout << "Finished migrating database." << std::endl;
 	}
-
 	// Establish database connection
-	db_connect(database_name.c_str(), database_port);
+	DatabaseConnection* database_connection = new DatabaseConnectionPostgres(std::string(""), database_name.c_str(), database_port);
 
 	if (variable_map.count("create_administrator")) {
 		db_create_administrator(admin_password.c_str());
 		std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
-		db_disconnect();
+		delete database_connection;
 
 		if (manage_cluster) {
 			std::cout << "Stopping database..." << std::endl;
@@ -191,7 +191,7 @@ int main(int argc, char* argv[]) {
 
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
-	boost::shared_ptr<shared_state> state(new shared_state(location.parent_path(), media_location));
+	boost::shared_ptr<shared_state> state(new shared_state(location.parent_path(), media_location, database_connection));
 	state->start();
 	boost::make_shared<listener>(
 		io_context,
@@ -230,7 +230,9 @@ int main(int argc, char* argv[]) {
 	// Block until all the threads exit
 	for(auto& t : v)
 		t.join();
-	db_disconnect();
+
+	std::cout << "Disconnecting from the database..." << std::endl;
+	delete database_connection;
 
 	if (manage_cluster) {
 		std::cout << "Stopping database..." << std::endl;

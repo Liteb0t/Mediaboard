@@ -17,6 +17,7 @@
 #include <unordered_set>
 #include "beast.hpp"
 #include "board.hpp"
+#include "DatabaseConnection.hpp"
 #include "permission_managed_object.hpp"
 
 // Forward declaration
@@ -38,7 +39,7 @@ public:
 // Represents the shared server state
 class shared_state : public PermissionManager {
 public:
-	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative);
+	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative, DatabaseConnection* database_connection);
 	// shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
 	// hence a seperate start() function is used
 	void start();
@@ -47,7 +48,7 @@ public:
 	const boost::filesystem::path& getProgramLocation() const { return program_location; }
 
 	// Board main_board;
-	boost::shared_ptr<Board> main_board() const { return this->boards.at(0); }
+	Board* main_board() { return &(this->boards.at(0)); }
 
 	std::string dumpAllGroups(int client_id) const;
 	BasicResponse setGroupHeirarchy(int client_id, std::vector<int> ordered_groups);
@@ -56,7 +57,7 @@ public:
 	std::string dumpMembersInGroupAsArray(int group_id) const;
 	std::string dumpAllUsers(int client_id) const;
 	std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
-	boost::shared_ptr<Thread> getThread(int board_id, int thread_id) const { return this->main_board()->getThread(thread_id); }
+	boost::shared_ptr<Thread> getThread(int board_id, int thread_id) const { return this->boards.at(board_id).getThread(thread_id); }
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
 	BasicResponse getKeyFromPassword(nlohmann::json request_json) const;
 	BasicResponse addUserToGroups(int client_id, int user_id, std::vector<int> groups_by_id);
@@ -67,6 +68,7 @@ public:
 	void sendToThread (std::string message, int thread_id);
 
 private:
+	DatabaseConnection* db;
 	const boost::filesystem::path media_location;
 	const boost::filesystem::path program_location;
 
@@ -77,7 +79,7 @@ private:
 	std::unordered_set<websocket_session*> sessions_;
 
 	// std::unordered_map<int, Board> boards;
-	std::unordered_map<int, boost::shared_ptr<Board>> boards;
+	std::unordered_map<int, Board> boards;
 	// std::vector<int> ordered_boards;
 };
 

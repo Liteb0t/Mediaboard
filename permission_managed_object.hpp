@@ -1,14 +1,15 @@
 #ifndef PERMISSION_MANAGED_OBJECT
 #define PERMISSION_MANAGED_OBJECT
 
-#include <algorithm>
-#include <iostream>
-#include <vector>
-#include <boost/smart_ptr.hpp>
-#include <nlohmann/json.hpp>
+#include "DatabaseConnection.hpp"
+#include "group.hpp"
 #include "permission_collection.hpp"
 #include "user.hpp"
-#include "group.hpp"
+#include <algorithm>
+#include <boost/smart_ptr.hpp>
+#include <iostream>
+#include <nlohmann/json.hpp>
+#include <vector>
 
 enum class BUILTIN_GROUPS { ADMINISTRATORS, USERS, PUBLIC };
 
@@ -210,7 +211,7 @@ protected:
 		// this->groups.at(static_cast<int>(BUILTIN_GROUPS::USERS)).addMember(new_user.getId());
 		return &(this->users.at(new_user.getId()));
 	}
-	void cacheAllGroups();
+	void cacheAllGroups(DatabaseConnection* db);
 	void cacheAllUsers();
 
 	void setOrderedGroups(std::vector<int> ordered_groups) {
