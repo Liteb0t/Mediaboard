@@ -4,8 +4,9 @@
 #include <cstring>
 
 // Save thread when JSON is received
-Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json thread_json, int new_permission_object_id)
-			: PermissionManagedObject(permission_parent, new_permission_object_id) {
+Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json thread_json, int new_permission_object_id, DatabaseConnection* db)
+			: PermissionManagedObject(permission_parent, new_permission_object_id, db),
+			db(db) {
 	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
 	this->number_of_posts = 0;
@@ -23,8 +24,9 @@ Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json t
 }
 
 // Cache thread using db_interface struct
-Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, struct db_thread_struct* thread_struct)
-			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id) {
+Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db)
+			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id, db),
+			db(db) {
 	// this->cacheAllPermissions();
 	this->id = thread_struct->id;
 	this->deleted = thread_struct->deleted;
@@ -40,7 +42,7 @@ std::string Thread::dumpThread() const {
 }
 
 void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
-	Post post(post_struct);
+	Post post(post_struct, db);
 	if (post.getIdInThread() == 0) {
 		this->thread_as_json["post_zero"] = post.asJson();
 	}
@@ -54,7 +56,7 @@ int Thread::createPostFromJson(json post_json) {
 	post_json["id_in_thread"] = this->number_of_posts;
 	// const std::string placeholder_key(KEY_LENGTH+1, 'T');
 	// post_json["key"] = placeholder_key;
-	Post post(post_json); // Key is deleted from post_json in its constructor
+	Post post(post_json, db); // Key is deleted from post_json in its constructor
 	if (this->number_of_posts == 0) {
 		this->thread_as_json["post_zero"] = post.asJson();
 	}

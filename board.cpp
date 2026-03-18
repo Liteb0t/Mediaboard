@@ -3,15 +3,14 @@
 #include <sstream>
 #include <iostream>
 
-Board::Board(boost::shared_ptr<PermissionObjectBase> permission_parent) : PermissionManagedObject(permission_parent, 1 /* temporary ID until multi board update*/) {
-	// this->thread_limit=50; // MAX_THREADS_PER_BOARD
-	// this->post_limit = 100;
-	// this->cacheAllThreads();
+Board::Board(boost::shared_ptr<PermissionObjectBase> permission_parent, DatabaseConnection* db)
+		: PermissionManagedObject(permission_parent, 1 /* temporary ID until multi board update*/, db),
+		db(db) {
 }
 
 int Board::createThread(json thread_json) {
 	int new_permission_object_id = db_get_unique_permission_object_id();
-	Thread thread(shared_from_this(), thread_json, new_permission_object_id);
+	Thread thread(shared_from_this(), thread_json, new_permission_object_id, db);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(thread.getLastPostTime(), thread.getId()));
 	return thread.getId();
@@ -51,7 +50,7 @@ void Board::cacheAllThreads() {
 		// thread_json["id"] = thread_list->array[i].id;
 		// thread_json["number_of_posts"] = thread_list->array[i].number_of_posts;
 		// Thread thread(thread_json, false);
-		Thread thread(shared_from_this(), &thread_list->array[i]);
+		Thread thread(shared_from_this(), &thread_list->array[i], db);
 		std::cout << thread.getId() << ", ";
 		this->threads.insert(std::make_pair(thread.getId(), thread));
 	}

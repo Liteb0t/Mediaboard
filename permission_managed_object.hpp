@@ -15,8 +15,8 @@ enum class BUILTIN_GROUPS { ADMINISTRATORS, USERS, PUBLIC };
 
 class PermissionObjectBase : public boost::enable_shared_from_this<PermissionObjectBase> {
 public:
-	PermissionObjectBase(int permission_object_id);
-	void cacheAllPermissions(/*int permission_object_id*/);
+	PermissionObjectBase(int permission_object_id, DatabaseConnection* db);
+	void cacheAllPermissions(DatabaseConnection* db);
 	void addGroupPermissionCollection(int group_id) {
 		std::cout << "[PermissionObjectBase] adding group permission_collection for group" << group_id << std::endl;
 		PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::GROUP, group_id);
@@ -110,7 +110,7 @@ private:
 
 class PermissionManager : public PermissionObjectBase {
 public:
-	PermissionManager(int permission_object_id);
+	PermissionManager(int permission_object_id, DatabaseConnection* db);
 
 	const std::vector<int>* getOrderedGroups() const {
 		return &(this->ordered_groups);
@@ -228,8 +228,8 @@ private:
 
 class PermissionManagedObject : public PermissionObjectBase {
 public:
-	PermissionManagedObject(boost::shared_ptr<PermissionObjectBase> parent_object, int permission_object_id)
-			: PermissionObjectBase(permission_object_id), parent_object(parent_object) {}
+	PermissionManagedObject(boost::shared_ptr<PermissionObjectBase> parent_object, int permission_object_id, DatabaseConnection* db)
+			: PermissionObjectBase(permission_object_id, db), parent_object(parent_object) {}
 	const std::vector<int>* getOrderedGroups() const {
 		return this->parent_object->getOrderedGroups();
 	}

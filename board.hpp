@@ -1,3 +1,4 @@
+#include "DatabaseConnection.hpp"
 #include "thread.hpp"
 #include <ctime>
 #include <nlohmann/json.hpp>
@@ -11,7 +12,7 @@ class websocket_session; // Forward declaration
 
 class Board : public PermissionManagedObject {
 public:
-	Board(boost::shared_ptr<PermissionObjectBase> permission_parent);
+	Board(boost::shared_ptr<PermissionObjectBase> permission_parent, DatabaseConnection* db);
 	int createThread(json thread_json);
 	int createPost(json post_json);
 	void deleteThread(int thread_id);
@@ -50,6 +51,7 @@ public:
 	void removeGroupPermissionCollectionFromThread(int group_id, int thread_id) { this->threads.at(thread_id).removeGroupPermissionCollection(group_id); }
 	void removeUserPermissionCollectionFromThread(int user_id, int thread_id) { this->threads.at(thread_id).removeUserPermissionCollection(user_id); }
 private:
+	DatabaseConnection* db;
 	std::unordered_map<int, Thread> threads;
 	// std::vector<int> ordered_threads; // O(N) access time - room for optimisation
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;

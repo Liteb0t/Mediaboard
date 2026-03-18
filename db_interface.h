@@ -1,5 +1,3 @@
-// This code is deprecated, as the DB interface will be rewritten in C++ using libpqxx
-
 #ifndef DB_INTERFACE_H
 #define DB_INTERFACE_H
 
@@ -163,7 +161,12 @@ extern "C" {
 	struct db_group_heirarchy_array* db_retrieve_group_heirarchy(void);
 	struct db_account_array* db_retrieve_accounts(void);
 	struct db_group_member_array* db_retrieve_group_members(void);
-	struct db_permission_collection_array* db_retrieve_permission_collections_for_permission_object(int permission_object_id);
+	// EXPERIMENTAL
+	void db_create_cursor_permission_collection_getter(int _permission_object_id);
+	struct db_permission_collection_struct db_retrieve_permission_collection();
+	void db_free_cursor_permission_collection_getter();
+
+	// struct db_permission_collection_array* db_retrieve_permission_collections_for_permission_object(int permission_object_id);
 	struct db_permission_setting_array* db_retrieve_permission_settings_for_permission_collection(int permission_collection_id);
 
 	void db_connect(const char* _database_name, unsigned short port);

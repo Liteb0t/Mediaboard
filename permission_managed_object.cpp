@@ -2,30 +2,22 @@
 #include "db_interface.h"
 #include <iostream>
 
-PermissionObjectBase::PermissionObjectBase(int permission_object_id)
+PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseConnection* db)
 		: permission_object_id(permission_object_id) {
-	this->cacheAllPermissions();
+	this->cacheAllPermissions(db);
 }
 
-void PermissionObjectBase::cacheAllPermissions(/*int permission_object_id*/) {
+void PermissionObjectBase::cacheAllPermissions(DatabaseConnection* db) {
 	// this->permission_object_id = permission_object_id;
 	std::cout << "[PermissionObjectBase] retrieving permissions for " << this->permission_object_id << ": ";
+	db_create_cursor_permission_collection_getter(this->permission_object_id);
+	db_permission_collection_struct testpc = db_retrieve_permission_collection();
+	std::cout << "[PermissionObjectBase] testpc ID: " << testpc.id << std::endl;
+	void db_free_cursor_permission_collection_getter();
 	// Permission Collections
+	/*
 	db_permission_collection_array* permission_collection_array = db_retrieve_permission_collections_for_permission_object(this->permission_object_id);
 	for (int i = 0; i < permission_collection_array->used; i++) {
-		/*
-		int permission_collection_id = permission_collection_array->array[i].id;
-		std::cout << permission_collection_id << ", ";
-		USER_OR_GROUP user_or_group; int user_or_group_id;
-		if (permission_collection_array->array[i].group_id > -1) {
-			user_or_group = USER_OR_GROUP::GROUP;
-			user_or_group_id = permission_collection_array->array[i].group_id;
-		}
-		else {
-			user_or_group = USER_OR_GROUP::USER;
-			user_or_group_id = permission_collection_array->array[i].account_id;
-		}
-		*/
 		PermissionCollection new_permission_collection(this->permission_object_id, &permission_collection_array->array[i]);
 		// Get permission settings
 		db_permission_setting_array* permission_settings = db_retrieve_permission_settings_for_permission_collection(permission_collection_array->array[i].id);
@@ -46,6 +38,7 @@ void PermissionObjectBase::cacheAllPermissions(/*int permission_object_id*/) {
 			this->group_permissions.emplace(permission_collection_array->array[i].group_id, new_permission_collection);
 	}
 	freePermissionCollectionArray(permission_collection_array);
+	*/
 	std::cout << "done." << std::endl;
 }
 
@@ -101,8 +94,8 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 	return permission_collections_json;
 }
 
-PermissionManager::PermissionManager(int permission_object_id)
-		: PermissionObjectBase(0) {
+PermissionManager::PermissionManager(int permission_object_id, DatabaseConnection* db)
+		: PermissionObjectBase(0, db) {
 	// Grants all permissions to the Administrators group
 	if (!permissionCollectionExistsForGroup(static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS)))
 		this->addGroupPermissionCollection(static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS));

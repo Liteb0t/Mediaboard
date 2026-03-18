@@ -1,5 +1,3 @@
-// This code is deprecated, as the DB interface will be rewritten in C++ using libpqxx
-
 #include "db_interface.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -669,6 +667,37 @@ int db_get_unique_permission_object_id() {
 	return new_permission_object_id;
 }
 
+void db_create_cursor_permission_collection_getter(int _permission_object_id) {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int permission_object_id = _permission_object_id;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL DECLARE permission_collection_getter CURSOR FOR
+	SELECT id, permission_group_id, account_id FROM permission_collection
+	WHERE permission_object_id = :permission_object_id;
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL OPEN permission_collection_getter;
+}
+
+struct db_permission_collection_struct db_retrieve_permission_collection() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int id;
+	int group_id;
+	int account_id;
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL FETCH permission_collection_getter INTO :id, :group_id, :account_id;
+	struct db_permission_collection_struct permission_collection;
+	permission_collection.id = id;
+	permission_collection.group_id = group_id;
+	permission_collection.account_id = account_id;
+	return permission_collection;
+}
+
+void db_free_cursor_permission_collection_getter() {
+	EXEC SQL CLOSE permission_collection_getter;
+	EXEC SQL COMMIT;
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+}
+/*
 struct db_permission_collection_array* db_retrieve_permission_collections_for_permission_object(int _permission_object_id) {
 	static struct db_permission_collection_array permission_collections;
 	initPermissionCollectionArray(&permission_collections, 50);
@@ -690,20 +719,6 @@ struct db_permission_collection_array* db_retrieve_permission_collections_for_pe
 		struct db_permission_collection_struct permission_collection;
 		permission_collection.id = id;
 		// permission_collection.permission_object_id = permission_object_id;
-		/*
-		if (group_id_indicator == 0) {
-			permission_collection.group_id = group_id;
-			permission_collection.account_id = -1;
-		}
-		else if (account_id_indicator == 0) {
-			permission_collection.account_id = account_id;
-			permission_collection.group_id = -1;
-		}
-		else {
-			fprintf(stderr, "Error retrieving permission collection with ID %d (both group_id and account_id are null or truncated).\n", id);
-			continue;
-		}
-		*/
 		permission_collection.group_id = group_id;
 		permission_collection.account_id = account_id;
 		insertToPermissionCollectionArray(&permission_collections, permission_collection);
@@ -713,7 +728,7 @@ struct db_permission_collection_array* db_retrieve_permission_collections_for_pe
 	EXEC SQL WHENEVER NOT FOUND CONTINUE;
 	return (&permission_collections);
 }
-
+*/
 struct db_permission_setting_array* db_retrieve_permission_settings_for_permission_collection(int _permission_collection_id) {
 	static struct db_permission_setting_array permission_settings;
 	initPermissionSettingArray(&permission_settings, 50);

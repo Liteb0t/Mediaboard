@@ -13,8 +13,8 @@ class websocket_session;
 class Thread : public PermissionManagedObject {
 public:
 	// Thread();
-	Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json thread_json, int new_permission_object_id);
-	Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, struct db_thread_struct* thread_struct);
+	Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json thread_json, int new_permission_object_id, DatabaseConnection* db);
+	Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db);
 	std::string dumpThread() const;
 	json asJson() const { return this->thread_as_json; };
 	// int getNumberOfPosts() const { return this->posts.size(); };
@@ -39,6 +39,7 @@ public:
 	int number_of_posts;
 	bool isDeleted() const { return this->deleted; }
 private:
+	DatabaseConnection* db;
 	int id;
 	std::time_t last_post_timestamp;
 	// std::vector<Post> posts;

@@ -1,14 +1,15 @@
 #include <string>
 #include <ctime>
 #include <nlohmann/json.hpp>
+#include "DatabaseConnection.hpp"
 #include "field_lengths.h"
 
 using json = nlohmann::json;
 
 class Post {
 public:
-	Post(struct db_post_struct* post_struct);
-	Post(json post_json);
+	Post(struct db_post_struct* post_struct, DatabaseConnection* db);
+	Post(json post_json, DatabaseConnection* db);
 	std::string dumpPost() const;
 	json asJson() const { return this->post_as_json; };
 	int getId() const { return this->id; };
@@ -19,6 +20,7 @@ public:
 	void markAsDeleted();
 	bool isDeleted() const { return this->deleted; }
 private:
+	DatabaseConnection* db;
 	int id;
 	int thread_id;
 	int id_in_thread;

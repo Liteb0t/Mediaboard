@@ -7,7 +7,8 @@
 #include <cstring>
 
 // Cache post from database interface struct
-Post::Post(struct db_post_struct* post_struct) {
+Post::Post(struct db_post_struct* post_struct, DatabaseConnection* db)
+		: db(db) {
 	// std::cout << "createFromStruct ID: " << post_struct->id << std::endl;
 	this->id = post_struct->id;
 	this->thread_id = post_struct->thread_id;
@@ -37,7 +38,8 @@ Post::Post(struct db_post_struct* post_struct) {
 }
 
 // Save post when JSON is received
-Post::Post(json post_json) {
+Post::Post(json post_json, DatabaseConnection* db)
+		: db(db) {
 	this->post_as_json = post_json;
 	this->post_as_json["type"] = "post";
 
