@@ -17,6 +17,7 @@ shared_state::shared_state(boost::filesystem::path parent_directory, boost::file
 		program_location(std::move(parent_directory)),
 		media_location(std::move(media_location)),
 		db(db) {
+	// this->grantDefaultAdminPrivileges();
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
@@ -27,6 +28,7 @@ void shared_state::start() {
 	this->boards.at(0).cacheAllThreads();
 	this->cacheAllGroups(db);
 	this->cacheAllUsers();
+	// this->grantDefaultAdminPrivileges();
 }
 
 void shared_state::join(websocket_session* session) {

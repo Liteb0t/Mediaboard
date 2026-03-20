@@ -80,8 +80,8 @@ extern "C" {
 		size_t size;
 	};
 	struct db_permission_collection_struct {
+		bool has_value;
 		int id;
-		// int permission_object_id;
 		int group_id;
 		int account_id;
 	};
@@ -91,8 +91,8 @@ extern "C" {
 		size_t size;
 	};
 	struct db_permission_setting_struct {
+		bool has_value;
 		int id;
-		// int permission_collection_id;
 		int permission_number;
 		int setting;
 	};
@@ -121,12 +121,6 @@ extern "C" {
 	void initGroupMemberArray(struct db_group_member_array*, size_t);
 	void insertToGroupMemberArray(struct db_group_member_array*, struct db_group_member_struct);
 	void freeGroupMemberArray(struct db_group_member_array*);
-	void initPermissionCollectionArray(struct db_permission_collection_array*, size_t);
-	void insertToPermissionCollectionArray(struct db_permission_collection_array*, struct db_permission_collection_struct);
-	void freePermissionCollectionArray(struct db_permission_collection_array*);
-	void initPermissionSettingArray(struct db_permission_setting_array*, size_t);
-	void insertToPermissionSettingArray(struct db_permission_setting_array*, struct db_permission_setting_struct);
-	void freePermissionSettingArray(struct db_permission_setting_array*);
 
 	// Database functions
 		// Posts
@@ -161,13 +155,12 @@ extern "C" {
 	struct db_group_heirarchy_array* db_retrieve_group_heirarchy(void);
 	struct db_account_array* db_retrieve_accounts(void);
 	struct db_group_member_array* db_retrieve_group_members(void);
-	// EXPERIMENTAL
-	void db_create_cursor_permission_collection_getter(int _permission_object_id);
-	struct db_permission_collection_struct db_retrieve_permission_collection();
-	void db_free_cursor_permission_collection_getter();
-
-	// struct db_permission_collection_array* db_retrieve_permission_collections_for_permission_object(int permission_object_id);
-	struct db_permission_setting_array* db_retrieve_permission_settings_for_permission_collection(int permission_collection_id);
+	void db_create_cursor_for_permission_collection(int _permission_object_id);
+	struct db_permission_collection_struct* db_cursor_retrieve_permission_collection();
+	void db_free_cursor_for_permission_collection();
+	void db_create_cursor_for_permission_setting(int _permission_object_id);
+	struct db_permission_setting_struct* db_cursor_retrieve_permission_setting();
+	void db_free_cursor_for_permission_setting();
 
 	void db_connect(const char* _database_name, unsigned short port);
 	void db_disconnect(void);

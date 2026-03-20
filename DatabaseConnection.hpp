@@ -1,9 +1,24 @@
 #pragma once
+#include "db_interface.h"
 #include <string>
-#include <iostream>
+
+enum struct USER_OR_GROUP {USER, GROUP};
 
 class DatabaseConnection {
 public:
 	virtual ~DatabaseConnection() {
 	}
+	class PermissionCollectionIterator {
+	public:
+		virtual ~PermissionCollectionIterator() {}
+		virtual db_permission_collection_struct* getValue() const = 0;
+	};
+	virtual PermissionCollectionIterator* retrievePermissionCollections(int permission_object_id) = 0;
+	virtual int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) = 0;
+	class PermissionSettingIterator {
+	public:
+		virtual ~PermissionSettingIterator() {}
+		virtual db_permission_setting_struct* getValue() const = 0;
+	};
+	virtual PermissionSettingIterator* retrievePermissionSettings(int permission_collection_id) = 0;
 };

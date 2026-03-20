@@ -32,8 +32,8 @@ bool writeMigrations(std::string parent_directory, std::string database_version,
 	file.close();
 	return false;
 v0_0_5:
-	file << "UPDATE TEST do stuff;" << std::endl;
-	file << "UPDATE TEST do MORE stuff!!!;" << std::endl;
+	file << "UPDATE permission_collection SET account_id = NULL WHERE account_id = -1;\n";
+	file << "UPDATE permission_collection SET permission_group_id = NULL WHERE permission_group_id = -1;\n";
 // v1_0:
 	std::cout << "Finished writing migrations" << std::endl;
 	file.close();

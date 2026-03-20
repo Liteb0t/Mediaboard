@@ -1,24 +1,23 @@
+#include "DatabaseConnection.hpp"
 #include "permission_setting.hpp"
 #include "db_interface.h"
 #include <iostream>
 #include <unordered_map>
 
-enum struct USER_OR_GROUP {USER, GROUP};
-
 class PermissionCollection {
 public:
-	PermissionCollection(int permission_object_id, db_permission_collection_struct* permission_collection) {
-		this->id = permission_collection->id;
-		this->group_id = permission_collection->group_id;
-		this->user_id = permission_collection->account_id;
+	PermissionCollection(int id, int user_id, int group_id)
+			: id(id),
+			user_id(user_id),
+			group_id(group_id),
+			user_or_group(user_id != -1 ? USER_OR_GROUP::USER : USER_OR_GROUP::GROUP) {
 	}
-	PermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id)
-			: permission_object_id(permission_object_id), user_or_group(user_or_group) {
-		if (this->user_or_group == USER_OR_GROUP::USER)
-			this->user_id = user_or_group_id;
-		else
-			this->group_id = user_or_group_id;
-		this->id = db_store_permission_collection(this->permission_object_id, this->user_id, this->group_id);
+	PermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id, DatabaseConnection* db)
+			: user_or_group(user_or_group),
+			user_id(user_or_group == USER_OR_GROUP::USER ? user_or_group_id : -1),
+			group_id(user_or_group == USER_OR_GROUP::GROUP ? user_or_group_id : -1),
+			id(db->storePermissionCollection(permission_object_id, user_or_group, user_or_group_id)) {
+		// this->id = db_store_permission_collection(permission_object_id, this->user_id, this->group_id);
 	}
 	void removeFromDatabase() {
 		db_delete_permission_collection(this->id);
@@ -56,12 +55,13 @@ public:
 	const std::unordered_map<PERMISSION, PermissionSetting>* getPermissionMap() const {
 		return &(this->permission_map);
 	}
+	const USER_OR_GROUP getUserOrGroupEnumValue() const { return this->user_or_group; }
 
 private:
-	int id;
-	int permission_object_id;
-	USER_OR_GROUP user_or_group;
-	int user_id = -1;
-	int group_id = -1;
+	const int id;
+	// int permission_object_id;
+	const USER_OR_GROUP user_or_group;
+	const int user_id;
+	const int group_id;
 	std::unordered_map<PERMISSION, PermissionSetting> permission_map;
 };

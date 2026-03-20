@@ -143,50 +143,6 @@ void freeGroupMemberArray(struct db_group_member_array* a) {
 	a->used = a->size = 0;
 }
 
-void initPermissionCollectionArray(struct db_permission_collection_array* a, size_t initialSize) {
-	a->array = malloc(initialSize * sizeof(struct db_permission_collection_struct));
-	a->used = 0;
-	a->size = initialSize;
-}
-
-void insertToPermissionCollectionArray(struct db_permission_collection_array* a, struct db_permission_collection_struct element) {
-	// a->used is the number of used entries, because a->array[a->used++] updates a->used only *after* the array has been accessed.
-	// Therefore a->used can go up to a->size
-	if (a->used == a->size) {
-		a->size *= 2;
-		a->array = realloc(a->array, a->size * sizeof(struct db_permission_collection_struct));
-	}
-	a->array[a->used++] = element;
-}
-
-void freePermissionCollectionArray(struct db_permission_collection_array* a) {
-	free(a->array);
-	a->array = NULL;
-	a->used = a->size = 0;
-}
-
-void initPermissionSettingArray(struct db_permission_setting_array* a, size_t initialSize) {
-	a->array = malloc(initialSize * sizeof(struct db_permission_setting_struct));
-	a->used = 0;
-	a->size = initialSize;
-}
-
-void insertToPermissionSettingArray(struct db_permission_setting_array* a, struct db_permission_setting_struct element) {
-	// a->used is the number of used entries, because a->array[a->used++] updates a->used only *after* the array has been accessed.
-	// Therefore a->used can go up to a->size
-	if (a->used == a->size) {
-		a->size *= 2;
-		a->array = realloc(a->array, a->size * sizeof(struct db_permission_setting_struct));
-	}
-	a->array[a->used++] = element;
-}
-
-void freePermissionSettingArray(struct db_permission_setting_array* a) {
-	free(a->array);
-	a->array = NULL;
-	a->used = a->size = 0;
-}
-
 void db_connect(const char* _database_name, unsigned short port) {
 	char _connection_target[256];
 	sprintf(_connection_target, "%s@%s:%d", _database_name, "localhost", port);
@@ -667,103 +623,95 @@ int db_get_unique_permission_object_id() {
 	return new_permission_object_id;
 }
 
-void db_create_cursor_permission_collection_getter(int _permission_object_id) {
+void db_create_cursor_for_permission_collection(int _permission_object_id) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int permission_object_id = _permission_object_id;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL DECLARE permission_collection_getter CURSOR FOR
 	SELECT id, permission_group_id, account_id FROM permission_collection
 	WHERE permission_object_id = :permission_object_id;
-	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
 	EXEC SQL OPEN permission_collection_getter;
 }
 
-struct db_permission_collection_struct db_retrieve_permission_collection() {
+struct db_permission_collection_struct* db_cursor_retrieve_permission_collection() {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int id;
-	int group_id;
-	int account_id;
+	int group_id;	int group_id_indicator;
+	int account_id;	int account_id_indicator;
 	EXEC SQL END DECLARE SECTION;
-	EXEC SQL FETCH permission_collection_getter INTO :id, :group_id, :account_id;
-	struct db_permission_collection_struct permission_collection;
-	permission_collection.id = id;
-	permission_collection.group_id = group_id;
-	permission_collection.account_id = account_id;
-	return permission_collection;
-}
-
-void db_free_cursor_permission_collection_getter() {
-	EXEC SQL CLOSE permission_collection_getter;
-	EXEC SQL COMMIT;
-	EXEC SQL WHENEVER NOT FOUND CONTINUE;
-}
-/*
-struct db_permission_collection_array* db_retrieve_permission_collections_for_permission_object(int _permission_object_id) {
-	static struct db_permission_collection_array permission_collections;
-	initPermissionCollectionArray(&permission_collections, 50);
-	EXEC SQL BEGIN DECLARE SECTION;
-	int id;
-	int permission_object_id = _permission_object_id;
-	int group_id;
-	// int group_id_indicator;
-	int account_id;
-	// int account_id_indicator;
-	EXEC SQL END DECLARE SECTION;
-	EXEC SQL DECLARE permission_collection_getter CURSOR FOR
-		SELECT id, permission_group_id, account_id FROM permission_collection
-		WHERE permission_object_id = :permission_object_id;
-	EXEC SQL OPEN permission_collection_getter;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `permission_collection_getter` has retreived all groups
+	static struct db_permission_collection_struct permission_collection;
 	while (true) {
-		EXEC SQL FETCH permission_collection_getter INTO :id, :group_id, :account_id;
-		struct db_permission_collection_struct permission_collection;
-		permission_collection.id = id;
-		// permission_collection.permission_object_id = permission_object_id;
-		permission_collection.group_id = group_id;
-		permission_collection.account_id = account_id;
-		insertToPermissionCollectionArray(&permission_collections, permission_collection);
+		EXEC SQL FETCH permission_collection_getter INTO :id, :group_id INDICATOR :group_id_indicator, :account_id INDICATOR :account_id_indicator;
+		goto db_cursor_retrieve_permission_collection_not_null;
 	}
-	EXEC SQL CLOSE permission_collection_getter;
-	EXEC SQL COMMIT;
-	EXEC SQL WHENEVER NOT FOUND CONTINUE;
-	return (&permission_collections);
+	permission_collection.has_value = false;
+	return &permission_collection;
+db_cursor_retrieve_permission_collection_not_null:
+	permission_collection.has_value = true;
+	permission_collection.id = id;
+	if (group_id_indicator > -1)
+		permission_collection.group_id = group_id;
+	else
+		permission_collection.group_id = -1;
+	if (account_id_indicator > -1)
+		permission_collection.account_id = account_id;
+	else
+		permission_collection.account_id = -1;
+	return &permission_collection;
 }
-*/
-struct db_permission_setting_array* db_retrieve_permission_settings_for_permission_collection(int _permission_collection_id) {
+
+void db_free_cursor_for_permission_collection() {
+	EXEC SQL CLOSE permission_collection_getter;
+	// EXEC SQL COMMIT;
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+}
+
+void db_create_cursor_for_permission_setting(int _permission_collection_id) {
 	static struct db_permission_setting_array permission_settings;
-	initPermissionSettingArray(&permission_settings, 50);
 	EXEC SQL BEGIN DECLARE SECTION;
-	int id;
 	int permission_collection_id = _permission_collection_id;
-	int permission_number;
-	int setting;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL DECLARE permission_setting_getter CURSOR FOR
 		SELECT id, permission_number, setting FROM permission_setting
 		WHERE permission_collection_id = :permission_collection_id;
 	EXEC SQL OPEN permission_setting_getter;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `permission_setting_getter` has retreived all groups
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+}
+
+struct db_permission_setting_struct* db_cursor_retrieve_permission_setting() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int id;
+	int permission_number;
+	int setting;
+	EXEC SQL END DECLARE SECTION;
+	static struct db_permission_setting_struct permission_setting;
 	while (true) {
 		EXEC SQL FETCH permission_setting_getter INTO :id, :permission_number, :setting;
-		struct db_permission_setting_struct permission_setting;
-		permission_setting.id = id;
-		// permission_setting.permission_collection_id = permission_collection_id;
-		permission_setting.permission_number = permission_number;
-		permission_setting.setting = setting;
-		insertToPermissionSettingArray(&permission_settings, permission_setting);
+		goto db_cursor_retrieve_permission_setting_not_null;
 	}
+	permission_setting.has_value = false;
+	return &permission_setting;
+db_cursor_retrieve_permission_setting_not_null:
+	permission_setting.has_value = true;
+	permission_setting.id = id;
+	permission_setting.permission_number = permission_number;
+	permission_setting.setting = setting;
+	return &permission_setting;
+}
+
+void db_free_cursor_for_permission_setting() {
 	EXEC SQL CLOSE permission_setting_getter;
-	EXEC SQL COMMIT;
+	// EXEC SQL COMMIT;
 	EXEC SQL WHENEVER NOT FOUND CONTINUE;
-	return (&permission_settings);
 }
 
 int db_store_permission_collection(int _permission_object_id, int _user_id, int _group_id) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int new_permission_collection_id;
 	int permission_object_id = _permission_object_id;
-	int user_id = _user_id; 	int user_id_indicator = user_id > -1;
-	int group_id = _group_id; 	int group_id_indicator = group_id > -1;
+	int user_id = _user_id; 	int user_id_indicator = (user_id < -1) - 1;  // If id is -1 then the indicator will also be -1, meaning a NULL is inserted
+	int group_id = _group_id; 	int group_id_indicator = (group_id < -1) - 1;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL SELECT nextval('permission_collection_id_seq') INTO :new_permission_collection_id;
 	EXEC SQL INSERT INTO permission_collection(id, permission_object_id, account_id, permission_group_id) VALUES (:new_permission_collection_id, :permission_object_id, :user_id INDICATOR :user_id_indicator, :group_id INDICATOR :group_id_indicator);

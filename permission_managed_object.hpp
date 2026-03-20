@@ -16,15 +16,15 @@ enum class BUILTIN_GROUPS { ADMINISTRATORS, USERS, PUBLIC };
 class PermissionObjectBase : public boost::enable_shared_from_this<PermissionObjectBase> {
 public:
 	PermissionObjectBase(int permission_object_id, DatabaseConnection* db);
-	void cacheAllPermissions(DatabaseConnection* db);
+	void cacheAllPermissions();
 	void addGroupPermissionCollection(int group_id) {
 		std::cout << "[PermissionObjectBase] adding group permission_collection for group" << group_id << std::endl;
-		PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::GROUP, group_id);
+		PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::GROUP, group_id, db);
 		this->group_permissions.emplace(group_id, permission_collection);
 	}
 	void addUserPermissionCollection(int user_id) {
 		std::cout << "[PermissionObjectBase] adding user permission_collection for user" << user_id << std::endl;
-		PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::USER, user_id);
+		PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::USER, user_id, db);
 		this->user_permissions.emplace(user_id, permission_collection);
 	}
 	void removeGroupPermissionCollection(int group_id) {
@@ -103,6 +103,7 @@ public:
 protected:
 	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
 private:
+	DatabaseConnection* db;
 	int permission_object_id; // Used to identify this object in the database
 	std::unordered_map<int, PermissionCollection> group_permissions;
 	std::unordered_map<int, PermissionCollection> user_permissions;
@@ -111,7 +112,7 @@ private:
 class PermissionManager : public PermissionObjectBase {
 public:
 	PermissionManager(int permission_object_id, DatabaseConnection* db);
-
+	void grantDefaultAdminPrivileges();
 	const std::vector<int>* getOrderedGroups() const {
 		return &(this->ordered_groups);
 	}
