@@ -21,7 +21,7 @@ void PermissionObjectBase::cacheAllPermissions() {
 		PermissionCollection new_permission_collection(permission_collection->id, permission_collection->account_id, permission_collection->group_id);
 
 		// Add settings, if any
-		DatabaseConnection::PermissionSettingIterator* permission_setting_it = db->retrievePermissionSettings(permission_collection->id);delete permission_setting_it;
+		DatabaseConnection::PermissionSettingIterator* permission_setting_it = db->retrievePermissionSettings(permission_collection->id);
 		while (true) {
 			db_permission_setting_struct* permission_setting = permission_setting_it->getValue();
 			if (!permission_setting->has_value) {
@@ -94,14 +94,17 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 
 PermissionManager::PermissionManager(int permission_object_id, DatabaseConnection* db)
 		: PermissionObjectBase(0, db) {
+	this->cacheAllGroups();
+	this->cacheAllUsers();
+	this->grantDefaultAdminPrivileges();
 }
 
 // Grants all permissions to the Administrators group
 void PermissionManager::grantDefaultAdminPrivileges() {
-	if (!permissionCollectionExistsForGroup(static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS)))
-		this->addGroupPermissionCollection(static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS));
+	std::cout << "[PermissionManager] grantDefaultAdminPrivileges()" << std::endl;
 	for (int permission_number = 0; permission_number < static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS); permission_number++) {
-		this->setGroupPermission(0, static_cast<PERMISSION>(permission_number), THREE_STATE_SETTING::ALLOW);
+		if (!this->passPermissionForGroup(false, static_cast<PERMISSION>(permission_number), static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS)))
+			this->setGroupPermission(0, static_cast<PERMISSION>(permission_number), THREE_STATE_SETTING::ALLOW);
 	}
 }
 
@@ -118,7 +121,7 @@ void PermissionManager::cacheAllUsers() {
 	freeAccountArray(account_array);
 }
 
-void PermissionManager::cacheAllGroups(DatabaseConnection* db) {
+void PermissionManager::cacheAllGroups() {
 	std::cout << "[PermissionManager] Retreiving groups from database... ";
 	// Refactor DB interface code like so:
 	// for (auto [group_id, group_name] : db->getGroups())

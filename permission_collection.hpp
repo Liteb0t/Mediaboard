@@ -11,13 +11,15 @@ public:
 			user_id(user_id),
 			group_id(group_id),
 			user_or_group(user_id != -1 ? USER_OR_GROUP::USER : USER_OR_GROUP::GROUP) {
+		std::cout << "Caching permission collection with user_id " << user_id << " and group_id " << group_id << std::endl;
 	}
 	PermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id, DatabaseConnection* db)
 			: user_or_group(user_or_group),
 			user_id(user_or_group == USER_OR_GROUP::USER ? user_or_group_id : -1),
 			group_id(user_or_group == USER_OR_GROUP::GROUP ? user_or_group_id : -1),
 			id(db->storePermissionCollection(permission_object_id, user_or_group, user_or_group_id)) {
-		// this->id = db_store_permission_collection(permission_object_id, this->user_id, this->group_id);
+				// this->id = db_store_permission_collection(permission_object_id, this->user_id, this->group_id);
+		std::cout << "Storing permission collection with user_id " << user_id << " and group_id " << group_id << std::endl;
 	}
 	void removeFromDatabase() {
 		db_delete_permission_collection(this->id);

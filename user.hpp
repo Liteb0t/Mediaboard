@@ -3,7 +3,7 @@
 
 enum BUILTIN_USERS {
 	PUBLIC = 0,
-	ADMINISTRATOR = 1
+	OWNER = 1
 };
 
 class User {

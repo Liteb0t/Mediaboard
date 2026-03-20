@@ -11,7 +11,8 @@
 */
 //------------------------------------------------------------------------------
 
-#include "DatabaseConnectionPostgres.hpp"
+#include "DatabaseConnectionPostgreSQL.hpp"
+#include "DatabaseConnectionSQLite.hpp"
 #include "listener.hpp"
 #include "migrations.hpp"
 #include "shared_state.hpp"
@@ -22,6 +23,7 @@
 #include <boost/program_options.hpp>
 #include <boost/smart_ptr.hpp>
 #include <Magick++.h>
+#include <cstdlib>
 #include <format>
 #include <fstream>
 #include <iostream>
@@ -35,14 +37,13 @@ int main(int argc, char* argv[]) {
 
 	// Check command line arguments.
 	std::string config_file;
-	unsigned short port, database_port;
-	std::string admin_password, media_location_relative_str, database_name, database_host;
+	unsigned short port;
+	std::string admin_password, media_location_relative_str, database_engine, postgresql_target;
 	int threads;
-	bool manage_cluster;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
 		("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
-		// ("initdb,i", "Initialise the Postgres database")
+		// ("initdb,i", "Initialise the PostgreSQL database")
 		("config,c", boost::program_options::value<std::string>(&config_file)->default_value("config.ini"), "location of configuration file.")
 		("version,v", "Show version string.")
 		("help,h", "Show list of options.");
@@ -50,10 +51,8 @@ int main(int argc, char* argv[]) {
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
-		("database,d", boost::program_options::value<std::string>(&database_name)->default_value("fuze_mediaboard"),  "Name of the postgresql database.")
-		("database_host,h", boost::program_options::value<std::string>(&database_host)->default_value("localhost"),  "Address of where the DB is hosted.")
-		("database_port,P", boost::program_options::value<unsigned short>(&database_port)->default_value(5400),  "The port which the database serves.")
-		("manage_cluster,c", boost::program_options::value<bool>(&manage_cluster)->default_value(true), "Whether the database will be managed by Fuze Mediaboard.")
+		("database_engine,d", boost::program_options::value<std::string>(&database_engine)->default_value("sqlite"), "Choices are \"postgres\" and \"sqlite\". The latter is recommended for beginners.")
+		("postgresql_target,t", boost::program_options::value<std::string>(&postgresql_target)->default_value("fuze_mediaboard@localhost:5432"),  "Connection string for the PostgreSQL database.")
 		("media_path,m", boost::program_options::value<std::string>(&media_location_relative_str)->default_value("."),  "File path where user-submitted media is stored.")
 		("port,p", boost::program_options::value<unsigned short>(&port)->default_value(8300), "The port which the server will serve. Make sure it isn't in use by another service.")
 		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.");
@@ -82,10 +81,10 @@ int main(int argc, char* argv[]) {
 		notify(variable_map);
 	}
 	else {
-		std::cout << "Could not open config file: " << config_file << std::endl;
+		std::cout << "Could not open config file: " << config_file << ". Default options will be used." << std::endl;
 	}
 
-	bool make_migrations, first_time_setup;
+	bool make_migrations;
 	// Get the path to this program, so files can be read/written relative to the executable
 	std::error_code ec;
 	boost::filesystem::path location = boost::dll::program_location(ec);
@@ -98,16 +97,10 @@ int main(int argc, char* argv[]) {
 	}
 	 // First time setup
 	if (!boost::filesystem::exists(parent_directory + "/database/MEDIABOARD_VERSION")) {
-		first_time_setup = true;
 		make_migrations = false;
 		writeDatabaseVersionFile(parent_directory, current_version);
-		if (manage_cluster) {
-			std::cout << "Performing first-time database setup..." << std::endl;
-			std::system(std::format("initdb -D {}/database/cluster", parent_directory).c_str());
-		}
 	}
 	else { // Not first time setup - the software may be out of sync with the database
-		first_time_setup = false;
 		boost::optional<std::string> database_version_string = getExistingDatabaseVersion(parent_directory);
 		if (database_version_string) {
 			std::cout << "Found database version: " << database_version_string.value() << std::endl;
@@ -126,41 +119,21 @@ int main(int argc, char* argv[]) {
 			make_migrations = false;
 		}
 	}
-	if (manage_cluster) {
-		// TODO remove after DB interface is rewritten in C++
-		std::system(std::format("pg_ctl -D {}/database/cluster stop", parent_directory, database_port).c_str());
 
-		std::cout << "Starting database..." << std::endl;
-		std::cout << std::format("pg_ctl -D {}/database/cluster -o \"-p {}\" -l {}/database/log.txt start", parent_directory, database_port, parent_directory) << std::endl;
-		int ret = std::system(std::format("pg_ctl -D {}/database/cluster -o \"-p {}\" -l {}/database/log.txt start", parent_directory, database_port, parent_directory).c_str());
-		if (ret) // The database could not be started, so terminate the program
-			return ret;
+	DatabaseConnection* database_connection;
+	if (database_engine.starts_with("postgres"))
+		database_connection = new DatabaseConnectionPostgreSQL(postgresql_target);
+	else if (database_engine.starts_with("sqlite"))
+		database_connection = new DatabaseConnectionSQLite(std::format("{}/database/sqlite_data.db", parent_directory));
+	else {
+		std::cerr << "Error: unknown database engine \"" << database_engine << "\". Must be \"postgres\" or \"sqlite\"." << std::endl;
+		return EXIT_FAILURE;
 	}
-	if (first_time_setup) {
-		if (manage_cluster) {
-			std::system(std::format("createuser --host={} --port={} mediaboard_server", database_host, database_port).c_str());
-			std::system(std::format("createdb --host={} --port={} fuze_mediaboard", database_host, database_port).c_str());
-		}
-		std::system(std::format("psql --host={} --port={} {} -f {}/database_template.sql", database_host, database_port, database_name, parent_directory).c_str());
-		std::system(std::format("psql --host={} --port={} {} -f {}/default_groups.sql", database_host, database_port, database_name, parent_directory).c_str());
-	}
-	if (make_migrations) {
-		std::cout << "Migrating database..." << std::endl;
-		std::system(std::format("psql --host={} --port={} {} -f {}/database/migrations.sql", database_host, database_port, database_name, parent_directory).c_str());
-		std::cout << "Finished migrating database." << std::endl;
-	}
-	// Establish database connection
-	DatabaseConnection* database_connection = new DatabaseConnectionPostgres(std::string(""), database_name.c_str(), database_port);
 
 	if (variable_map.count("create_administrator")) {
 		db_create_administrator(admin_password.c_str());
 		std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
 		delete database_connection;
-
-		if (manage_cluster) {
-			std::cout << "Stopping database..." << std::endl;
-			std::system(std::format("pg_ctl -D {}/database/cluster stop", parent_directory, database_port).c_str());
-		}
 		return 0;
 	}
 	std::cout << "Set port: " << port << std::endl;
@@ -231,13 +204,8 @@ int main(int argc, char* argv[]) {
 	for(auto& t : v)
 		t.join();
 
-	std::cout << "Disconnecting from the database..." << std::endl;
+	std::cout << "All thread(s) exited." << std::endl;
 	delete database_connection;
-
-	if (manage_cluster) {
-		std::cout << "Stopping database..." << std::endl;
-		std::system(std::format("pg_ctl -D {}/database/cluster stop", parent_directory, database_port).c_str());
-	}
 
 	return EXIT_SUCCESS;
 }

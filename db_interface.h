@@ -85,24 +85,14 @@ extern "C" {
 		int group_id;
 		int account_id;
 	};
-	struct db_permission_collection_array {
-		struct db_permission_collection_struct* array;
-		size_t used;
-		size_t size;
-	};
 	struct db_permission_setting_struct {
 		bool has_value;
 		int id;
 		int permission_number;
 		int setting;
 	};
-	struct db_permission_setting_array {
-		struct db_permission_setting_struct* array;
-		size_t used;
-		size_t size;
-	};
 
-	// Dynamic array functions
+	// Dynamic array functions - to be refactored away
 	void initPostArray(struct db_post_array*, size_t);
 	void insertToPostArray(struct db_post_array*, struct db_post_struct);
 	void freePostArray(struct db_post_array*);
@@ -162,7 +152,7 @@ extern "C" {
 	struct db_permission_setting_struct* db_cursor_retrieve_permission_setting();
 	void db_free_cursor_for_permission_setting();
 
-	void db_connect(const char* _database_name, unsigned short port);
+	void db_connect(const char* _connection_target);
 	void db_disconnect(void);
 #ifdef __cplusplus
 }

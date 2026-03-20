@@ -12,30 +12,42 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Required on FreeBSD
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd to use
 
+# Find dependencies sneeded by the project
+cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
 find_package(Boost 1.88 COMPONENTS filesystem program_options REQUIRED)
-find_package(nlohmann_json REQUIRED)
+
 find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
 add_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
 add_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
 include_directories(${ImageMagick_INCLUDE_DIRS})
+
+find_package(nlohmann_json REQUIRED) # maybe replace with boost::json later
+
 find_package(PostgreSQL REQUIRED)
 find_library(ECPG_LIB ecpg)
 include_directories (${PostgreSQL_INCLUDE_DIRS})
 link_directories(${PostgreSQL_LIBRARY_DIRS})
+
+find_package(SQLite3) # CMake >= 4.3
+if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
+  add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+endif()
 
 add_executable(MediaboardServer)
 target_link_libraries(MediaboardServer
   PRIVATE
     Boost::filesystem
     Boost::program_options
-    nlohmann_json::nlohmann_json
     ${ImageMagick_LIBRARIES}
+    nlohmann_json::nlohmann_json
     ${ECPG_LIB}
+    SQLite3::SQLite3
 )
 target_sources(MediaboardServer
   PRIVATE
     board.cpp
-    DatabaseConnectionPostgres.cpp
+    DatabaseConnectionPostgreSQL.cpp
+    DatabaseConnectionSQLite.cpp
     db_interface.c
     group.cpp
     http_session.cpp

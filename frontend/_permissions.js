@@ -204,8 +204,8 @@ class ManageGroupsGroupList extends GroupList {
 		let previous_group_not_editable;
 		this.groups_json = groups_json;
 		console.log(groups_json);
-		for (let rank = 0; rank < groups_json["group_heirarchy"].length; rank++) {
-			let group_id = groups_json["group_heirarchy"][rank];
+		for (let rank = 1; rank <= groups_json["group_heirarchy"].length; rank++) {
+			let group_id = groups_json["group_heirarchy"][rank-1];
 			let group_json = groups_json["groups"][group_id];
 			// console.log(group_json);
 			// TODO do not make new Group objects unnecessarily
@@ -216,10 +216,12 @@ class ManageGroupsGroupList extends GroupList {
 				new_group.element.style["display"] = "none";
 			}
 			else {
+				// heirarchy_editable groups enable up/down buttons by default.
 				if (group_json.heirarchy_editable && previous_group_not_editable) {
 					new_group.up_button.disabled = true;
 				}
-				if (group_json.heirarchy_editable && rank === groups_json["group_heirarchy"].length - 3) {
+				// can't move down the final visible group in the list
+				if (group_json.heirarchy_editable && rank === groups_json["group_heirarchy"].length - 2) {
 					new_group.down_button.disabled = true;
 				}
 			}
@@ -503,8 +505,8 @@ class PermissionSettingsGroupList extends GroupList {
 		const fragment = new DocumentFragment();
 		let previous_group_not_editable;
 		this.groups_json = groups_json;
-		for (let rank = 0; rank < groups_json["group_heirarchy"].length; rank++) {
-			let group_id = groups_json["group_heirarchy"][rank];
+		for (let rank = 1; rank <= groups_json["group_heirarchy"].length; rank++) {
+			let group_id = groups_json["group_heirarchy"][rank-1];
 			let group_json = groups_json["groups"][group_id];
 			console.log(group_id);
 			console.log(group_json);
@@ -598,8 +600,8 @@ class PermissionSettingsAddGroupGroupList extends GroupList {
 		const fragment = new DocumentFragment();
 		let previous_group_not_editable;
 		this.groups_json = groups_json;
-		for (let rank = 0; rank < groups_json["group_heirarchy"].length; rank++) {
-			let group_id = groups_json["group_heirarchy"][rank];
+		for (let rank = 1; rank <= groups_json["group_heirarchy"].length; rank++) {
+			let group_id = groups_json["group_heirarchy"][rank-1];
 			let group_json = groups_json["groups"][group_id];
 			console.log(group_id);
 			console.log(group_json);

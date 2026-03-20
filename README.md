@@ -53,7 +53,7 @@ Then to build:\
 `sh build.sh`\
 `cd build`\
 `ninja`
-### Postgres setup
+### PostgreSQL setup
 #### Create the cluster
 *This may be skipped on certain Linux distros such as Debian. Check if the server is already running with `systemctl status postgresql` or `service postgresql status`*
 `initdb -D /var/db/postgres/18/main/`\
@@ -73,7 +73,7 @@ To import the database template, go back to your user account and run:\
 Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it at the top of the table so that it won't be overridden by other settings:\
 `local   fuze_mediaboard mediaboard_server                       password`\
 \
-`mediaboard_server` is the Postgres user which interacts with the database named `fuze_mediaboard`.\
+`mediaboard_server` is the PostgreSQL user which interacts with the database named `fuze_mediaboard`.\
 Set the environment variable `FUZE_MEDIABOARD_PASSWORD` with the same password used in the CREATE_USER statement earlier. Open a new terminal window or reboot your system to apply the change.
 ### Administrator account
 The administrator is able to delete posts from any user. To create the administrator account:\

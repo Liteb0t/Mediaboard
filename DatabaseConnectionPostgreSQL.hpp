@@ -1,13 +1,16 @@
 #include "DatabaseConnection.hpp"
 
-class DatabaseConnectionPostgres : public DatabaseConnection {
+class DatabaseConnectionPostgreSQL : public DatabaseConnection {
 public:
-	DatabaseConnectionPostgres(std::string connection_string, std::string database_name, unsigned short port);
-	~DatabaseConnectionPostgres() override {
-		db_disconnect();
-	}
+	DatabaseConnectionPostgreSQL(std::string connection_target);
+	~DatabaseConnectionPostgreSQL();
+
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
 
+	PermissionSettingIterator* retrievePermissionSettings(int permission_collection_id) override {
+		return new PermissionSettingIteratorECPG(permission_collection_id);
+	}
+private:
 	class PermissionCollectionIteratorECPG : public DatabaseConnection::PermissionCollectionIterator {
 	public:
 		PermissionCollectionIteratorECPG(int permission_object_id) {
@@ -31,7 +34,4 @@ public:
 		}
 		db_permission_setting_struct* getValue() const override { return db_cursor_retrieve_permission_setting(); }
 	};
-	PermissionSettingIterator* retrievePermissionSettings(int permission_collection_id) override {
-		return new PermissionSettingIteratorECPG(permission_collection_id);
-	}
 };

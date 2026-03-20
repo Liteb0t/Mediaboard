@@ -18,12 +18,12 @@ public:
 	PermissionObjectBase(int permission_object_id, DatabaseConnection* db);
 	void cacheAllPermissions();
 	void addGroupPermissionCollection(int group_id) {
-		std::cout << "[PermissionObjectBase] adding group permission_collection for group" << group_id << std::endl;
+		std::cout << "[PermissionObjectBase] adding group permission_collection for group " << group_id << std::endl;
 		PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::GROUP, group_id, db);
 		this->group_permissions.emplace(group_id, permission_collection);
 	}
 	void addUserPermissionCollection(int user_id) {
-		std::cout << "[PermissionObjectBase] adding user permission_collection for user" << user_id << std::endl;
+		std::cout << "[PermissionObjectBase] adding user permission_collection for user " << user_id << std::endl;
 		PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::USER, user_id, db);
 		this->user_permissions.emplace(user_id, permission_collection);
 	}
@@ -130,16 +130,16 @@ public:
 		return it != this->groups.end();
 	}
 	int getUserRank(int user_id) const {
-		if (user_id == static_cast<int>(BUILTIN_USERS::ADMINISTRATOR))
-			return 0;
+		if (user_id == static_cast<int>(BUILTIN_USERS::OWNER))
+			return 0; // This is the most privileged rank
 		else if (user_id == static_cast<int>(BUILTIN_USERS::PUBLIC))
-			return this->ordered_groups.size() - 1;
+			return this->ordered_groups.size(); // This is the least privileged rank
 		int i;
-		for (i = 0; i < this->ordered_groups.size() - 2; i++) {
+		for (i = 0; i < this->ordered_groups.size() - 2; i++) { // 2 is subtracted because USERS and PUBLIC are hard-coded groups
 			if (this->groups.at(ordered_groups[i]).containsMember(user_id))
 				break;
 		}
-		return i;
+		return i + 1; // 1 is added because the ADMINISTRATORS group is one rank below OWNER
 	}
 	int getIdFromUsername(std::string username) const {
 		return this->username_to_id_map.at(username);
@@ -158,7 +158,7 @@ public:
 		int rank;
 		for (rank = 0; this->ordered_groups[rank] != group_id; rank++)
 			;
-		return rank;
+		return rank + 1; // 1 is added because the ADMINISTRATORS group is one rank below OWNER
 	}
 	void eraseGroup(int group_id) {
 		std::vector<int>::const_iterator it = std::find(this->ordered_groups.begin(), this->ordered_groups.end(), group_id);
@@ -212,7 +212,7 @@ protected:
 		// this->groups.at(static_cast<int>(BUILTIN_GROUPS::USERS)).addMember(new_user.getId());
 		return &(this->users.at(new_user.getId()));
 	}
-	void cacheAllGroups(DatabaseConnection* db);
+	void cacheAllGroups();
 	void cacheAllUsers();
 
 	void setOrderedGroups(std::vector<int> ordered_groups) {

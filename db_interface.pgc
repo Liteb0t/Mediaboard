@@ -143,11 +143,9 @@ void freeGroupMemberArray(struct db_group_member_array* a) {
 	a->used = a->size = 0;
 }
 
-void db_connect(const char* _database_name, unsigned short port) {
-	char _connection_target[256];
-	sprintf(_connection_target, "%s@%s:%d", _database_name, "localhost", port);
+void db_connect(const char* _connection_target) {
 	EXEC SQL BEGIN DECLARE SECTION;
-	const char* database_name = _database_name;
+	const char* connection_target = _connection_target;
 	const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts, permission_object_id) VALUES (?, 0, ?);";
@@ -157,17 +155,16 @@ void db_connect(const char* _database_name, unsigned short port) {
 	const char* create_permission_group_stmt = "INSERT INTO permission_group(id, name) VALUES (?, ?)";
 	const char* add_administrator_account_stmt = "INSERT INTO account(id, username, password_hash, key, administrator) VALUES (1, 'Administrator', ?, ?, 't');";
 	// char connection_target[256];
-	const char* connection_target = _connection_target;
 	EXEC SQL END DECLARE SECTION;
-	printf("connection_target: %s\n", connection_target);
 	if (password)
 		printf("Found environment variable \"%s\"\n", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	else {
 		fprintf(stderr, "Could not find environment variable \"%s\" required for the database connection password. Exiting.\n", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 		exit(2);
 	}
-	EXEC SQL CONNECT TO :database_name USER "mediaboard_server" USING :password;
-	printf("Connected!\n");
+	printf("Connecting to PostgreSQL database at %s", connection_target);
+	EXEC SQL CONNECT TO :connection_target USER "mediaboard_server" USING :password;
+	printf(" - Success\n");
 	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;
 	EXEC SQL PREPARE mark_post_as_deleted_stmt FROM :mark_post_as_deleted_prepared_stmt;
@@ -437,7 +434,7 @@ struct db_post_array* db_retrieve_history() {
 				break;
 		}
 		post.number_of_files = file_i;
-		post.deleted = deleted == 't'; // In Postgres 't' means true
+		post.deleted = deleted == 't'; // In PostgreSQL 't' means true
 		strcpy(post.key, key);
 		insertToPostArray(&post_history, post);
 	}
@@ -663,12 +660,11 @@ db_cursor_retrieve_permission_collection_not_null:
 
 void db_free_cursor_for_permission_collection() {
 	EXEC SQL CLOSE permission_collection_getter;
-	// EXEC SQL COMMIT;
+	EXEC SQL COMMIT;
 	EXEC SQL WHENEVER NOT FOUND CONTINUE;
 }
 
 void db_create_cursor_for_permission_setting(int _permission_collection_id) {
-	static struct db_permission_setting_array permission_settings;
 	EXEC SQL BEGIN DECLARE SECTION;
 	int permission_collection_id = _permission_collection_id;
 	EXEC SQL END DECLARE SECTION;
@@ -710,8 +706,8 @@ int db_store_permission_collection(int _permission_object_id, int _user_id, int 
 	EXEC SQL BEGIN DECLARE SECTION;
 	int new_permission_collection_id;
 	int permission_object_id = _permission_object_id;
-	int user_id = _user_id; 	int user_id_indicator = (user_id < -1) - 1;  // If id is -1 then the indicator will also be -1, meaning a NULL is inserted
-	int group_id = _group_id; 	int group_id_indicator = (group_id < -1) - 1;
+	int user_id = _user_id; 	int user_id_indicator = (user_id > -1) - 1;  // If id is -1 then the indicator will also be -1, meaning a NULL is inserted
+	int group_id = _group_id; 	int group_id_indicator = (group_id > -1) - 1;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL SELECT nextval('permission_collection_id_seq') INTO :new_permission_collection_id;
 	EXEC SQL INSERT INTO permission_collection(id, permission_object_id, account_id, permission_group_id) VALUES (:new_permission_collection_id, :permission_object_id, :user_id INDICATOR :user_id_indicator, :group_id INDICATOR :group_id_indicator);
@@ -723,7 +719,6 @@ void db_delete_permission_collection(int _permission_collection_id) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int permission_collection_id = _permission_collection_id;
 	EXEC SQL END DECLARE SECTION;
-	printf("deleting permission_collection %d`n", permission_collection_id);
 	EXEC SQL DELETE FROM permission_setting WHERE permission_collection_id = :permission_collection_id;
 	EXEC SQL DELETE FROM permission_collection WHERE id = :permission_collection_id;
 	EXEC SQL COMMIT;
