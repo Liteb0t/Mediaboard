@@ -6,9 +6,12 @@ class DatabaseConnectionSQLite : public DatabaseConnection {
 public:
 	DatabaseConnectionSQLite(std::string file);
 	~DatabaseConnectionSQLite() override;
-
+	int getUniquePermissionObjectId() const override { return -1; } // Not yet implemented
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
-
+	PermissionSettingIterator* retrievePermissionSettings(int permission_collection_id) override {
+		return new PermissionSettingIteratorSQLite(permission_collection_id);
+	}
+private:
 	class PermissionCollectionIteratorSQLite : public DatabaseConnection::PermissionCollectionIterator {
 	public:
 		PermissionCollectionIteratorSQLite(int permission_object_id) {
@@ -32,9 +35,5 @@ public:
 		}
 		db_permission_setting_struct* getValue() const override { return db_cursor_retrieve_permission_setting(); }
 	};
-	PermissionSettingIterator* retrievePermissionSettings(int permission_collection_id) override {
-		return new PermissionSettingIteratorSQLite(permission_collection_id);
-	}
-private:
 	sqlite3* db;
 };

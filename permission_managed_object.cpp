@@ -9,7 +9,13 @@ PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseCon
 	this->cacheAllPermissions();
 }
 
-// TODO differentiate between newly created and database-retrieved data
+PermissionObjectBase::PermissionObjectBase(DatabaseConnection* db)
+: permission_object_id(db->getUniquePermissionObjectId()),
+db(db) {
+}
+
+int new_permission_object_id = db_get_unique_permission_object_id();
+
 void PermissionObjectBase::cacheAllPermissions() {
 	std::cout << "[PermissionObjectBase] retrieving permissions for " << this->permission_object_id << ": ";
 	DatabaseConnection::PermissionCollectionIterator* permission_collection_it = db->retrievePermissionCollections(this->permission_object_id);

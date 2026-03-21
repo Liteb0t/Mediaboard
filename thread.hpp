@@ -13,7 +13,7 @@ class websocket_session;
 class Thread : public PermissionManagedObject {
 public:
 	// Thread();
-	Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json thread_json, int new_permission_object_id, DatabaseConnection* db);
+	Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json thread_json, DatabaseConnection* db);
 	Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db);
 	std::string dumpThread() const;
 	json asJson() const { return this->thread_as_json; };

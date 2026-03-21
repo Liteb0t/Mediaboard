@@ -15,7 +15,8 @@ enum class BUILTIN_GROUPS { ADMINISTRATORS, USERS, PUBLIC };
 
 class PermissionObjectBase : public boost::enable_shared_from_this<PermissionObjectBase> {
 public:
-	PermissionObjectBase(int permission_object_id, DatabaseConnection* db);
+	PermissionObjectBase(int permission_object_id, DatabaseConnection* db); // retrieve from database
+	PermissionObjectBase(DatabaseConnection* db); // save new object to database
 	void cacheAllPermissions();
 	void addGroupPermissionCollection(int group_id) {
 		std::cout << "[PermissionObjectBase] adding group permission_collection for group " << group_id << std::endl;
@@ -102,9 +103,9 @@ public:
 	}
 protected:
 	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
+	int permission_object_id; // Used to identify this object in the database
 private:
 	DatabaseConnection* db;
-	int permission_object_id; // Used to identify this object in the database
 	std::unordered_map<int, PermissionCollection> group_permissions;
 	std::unordered_map<int, PermissionCollection> user_permissions;
 };
@@ -229,8 +230,14 @@ private:
 
 class PermissionManagedObject : public PermissionObjectBase {
 public:
+	// Existing object
 	PermissionManagedObject(boost::shared_ptr<PermissionObjectBase> parent_object, int permission_object_id, DatabaseConnection* db)
-			: PermissionObjectBase(permission_object_id, db), parent_object(parent_object) {}
+			: PermissionObjectBase(permission_object_id, db), parent_object(parent_object) {
+	}
+	// New object
+	PermissionManagedObject(boost::shared_ptr<PermissionObjectBase> parent_object, DatabaseConnection* db)
+			: PermissionObjectBase(db), parent_object(parent_object) {
+	}
 	const std::vector<int>* getOrderedGroups() const {
 		return this->parent_object->getOrderedGroups();
 	}

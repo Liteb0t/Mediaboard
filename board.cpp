@@ -4,13 +4,12 @@
 #include <iostream>
 
 Board::Board(boost::shared_ptr<PermissionObjectBase> permission_parent, DatabaseConnection* db)
-		: PermissionManagedObject(permission_parent, 1 /* temporary ID until multi board update*/, db),
+		: PermissionManagedObject(permission_parent, db),
 		db(db) {
 }
 
 int Board::createThread(json thread_json) {
-	int new_permission_object_id = db_get_unique_permission_object_id();
-	Thread thread(shared_from_this(), thread_json, new_permission_object_id, db);
+	Thread thread(shared_from_this(), thread_json, db);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(thread.getLastPostTime(), thread.getId()));
 	return thread.getId();

@@ -4,7 +4,7 @@ class DatabaseConnectionPostgreSQL : public DatabaseConnection {
 public:
 	DatabaseConnectionPostgreSQL(std::string connection_target);
 	~DatabaseConnectionPostgreSQL();
-
+	int getUniquePermissionObjectId() const override { return db_get_unique_permission_object_id(); }
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
 
 	PermissionSettingIterator* retrievePermissionSettings(int permission_collection_id) override {

@@ -8,6 +8,7 @@ class DatabaseConnection {
 public:
 	virtual ~DatabaseConnection() {
 	}
+	virtual int getUniquePermissionObjectId() const = 0;
 	class PermissionCollectionIterator {
 	public:
 		virtual ~PermissionCollectionIterator() {}
