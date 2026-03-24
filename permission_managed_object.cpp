@@ -14,8 +14,6 @@ PermissionObjectBase::PermissionObjectBase(DatabaseConnection* db)
 db(db) {
 }
 
-int new_permission_object_id = db_get_unique_permission_object_id();
-
 void PermissionObjectBase::cacheAllPermissions() {
 	std::cout << "[PermissionObjectBase] retrieving permissions for " << this->permission_object_id << ": ";
 	DatabaseConnection::PermissionCollectionIterator* permission_collection_it = db->retrievePermissionCollections(this->permission_object_id);

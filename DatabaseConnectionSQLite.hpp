@@ -1,11 +1,14 @@
 #include "DatabaseConnection.hpp"
 #include "db_interface.h"
+#include <boost/filesystem/path.hpp>
 #include <sqlite3.h>
 
 class DatabaseConnectionSQLite : public DatabaseConnection {
 public:
-	DatabaseConnectionSQLite(std::string file);
+	DatabaseConnectionSQLite(boost::filesystem::path database_directory, std::string filename);
 	~DatabaseConnectionSQLite() override;
+	// void init() override;
+	void init(boost::filesystem::path database_directory);
 	int getUniquePermissionObjectId() const override { return -1; } // Not yet implemented
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
 	PermissionSettingIterator* retrievePermissionSettings(int permission_collection_id) override {

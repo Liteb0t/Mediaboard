@@ -24,7 +24,6 @@
 #include <boost/smart_ptr.hpp>
 #include <Magick++.h>
 #include <cstdlib>
-#include <format>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -87,15 +86,17 @@ int main(int argc, char* argv[]) {
 	bool make_migrations;
 	// Get the path to this program, so files can be read/written relative to the executable
 	std::error_code ec;
-	boost::filesystem::path location = boost::dll::program_location(ec);
+	boost::filesystem::path location = boost::dll::program_location(ec).parent_path();
+	boost::filesystem::path database_location = location; database_location += "/database";
 	if (ec)
 		throw("An error occured when attempting to get the current program's location.");
-	std::string parent_directory = location.parent_path().string();
-	if (!boost::filesystem::exists(parent_directory + "/database")) {
-		std::cout << parent_directory + "/database" << " doesn't exist. Creating..." << std::endl;
-		boost::filesystem::create_directory(parent_directory + "/database");
+	// std::string parent_directory = location.parent_path().string();
+	if (!boost::filesystem::exists(database_location.string())) {
+		std::cout << database_location.string() << " doesn't exist. Creating..." << std::endl;
+		boost::filesystem::create_directory(database_location.string());
 	}
-	 // First time setup
+	/*
+	// First time setup
 	if (!boost::filesystem::exists(parent_directory + "/database/MEDIABOARD_VERSION")) {
 		make_migrations = false;
 		writeDatabaseVersionFile(parent_directory, current_version);
@@ -119,12 +120,13 @@ int main(int argc, char* argv[]) {
 			make_migrations = false;
 		}
 	}
+	*/
 
 	DatabaseConnection* database_connection;
 	if (database_engine.starts_with("postgres"))
 		database_connection = new DatabaseConnectionPostgreSQL(postgresql_target);
 	else if (database_engine.starts_with("sqlite"))
-		database_connection = new DatabaseConnectionSQLite(std::format("{}/database/sqlite_data.db", parent_directory));
+		database_connection = new DatabaseConnectionSQLite(database_location, "sqlite_data.db");
 	else {
 		std::cerr << "Error: unknown database engine \"" << database_engine << "\". Must be \"postgres\" or \"sqlite\"." << std::endl;
 		return EXIT_FAILURE;
