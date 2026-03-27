@@ -36,9 +36,10 @@ int main(int argc, char* argv[]) {
 
 	// Check command line arguments.
 	std::string config_file;
-	unsigned short port;
-	std::string admin_password, media_location_relative_str, database_engine, postgresql_target;
+	unsigned short server_port, postgresql_port;
+	std::string admin_password, media_location_relative_str, database_engine, sqlite_database_path, postgresql_uri, postgresql_user, postgresql_host, postgresql_database_name;
 	int threads;
+	bool postgresql_use_uri;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
 		("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
@@ -50,10 +51,16 @@ int main(int argc, char* argv[]) {
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
-		("database_engine,d", boost::program_options::value<std::string>(&database_engine)->default_value("sqlite"), "Choices are \"postgres\" and \"sqlite\". The latter is recommended for beginners.")
-		("postgresql_target,t", boost::program_options::value<std::string>(&postgresql_target)->default_value("fuze_mediaboard@localhost:5432"),  "Connection string for the PostgreSQL database.")
 		("media_path,m", boost::program_options::value<std::string>(&media_location_relative_str)->default_value("."),  "File path where user-submitted media is stored.")
-		("port,p", boost::program_options::value<unsigned short>(&port)->default_value(8300), "The port which the server will serve. Make sure it isn't in use by another service.")
+		("server_port,p", boost::program_options::value<unsigned short>(&server_port)->default_value(8300), "The port which the server will serve. Make sure it isn't already in use by another service.")
+		("database_engine,d", boost::program_options::value<std::string>(&database_engine)->default_value("sqlite"), "Choices are \"postgres\" and \"sqlite\". The latter is recommended for beginners.")
+		("postgresql_use_uri", boost::program_options::value<bool>(&postgresql_use_uri)->default_value(false), "If true, use postgresql_uri to connect.")
+		("postgresql_uri,u", boost::program_options::value<std::string>(&postgresql_uri)->default_value("fuze_mediaboard@localhost:5432"),  "Connection string for the PostgreSQL database.")
+		("postgresql_user,U", boost::program_options::value<std::string>(&postgresql_user)->default_value("mediaboard_server"),  "User which will access the PostgreSQL database.")
+		("postgresql_host,h", boost::program_options::value<std::string>(&postgresql_host)->default_value("localhost"),  "Host for the PostgreSQL database.")
+		("postgresql_port,p", boost::program_options::value<unsigned short>(&postgresql_port)->default_value(5432), "The port at which the database is available.")
+		("postgresql_database_name,n", boost::program_options::value<std::string>(&postgresql_database_name)->default_value("fuze_mediaboard"), "Name of the PostgreSQL database.")
+		("sqlite_database_path,s", boost::program_options::value<std::string>(&postgresql_uri)->default_value("database/sqlite_data.db"),  "File where SQLite data is stored.")
 		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.");
 
 	boost::program_options::options_description command_line_options;
@@ -123,10 +130,14 @@ int main(int argc, char* argv[]) {
 	*/
 
 	DatabaseConnection* database_connection;
-	if (database_engine.starts_with("postgres"))
-		database_connection = new DatabaseConnectionPostgreSQL(postgresql_target);
+	if (database_engine.starts_with("postgres")) {
+		if (postgresql_use_uri)
+			database_connection = new DatabaseConnectionPostgreSQL(postgresql_uri, current_version);
+		else
+			database_connection = new DatabaseConnectionPostgreSQL(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name, current_version);
+	}
 	else if (database_engine.starts_with("sqlite"))
-		database_connection = new DatabaseConnectionSQLite(database_location, "sqlite_data.db");
+		database_connection = new DatabaseConnectionSQLite(database_location, "sqlite_data.db", current_version);
 	else {
 		std::cerr << "Error: unknown database engine \"" << database_engine << "\". Must be \"postgres\" or \"sqlite\"." << std::endl;
 		return EXIT_FAILURE;
@@ -138,7 +149,7 @@ int main(int argc, char* argv[]) {
 		delete database_connection;
 		return 0;
 	}
-	std::cout << "Set port: " << port << std::endl;
+	std::cout << "Set port: " << postgresql_port << std::endl;
 	boost::filesystem::path media_location;
 	try {
 		media_location = boost::filesystem::canonical(media_location_relative_str, location.parent_path());
@@ -170,7 +181,7 @@ int main(int argc, char* argv[]) {
 	state->start();
 	boost::make_shared<listener>(
 		io_context,
-		boost::asio::ip::tcp::endpoint{address, port},
+		boost::asio::ip::tcp::endpoint{address, server_port},
 		state
 	)->run();
 
@@ -197,7 +208,7 @@ int main(int argc, char* argv[]) {
 			}
 		);
 	}
-	std::cout << "The server can now be accessed from http://localhost:" << port << std::endl;
+	std::cout << "The server can now be accessed from http://localhost:" << server_port << std::endl;
 	io_context.run();
 
 	// (If we get here, it means we got a SIGINT or SIGTERM)

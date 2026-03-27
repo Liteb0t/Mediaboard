@@ -1,6 +1,9 @@
 #include "DatabaseConnectionSQLite.hpp"
 #include <iostream>
 #include <fstream>
+#include <stdexcept>
+#include <string_view>
+#include <sstream>
 
 int callback(void* unused, int number_of_columns, char** columns, char** column_names) {
 	int i;
@@ -11,7 +14,35 @@ int callback(void* unused, int number_of_columns, char** columns, char** column_
 	return 0;
 }
 
-DatabaseConnectionSQLite::DatabaseConnectionSQLite(boost::filesystem::path database_directory, std::string filename) {
+void DatabaseConnectionSQLite::execWriteOnlyStatement(std::string& statement) {
+	this->execWriteOnlyStatement(statement.c_str());
+}
+void DatabaseConnectionSQLite::execWriteOnlyStatement(const char* statement) {
+	std::cout << "[DatabaseConnectionSQLite] " << statement << std::endl;
+	int ec; char* error_message;
+	ec = sqlite3_exec(this->db, statement, callback, 0, &error_message);
+	if (ec != SQLITE_OK) {
+		std::string error_str = error_message;
+		sqlite3_free(error_message);
+		throw std::runtime_error(error_str);
+		// fprintf(stderr, "[DatabaseConnectionSQLite] SQL error %d: %s\n", ec, error_message);
+	}
+}
+
+void DatabaseConnectionSQLite::execMultipleWriteOnlyStatements(std::istream& stream) {
+	std::string line;
+	while (std::getline(stream, line)) {
+		this->execWriteOnlyStatement(line);
+	}
+}
+
+void DatabaseConnectionSQLite::writeDatabaseVersion(const std::string& program_version_string) {
+	this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _info(version TEXT NOT NULL)");
+	this->execWriteOnlyStatement("DELETE FROM _info");
+	this->execWriteOnlyStatement(std::format("INSERT INTO _info VALUES('{}')", program_version_string).c_str());
+}
+
+DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path& database_directory, const std::string& filename, const std::string& program_version_string) {
 	std::string database_filepath = std::format("{}/{}", database_directory.string(), filename);
 	std::cout << "[DatabaseConnectionSQLite] Connecting to database at " << database_filepath << std::endl;
 	int ec = sqlite3_open(database_filepath.c_str(), &db);
@@ -20,29 +51,96 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(boost::filesystem::path datab
 		sqlite3_close(db);
 		return;
 	}
-	char* error_message;
-	ec = sqlite3_exec(db, "SELECT version FROM _info", callback, 0, &error_message);
+	// char* error_message;
+	sqlite3_stmt* stmt;
+	ec = sqlite3_prepare_v2(db, "SELECT version FROM _info", -1, &stmt, NULL);
 	if (ec != SQLITE_OK) { // We will assume this means the database is not populated
-		fprintf(stderr, "[DatabaseConnectionSQLite] SQL error %d: %s\n", ec, error_message);
-		sqlite3_free(error_message);
-		this->init(database_directory);
-		return;
+		// fprintf(stderr, "[DatabaseConnectionSQLite] SQL error %d: %s\n", ec, error_message);
+		// sqlite3_free(error_message);
+		// this->firstTimeSetup(database_directory, program_version_string);
+		try {
+			std::ifstream sqlite_template_file(std::format("{}/database_template_sqlite.sql", database_directory.string()));
+			this->execMultipleWriteOnlyStatements(sqlite_template_file);
+			sqlite_template_file.close();
+			this->writeDatabaseVersion(program_version_string);
+		}
+		catch (std::exception& exception) {
+			std::cout << "[DatabaseConnectionSQLite] Exception occured in constructor: " << exception.what() << std::endl;
+		}
 	}
-	// TODO check version if current and then make migrations if not
+	else {
+		int number_of_columns = sqlite3_column_count(stmt);
+		// std::cout << "[DatabaseConnectionSQLite] number_of_columns: " << number_of_columns << std::endl;
+		if (sqlite3_step(stmt) == SQLITE_ROW || sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+			// const unsigned char* text = sqlite3_column_text(stmt, 0);
+			// version_string = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
+			// std::cout << "[DatabaseConnectionSQLite] Read version string: " << sqlite3_column_text(stmt, 0) << std::endl;
+			const unsigned char* text = sqlite3_column_text(stmt, 0); //get the value from at that column as text
+			printf("= %s \n", text);
+			std::string database_version_string = std::string(reinterpret_cast<const char*>(text));
+			std::cout << "[DatabaseConnectionSQLite] database_version_string " << database_version_string << std::endl;
+			if (database_version_string < program_version_string) {
+				std::cout << "[DatabaseConnectionSQLite] Mediaboard version " << program_version_string << " is newer than the database version " << database_version_string << ". Migrations will be made if necessary." << std::endl;
+				std::stringstream migrations;
+				if (this->writeMigrations(migrations, database_version_string)) {
+					try {
+						this->execMultipleWriteOnlyStatements(migrations);
+					}
+					catch (std::exception& exception) {
+						std::cout << "[DatabaseConnectionSQLite] Exception occured in constructor: " << exception.what() << std::endl;
+					}
+					std::cout << "[DatabaseConnectionSQLite] Finished doing migrations." << std::endl;
+				}
+				else {
+					std::cout << "[DatabaseConnectionSQLite] No migrations necessary." << std::endl;
+				}
+				migrations.clear();
+				try {
+					this->writeDatabaseVersion(program_version_string);
+				}
+				catch (std::exception& exception) {
+					std::cout << "[DatabaseConnectionSQLite] Exception occured in constructor: " << exception.what() << std::endl;
+				}
+			}
+			else if (database_version_string > program_version_string)
+				std::cout << "[DatabaseConnectionSQLite] WARNING! database version is found to be newer than this server. Issues may occur. Consider updating to a newer version of Fuze Mediaboard." << std::endl;
+			else
+				std::cout << "[DatabaseConnectionSQLite] Database is up-to-date." << std::endl;
+		}
+		else {
+			std::cout << "[DatabaseConnectionSQLite] No version string found. Database is bugged out." << std::endl;
+		}
+		sqlite3_finalize(stmt);
+	}
 }
 
-void DatabaseConnectionSQLite::init(boost::filesystem::path database_directory) {
+bool DatabaseConnectionSQLite::writeMigrations(std::ostream& stream, const std::string& database_version_string) {
+	if (database_version_string == "0.0.5")	goto v0_0_5;
+	// if (database_version_string == "1.0")goto v1_0;
+	// If code reaches here, no migrations need to be made
+	return false;
+v0_0_5:
+	stream << "UPDATE permission_collection SET account_id = NULL WHERE account_id = -1;\n";
+	stream << "UPDATE permission_collection SET permission_group_id = NULL WHERE permission_group_id = -1;\n";
+	// v1_0:
+	std::cout << "Finished writing migrations" << std::endl;
+	return true; // Migrations were made
+}
+
+void DatabaseConnectionSQLite::firstTimeSetup(const boost::filesystem::path& database_directory, const std::string& program_version_string) {
+	int ec; char* error_message;
 	std::ifstream sqlite_template_file(std::format("{}/database_template_sqlite.sql", database_directory.string()));
 	std::string line;
-	char* error_message;
-	while (std::getline(sqlite_template_file, line)) {
-		std::cout << "[DatabaseConnectionSQLite] init line: " << line << std::endl;
-		int ec = sqlite3_exec(db, line.c_str(), callback, 0, &error_message);
-		if (ec != SQLITE_OK) {
-			fprintf(stderr, "[DatabaseConnectionSQLite] SQL error %d: %s\n", ec, error_message);
-			sqlite3_free(error_message);
-			// return;
+	try {
+		while (std::getline(sqlite_template_file, line)) {
+			std::cout << "[DatabaseConnectionSQLite] " << line << std::endl;
+			this->execWriteOnlyStatement(line);
 		}
+		this->execWriteOnlyStatement("CREATE TABLE _info(version TEXT NOT NULL)");
+		this->execWriteOnlyStatement("INSERT INTO _info VALUES('0.1')");
+	}
+	catch (std::exception& exception) {
+		std::cout << "[DatabaseConnectionSQLite] Exception in SQLite init: " << exception.what() << std::endl;
 	}
 }
 

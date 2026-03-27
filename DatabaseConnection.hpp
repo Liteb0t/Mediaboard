@@ -23,4 +23,7 @@ public:
 		virtual db_permission_setting_struct* getValue() const = 0;
 	};
 	virtual PermissionSettingIterator* retrievePermissionSettings(int permission_collection_id) = 0;
+protected:
+	// virtual const std::string getDatabaseVersion() const = 0;
+	// virtual void connectToDatabase(const std::string& connection_target);
 };

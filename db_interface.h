@@ -113,6 +113,7 @@ extern "C" {
 	void freeGroupMemberArray(struct db_group_member_array*);
 
 	// Database functions
+	char* db_retrieve_database_version();
 		// Posts
 	int db_store_post(int thread_id, int id_in_thread, const char name[POST_MAX_NAME+1], time_t upload_timestamp, const char*, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key[KEY_LENGTH+1]);
 	int db_store_thread(int number_of_posts, int _new_permission_object_id);
@@ -152,7 +153,7 @@ extern "C" {
 	struct db_permission_setting_struct* db_cursor_retrieve_permission_setting();
 	void db_free_cursor_for_permission_setting();
 
-	void db_connect(const char* _connection_target);
+	void db_connect(const char* _target, const char* _user);
 	void db_disconnect(void);
 #ifdef __cplusplus
 }

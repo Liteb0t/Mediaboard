@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23)
+cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
 
 project(Mediaboard
   VERSION 0.1
@@ -41,6 +41,7 @@ target_link_libraries(MediaboardServer
     ${ImageMagick_LIBRARIES}
     nlohmann_json::nlohmann_json
     ${ECPG_LIB}
+    PostgreSQL::PostgreSQL
     SQLite3::SQLite3
 )
 target_sources(MediaboardServer

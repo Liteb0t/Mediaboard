@@ -143,9 +143,10 @@ void freeGroupMemberArray(struct db_group_member_array* a) {
 	a->used = a->size = 0;
 }
 
-void db_connect(const char* _connection_target) {
+void db_connect(const char* _target, const char* _user) {
 	EXEC SQL BEGIN DECLARE SECTION;
-	const char* connection_target = _connection_target;
+	const char* target = _target;
+	const char* user = _user;
 	const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts, permission_object_id) VALUES (?, 0, ?);";
@@ -162,8 +163,8 @@ void db_connect(const char* _connection_target) {
 		fprintf(stderr, "Could not find environment variable \"%s\" required for the database connection password. Exiting.\n", DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 		exit(2);
 	}
-	printf("Connecting to PostgreSQL database at %s", connection_target);
-	EXEC SQL CONNECT TO :connection_target USER "mediaboard_server" USING :password;
+	printf("[ecpg] Connecting to PostgreSQL database at %s", target);
+	EXEC SQL CONNECT TO :target USER :user USING :password;
 	printf(" - Success\n");
 	EXEC SQL PREPARE upload_post_stmt FROM :upload_post_prepared_stmt;
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;
@@ -181,6 +182,22 @@ void db_test() {
 
 	EXEC SQL SELECT current_database() INTO :dbname;
 	printf("current_database = %s\n", dbname);
+}
+
+char* db_retrieve_database_version() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	char* database_version = malloc(sizeof(char)*32);
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+	while(true) {
+		EXEC SQL SELECT version INTO :database_version FROM _info;
+		goto database_version_not_null;
+	}
+	database_version[0] = '\0';
+database_version_not_null:
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+	EXEC SQL COMMIT;
+	return database_version;
 }
 
 void db_create_administrator(const char* _password) {

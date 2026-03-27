@@ -1,8 +1,10 @@
 #include "DatabaseConnection.hpp"
+#include "libpq-fe.h"
 
 class DatabaseConnectionPostgreSQL : public DatabaseConnection {
 public:
-	DatabaseConnectionPostgreSQL(std::string connection_target);
+	DatabaseConnectionPostgreSQL(const std::string& postgresql_uri, const std::string& program_version_string);
+	DatabaseConnectionPostgreSQL(const std::string& postgresql_user, const std::string& postgresql_host, const unsigned short postgresql_port, const std::string& postgresql_database_name, const std::string& current_version);
 	~DatabaseConnectionPostgreSQL();
 	// void init() override {};
 	int getUniquePermissionObjectId() const override { return db_get_unique_permission_object_id(); }
@@ -12,6 +14,14 @@ public:
 		return new PermissionSettingIteratorECPG(permission_collection_id);
 	}
 private:
+	void migrateIfVersionIsNewer(const std::string& program_version_string);
+	void writeDatabaseVersion(const std::string& program_version_string);
+	// const std::string getDatabaseVersion() const override;
+	// void connectToDatabase(const std::string& connection_target) override;
+	void execWriteOnlyStatement(const std::string& statement);
+	void execWriteOnlyStatement(const char* statement);
+	void execMultipleWriteOnlyStatements(std::istream& stream);
+	bool writeMigrations(std::ostream& stream, const std::string& database_version_string);
 	class PermissionCollectionIteratorECPG : public DatabaseConnection::PermissionCollectionIterator {
 	public:
 		PermissionCollectionIteratorECPG(int permission_object_id) {
@@ -35,4 +45,5 @@ private:
 		}
 		db_permission_setting_struct* getValue() const override { return db_cursor_retrieve_permission_setting(); }
 	};
+	PGconn* db;
 };
