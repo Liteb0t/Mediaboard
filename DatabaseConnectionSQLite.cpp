@@ -1,6 +1,8 @@
 #include "DatabaseConnectionSQLite.hpp"
+#include "db_interface.h"
 #include <iostream>
 #include <fstream>
+#include <sqlite3.h>
 #include <stdexcept>
 #include <string_view>
 #include <sstream>
@@ -31,7 +33,7 @@ void DatabaseConnectionSQLite::execWriteOnlyStatement(const char* statement) {
 
 void DatabaseConnectionSQLite::execMultipleWriteOnlyStatements(std::istream& stream) {
 	std::string line;
-	while (std::getline(stream, line)) {
+	while (std::getline(stream, line, ';')) {
 		this->execWriteOnlyStatement(line);
 	}
 }
@@ -53,7 +55,7 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 	}
 	// char* error_message;
 	sqlite3_stmt* stmt;
-	ec = sqlite3_prepare_v2(db, "SELECT version FROM _info", -1, &stmt, NULL);
+	ec = sqlite3_prepare_v2(this->db, "SELECT version FROM _info", -1, &stmt, NULL);
 	if (ec != SQLITE_OK) { // We will assume this means the database is not populated
 		// fprintf(stderr, "[DatabaseConnectionSQLite] SQL error %d: %s\n", ec, error_message);
 		// sqlite3_free(error_message);
@@ -72,13 +74,10 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 		int number_of_columns = sqlite3_column_count(stmt);
 		// std::cout << "[DatabaseConnectionSQLite] number_of_columns: " << number_of_columns << std::endl;
 		if (sqlite3_step(stmt) == SQLITE_ROW || sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
-			// const unsigned char* text = sqlite3_column_text(stmt, 0);
-			// version_string = std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0)));
-			// std::cout << "[DatabaseConnectionSQLite] Read version string: " << sqlite3_column_text(stmt, 0) << std::endl;
 			const unsigned char* text = sqlite3_column_text(stmt, 0); //get the value from at that column as text
-			printf("= %s \n", text);
+			// printf("= %s \n", text);
 			std::string database_version_string = std::string(reinterpret_cast<const char*>(text));
-			std::cout << "[DatabaseConnectionSQLite] database_version_string " << database_version_string << std::endl;
+			std::cout << database_version_string << " (database) : " << program_version_string << " (server)" << std::endl;
 			if (database_version_string < program_version_string) {
 				std::cout << "[DatabaseConnectionSQLite] Mediaboard version " << program_version_string << " is newer than the database version " << database_version_string << ". Migrations will be made if necessary." << std::endl;
 				std::stringstream migrations;
@@ -115,14 +114,12 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 }
 
 bool DatabaseConnectionSQLite::writeMigrations(std::ostream& stream, const std::string& database_version_string) {
-	if (database_version_string == "0.0.5")	goto v0_0_5;
-	// if (database_version_string == "1.0")goto v1_0;
+	if (database_version_string <= "0.0.5")	goto v0_0_5;
 	// If code reaches here, no migrations need to be made
 	return false;
 v0_0_5:
-	stream << "UPDATE permission_collection SET account_id = NULL WHERE account_id = -1;\n";
-	stream << "UPDATE permission_collection SET permission_group_id = NULL WHERE permission_group_id = -1;\n";
-	// v1_0:
+	stream << "UPDATE permission_collection SET account_id = NULL WHERE account_id = -1;";
+	stream << "UPDATE permission_collection SET permission_group_id = NULL WHERE permission_group_id = -1;";
 	std::cout << "Finished writing migrations" << std::endl;
 	return true; // Migrations were made
 }
@@ -151,5 +148,80 @@ DatabaseConnectionSQLite::~DatabaseConnectionSQLite() {
 
 int DatabaseConnectionSQLite::storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) {
 	std::cout << "[DatabaseConnectionSQLite] storePermissionCollection()... can't do that yet famalam" << std::endl;
-	return -1;
+	int new_permission_collection_id;
+	this->execWriteOnlyStatement(std::format("EXEC SQL INSERT INTO permission_collection(permission_object_id, account_id, permission_group_id) VALUES ({}, {}, {})", permission_object_id, user_or_group == USER_OR_GROUP::USER ? std::to_string(user_or_group_id) : std::string("NULL"), user_or_group == USER_OR_GROUP::GROUP ? std::to_string(user_or_group_id) : std::string("NULL")).c_str())
+	;
+	int ec = sqlite3_prepare_v2(this->db, "SELECT last_insert_rowid()", -1, &this->stmt, NULL);
+	if (ec == SQLITE_OK && sqlite3_step(this->stmt) == SQLITE_ROW) {
+		new_permission_collection_id = sqlite3_column_int(stmt, 0);
+	}
+	else {
+		throw std::runtime_error("[DatabaseConnectionSQLite] Couldn't get new ID of store permission_collection");
+	}
+	sqlite3_finalize(this->stmt);
+	return new_permission_collection_id;
+}
+
+void DatabaseConnectionSQLite::declarePermissionCollectionCursor(int permission_object_id) {
+	int ec;
+	ec = sqlite3_prepare_v2(this->db, std::format("SELECT id, permission_group_id, account_id FROM permission_collection WHERE permission_object_id = {}", permission_object_id).c_str(), -1, &this->stmt, NULL);
+	if (ec != SQLITE_OK) {
+		std::cerr << "[DatabaseConnectionSQLite] Could not declare cursor: " << sqlite3_errmsg(this->db);
+		return /* failure */;
+	}
+}
+db_permission_collection_struct* DatabaseConnectionSQLite::getValueFromPermissionCollectionCursor() {
+	int ec;
+	static db_permission_collection_struct permission_collection;
+	switch (sqlite3_step(this->stmt)) {
+		case SQLITE_ROW:
+			permission_collection.has_value = true;
+			permission_collection.id = sqlite3_column_int(stmt, 0);
+			permission_collection.group_id = sqlite3_column_int(stmt, 1);
+			permission_collection.account_id = sqlite3_column_int(stmt, 2);
+			break;
+		case SQLITE_DONE:
+			permission_collection.has_value = false;
+			break;
+		default:
+			permission_collection.has_value = false;
+			std::cerr << "[DatabaseConnectionSQLite] getValueFromPermissionCollectionCursor() Error: " <<sqlite3_errmsg(this->db);
+			break;
+	}
+	return &permission_collection;
+}
+void DatabaseConnectionSQLite::closePermissionCollectionCursor() {
+	sqlite3_finalize(this->stmt);
+}
+
+void DatabaseConnectionSQLite::declarePermissionSettingCursor(int permission_collection_id) {
+	int ec;
+	ec = sqlite3_prepare_v2(this->db, std::format("SELECT id, permission_number, setting FROM permission_setting WHERE permission_collection_id = {}", permission_collection_id).c_str(), -1, &this->stmt, NULL);
+	if (ec != SQLITE_OK) {
+		std::cerr << "[DatabaseConnectionSQLite] Could not declare cursor: " << sqlite3_errmsg(this->db);
+		return /* failure */;
+	}
+}
+db_permission_setting_struct* DatabaseConnectionSQLite::getValueFromPermissionSettingCursor() {
+	int ec;
+	static db_permission_setting_struct permission_setting;
+	switch (sqlite3_step(this->stmt)) {
+		case SQLITE_ROW:
+			permission_setting.has_value = true;
+			permission_setting.id = sqlite3_column_int(stmt, 0);
+			permission_setting.permission_number = sqlite3_column_int(stmt, 1);
+			permission_setting.setting = sqlite3_column_int(stmt, 2);
+			break;
+		case SQLITE_DONE:
+			permission_setting.has_value = false;
+			break;
+		default:
+			permission_setting.has_value = false;
+			std::cerr << "[DatabaseConnectionSQLite] getValueFromPermissionSettingCursor() Error: " <<sqlite3_errmsg(this->db);
+			break;
+	}
+	return &permission_setting;
+}
+void DatabaseConnectionSQLite::closePermissionSettingCursor() {
+	sqlite3_finalize(this->stmt);
 }

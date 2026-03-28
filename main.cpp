@@ -97,37 +97,12 @@ int main(int argc, char* argv[]) {
 	boost::filesystem::path database_location = location; database_location += "/database";
 	if (ec)
 		throw("An error occured when attempting to get the current program's location.");
-	// std::string parent_directory = location.parent_path().string();
+	else
+		std::cout << "Server is located at " << location << std::endl;
 	if (!boost::filesystem::exists(database_location.string())) {
 		std::cout << database_location.string() << " doesn't exist. Creating..." << std::endl;
 		boost::filesystem::create_directory(database_location.string());
 	}
-	/*
-	// First time setup
-	if (!boost::filesystem::exists(parent_directory + "/database/MEDIABOARD_VERSION")) {
-		make_migrations = false;
-		writeDatabaseVersionFile(parent_directory, current_version);
-	}
-	else { // Not first time setup - the software may be out of sync with the database
-		boost::optional<std::string> database_version_string = getExistingDatabaseVersion(parent_directory);
-		if (database_version_string) {
-			std::cout << "Found database version: " << database_version_string.value() << std::endl;
-			if (database_version_string != current_version) {
-				std::cout << "Database is out-of-date. Checking if migrations need to be made..." << std::endl;
-				make_migrations = writeMigrations(parent_directory, database_version_string.value(), current_version);
-			}
-			else {
-				std::cout << "Database is up-to-date" << std::endl;
-				make_migrations = false;
-			}
-		}
-		else {
-			std::cerr << "Could not find database/MEDIABOARD_VERSION file. Creating a new one whilst assuming the DB is up-to-date..." << std::endl;
-			writeDatabaseVersionFile(parent_directory, current_version);
-			make_migrations = false;
-		}
-	}
-	*/
 
 	DatabaseConnection* database_connection;
 	if (database_engine.starts_with("postgres")) {
@@ -149,10 +124,10 @@ int main(int argc, char* argv[]) {
 		delete database_connection;
 		return 0;
 	}
-	std::cout << "Set port: " << postgresql_port << std::endl;
+	std::cout << "Set port: " << server_port << std::endl;
 	boost::filesystem::path media_location;
 	try {
-		media_location = boost::filesystem::canonical(media_location_relative_str, location.parent_path());
+		media_location = boost::filesystem::canonical(media_location_relative_str, location);
 	}
 	catch (const std::exception* exception) {
 		std::cout << exception->what();
@@ -177,7 +152,7 @@ int main(int argc, char* argv[]) {
 
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
-	boost::shared_ptr<shared_state> state(new shared_state(location.parent_path(), media_location, database_connection));
+	boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection));
 	state->start();
 	boost::make_shared<listener>(
 		io_context,
@@ -217,7 +192,10 @@ int main(int argc, char* argv[]) {
 	for(auto& t : v)
 		t.join();
 
-	std::cout << "All thread(s) exited." << std::endl;
+	if (threads == 1)
+		std::cout << "Thread closed." << std::endl;
+	else
+		std::cout << "All " << threads << " threads closed." << std::endl;
 	delete database_connection;
 
 	return EXIT_SUCCESS;

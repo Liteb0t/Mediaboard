@@ -64,7 +64,8 @@ To create the database:\
 `su postgres`\
 `createdb fuze_mediaboard`\
 `psql -d fuze_mediaboard`\
-fuze_mediaboard=# `CREATE USER mediaboard_server WITH PASSWORD '<password>'`\
+fuze_mediaboard=# `CREATE USER mediaboard_server WITH PASSWORD '<password>';`\
+fuze_mediaboard=# `GRANT ALL ON SCHEMA public TO mediaboard_server;`\
 fuze_mediaboard=# `\q`\
 To import the database template, go back to your user account and run:\
 `psql -U postgres fuze_mediaboard < database_template.sql`\

@@ -16,31 +16,31 @@ db(db) {
 
 void PermissionObjectBase::cacheAllPermissions() {
 	std::cout << "[PermissionObjectBase] retrieving permissions for " << this->permission_object_id << ": ";
-	DatabaseConnection::PermissionCollectionIterator* permission_collection_it = db->retrievePermissionCollections(this->permission_object_id);
+	db->declarePermissionCollectionCursor(this->permission_object_id);
 	while (true) {
-		db_permission_collection_struct* permission_collection = permission_collection_it->getValue();
+		db_permission_collection_struct* permission_collection = db->getValueFromPermissionCollectionCursor();
 		if (!permission_collection->has_value)
 			break;
 		std::cout << permission_collection->id << ", ";
 		PermissionCollection new_permission_collection(permission_collection->id, permission_collection->account_id, permission_collection->group_id);
 
 		// Add settings, if any
-		DatabaseConnection::PermissionSettingIterator* permission_setting_it = db->retrievePermissionSettings(permission_collection->id);
+		db->declarePermissionCollectionCursor(permission_collection->id);
 		while (true) {
-			db_permission_setting_struct* permission_setting = permission_setting_it->getValue();
+			db_permission_setting_struct* permission_setting = db->getValueFromPermissionSettingCursor();
 			if (!permission_setting->has_value) {
 				break;
 			}
 			new_permission_collection.addPermissionSetting(permission_setting);
 		}
-		delete permission_setting_it;
+		db->closePermissionSettingCursor();
 
 		if (new_permission_collection.getUserOrGroupEnumValue() == USER_OR_GROUP::USER)
 			this->user_permissions.emplace(permission_collection->account_id, new_permission_collection);
 		else
 			this->group_permissions.emplace(permission_collection->group_id, new_permission_collection);
 	}
-	delete permission_collection_it;
+	db->closePermissionCollectionCursor();
 	std::cout << "done." << std::endl;
 }
 
