@@ -13,6 +13,7 @@ public:
 private:
 	sqlite3* db;
 	sqlite3_stmt* stmt;
+	sqlite3_stmt* stmt2;
 	void writeDatabaseVersion(const std::string& program_version_string);
 	// const std::string getDatabaseVersion() const override;
 	// void connectToDatabase(const std::string& connection_target) override;

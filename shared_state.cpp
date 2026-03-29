@@ -22,7 +22,7 @@ shared_state::shared_state(boost::filesystem::path parent_directory, boost::file
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
 // hence a seperate start() function is used
 void shared_state::start() {
-	Board main_board(shared_from_this(), db);
+	Board main_board(this, db);
 	this->boards.emplace(0, main_board);
 	this->boards.at(0).cacheAllThreads();
 }

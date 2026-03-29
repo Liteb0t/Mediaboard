@@ -150,10 +150,11 @@ int main(int argc, char* argv[]) {
 	// The io_context is required for all I/O - see https://www.boost.org/doc/libs/latest/doc/html/boost_asio/overview/basics.html
 	boost::asio::io_context io_context;
 
-	// Create and launch a listening port
-	std::cout << "Creating a listening port..." << std::endl;
+	std::cout << "Initialising shared state..." << std::endl;
 	boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection));
 	state->start();
+	// Create and launch a listening port
+	std::cout << "Creating a listening port..." << std::endl;
 	boost::make_shared<listener>(
 		io_context,
 		boost::asio::ip::tcp::endpoint{address, server_port},

@@ -1,5 +1,6 @@
 #include "DatabaseConnectionSQLite.hpp"
 #include "db_interface.h"
+#include <format>
 #include <iostream>
 #include <fstream>
 #include <sqlite3.h>
@@ -147,7 +148,6 @@ DatabaseConnectionSQLite::~DatabaseConnectionSQLite() {
 }
 
 int DatabaseConnectionSQLite::storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) {
-	std::cout << "[DatabaseConnectionSQLite] storePermissionCollection()... can't do that yet famalam" << std::endl;
 	int new_permission_collection_id;
 	this->execWriteOnlyStatement(std::format("EXEC SQL INSERT INTO permission_collection(permission_object_id, account_id, permission_group_id) VALUES ({}, {}, {})", permission_object_id, user_or_group == USER_OR_GROUP::USER ? std::to_string(user_or_group_id) : std::string("NULL"), user_or_group == USER_OR_GROUP::GROUP ? std::to_string(user_or_group_id) : std::string("NULL")).c_str())
 	;
@@ -196,7 +196,7 @@ void DatabaseConnectionSQLite::closePermissionCollectionCursor() {
 
 void DatabaseConnectionSQLite::declarePermissionSettingCursor(int permission_collection_id) {
 	int ec;
-	ec = sqlite3_prepare_v2(this->db, std::format("SELECT id, permission_number, setting FROM permission_setting WHERE permission_collection_id = {}", permission_collection_id).c_str(), -1, &this->stmt, NULL);
+	ec = sqlite3_prepare_v2(this->db, std::format("SELECT id, permission_number, setting FROM permission_setting WHERE permission_collection_id = {}", permission_collection_id).c_str(), -1, &this->stmt2, NULL);
 	if (ec != SQLITE_OK) {
 		std::cerr << "[DatabaseConnectionSQLite] Could not declare cursor: " << sqlite3_errmsg(this->db);
 		return /* failure */;
@@ -205,12 +205,12 @@ void DatabaseConnectionSQLite::declarePermissionSettingCursor(int permission_col
 db_permission_setting_struct* DatabaseConnectionSQLite::getValueFromPermissionSettingCursor() {
 	int ec;
 	static db_permission_setting_struct permission_setting;
-	switch (sqlite3_step(this->stmt)) {
+	switch (sqlite3_step(this->stmt2)) {
 		case SQLITE_ROW:
 			permission_setting.has_value = true;
-			permission_setting.id = sqlite3_column_int(stmt, 0);
-			permission_setting.permission_number = sqlite3_column_int(stmt, 1);
-			permission_setting.setting = sqlite3_column_int(stmt, 2);
+			permission_setting.id = sqlite3_column_int(stmt2, 0);
+			permission_setting.permission_number = sqlite3_column_int(stmt2, 1);
+			permission_setting.setting = sqlite3_column_int(stmt2, 2);
 			break;
 		case SQLITE_DONE:
 			permission_setting.has_value = false;
@@ -223,5 +223,5 @@ db_permission_setting_struct* DatabaseConnectionSQLite::getValueFromPermissionSe
 	return &permission_setting;
 }
 void DatabaseConnectionSQLite::closePermissionSettingCursor() {
-	sqlite3_finalize(this->stmt);
+	sqlite3_finalize(this->stmt2);
 }

@@ -12,7 +12,7 @@ class websocket_session; // Forward declaration
 
 class Board : public PermissionManagedObject {
 public:
-	Board(boost::shared_ptr<PermissionObjectBase> permission_parent, DatabaseConnection* db);
+	Board(PermissionObjectBase* permission_parent, DatabaseConnection* db);
 	int createThread(json thread_json);
 	int createPost(json post_json);
 	void deleteThread(int thread_id);

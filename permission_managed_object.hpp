@@ -13,7 +13,7 @@
 
 enum class BUILTIN_GROUPS { ADMINISTRATORS, USERS, PUBLIC };
 
-class PermissionObjectBase : public boost::enable_shared_from_this<PermissionObjectBase> {
+class PermissionObjectBase {
 public:
 	PermissionObjectBase(int permission_object_id, DatabaseConnection* db); // retrieve from database
 	PermissionObjectBase(DatabaseConnection* db); // save new object to database
@@ -231,11 +231,11 @@ private:
 class PermissionManagedObject : public PermissionObjectBase {
 public:
 	// Existing object
-	PermissionManagedObject(boost::shared_ptr<PermissionObjectBase> parent_object, int permission_object_id, DatabaseConnection* db)
+	PermissionManagedObject(PermissionObjectBase* parent_object, int permission_object_id, DatabaseConnection* db)
 			: PermissionObjectBase(permission_object_id, db), parent_object(parent_object) {
 	}
 	// New object
-	PermissionManagedObject(boost::shared_ptr<PermissionObjectBase> parent_object, DatabaseConnection* db)
+	PermissionManagedObject(PermissionObjectBase* parent_object, DatabaseConnection* db)
 			: PermissionObjectBase(db), parent_object(parent_object) {
 	}
 	const std::vector<int>* getOrderedGroups() const {
@@ -260,6 +260,6 @@ public:
 		return this->parent_object->passPermissionForUser(inherited_permission, permission, user_id);
 	}
 private:
-	boost::shared_ptr<PermissionObjectBase> parent_object;
+	PermissionObjectBase* parent_object;
 };
 #endif

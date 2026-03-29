@@ -25,7 +25,7 @@ void PermissionObjectBase::cacheAllPermissions() {
 		PermissionCollection new_permission_collection(permission_collection->id, permission_collection->account_id, permission_collection->group_id);
 
 		// Add settings, if any
-		db->declarePermissionCollectionCursor(permission_collection->id);
+		db->declarePermissionSettingCursor(permission_collection->id);
 		while (true) {
 			db_permission_setting_struct* permission_setting = db->getValueFromPermissionSettingCursor();
 			if (!permission_setting->has_value) {
@@ -127,9 +127,6 @@ void PermissionManager::cacheAllUsers() {
 
 void PermissionManager::cacheAllGroups() {
 	std::cout << "[PermissionManager] Retreiving groups from database... ";
-	// Refactor DB interface code like so:
-	// for (auto [group_id, group_name] : db->getGroups())
-	// Group group(group_id, group_name);
 	struct db_group_array* group_array = db_retrieve_groups();
 	for (int i = 0; i < group_array->used; i++) {
 		Group group(&group_array->array[i]);
@@ -147,7 +144,7 @@ void PermissionManager::cacheAllGroups() {
 	std::cout << ", established heirarchy";
 	struct db_group_member_array* group_member_array = db_retrieve_group_members();
 	for (int i = 0; i < group_member_array->used; i++) {
-		this->addUserToGroup(group_member_array->array[i].account_id, group_member_array->array[i].group_id);
+		this->groups.at(group_member_array->array[i].group_id).addMember(group_member_array->array[i].account_id);
 	}
 	freeGroupMemberArray(group_member_array);
 	std::cout << ", added users to groups." << std::endl;

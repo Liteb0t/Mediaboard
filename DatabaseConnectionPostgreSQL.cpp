@@ -1,6 +1,7 @@
 #include "DatabaseConnectionPostgreSQL.hpp"
 #include "DatabaseConnection.hpp"
 #include "db_interface.h"
+#include <format>
 #include <iostream>
 #include <libpq-fe.h>
 #include <sqlite3.h>

@@ -4,7 +4,7 @@
 #include <cstring>
 
 // Save thread when JSON is received
-Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json thread_json, DatabaseConnection* db)
+Thread::Thread(PermissionObjectBase* permission_parent, json thread_json, DatabaseConnection* db)
 			: PermissionManagedObject(permission_parent, db),
 			db(db) {
 	// thread_json.erase("key");
@@ -24,7 +24,7 @@ Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, json t
 }
 
 // Cache thread using db_interface struct
-Thread::Thread(boost::shared_ptr<PermissionObjectBase> permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db)
+Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db)
 			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id, db),
 			db(db) {
 	// this->cacheAllPermissions();
