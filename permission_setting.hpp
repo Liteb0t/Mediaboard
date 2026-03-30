@@ -1,4 +1,5 @@
 #include "db_interface.h"
+#include <iostream>
 
 // Caution: only insert values just before NUMBER_OF_PERMISSIONS; otherwise existing database entries will be messed up
 enum struct PERMISSION {  // Mirrors PermissionCollection.permissions in _permissions.js
@@ -22,9 +23,10 @@ enum struct THREE_STATE_SETTING { DENY, INHERIT, ALLOW };
 // in Permissions 2 custom constraints will be added.
 class PermissionSetting {
 public:
-	PermissionSetting(db_permission_setting_struct* permission_setting) {
-		this->id = permission_setting->id;
-		this->setting = static_cast<THREE_STATE_SETTING>(permission_setting->setting);
+	PermissionSetting(db_permission_setting_struct* permission_setting)
+			: id(permission_setting->id),
+			setting(static_cast<THREE_STATE_SETTING>(permission_setting->setting)) {
+		std::cout << "[PermissionSetting] Created with ID " << id << std::endl;
 	}
 	PermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting)
 			: /*permission_collection_id(permission_collection_id), permission(permission),*/ setting(setting) {

@@ -34,7 +34,7 @@ public:
 	}
 	void addPermissionSetting(db_permission_setting_struct* db_permission_setting) {
 		PermissionSetting permission_setting(db_permission_setting);
-		permission_map.emplace(static_cast<PERMISSION>(db_permission_setting->permission_number), db_permission_setting);
+		permission_map.emplace(static_cast<PERMISSION>(db_permission_setting->permission_number), permission_setting);
 	}
 	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting) {
 		auto permission_iterator = this->permission_map.find(permission_type);

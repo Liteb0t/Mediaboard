@@ -164,7 +164,7 @@ int DatabaseConnectionSQLite::storePermissionCollection(int permission_object_id
 
 void DatabaseConnectionSQLite::declarePermissionCollectionCursor(int permission_object_id) {
 	int ec;
-	ec = sqlite3_prepare_v2(this->db, std::format("SELECT id, permission_group_id, account_id FROM permission_collection WHERE permission_object_id = {}", permission_object_id).c_str(), -1, &this->stmt, NULL);
+	ec = sqlite3_prepare_v2(this->db, std::format("SELECT id, account_id, permission_group_id FROM permission_collection WHERE permission_object_id = {}", permission_object_id).c_str(), -1, &this->stmt, NULL);
 	if (ec != SQLITE_OK) {
 		std::cerr << "[DatabaseConnectionSQLite] Could not declare cursor: " << sqlite3_errmsg(this->db);
 		return /* failure */;
@@ -177,8 +177,14 @@ db_permission_collection_struct* DatabaseConnectionSQLite::getValueFromPermissio
 		case SQLITE_ROW:
 			permission_collection.has_value = true;
 			permission_collection.id = sqlite3_column_int(stmt, 0);
-			permission_collection.group_id = sqlite3_column_int(stmt, 1);
-			permission_collection.account_id = sqlite3_column_int(stmt, 2);
+			if (sqlite3_column_type(stmt, 1) != SQLITE_NULL)
+				permission_collection.account_id = sqlite3_column_int(stmt, 1);
+			else
+				permission_collection.account_id = -1;
+			if (sqlite3_column_type(stmt, 2) != SQLITE_NULL)
+				permission_collection.group_id = sqlite3_column_int(stmt, 2);
+			else
+				permission_collection.group_id = -1;
 			break;
 		case SQLITE_DONE:
 			permission_collection.has_value = false;
@@ -217,11 +223,15 @@ db_permission_setting_struct* DatabaseConnectionSQLite::getValueFromPermissionSe
 			break;
 		default:
 			permission_setting.has_value = false;
-			std::cerr << "[DatabaseConnectionSQLite] getValueFromPermissionSettingCursor() Error: " <<sqlite3_errmsg(this->db);
+			std::cerr << "[DatabaseConnectionSQLite] getValueFromPermissionSettingCursor() Error: " << sqlite3_errmsg(this->db);
 			break;
 	}
 	return &permission_setting;
 }
 void DatabaseConnectionSQLite::closePermissionSettingCursor() {
 	sqlite3_finalize(this->stmt2);
+}
+
+void DatabaseConnectionSQLite::TestIteratorSQLite::printClassType() const {
+	std::cout << "[TestIteratorSQLite] type is " << this->db->getClassType() << std::endl;
 }

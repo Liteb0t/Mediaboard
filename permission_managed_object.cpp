@@ -6,6 +6,9 @@
 PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseConnection* db)
 		: permission_object_id(permission_object_id),
 		db(db) {
+	DatabaseConnection::TestIterator* it = db->getTestIterator();
+	it->printClassType();
+	DatabaseConnection::TestRange* r = db->permission_setting();
 	this->cacheAllPermissions();
 }
 
@@ -28,10 +31,10 @@ void PermissionObjectBase::cacheAllPermissions() {
 		db->declarePermissionSettingCursor(permission_collection->id);
 		while (true) {
 			db_permission_setting_struct* permission_setting = db->getValueFromPermissionSettingCursor();
-			if (!permission_setting->has_value) {
+			if (permission_setting->has_value)
+				new_permission_collection.addPermissionSetting(permission_setting);
+			else
 				break;
-			}
-			new_permission_collection.addPermissionSetting(permission_setting);
 		}
 		db->closePermissionSettingCursor();
 
