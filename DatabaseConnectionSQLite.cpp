@@ -5,45 +5,8 @@
 #include <fstream>
 #include <sqlite3.h>
 #include <stdexcept>
-#include <string_view>
 #include <sstream>
-
-int callback(void* unused, int number_of_columns, char** columns, char** column_names) {
-	int i;
-	for(i = 0; i < number_of_columns; i++) {
-		printf(" %s = %s |", column_names[i], columns[i] ? columns[i] : "NULL");
-	}
-	printf("\n");
-	return 0;
-}
-
-void DatabaseConnectionSQLite::execWriteOnlyStatement(std::string& statement) {
-	this->execWriteOnlyStatement(statement.c_str());
-}
-void DatabaseConnectionSQLite::execWriteOnlyStatement(const char* statement) {
-	std::cout << "[DatabaseConnectionSQLite] " << statement << std::endl;
-	int ec; char* error_message;
-	ec = sqlite3_exec(this->db, statement, callback, 0, &error_message);
-	if (ec != SQLITE_OK) {
-		std::string error_str = error_message;
-		sqlite3_free(error_message);
-		throw std::runtime_error(error_str);
-		// fprintf(stderr, "[DatabaseConnectionSQLite] SQL error %d: %s\n", ec, error_message);
-	}
-}
-
-void DatabaseConnectionSQLite::execMultipleWriteOnlyStatements(std::istream& stream) {
-	std::string line;
-	while (std::getline(stream, line, ';')) {
-		this->execWriteOnlyStatement(line);
-	}
-}
-
-void DatabaseConnectionSQLite::writeDatabaseVersion(const std::string& program_version_string) {
-	this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _info(version TEXT NOT NULL)");
-	this->execWriteOnlyStatement("DELETE FROM _info");
-	this->execWriteOnlyStatement(std::format("INSERT INTO _info VALUES('{}')", program_version_string).c_str());
-}
+#include <cstring>
 
 DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path& database_directory, const std::string& filename, const std::string& program_version_string) {
 	std::string database_filepath = std::format("{}/{}", database_directory.string(), filename);
@@ -114,6 +77,48 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 	}
 }
 
+DatabaseConnectionSQLite::~DatabaseConnectionSQLite() {
+	std::cout << "[DatabaseConnectionSQLite] Closing connection..." << std::endl;
+	sqlite3_close(db);
+}
+
+int callback(void* unused, int number_of_columns, char** columns, char** column_names) {
+	int i;
+	for(i = 0; i < number_of_columns; i++) {
+		printf(" %s = %s |", column_names[i], columns[i] ? columns[i] : "NULL");
+	}
+	printf("\n");
+	return 0;
+}
+
+void DatabaseConnectionSQLite::execWriteOnlyStatement(std::string& statement) {
+	this->execWriteOnlyStatement(statement.c_str());
+}
+void DatabaseConnectionSQLite::execWriteOnlyStatement(const char* statement) {
+	std::cout << "[DatabaseConnectionSQLite] " << statement << std::endl;
+	int ec; char* error_message;
+	ec = sqlite3_exec(this->db, statement, callback, 0, &error_message);
+	if (ec != SQLITE_OK) {
+		std::string error_str = error_message;
+		sqlite3_free(error_message);
+		throw std::runtime_error(error_str);
+		// fprintf(stderr, "[DatabaseConnectionSQLite] SQL error %d: %s\n", ec, error_message);
+	}
+}
+
+void DatabaseConnectionSQLite::execMultipleWriteOnlyStatements(std::istream& stream) {
+	std::string line;
+	while (std::getline(stream, line, ';')) {
+		this->execWriteOnlyStatement(line);
+	}
+}
+
+void DatabaseConnectionSQLite::writeDatabaseVersion(const std::string& program_version_string) {
+	this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _info(version TEXT NOT NULL)");
+	this->execWriteOnlyStatement("DELETE FROM _info");
+	this->execWriteOnlyStatement(std::format("INSERT INTO _info VALUES('{}')", program_version_string).c_str());
+}
+
 bool DatabaseConnectionSQLite::writeMigrations(std::ostream& stream, const std::string& database_version_string) {
 	if (database_version_string <= "0.0.5")	goto v0_0_5;
 	// If code reaches here, no migrations need to be made
@@ -140,11 +145,6 @@ void DatabaseConnectionSQLite::firstTimeSetup(const boost::filesystem::path& dat
 	catch (std::exception& exception) {
 		std::cout << "[DatabaseConnectionSQLite] Exception in SQLite init: " << exception.what() << std::endl;
 	}
-}
-
-DatabaseConnectionSQLite::~DatabaseConnectionSQLite() {
-	std::cout << "[DatabaseConnectionSQLite] Closing connection..." << std::endl;
-	sqlite3_close(db);
 }
 
 int DatabaseConnectionSQLite::storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) {
@@ -231,7 +231,145 @@ db_permission_setting_struct* DatabaseConnectionSQLite::getValueFromPermissionSe
 void DatabaseConnectionSQLite::closePermissionSettingCursor() {
 	sqlite3_finalize(this->stmt2);
 }
-
+/*
 void DatabaseConnectionSQLite::TestIteratorSQLite::printClassType() const {
 	std::cout << "[TestIteratorSQLite] type is " << this->db->getClassType() << std::endl;
+}*/
+void DatabaseConnectionSQLite::declareAccountCursor() {
+	int ec;
+	ec = sqlite3_prepare_v2(this->db, "SELECT id, username, key FROM account" , -1, &this->stmt, NULL);
+	if (ec != SQLITE_OK) {
+		std::cerr << "[DatabaseConnectionSQLite] Could not declare cursor: " << sqlite3_errmsg(this->db);
+		return /* failure */;
+	}
+}
+db_account_struct* DatabaseConnectionSQLite::getValueFromAccountCursor() {
+	int ec;
+	static db_account_struct account;
+	switch (sqlite3_step(this->stmt)) {
+		case SQLITE_ROW:
+			account.has_value = true;
+			account.id = sqlite3_column_int(this->stmt, 0);
+			if (sqlite3_column_type(this->stmt, 1) != SQLITE_NULL) {
+				const unsigned char* text = sqlite3_column_text(this->stmt, 1);
+				strcpy(account.username, reinterpret_cast<const char*>(text));
+			}
+			else
+				account.username[0] = '\0';
+			if (sqlite3_column_type(this->stmt, 2) != SQLITE_NULL) {
+				const unsigned char* text = sqlite3_column_text(this->stmt, 2);
+				strcpy(account.key, reinterpret_cast<const char*>(text));
+			}
+			else
+				account.key[0] = '\0';
+			break;
+		case SQLITE_DONE:
+			account.has_value = false;
+			break;
+		default:
+			account.has_value = false;
+			std::cerr << "[DatabaseConnectionSQLite] getValueFromPermissionSettingCursor() Error: " << sqlite3_errmsg(this->db);
+			break;
+	}
+	return &account;
+}
+void DatabaseConnectionSQLite::closeAccountCursor() {
+	sqlite3_finalize(this->stmt);
+}
+void DatabaseConnectionSQLite::declareGroupCursor() {
+	int ec;
+	ec = sqlite3_prepare_v2(this->db, "SELECT id, name FROM permission_group" , -1, &this->stmt, NULL);
+	if (ec != SQLITE_OK) {
+		std::cerr << "[DatabaseConnectionSQLite] Could not declare cursor: " << sqlite3_errmsg(this->db);
+		return /* failure */;
+	}
+}
+db_group_struct* DatabaseConnectionSQLite::getValueFromGroupCursor() {
+	int ec;
+	static db_group_struct group;
+	switch (sqlite3_step(this->stmt)) {
+		case SQLITE_ROW:
+			group.has_value = true;
+			group.id = sqlite3_column_int(this->stmt, 0);
+			if (sqlite3_column_type(this->stmt, 1) != SQLITE_NULL) {
+				const unsigned char* text = sqlite3_column_text(this->stmt, 1);
+				strcpy(group.name, reinterpret_cast<const char*>(text));
+			}
+			else
+				group.name[0] = '\0';
+			break;
+		case SQLITE_DONE:
+			group.has_value = false;
+			break;
+		default:
+			group.has_value = false;
+			std::cerr << "[DatabaseConnectionSQLite] getValueFromPermissionSettingCursor() Error: " << sqlite3_errmsg(this->db);
+			break;
+	}
+	return &group;
+}
+void DatabaseConnectionSQLite::closeGroupCursor() {
+	sqlite3_finalize(this->stmt);
+}
+
+void DatabaseConnectionSQLite::declareGroupHeirarchyCursor() {
+	int ec;
+	ec = sqlite3_prepare_v2(this->db, "SELECT rank, permission_group FROM permission_group_heirarchy" , -1, &this->stmt, NULL);
+	if (ec != SQLITE_OK) {
+		std::cerr << "[DatabaseConnectionSQLite] Could not declare cursor: " << sqlite3_errmsg(this->db);
+		return /* failure */;
+	}
+}
+db_group_heirarchy_struct* DatabaseConnectionSQLite::getValueFromGroupHeirarchyCursor() {
+	int ec;
+	static db_group_heirarchy_struct group_heirarchy;
+	switch (sqlite3_step(this->stmt)) {
+		case SQLITE_ROW:
+			group_heirarchy.has_value = true;
+			group_heirarchy.rank = sqlite3_column_int(stmt, 0);
+			group_heirarchy.group_id = sqlite3_column_int(stmt, 1);
+			break;
+		case SQLITE_DONE:
+			group_heirarchy.has_value = false;
+			break;
+		default:
+			group_heirarchy.has_value = false;
+			std::cerr << "[DatabaseConnectionSQLite] getValueFromGroupHeirarchyCursor() Error: " << sqlite3_errmsg(this->db);
+			break;
+	}
+	return &group_heirarchy;
+}
+void DatabaseConnectionSQLite::closeGroupHeirarchyCursor() {
+	sqlite3_finalize(this->stmt);
+}
+
+void DatabaseConnectionSQLite::declareGroupMemberCursor() {
+	int ec;
+	ec = sqlite3_prepare_v2(this->db, "SELECT group_id, account_id FROM permission_group_account" , -1, &this->stmt, NULL);
+	if (ec != SQLITE_OK) {
+		std::cerr << "[DatabaseConnectionSQLite] Could not declare cursor: " << sqlite3_errmsg(this->db);
+		return /* failure */;
+	}
+}
+db_group_member_struct* DatabaseConnectionSQLite::getValueFromGroupMemberCursor() {
+	int ec;
+	static db_group_member_struct group_member;
+	switch (sqlite3_step(this->stmt)) {
+		case SQLITE_ROW:
+			group_member.has_value = true;
+			group_member.group_id = sqlite3_column_int(stmt, 0);
+			group_member.account_id = sqlite3_column_int(stmt, 1);
+			break;
+		case SQLITE_DONE:
+			group_member.has_value = false;
+			break;
+		default:
+			group_member.has_value = false;
+			std::cerr << "[DatabaseConnectionSQLite] getValueFromGroupHeirarchyCursor() Error: " << sqlite3_errmsg(this->db);
+			break;
+	}
+	return &group_member;
+}
+void DatabaseConnectionSQLite::closeGroupMemberCursor() {
+	sqlite3_finalize(this->stmt);
 }

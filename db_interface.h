@@ -41,17 +41,12 @@ extern "C" {
 		size_t size;
 	};
 	struct db_group_struct {
+		bool has_value;
 		int id;
 		char name[GROUP_MAX_NAME+1];
-		// int rank;
-		// char permissions[NUMBER_OF_PERMISSIONS+1];
-	};
-	struct db_group_array {
-		struct db_group_struct* array;
-		size_t used;
-		size_t size;
 	};
 	struct db_group_heirarchy_struct {
+		bool has_value;
 		int rank;
 		int group_id;
 	};
@@ -61,23 +56,15 @@ extern "C" {
 		size_t size;
 	};
 	struct db_account_struct {
+		bool has_value;
 		int id;
 		char username[ACCOUNT_MAX_USERNAME+1];
 		char key[KEY_LENGTH+1];
 	};
-	struct db_account_array {
-		struct db_account_struct* array;
-		size_t used;
-		size_t size;
-	};
 	struct db_group_member_struct {
+		bool has_value;
 		int group_id;
 		int account_id;
-	};
-	struct db_group_member_array {
-		struct db_group_member_struct* array;
-		size_t used;
-		size_t size;
 	};
 	struct db_permission_collection_struct {
 		bool has_value;
@@ -99,18 +86,9 @@ extern "C" {
 	void initThreadArray(struct db_thread_array*, size_t);
 	void insertToThreadArray(struct db_thread_array*, struct db_thread_struct);
 	void freeThreadArray(struct db_thread_array*);
-	void initGroupArray(struct db_group_array*, size_t);
-	void insertToGroupArray(struct db_group_array*, struct db_group_struct);
-	void freeGroupArray(struct db_group_array*);
 	void initGroupHeirarchyArray(struct db_group_heirarchy_array*, size_t);
 	void insertToGroupHeirarchyArray(struct db_group_heirarchy_array*, struct db_group_heirarchy_struct);
 	void freeGroupHeirarchyArray(struct db_group_heirarchy_array*);
-	void initAccountArray(struct db_account_array*, size_t);
-	void insertToAccountArray(struct db_account_array*, struct db_account_struct);
-	void freeAccountArray(struct db_account_array*);
-	void initGroupMemberArray(struct db_group_member_array*, size_t);
-	void insertToGroupMemberArray(struct db_group_member_array*, struct db_group_member_struct);
-	void freeGroupMemberArray(struct db_group_member_array*);
 
 	// Database functions
 	char* db_retrieve_database_version();
@@ -142,10 +120,18 @@ extern "C" {
 	struct db_post_struct db_retrieve_last_post(void);
 	struct db_thread_array* db_retrieve_threads(void);
 	struct db_post_array* db_retrieve_history(void);
-	struct db_group_array* db_retrieve_groups(void);
-	struct db_group_heirarchy_array* db_retrieve_group_heirarchy(void);
-	struct db_account_array* db_retrieve_accounts(void);
-	struct db_group_member_array* db_retrieve_group_members(void);
+	void db_create_cursor_for_account();
+	struct db_account_struct* db_cursor_retrieve_account();
+	void db_free_cursor_for_account();
+	void db_create_cursor_for_group();
+	struct db_group_struct* db_cursor_retrieve_group();
+	void db_free_cursor_for_group();
+	void db_create_cursor_for_group_heirarchy();
+	struct db_group_heirarchy_struct* db_cursor_retrieve_group_heirarchy();
+	void db_free_cursor_for_group_heirarchy();
+	void db_create_cursor_for_group_member();
+	struct db_group_member_struct* db_cursor_retrieve_group_member();
+	void db_free_cursor_for_group_member();
 	void db_create_cursor_for_permission_collection(int _permission_object_id);
 	struct db_permission_collection_struct* db_cursor_retrieve_permission_collection();
 	void db_free_cursor_for_permission_collection();

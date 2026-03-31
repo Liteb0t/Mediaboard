@@ -1,5 +1,7 @@
 #include "DatabaseConnection.hpp"
+#include "db_interface.h"
 #include "libpq-fe.h"
+#include <string>
 
 class DatabaseConnectionPostgreSQL : public DatabaseConnection {
 public:
@@ -10,43 +12,26 @@ public:
 	int getUniquePermissionObjectId() const override { return db_get_unique_permission_object_id(); }
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
 
+	void declareAccountCursor() override { db_create_cursor_for_account(); }
+	db_account_struct* getValueFromAccountCursor() override { return db_cursor_retrieve_account(); }
+	void closeAccountCursor() override { db_free_cursor_for_account(); }
+
+	void declareGroupCursor() override { db_create_cursor_for_group(); }
+	db_group_struct* getValueFromGroupCursor() override { return db_cursor_retrieve_group(); }
+	void closeGroupCursor() override { return db_free_cursor_for_group(); }
+	void declareGroupHeirarchyCursor() override { db_create_cursor_for_group_heirarchy(); }
+	db_group_heirarchy_struct* getValueFromGroupHeirarchyCursor() override { return db_cursor_retrieve_group_heirarchy(); }
+	void closeGroupHeirarchyCursor() override { db_free_cursor_for_group_heirarchy(); }
+	void declareGroupMemberCursor() override { db_create_cursor_for_group_member(); }
+	db_group_member_struct* getValueFromGroupMemberCursor() override { return db_cursor_retrieve_group_member(); }
+	void closeGroupMemberCursor() override { db_free_cursor_for_group_member(); }
+
 	void declarePermissionCollectionCursor(int permission_object_id) override { db_create_cursor_for_permission_collection(permission_object_id); }
 	db_permission_collection_struct* getValueFromPermissionCollectionCursor() override { return db_cursor_retrieve_permission_collection(); }
 	void closePermissionCollectionCursor() override { db_free_cursor_for_permission_collection(); }
 	void declarePermissionSettingCursor(int permission_collection_id) override { db_create_cursor_for_permission_setting(permission_collection_id); };
 	db_permission_setting_struct* getValueFromPermissionSettingCursor() override { return db_cursor_retrieve_permission_setting(); };
 	void closePermissionSettingCursor() override { db_free_cursor_for_permission_setting(); };
-	class TestIteratorPostgreSQL : public TestIterator {
-	public:
-		TestIteratorPostgreSQL(DatabaseConnectionPostgreSQL* db) : db(db) {}
-		void printClassType() const override;
-	private:
-		DatabaseConnectionPostgreSQL* db;
-	};
-	TestIterator* getTestIterator() override {
-		TestIteratorPostgreSQL* it = new TestIteratorPostgreSQL(this);
-		return it;
-	}
-	std::string class_type = "DatabaseConnectionPostgreSQL";
-	const std::string& getClassType() const { return this->class_type; }
-	class TestRangePostgreSQL : public TestRange {
-	public:
-		virtual int operator*() override {
-			return this->data[index];
-		}
-	private:
-		std::array<int, 5> data = {101, 102, 103, 104, 105};
-		virtual int getId() const override { return index; }
-		virtual bool isEnd() const override { return index == 4; }
-	};
-	namespace permission_setting {
-	public:
-		TestRange* begin() override { return new TestRangePostgreSQL(); };
-	};
-	// TestRange* getTestRange() override {
-	// 	TestRangePostgreSQL* it = new TestRangePostgreSQL();
-	// 	return it;
-	// }
 private:
 	PGconn* db;
 	void migrateIfVersionIsNewer(const std::string& program_version_string);

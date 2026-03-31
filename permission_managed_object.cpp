@@ -6,9 +6,6 @@
 PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseConnection* db)
 		: permission_object_id(permission_object_id),
 		db(db) {
-	DatabaseConnection::TestIterator* it = db->getTestIterator();
-	it->printClassType();
-	DatabaseConnection::TestRange* r = db->permission_setting();
 	this->cacheAllPermissions();
 }
 
@@ -117,39 +114,51 @@ void PermissionManager::grantDefaultAdminPrivileges() {
 
 void PermissionManager::cacheAllUsers() {
 	std::cout << "[PermissionManager] Retreiving accounts from database... ";
-	struct db_account_array* account_array = db_retrieve_accounts();
-	for (int i = 0; i < account_array->used; i++) {
-		std::cout << account_array->array[i].id << ", ";
-		User user(&account_array->array[i]);
-		this->users.emplace(account_array->array[i].id, user);
-		this->username_to_id_map.emplace(user.getUsername(), account_array->array[i].id);
+	db->declareAccountCursor();
+	while (true) {
+		struct db_account_struct* account_struct = db->getValueFromAccountCursor();
+		if (!account_struct->has_value)
+			break;
+		std::cout << account_struct->id << ", ";
+		User user(account_struct);
+		this->users.emplace(account_struct->id, user);
+		this->username_to_id_map.emplace(user.getUsername(), account_struct->id);
 	}
+	db->closeAccountCursor();
 	std::cout << "done." << std::endl;
-	freeAccountArray(account_array);
 }
 
 void PermissionManager::cacheAllGroups() {
 	std::cout << "[PermissionManager] Retreiving groups from database... ";
-	struct db_group_array* group_array = db_retrieve_groups();
-	for (int i = 0; i < group_array->used; i++) {
-		Group group(&group_array->array[i]);
-		this->groups.emplace(group_array->array[i].id, group);
-		std::cout << group_array->array[i].id << ", ";
+	// struct db_group_array* group_array = db_retrieve_groups();
+	db->declareGroupCursor();
+	while (true) {
+		db_group_struct* group_struct = db->getValueFromGroupCursor();
+		if (!group_struct->has_value)
+			break;
+		Group group(group_struct);
+		this->groups.emplace(group_struct->id, group);
+		std::cout << group_struct->id << ", ";
 	}
-	freeGroupArray(group_array);
+	db->closeGroupCursor();
 	std::cout << "added " << this->groups.size() << " groups";
-	struct db_group_heirarchy_array* group_heirarchy = db_retrieve_group_heirarchy();
-	this->ordered_groups.reserve(group_heirarchy->used + 4);
-	for (int i = 0; i < group_heirarchy->used; i++) {
-		this->ordered_groups.push_back(group_heirarchy->array[i].group_id);
+	db->declareGroupHeirarchyCursor();
+	while (true) {
+		db_group_heirarchy_struct* group_heirarchy_struct = db->getValueFromGroupHeirarchyCursor();
+		if (!group_heirarchy_struct->has_value)
+			break;
+		this->ordered_groups.push_back(group_heirarchy_struct->group_id);
 	}
-	freeGroupHeirarchyArray(group_heirarchy);
+	db->closeGroupHeirarchyCursor();
 	std::cout << ", established heirarchy";
-	struct db_group_member_array* group_member_array = db_retrieve_group_members();
-	for (int i = 0; i < group_member_array->used; i++) {
-		this->groups.at(group_member_array->array[i].group_id).addMember(group_member_array->array[i].account_id);
+	db->declareGroupMemberCursor();
+	while (true) {
+		db_group_member_struct* group_member_struct = db->getValueFromGroupMemberCursor();
+		if (!group_member_struct->has_value)
+			break;
+		this->groups.at(group_member_struct->group_id).addMember(group_member_struct->account_id);
 	}
-	freeGroupMemberArray(group_member_array);
+	db->closeGroupMemberCursor();
 	std::cout << ", added users to groups." << std::endl;
 
 	// Check that the permission_group table is consistent with the permission_group_heirarchy table

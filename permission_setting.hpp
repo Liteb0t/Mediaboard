@@ -26,7 +26,7 @@ public:
 	PermissionSetting(db_permission_setting_struct* permission_setting)
 			: id(permission_setting->id),
 			setting(static_cast<THREE_STATE_SETTING>(permission_setting->setting)) {
-		std::cout << "[PermissionSetting] Created with ID " << id << std::endl;
+		std::cout << "[PermissionSetting] Cached with ID " << id << std::endl;
 	}
 	PermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting)
 			: /*permission_collection_id(permission_collection_id), permission(permission),*/ setting(setting) {

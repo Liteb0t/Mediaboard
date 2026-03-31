@@ -135,7 +135,3 @@ int DatabaseConnectionPostgreSQL::storePermissionCollection(int permission_objec
 								   user_or_group == USER_OR_GROUP::USER ? user_or_group_id : -1,
 								   user_or_group == USER_OR_GROUP::GROUP ? user_or_group_id : -1);
 }
-
-void DatabaseConnectionPostgreSQL::TestIteratorPostgreSQL::printClassType() const {
-	std::cout << "[TestIteratorSQLite] type is " << this->db->getClassType() << std::endl;
-}

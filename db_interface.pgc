@@ -55,28 +55,6 @@ void freeThreadArray(struct db_thread_array* a) {
 	a->used = a->size = 0;
 }
 
-void initGroupArray(struct db_group_array* a, size_t initialSize) {
-	a->array = malloc(initialSize * sizeof(struct db_group_struct));
-	a->used = 0;
-	a->size = initialSize;
-}
-
-void insertToGroupArray(struct db_group_array* a, struct db_group_struct element) {
-	// a->used is the number of used entries, because a->array[a->used++] updates a->used only *after* the array has been accessed.
-	// Therefore a->used can go up to a->size
-	if (a->used == a->size) {
-		a->size *= 2;
-		a->array = realloc(a->array, a->size * sizeof(struct db_group_struct));
-	}
-	a->array[a->used++] = element;
-}
-
-void freeGroupArray(struct db_group_array* a) {
-	free(a->array);
-	a->array = NULL;
-	a->used = a->size = 0;
-}
-
 void initGroupHeirarchyArray(struct db_group_heirarchy_array* a, size_t initialSize) {
 	a->array = malloc(initialSize * sizeof(struct db_group_heirarchy_struct));
 	a->used = 0;
@@ -94,50 +72,6 @@ void insertToGroupHeirarchyArray(struct db_group_heirarchy_array* a, struct db_g
 }
 
 void freeGroupHeirarchyArray(struct db_group_heirarchy_array* a) {
-	free(a->array);
-	a->array = NULL;
-	a->used = a->size = 0;
-}
-
-void initAccountArray(struct db_account_array* a, size_t initialSize) {
-	a->array = malloc(initialSize * sizeof(struct db_account_struct));
-	a->used = 0;
-	a->size = initialSize;
-}
-
-void insertToAccountArray(struct db_account_array* a, struct db_account_struct element) {
-	// a->used is the number of used entries, because a->array[a->used++] updates a->used only *after* the array has been accessed.
-	// Therefore a->used can go up to a->size
-	if (a->used == a->size) {
-		a->size *= 2;
-		a->array = realloc(a->array, a->size * sizeof(struct db_account_struct));
-	}
-	a->array[a->used++] = element;
-}
-
-void freeAccountArray(struct db_account_array* a) {
-	free(a->array);
-	a->array = NULL;
-	a->used = a->size = 0;
-}
-
-void initGroupMemberArray(struct db_group_member_array* a, size_t initialSize) {
-	a->array = malloc(initialSize * sizeof(struct db_group_member_struct));
-	a->used = 0;
-	a->size = initialSize;
-}
-
-void insertToGroupMemberArray(struct db_group_member_array* a, struct db_group_member_struct element) {
-	// a->used is the number of used entries, because a->array[a->used++] updates a->used only *after* the array has been accessed.
-	// Therefore a->used can go up to a->size
-	if (a->used == a->size) {
-		a->size *= 2;
-		a->array = realloc(a->array, a->size * sizeof(struct db_group_member_struct));
-	}
-	a->array[a->used++] = element;
-}
-
-void freeGroupMemberArray(struct db_group_member_array* a) {
 	free(a->array);
 	a->array = NULL;
 	a->used = a->size = 0;
@@ -498,54 +432,6 @@ void db_delete_group(int _group_id) {
 	EXEC SQL COMMIT;
 }
 
-struct db_group_array* db_retrieve_groups(void) {
-	static struct db_group_array groups;
-	initGroupArray(&groups, 100);
-	EXEC SQL BEGIN DECLARE SECTION;
-	int id;
-	char name[GROUP_MAX_NAME+1];
-	EXEC SQL END DECLARE SECTION;
-	EXEC SQL DECLARE group_getter CURSOR FOR
-		SELECT id, name FROM permission_group;
-	EXEC SQL OPEN group_getter;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `group_getter` has retreived all groups
-	while (true) {
-		EXEC SQL FETCH group_getter INTO :id, :name;
-		struct db_group_struct group;
-		group.id = id;
-		strcpy(group.name, name);
-		insertToGroupArray(&groups, group);
-	}
-	EXEC SQL CLOSE group_getter;
-	EXEC SQL COMMIT;
-	return (&groups);
-}
-
-struct db_group_heirarchy_array* db_retrieve_group_heirarchy(void) {
-	static struct db_group_heirarchy_array group_heirarchy;
-	initGroupHeirarchyArray(&group_heirarchy, 100);
-	EXEC SQL BEGIN DECLARE SECTION;
-	int rank;
-	int group_id;
-	EXEC SQL END DECLARE SECTION;
-	EXEC SQL DECLARE group_heirarchy_getter CURSOR FOR
-		SELECT rank, permission_group FROM permission_group_heirarchy
-		ORDER BY rank;
-	EXEC SQL OPEN group_heirarchy_getter;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `group_heirarchy_getter` has retreived all groups
-	while (true) {
-		EXEC SQL FETCH group_heirarchy_getter INTO :rank, :group_id;
-		struct db_group_heirarchy_struct group;
-		group.rank = rank;
-		group.group_id = group_id;
-		insertToGroupHeirarchyArray(&group_heirarchy, group);
-	}
-	EXEC SQL CLOSE group_heirarchy_getter;
-	EXEC SQL COMMIT;
-	EXEC SQL WHENEVER NOT FOUND CONTINUE;
-	return (&group_heirarchy);
-}
-
 void db_update_group_heirarchy(struct db_group_heirarchy_array* group_heirarchy) {
 	EXEC SQL DELETE FROM permission_group_heirarchy;
 	EXEC SQL BEGIN DECLARE SECTION;
@@ -558,32 +444,6 @@ void db_update_group_heirarchy(struct db_group_heirarchy_array* group_heirarchy)
 		EXEC SQL INSERT INTO permission_group_heirarchy(rank, permission_group) VALUES (:rank, :group_id);
 	}
 	EXEC SQL COMMIT;
-}
-
-struct db_account_array* db_retrieve_accounts(void) {
-	static struct db_account_array accounts;
-	initAccountArray(&accounts, 500);
-	EXEC SQL BEGIN DECLARE SECTION;
-	int id;
-	char username[ACCOUNT_MAX_USERNAME+1];
-	char key[KEY_LENGTH+1];
-	EXEC SQL END DECLARE SECTION;
-	EXEC SQL DECLARE account_getter CURSOR FOR
-		SELECT id, username, key FROM account;
-	EXEC SQL OPEN account_getter;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `account_getter` has retreived all accounts
-	while (true) {
-		EXEC SQL FETCH account_getter INTO :id, :username, :key;
-		struct db_account_struct account;
-		account.id = id;
-		strcpy(account.username, username);
-		strcpy(account.key, key);
-		insertToAccountArray(&accounts, account);
-	}
-	EXEC SQL CLOSE account_getter;
-	EXEC SQL COMMIT;
-	EXEC SQL WHENEVER NOT FOUND CONTINUE;
-	return (&accounts);
 }
 
 void db_add_member_to_group(int _user_id, int _group_id) {
@@ -604,30 +464,6 @@ void db_remove_member_from_group(int _user_id, int _group_id) {
 	EXEC SQL COMMIT;
 }
 
-struct db_group_member_array* db_retrieve_group_members(void) {
-	static struct db_group_member_array group_members;
-	initGroupMemberArray(&group_members, 500);
-	EXEC SQL BEGIN DECLARE SECTION;
-	int group_id;
-	int account_id;
-	EXEC SQL END DECLARE SECTION;
-	EXEC SQL DECLARE group_member_getter CURSOR FOR
-		SELECT group_id, account_id FROM permission_group_account;
-	EXEC SQL OPEN group_member_getter;
-	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `group_member_getter` has retreived all groups
-	while (true) {
-		EXEC SQL FETCH group_member_getter INTO :group_id, :account_id;
-		struct db_group_member_struct group_member;
-		group_member.group_id = group_id;
-		group_member.account_id = account_id;
-		insertToGroupMemberArray(&group_members, group_member);
-	}
-	EXEC SQL CLOSE group_member_getter;
-	EXEC SQL COMMIT;
-	EXEC SQL WHENEVER NOT FOUND CONTINUE;
-	return (&group_members);
-}
-
 int db_get_unique_permission_object_id() {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int new_permission_object_id;
@@ -635,6 +471,130 @@ int db_get_unique_permission_object_id() {
 	EXEC SQL SELECT nextval('permission_object_id_seq') INTO :new_permission_object_id;
 	EXEC SQL COMMIT;
 	return new_permission_object_id;
+}
+// }
+
+void db_create_cursor_for_account() {
+	EXEC SQL DECLARE account_getter CURSOR FOR
+		SELECT id, username, key FROM account;
+	EXEC SQL OPEN account_getter;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `account_getter` has retreived all accounts
+}
+struct db_account_struct* db_cursor_retrieve_account() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int id;
+	char username[ACCOUNT_MAX_USERNAME+1];
+	char key[KEY_LENGTH+1];
+	EXEC SQL END DECLARE SECTION;
+	static struct db_account_struct account;
+	while (true) {
+		EXEC SQL FETCH account_getter INTO :id, :username, :key;
+		goto db_cursor_retrieve_account_not_null;
+	}
+db_cursor_retrieve_account_not_null:
+	account.has_value = false;
+	return &account;
+	account.has_value = true;
+	account.id = id;
+	strcpy(account.username, username);
+	strcpy(account.key, key);
+	return &account;
+}
+void db_free_cursor_for_account() {
+	EXEC SQL CLOSE account_getter;
+	EXEC SQL COMMIT;
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+}
+
+void db_create_cursor_for_group() {
+	EXEC SQL DECLARE group_getter CURSOR FOR
+		SELECT id, name FROM permission_group;
+	EXEC SQL OPEN group_getter;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+}
+struct db_group_struct* db_cursor_retrieve_group() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int id;
+	char name[GROUP_MAX_NAME+1];
+	EXEC SQL END DECLARE SECTION;
+	static struct db_group_struct group;
+	while (true) {
+		EXEC SQL FETCH group_getter INTO :id, :name;
+		goto db_cursor_retrieve_group_not_null;
+	}
+	group.has_value = false;
+	return &group;
+db_cursor_retrieve_group_not_null:
+	group.has_value = true;
+	group.id = id;
+	strcpy(group.name, name);
+	return &group;
+}
+void db_free_cursor_for_group() {
+	EXEC SQL CLOSE group_getter;
+	EXEC SQL COMMIT;
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+}
+
+void db_create_cursor_for_group_heirarchy() {
+	EXEC SQL DECLARE group_heirarchy_getter CURSOR FOR
+		SELECT rank, permission_group FROM permission_group_heirarchy
+		ORDER BY rank;
+	EXEC SQL OPEN group_heirarchy_getter;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK;
+}
+struct db_group_heirarchy_struct* db_cursor_retrieve_group_heirarchy() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int rank;
+	int group_id;
+	EXEC SQL END DECLARE SECTION;
+	static struct db_group_heirarchy_struct group;
+	while (true) {
+		EXEC SQL FETCH group_heirarchy_getter INTO :rank, :group_id;
+		goto db_cursor_retrieve_group_not_null;
+	}
+	group.has_value = false;
+	return &group;
+db_cursor_retrieve_group_not_null:
+	group.has_value = true;
+	group.rank = rank;
+	group.group_id = group_id;
+	return &group;
+}
+void db_free_cursor_for_group_heirarchy() {
+	EXEC SQL CLOSE group_heirarchy_getter;
+	EXEC SQL COMMIT;
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
+}
+
+void db_create_cursor_for_group_member() {
+	EXEC SQL DECLARE group_member_getter CURSOR FOR
+		SELECT group_id, account_id FROM permission_group_account;
+	EXEC SQL OPEN group_member_getter;
+	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `group_member_getter` has retreived all groups
+}
+struct db_group_member_struct* db_cursor_retrieve_group_member() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	int group_id;
+	int account_id;
+	EXEC SQL END DECLARE SECTION;
+	static struct db_group_member_struct group_member;
+	while (true) {
+		EXEC SQL FETCH group_member_getter INTO :group_id, :account_id;
+		goto db_cursor_retrieve_group_member_not_null;
+	}
+	group_member.has_value = false;
+	return &group_member;
+db_cursor_retrieve_group_member_not_null:
+	group_member.has_value = true;
+	group_member.group_id = group_id;
+	group_member.account_id = account_id;
+	return &group_member;
+}
+void db_free_cursor_for_group_member() {
+	EXEC SQL CLOSE group_member_getter;
+	EXEC SQL COMMIT;
+	EXEC SQL WHENEVER NOT FOUND CONTINUE;
 }
 
 void db_create_cursor_for_permission_collection(int _permission_object_id) {
@@ -647,7 +607,6 @@ void db_create_cursor_for_permission_collection(int _permission_object_id) {
 	EXEC SQL WHENEVER NOT FOUND DO BREAK;
 	EXEC SQL OPEN permission_collection_getter;
 }
-
 struct db_permission_collection_struct* db_cursor_retrieve_permission_collection() {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int id;
@@ -674,7 +633,6 @@ db_cursor_retrieve_permission_collection_not_null:
 		permission_collection.account_id = -1;
 	return &permission_collection;
 }
-
 void db_free_cursor_for_permission_collection() {
 	EXEC SQL CLOSE permission_collection_getter;
 	EXEC SQL COMMIT;
@@ -691,7 +649,6 @@ void db_create_cursor_for_permission_setting(int _permission_collection_id) {
 	EXEC SQL OPEN permission_setting_getter;
 	EXEC SQL WHENEVER NOT FOUND DO BREAK;
 }
-
 struct db_permission_setting_struct* db_cursor_retrieve_permission_setting() {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int id;
@@ -712,7 +669,6 @@ db_cursor_retrieve_permission_setting_not_null:
 	permission_setting.setting = setting;
 	return &permission_setting;
 }
-
 void db_free_cursor_for_permission_setting() {
 	EXEC SQL CLOSE permission_setting_getter;
 	// EXEC SQL COMMIT;

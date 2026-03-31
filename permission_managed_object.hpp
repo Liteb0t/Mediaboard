@@ -104,8 +104,8 @@ public:
 protected:
 	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
 	int permission_object_id; // Used to identify this object in the database
-private:
 	DatabaseConnection* db;
+private:
 	std::unordered_map<int, PermissionCollection> group_permissions;
 	std::unordered_map<int, PermissionCollection> user_permissions;
 };
