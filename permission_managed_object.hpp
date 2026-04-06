@@ -40,13 +40,13 @@ public:
 		std::unordered_map<int, PermissionCollection>::const_iterator group_iterator = this->group_permissions.find(group_id);
 		if (group_iterator == this->group_permissions.end())
 			this->addGroupPermissionCollection(group_id);
-		this->group_permissions.at(group_id).setPermission(permission_type, setting);
+		this->group_permissions.at(group_id).setPermission(permission_type, setting, this->db);
 	}
 	void setUserPermission(int user_id, PERMISSION permission_type, THREE_STATE_SETTING setting) {
 		std::unordered_map<int, PermissionCollection>::const_iterator user_iterator = this->user_permissions.find(user_id);
 		if (user_iterator == this->user_permissions.end())
 			this->addUserPermissionCollection(user_id);
-		this->user_permissions.at(user_id).setPermission(permission_type, setting);
+		this->user_permissions.at(user_id).setPermission(permission_type, setting, this->db);
 	}
 	bool passPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const {
 		inherited_permission = this->passInheritedPermissionForGroup(inherited_permission, permission, group_id);

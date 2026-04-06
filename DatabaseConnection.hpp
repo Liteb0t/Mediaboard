@@ -6,6 +6,24 @@
 
 enum struct USER_OR_GROUP {USER, GROUP};
 
+// Caution: only insert values just before NUMBER_OF_PERMISSIONS; otherwise existing database entries will be messed up
+enum struct PERMISSION {  // Mirrors PermissionCollection.permissions in _permissions.js
+	MANAGE_PERMISSIONS,
+	VIEW_THREAD,
+	CREATE_THREAD,
+	SEND_MESSAGE,
+	DELETE_POST,
+	// AUTHOR_DELETE_THREAD,
+	// NON_AUTHOR_DELETE_THREAD,
+	// NON_AUTHOR_VIEW_MESSAGE,
+	// NON_AUTHOR_VIEW_THREAD,
+	// UPLOAD_FILE,
+	// NON_AUTHOR_DELETE_FILE,
+	NUMBER_OF_PERMISSIONS
+};
+
+enum struct THREE_STATE_SETTING { DENY, INHERIT, ALLOW };
+
 class DatabaseConnection {
 public:
 	virtual ~DatabaseConnection() {
@@ -13,6 +31,8 @@ public:
 	// virtual void init() = 0;
 	virtual int getUniquePermissionObjectId() const = 0;
 	virtual int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) = 0;
+	virtual int storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) = 0;
+	virtual void updatePermissionSetting(int permission_setting_id, THREE_STATE_SETTING setting) = 0;
 
 	virtual void declareAccountCursor() = 0;
 	virtual db_account_struct* getValueFromAccountCursor() = 0;

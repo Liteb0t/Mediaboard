@@ -11,6 +11,8 @@ public:
 	// void init() override {};
 	int getUniquePermissionObjectId() const override { return db_get_unique_permission_object_id(); }
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
+	int storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) override;
+	void updatePermissionSetting(int permission_setting_id, THREE_STATE_SETTING setting) override;
 
 	void declareAccountCursor() override { db_create_cursor_for_account(); }
 	db_account_struct* getValueFromAccountCursor() override { return db_cursor_retrieve_account(); }

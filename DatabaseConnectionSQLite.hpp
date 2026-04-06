@@ -10,10 +10,13 @@ public:
 	void firstTimeSetup(const boost::filesystem::path& database_directory, const std::string& program_version_string);
 	int getUniquePermissionObjectId() const override { return -1; } // Not yet implemented
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
+	int storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) override;
+	void updatePermissionSetting(int permission_setting_id, THREE_STATE_SETTING setting) override;
 private:
 	sqlite3* db;
 	sqlite3_stmt* stmt;
 	sqlite3_stmt* stmt2; // Used when two cursors are active at once, for the "inner" cursor
+	sqlite3_stmt* create_account_prepared_stmt;
 	void writeDatabaseVersion(const std::string& program_version_string);
 	// const std::string getDatabaseVersion() const override;
 	// void connectToDatabase(const std::string& connection_target) override;

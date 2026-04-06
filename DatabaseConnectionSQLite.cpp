@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <cstring>
+// #include <boost/hash2/sha3.hpp>
 
 DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path& database_directory, const std::string& filename, const std::string& program_version_string) {
 	std::string database_filepath = std::format("{}/{}", database_directory.string(), filename);
@@ -74,6 +75,11 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 			std::cout << "[DatabaseConnectionSQLite] No version string found. Database is bugged out." << std::endl;
 		}
 		sqlite3_finalize(stmt);
+	}
+	// Prepared statements
+	ec = sqlite3_prepare_v2(this->db, "INSERT INTO account(id, username, password_hash, key) VALUES (?, ?, ?, ?)", -1, &create_account_prepared_stmt, NULL);
+	if (ec != SQLITE_OK) {
+		std::cerr << "Couldn't prepare create_account_prepared_stmt" << std::endl;
 	}
 }
 
@@ -149,7 +155,7 @@ void DatabaseConnectionSQLite::firstTimeSetup(const boost::filesystem::path& dat
 
 int DatabaseConnectionSQLite::storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) {
 	int new_permission_collection_id;
-	this->execWriteOnlyStatement(std::format("EXEC SQL INSERT INTO permission_collection(permission_object_id, account_id, permission_group_id) VALUES ({}, {}, {})", permission_object_id, user_or_group == USER_OR_GROUP::USER ? std::to_string(user_or_group_id) : std::string("NULL"), user_or_group == USER_OR_GROUP::GROUP ? std::to_string(user_or_group_id) : std::string("NULL")).c_str())
+	this->execWriteOnlyStatement(std::format("INSERT INTO permission_collection(permission_object_id, account_id, permission_group_id) VALUES ({}, {}, {})", permission_object_id, user_or_group == USER_OR_GROUP::USER ? std::to_string(user_or_group_id) : std::string("NULL"), user_or_group == USER_OR_GROUP::GROUP ? std::to_string(user_or_group_id) : std::string("NULL")).c_str())
 	;
 	int ec = sqlite3_prepare_v2(this->db, "SELECT last_insert_rowid()", -1, &this->stmt, NULL);
 	if (ec == SQLITE_OK && sqlite3_step(this->stmt) == SQLITE_ROW) {
@@ -160,6 +166,25 @@ int DatabaseConnectionSQLite::storePermissionCollection(int permission_object_id
 	}
 	sqlite3_finalize(this->stmt);
 	return new_permission_collection_id;
+}
+
+int DatabaseConnectionSQLite::storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) {
+	int new_permission_setting_id;
+	this->execWriteOnlyStatement(std::format("INSERT INTO permission_setting(permission_collection_id, permission_number, setting) VALUES ({}, {}, {})", permission_collection_id, static_cast<int>(permission), static_cast<int>(setting)).c_str());
+	;
+	int ec = sqlite3_prepare_v2(this->db, "SELECT last_insert_rowid()", -1, &this->stmt, NULL);
+	if (ec == SQLITE_OK && sqlite3_step(this->stmt) == SQLITE_ROW) {
+		new_permission_setting_id = sqlite3_column_int(stmt, 0);
+	}
+	else {
+		throw std::runtime_error("[DatabaseConnectionSQLite] Couldn't get new ID of store permission_collection");
+	}
+	sqlite3_finalize(this->stmt);
+	return new_permission_setting_id;
+}
+
+void DatabaseConnectionSQLite::updatePermissionSetting(int permission_setting_id, THREE_STATE_SETTING setting) {
+	this->execWriteOnlyStatement(std::format("UPDATE permission_setting SET setting = {} WHERE id = {}", static_cast<int>(setting), permission_setting_id).c_str());
 }
 
 void DatabaseConnectionSQLite::declarePermissionCollectionCursor(int permission_object_id) {

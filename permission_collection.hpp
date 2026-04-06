@@ -1,4 +1,3 @@
-#include "DatabaseConnection.hpp"
 #include "permission_setting.hpp"
 #include "db_interface.h"
 #include <iostream>
@@ -36,15 +35,15 @@ public:
 		PermissionSetting permission_setting(db_permission_setting);
 		permission_map.emplace(static_cast<PERMISSION>(db_permission_setting->permission_number), permission_setting);
 	}
-	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting) {
+	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting, DatabaseConnection* db) {
 		auto permission_iterator = this->permission_map.find(permission_type);
 		if (permission_iterator == this->permission_map.end()) {
 			// std::cout << "PermissionCollection " << this->id << ": permission " << static_cast<int>(permission_type) << " not found" << std::endl;
-			PermissionSetting permission_setting(this->id, permission_type, setting);
+			PermissionSetting permission_setting(this->id, permission_type, setting, db);
 			this->permission_map.emplace(permission_type, permission_setting);
 		}
 		else {
-			permission_iterator->second.set(setting);
+			permission_iterator->second.set(setting, db);
 		}
 	}
 	/*

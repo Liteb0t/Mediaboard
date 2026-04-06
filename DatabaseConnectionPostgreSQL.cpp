@@ -135,3 +135,11 @@ int DatabaseConnectionPostgreSQL::storePermissionCollection(int permission_objec
 								   user_or_group == USER_OR_GROUP::USER ? user_or_group_id : -1,
 								   user_or_group == USER_OR_GROUP::GROUP ? user_or_group_id : -1);
 }
+
+int DatabaseConnectionPostgreSQL::storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) {
+	return db_store_permission_setting(permission_collection_id, static_cast<int>(permission), static_cast<int>(setting));
+}
+
+void DatabaseConnectionPostgreSQL::updatePermissionSetting(int permission_setting_id, THREE_STATE_SETTING setting) {
+	db_update_permission_setting(permission_setting_id, static_cast<int>(setting));
+}

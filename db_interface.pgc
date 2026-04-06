@@ -491,9 +491,9 @@ struct db_account_struct* db_cursor_retrieve_account() {
 		EXEC SQL FETCH account_getter INTO :id, :username, :key;
 		goto db_cursor_retrieve_account_not_null;
 	}
-db_cursor_retrieve_account_not_null:
 	account.has_value = false;
 	return &account;
+db_cursor_retrieve_account_not_null:
 	account.has_value = true;
 	account.id = id;
 	strcpy(account.username, username);
