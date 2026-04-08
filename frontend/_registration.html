@@ -32,7 +32,7 @@
 				<input type="submit">-->
 				<input type="button" value="Log in" id="post_button" class="RightAligned" onclick="loginAction()">
 				<input type="button" value="Register" id="post_button" class="RightAligned" onclick="registerAction()">
-				<a class="Button RightAligned" href="_ROOT_URL">Return</a>
+				<!--<a class="Button RightAligned" href="_ROOT_URL">Return</a>-->
 			</form>
 			<div id="error_messages"></div>
 		</main>
@@ -58,8 +58,8 @@ async function loginAction() {
 		let response_body_as_JSON = await fetch_response.json();
 		logged_in_as.textContent = account_username_input.value;
 		login_success_dialog.showModal();
-		localStorage.setItem("account_username", account_username_input.value);
 		localStorage.setItem("account_key", response_body_as_JSON.account_key);
+		localStorage.setItem("account_username", account_username_input.value);
 	}
 }
 async function registerAction() {
@@ -68,8 +68,9 @@ async function registerAction() {
 		let response_body_as_JSON = await fetch_response.json();
 		registered_as.textContent = account_username_input.value;
 		registration_success_dialog.showModal();
-		localStorage.setItem("account_username", account_username_input.value);
 		localStorage.setItem("account_key", response_body_as_JSON.account_key);
+		localStorage.setItem("account_username", account_username_input.value);
+		localStorage.setItem("name", account_username_input.value);
 	}
 }
 async function sendRegistrationFormData(endpoint) {

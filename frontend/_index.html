@@ -31,9 +31,9 @@
 				</div>
 				<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
 				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
-				<!--
-				<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.1</a>
-				-->
+
+				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard 0.0.6</a>
+
 			</div>
 			<h3 id="location_indicator"></h3>
 			<noscript>
@@ -42,7 +42,7 @@
 			<div id="post_container"></div>
 		</main>
 		<div id="body_separator" class="FlexSeparator"></div>
-		<details id="reply_container" style="display: none">
+		<details id="reply_container" style="display: none" open="">
 			<summary><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator"></span></div></summary>
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
@@ -58,7 +58,7 @@
 			</form>
 		</details>
 		<div id="bottom_marker"></div>
-		<!--<a id="watermark" style="display: none" href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.5</a>-->
+		<a id="watermark" style="display: none" href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.0.6</a>
 		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="thread_posted_dialog" closedby="any">
 			<h2>Thread posted!</h2>
@@ -123,7 +123,7 @@ html {
 }
 
 main {
-	margin: 0 var(--side-margins);
+	margin: 0;
 	overflow: auto;
 	flex: 0 0 auto;
 }
@@ -204,7 +204,6 @@ main {
 	bottom: 0;
 	background: #fffA;
 	backdrop-filter: blur(4px);
-	margin: 0 var(--side-margins);
 	summary {
 		border-top: 3px double #000;
 		font-family: var(--interactive-font);
@@ -337,10 +336,11 @@ if (url_params.get("display") === "embed") {
 	header_bar.style["display"] = "none";
 	location_indicator.style["display"] = "none";
 	reply_container.style["display"] = "none";
-	watermark.style["display"] = "inherit";
 	url_params_display_as_embed = true;
 }
 else url_params_display_as_embed = false;
+if (_SHOW_WATERMARKS && !url_params_display_as_embed) header_bar_mediaboard_link.style["display"] = "inherit";
+if (_SHOW_WATERMARKS && url_params_display_as_embed) watermark.style["display"] = "inherit";
 
 if (window.location.pathname.startsWith("_ROOT_URL" + "thread/")) {
 	let second_slash_index = window.location.pathname.indexOf("/", "_ROOT_URL".length + 7);
@@ -375,7 +375,7 @@ class Format {
 	static image_formats = ["bmp", "gif", "ico", "jpg", "jpeg", "jxl", "png", "svg", "webp"];
 	static audio_formats = ["flac", "m4a", "mp3", "ogg", "ogx", "opus", "wav"];
 	static fromFileName(file_name) {
-		let dot_index = file_name.indexOf('.');
+		let dot_index = file_name.lastIndexOf('.');
 		if (dot_index !== -1) {
 			let file_extension = file_name.substring(dot_index+1);
 			if (Format.image_formats.indexOf(file_extension) !== -1) {
@@ -510,31 +510,6 @@ async function getAllThreads() {
 	}
 }
 
-function updateReplyContainer(selected_thread_id, permissions) {
-	if (url_params_display_as_embed) {
-		reply_container.style["display"] = "none";
-		return;
-	}
-	if (selected_thread_id === -1) {
-		if (permissions["create_thread"]) {
-			reply_heading_text.textContent = "Create a thread";
-			reply_container.style["display"] = "initial";
-		}
-		else {
-			reply_container.style["display"] = "none";
-		}
-	}
-	else {
-		if (permissions["send_message"] ) {
-			reply_heading_text.textContent = "Leave a reply";
-			reply_container.style["display"] = "initial";
-		}
-		else {
-			reply_container.style["display"] = "none";
-		}
-	}
-}
-
 function showAllThreads(message_json) {
 	location_indicator.textContent = "Threads";
 	threads_button.disabled = true;
@@ -546,44 +521,45 @@ function showAllThreads(message_json) {
 	for (let thread of message_json.threads) {
 		// console.log(thread.id);
 		// console.log(thread.post_zero);
-		let post_zero_element = createPost(thread.post_zero, state.server_permissions);
-		// console.log(post_zero_element);
-		let thread_element = document.createElement("div");
-		thread_element.classList.add("Thread");
-		thread_element.appendChild(post_zero_element);
-
-		// Toolbar at the bottom of each thread
-		let thread_toolbar = document.createElement("div");
-		thread_toolbar.classList.add("ToolBar", "WithBorders");
-
-		const reply_count_container = document.createElement("div");
-		const reply_count = document.createElement("span");
-		reply_count.textContent = "Replies: " + (thread.number_of_posts - 1);
-		reply_count_container.appendChild(reply_count);
-
-		thread_toolbar.append(reply_count_container, flex_separator.cloneNode());
-
-		// TODO ensure getClientInfo finishes before determining whether to show manage_permissions button on threads.
-		// This is a minor bug which causes the button to sometimes not show the first time a user with MANAGE_PERMISSIONS logs in. It will show after a refresh.
-		if (state.server_permissions["manage_permissions"]/*thread["permission_editable"] === true*/) {
-			let manage_thread_permissions_button = document.createElement("a");
-			manage_thread_permissions_button.classList.add("Button", "ToolBarButton");
-			manage_thread_permissions_button.textContent = "Manage permissions";
-			manage_thread_permissions_button.setAttribute("href", "_ROOT_URL" + `manage_permissions.html?location=/thread/${thread.id}/`);
-			thread_toolbar.append(manage_thread_permissions_button);
+		let post_zero_element = createPost(thread.post_zero, {...state.server_permissions, ...thread.client_permissions});
+		if (url_params_display_as_embed) {
+			fragment.appendChild(post_zero_element);
 		}
+		else {
+			let thread_element = document.createElement("div");
+			thread_element.classList.add("Thread");
+			thread_element.appendChild(post_zero_element);
+			// Toolbar at the bottom of each thread
+			let thread_toolbar = document.createElement("div");
+			thread_toolbar.classList.add("ToolBar", "WithBorders");
 
-		let open_thread_button = document.createElement("button");
-		open_thread_button.classList.add("ToolBarButton");
-		open_thread_button.textContent = "\u21E8 Open thread";
-		open_thread_button.onclick = (event) => {
-			openThread(thread.id);
+			const reply_count_container = document.createElement("div");
+			const reply_count = document.createElement("span");
+			reply_count.textContent = "Replies: " + (thread["reply_count"]);
+			reply_count_container.appendChild(reply_count);
+
+			thread_toolbar.append(reply_count_container, flex_separator.cloneNode());
+
+			if (thread.client_permissions["manage_permissions"]) {
+				let manage_thread_permissions_button = document.createElement("a");
+				manage_thread_permissions_button.classList.add("Button", "ToolBarButton");
+				manage_thread_permissions_button.textContent = "Manage permissions";
+				manage_thread_permissions_button.setAttribute("href", "_ROOT_URL" + `manage_permissions.html?location=/thread/${thread.id}/`);
+				thread_toolbar.append(manage_thread_permissions_button);
+			}
+
+			let open_thread_button = document.createElement("button");
+			open_thread_button.classList.add("ToolBarButton");
+			open_thread_button.textContent = "\u21E8 Open thread";
+			open_thread_button.onclick = (event) => {
+				openThread(thread.id);
+			}
+
+			thread_toolbar.append(open_thread_button);
+			// thread_toolbar.appendChild(open_thread_button);
+			thread_element.appendChild(thread_toolbar);
+			fragment.appendChild(thread_element);
 		}
-
-		thread_toolbar.append(open_thread_button);
-		// thread_toolbar.appendChild(open_thread_button);
-		thread_element.appendChild(thread_toolbar);
-		fragment.appendChild(thread_element);
 	}
 	post_container.replaceChildren(fragment);
 }
@@ -615,8 +591,217 @@ function showThread(thread_json) {
 	for (let message of thread_json["messages"]) {
 		fragment.appendChild(createPost(message, thread_json["client_permissions"]));
 	}
-	// }
 	post_container.replaceChildren(fragment);
+}
+
+function createPost(data, client_permissions) {
+	// console.log(data);
+	let post_box_element = document.createElement("article");
+	post_box_element.classList.add("Post");
+
+	let post_header_element
+	if (!url_params_display_as_embed) {
+		post_header_element = document.createElement("div");
+		// post_header_element.classList.add("PostHeader");
+		post_header_element.classList.add("ToolBar");
+
+		let post_name_element = document.createElement("b");
+		post_name_element.classList.add("Username");
+		post_name_element.textContent = data.name;
+
+		let post_timestamp_element = document.createElement("time");
+		let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
+		post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
+		post_timestamp_element.textContent = post_date;
+		post_timestamp_element.classList.add("Timestamp");
+
+		let post_id_element = document.createElement("span");
+		post_id_element.classList.add("ID");
+		let post_id;
+		if (state.selected_thread.id > -1) {
+			post_id = `#${data.thread_id}/${data.id_in_thread}`;
+		}
+		else {
+			post_id = "#" + data.thread_id;
+		}
+		post_id_element.textContent = post_id;
+
+		post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
+		const right_aligned_toolbar_group = document.createElement("div");
+		right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
+
+		// Delete button
+		if (client_permissions["delete_post"] || data.is_author) {
+			let delete_button_element = document.createElement("button");
+			delete_button_element.textContent = "\u{1F5D1} Delete";
+			delete_button_element.onclick = async() => {
+				let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
+				console.log(server_response);
+				if (server_response.ok) {
+					post_box_element.classList.add("Deleted");
+					delete_button_element.disabled = true;
+				}
+				else {
+					alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
+				}
+			}
+			// post_header_element.appendChild(delete_button_element);
+			right_aligned_toolbar_group.appendChild(delete_button_element);
+		}
+		// Reply button
+		if (state.selected_thread.id > -1 && client_permissions["send_message"]) {
+			let reply_button = document.createElement("button");
+			reply_button.style["margin-left"] = "0.5em";
+			reply_button.textContent = "\u{2BA9} Reply";
+			reply_button.onclick = () => {
+				reply_container.open = true;
+
+				let reply_link_node = document.createTextNode(post_id + " ");
+				// Add reply tag at caret position, if focused on content_field
+				let range, selection;
+				selection = window.getSelection();
+				if (content_field.contains(selection.focusNode)) {
+					range = selection.getRangeAt(0);
+					// console.log(range);
+					range.insertNode(reply_link_node);
+				}
+				else
+					content_field.append(reply_link_node);
+
+				// Move caret position to end of reply tag
+				range = document.createRange();
+				// console.log(reply_link_node);
+				range.setStartAfter(reply_link_node);
+				range.collapse(true);
+				selection.removeAllRanges();
+				selection.addRange(range);
+				// content_field.focus();
+			}
+			right_aligned_toolbar_group.appendChild(reply_button);
+		}
+		right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
+		post_header_element.append(right_aligned_toolbar_group);
+	}
+
+	let post_content_element = document.createElement("div");
+	post_content_element.classList.add("Content");
+
+	// Highlight reply links by wrapping them in a <span> element
+	const message_content_split = data.content.split(/#\d*\/(\d+)\b/g);
+	for (let i = 0; i < message_content_split.length; i+=2) {
+		post_content_element.appendChild(document.createTextNode(message_content_split[i]));
+		if (i+1 !== message_content_split.length) {
+			let reply_link = document.createElement("span");
+			reply_link.classList.add("PostLink");
+			reply_link.textContent = `#${data.thread_id}/${message_content_split[i+1]}`;
+			post_content_element.appendChild(reply_link);
+		}
+	}
+
+	let post_files_element = document.createElement("div");
+	post_files_element.classList.add("Files");
+	for (const filename of data.files) {
+		let figure_element = document.createElement("figure");
+		figure_element.classList.add("EmbedFigure");
+		let filename_extension_i = filename.lastIndexOf(".");
+		let file_format = Format.fromFileName(filename); // Format enum
+		if (file_format === Format.IMAGE) {
+			let thumbnail_element = document.createElement("img");
+			thumbnail_element.classList.add("EmbedThumbnail");
+			let thumbnail_filename = "THUMBNAIL_" + filename + "._THUMBNAIL_FILE_FORMAT";
+			thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+			let image_opened = false;
+			let img_element = document.createElement("img");
+			img_element.classList.add("EmbedImage");
+			thumbnail_element.onclick = (event) => {
+				if (!image_opened) {
+					image_opened = true;
+					img_element.onload = (event) => {
+						img_element.style["display"] = "inherit";
+						thumbnail_element.style["display"] = "none";
+					}
+					img_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
+				}
+				else {
+					thumbnail_element.style["display"] = "none";
+					img_element.style["display"] = "inherit";
+				}
+			}
+			img_element.style["display"] = "none";
+			img_element.onclick = (event) => {
+				thumbnail_element.style["display"] = "inherit";
+				img_element.style["display"] = "none";
+			}
+			figure_element.appendChild(img_element);
+			thumbnail_element.setAttribute("loading", "lazy");
+			thumbnail_element.setAttribute("width", "150px");
+			thumbnail_element.setAttribute("height", "150px");
+			figure_element.appendChild(thumbnail_element);
+		}
+		else if (file_format === Format.AUDIO) {
+			let audio_element = document.createElement("audio");
+			audio_element.controls = true;
+			audio_element.setAttribute("controlslist", "nofullscreen nodownload");
+			audio_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
+			figure_element.appendChild(audio_element);
+		}
+		let pretty_filename;
+		if (filename_extension_i == -1) {
+			pretty_filename = filename.slice(0, filename.length - media_uuid_len);
+		}
+		else {
+			pretty_filename = filename.slice(0, filename_extension_i - media_uuid_len) + filename.slice(filename_extension_i, filename.length);
+		}
+		let figcaption_element = document.createElement("figcaption");
+		let media_src = "_ROOT_URL" + media_url + filename.replace(" ", "%20");
+		let figcaption_element_a = document.createElement("a");
+		figcaption_element_a.setAttribute("href", media_src);
+		figcaption_element_a.setAttribute("target", "_blank");
+		figcaption_element_a.textContent = pretty_filename;
+
+		let file_download_button = document.createElement("a");
+		file_download_button.setAttribute("href", media_src);
+		file_download_button.setAttribute("download", pretty_filename);
+		file_download_button.setAttribute("title", "Download");
+		file_download_button.innerText = "\ud83d\udce5\ufe0e";
+
+		figcaption_element.append(figcaption_element_a, document.createTextNode("\u00A0"), file_download_button);
+		figure_element.appendChild(figcaption_element);
+		post_files_element.appendChild(figure_element);
+	}
+
+	if (!url_params_display_as_embed) {
+		post_box_element.appendChild(post_header_element);
+	}
+	post_box_element.appendChild(post_content_element);
+	post_box_element.appendChild(post_files_element);
+	// post_container_element.appendChild(post_box_element);
+	return post_box_element;
+}
+
+function updateReplyContainer(selected_thread_id, permissions) {
+	if (url_params_display_as_embed) {
+		reply_container.style["display"] = "none";
+		return;
+	}
+	if (selected_thread_id === -1) {
+		if (permissions["create_thread"]) {
+			reply_heading_text.textContent = "Create a thread";
+			reply_container.style["display"] = "initial";
+		}
+		else {
+			reply_container.style["display"] = "none";
+		}
+	}
+	else {
+		if (permissions["send_message"] ) {
+			reply_heading_text.textContent = "Leave a reply";
+			reply_container.style["display"] = "initial";
+		}
+		else {
+			reply_container.style["display"] = "none";
+		}
+	}
 }
 
 content_field.oninput = () => {
@@ -746,7 +931,7 @@ function uploadFile(file_object) {
 				// console.log("server_filename dec new: " + newdecoded);
 				file_element.setAttribute("id", "file_" + decoded_filename);
 				if (Format.fromFileName(server_filename) === Format.IMAGE) {
-					file_img_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + ".jxl");
+					file_img_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
 				}
 				const upload_complete_indicator = document.createElement("span");
 				upload_complete_indicator.classList.add("UploadCompleteIndicator");
@@ -826,192 +1011,6 @@ function addFileToList(filename) {
 		removeFileFromList(file_container);
 	}
 	return file_container;
-}
-
-function createPost(data, client_permissions) {
-	// console.log(data);
-	let post_box_element = document.createElement("article");
-	post_box_element.classList.add("Post");
-
-	let post_header_element
-	if (!url_params_display_as_embed) {
-		post_header_element = document.createElement("div");
-		// post_header_element.classList.add("PostHeader");
-		post_header_element.classList.add("ToolBar");
-
-		let post_name_element = document.createElement("b");
-		post_name_element.classList.add("Username");
-		post_name_element.textContent = data.name;
-
-		let post_timestamp_element = document.createElement("time");
-		let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
-		post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
-		post_timestamp_element.textContent = post_date;
-		post_timestamp_element.classList.add("Timestamp");
-
-		let post_id_element = document.createElement("span");
-		post_id_element.classList.add("ID");
-		let post_id;
-		if (state.selected_thread.id > -1) {
-			post_id = `#${data.thread_id}/${data.id_in_thread}`;
-		}
-		else {
-			post_id = "#" + data.thread_id;
-		}
-		post_id_element.textContent = post_id;
-
-		post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
-		const right_aligned_toolbar_group = document.createElement("div");
-		right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
-
-		// Delete button
-		// TODO replace is_administrator with client permission
-		if ((is_administrator === true || data.is_author)) {
-			let delete_button_element = document.createElement("button");
-			delete_button_element.textContent = "\u{1F5D1} Delete";
-			delete_button_element.onclick = async() => {
-				let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
-				console.log(server_response);
-				if (server_response.ok) {
-					post_box_element.classList.add("Deleted");
-					delete_button_element.disabled = true;
-				}
-				else {
-					alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
-				}
-			}
-			// post_header_element.appendChild(delete_button_element);
-			right_aligned_toolbar_group.appendChild(delete_button_element);
-		}
-		// Reply button
-		if (state.selected_thread.id > -1 && client_permissions["send_message"]) {
-			let reply_button = document.createElement("button");
-			reply_button.style["margin-left"] = "0.5em";
-			reply_button.textContent = "\u{2BA9} Reply";
-			reply_button.onclick = () => {
-				reply_container.open = true;
-
-				let reply_link_node = document.createTextNode(post_id + " ");
-				// Add reply tag at caret position, if focused on content_field
-				let range, selection;
-				selection = window.getSelection();
-				if (content_field.contains(selection.focusNode)) {
-					range = selection.getRangeAt(0);
-					// console.log(range);
-					range.insertNode(reply_link_node);
-				}
-				else
-					content_field.append(reply_link_node);
-
-				// Move caret position to end of reply tag
-				range = document.createRange();
-				// console.log(reply_link_node);
-				range.setStartAfter(reply_link_node);
-				range.collapse(true);
-				selection.removeAllRanges();
-				selection.addRange(range);
-				// content_field.focus();
-			}
-			right_aligned_toolbar_group.appendChild(reply_button);
-		}
-		right_aligned_toolbar_group.append(post_id_element, post_timestamp_element);
-		post_header_element.append(right_aligned_toolbar_group);
-	}
-
-	let post_content_element = document.createElement("div");
-	post_content_element.classList.add("Content");
-
-	// Highlight reply links by wrapping them in a <span> element
-	const message_content_split = data.content.split(/#\d*\/(\d+)\b/g);
-	for (let i = 0; i < message_content_split.length; i+=2) {
-		post_content_element.appendChild(document.createTextNode(message_content_split[i]));
-		if (i+1 !== message_content_split.length) {
-			let reply_link = document.createElement("span");
-			reply_link.classList.add("PostLink");
-			reply_link.textContent = `#${data.thread_id}/${message_content_split[i+1]}`;
-			post_content_element.appendChild(reply_link);
-		}
-	}
-
-	let post_files_element = document.createElement("div");
-	post_files_element.classList.add("Files");
-	for (const filename of data.files) {
-		let figure_element = document.createElement("figure");
-		figure_element.classList.add("EmbedFigure");
-		let filename_extension_i = filename.lastIndexOf(".");
-		let file_format = Format.fromFileName(filename); // Format enum
-		if (file_format === Format.IMAGE) {
-			let thumbnail_element = document.createElement("img");
-			thumbnail_element.classList.add("EmbedThumbnail");
-			let thumbnail_filename = "THUMBNAIL_" + filename + ".jxl";
-			thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
-			let image_opened = false;
-			let img_element = document.createElement("img");
-			img_element.classList.add("EmbedImage");
-			thumbnail_element.onclick = (event) => {
-				if (!image_opened) {
-					image_opened = true;
-					img_element.onload = (event) => {
-						img_element.style["display"] = "inherit";
-						thumbnail_element.style["display"] = "none";
-					}
-					img_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
-				}
-				else {
-					thumbnail_element.style["display"] = "none";
-					img_element.style["display"] = "inherit";
-				}
-			}
-			img_element.style["display"] = "none";
-			img_element.onclick = (event) => {
-				thumbnail_element.style["display"] = "inherit";
-				img_element.style["display"] = "none";
-			}
-			figure_element.appendChild(img_element);
-			thumbnail_element.setAttribute("loading", "lazy");
-			thumbnail_element.setAttribute("width", "150px");
-			thumbnail_element.setAttribute("height", "150px");
-			figure_element.appendChild(thumbnail_element);
-		}
-		else if (file_format === Format.AUDIO) {
-			let audio_element = document.createElement("audio");
-			audio_element.controls = true;
-			audio_element.setAttribute("controlslist", "nofullscreen nodownload");
-			audio_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
-			figure_element.appendChild(audio_element);
-		}
-		let pretty_filename;
-		if (filename_extension_i == -1) {
-			pretty_filename = filename.slice(0, filename.length - media_uuid_len);
-		}
-		else {
-			pretty_filename = filename.slice(0, filename_extension_i - media_uuid_len) + filename.slice(filename_extension_i, filename.length);
-		}
-		let figcaption_element = document.createElement("figcaption");
-		let media_src = "_ROOT_URL" + media_url + filename.replace(" ", "%20");
-		let figcaption_element_a = document.createElement("a");
-		figcaption_element_a.setAttribute("href", media_src);
-		figcaption_element_a.setAttribute("target", "_blank");
-		figcaption_element_a.textContent = pretty_filename;
-
-		let file_download_button = document.createElement("a");
-		file_download_button.setAttribute("href", media_src);
-		file_download_button.setAttribute("download", pretty_filename);
-		file_download_button.setAttribute("title", "Download");
-		file_download_button.innerText = "\ud83d\udce5\ufe0e";
-
-		figcaption_element.append(figcaption_element_a, document.createTextNode("\u00A0"), file_download_button);
-		figure_element.appendChild(figcaption_element);
-		post_files_element.appendChild(figure_element);
-	}
-
-	if (!url_params_display_as_embed) {
-		post_box_element.appendChild(post_header_element);
-	}
-	post_box_element.appendChild(post_content_element);
-	post_box_element.appendChild(post_files_element);
-	// post_container_element.appendChild(post_box_element);
-	return post_box_element;
 }
 
 function connectToServer() {

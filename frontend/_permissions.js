@@ -398,6 +398,7 @@ class ManageGroupsUser extends User {
 			let response = await API.sendRequest("DELETE", `group/${this.user_list.group_manager.group_list.selected_group.id}/member/${this.id}`);
 			if (response.ok) {
 				this.user_list.user_list_container.removeChild(this.element);
+				user_list_factory.refreshUsers();
 			}
 		}
 		this.element.append(this.remove_button);

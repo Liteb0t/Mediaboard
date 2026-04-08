@@ -1,5 +1,4 @@
 # ![FUZE](https://fuze.page/static/fuze-min-hover.png) Mediaboard
-## Note: This README is for the 0.0.5 release. The deployment process is being simplified for 0.1 and the updated README will be coming shortly.
 ### Required packages (Debian 12/Devuan 5)
 `postgresql`\
 `postgresql-contrib`\
@@ -10,6 +9,7 @@
 `libboost-filesystem1.88-dev`\
 `cmake`\
 `m4`\
+`libsqlite3-dev`
 ### Imagemagick
 Note: FreeBSD users can skip this step because the pkg contains all the required delegates.\
 Clone and configure [Imagemagick](https://github.com/ImageMagick/ImageMagick) with the delegates for JPEG, PNG, WEBP, XML, and JPEG-XL.\
@@ -27,6 +27,7 @@ Then install:\
 `ImageMagick7-nox11`\
 `nlohmann-json`\
 `boost-libs`\
+`sqlite3`\
 `postgresql18-server`   Versions 15-17 work too\
 `postgresql18-contrib`   ^\
 Add the following line to `/etc/rc.conf`:\
@@ -54,6 +55,7 @@ Then to build:\
 `cd build`\
 `ninja`
 ### PostgreSQL setup
+*SQLite integration will arrive in 0.1, allowing easier deployment*
 #### Create the cluster
 *This may be skipped on certain Linux distros such as Debian. Check if the server is already running with `systemctl status postgresql` or `service postgresql status`*
 `initdb -D /var/db/postgres/18/main/`\

@@ -39,13 +39,14 @@ public:
 // Represents the shared server state
 class shared_state : public PermissionManager {
 public:
-	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative, DatabaseConnection* database_connection);
+	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative, DatabaseConnection* database_connection, std::string thumbnail_file_format);
 	// shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
 	// hence a seperate start() function is used
 	void start();
 
 	const boost::filesystem::path& getMediaLocation() const { return media_location; }
 	const boost::filesystem::path& getProgramLocation() const { return program_location; }
+	const std::string& getThumbnailFileFormat() const { return thumbnail_file_format; }
 
 	// Board main_board;
 	Board* main_board() { return &(this->boards.at(0)); }
@@ -71,6 +72,7 @@ private:
 	DatabaseConnection* db;
 	const boost::filesystem::path media_location;
 	const boost::filesystem::path program_location;
+	const std::string thumbnail_file_format;
 
 	// This mutex synchronizes all access to sessions_
 	std::mutex mutex_;

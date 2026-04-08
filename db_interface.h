@@ -14,7 +14,6 @@ extern "C" {
 		int id;
 		int permission_object_id;
 		// Add char* subject later
-		int number_of_posts;
 		char deleted;
 	};
 	struct db_thread_array {
@@ -94,7 +93,7 @@ extern "C" {
 	char* db_retrieve_database_version();
 		// Posts
 	int db_store_post(int thread_id, int id_in_thread, const char name[POST_MAX_NAME+1], time_t upload_timestamp, const char*, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key[KEY_LENGTH+1]);
-	int db_store_thread(int number_of_posts, int _new_permission_object_id);
+	int db_store_thread(int _new_permission_object_id);
 	void db_mark_post_as_deleted(int post_id);
 	void db_mark_thread_as_deleted(int _thread_id);
 		// Accounts

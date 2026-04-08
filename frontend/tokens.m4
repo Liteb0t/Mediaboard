@@ -7,12 +7,16 @@ define(`_WEBSOCKET_URL', `ws://localhost:8300')
 # define(`_WEBSOCKET_URL', `wss://example.com/mediaboard/')
 
 define(`_SITE_NAME', `Change SITE_NAME in frontend/tokens.m4')
+define(`_SHOW_WATERMARKS', `true')
 
 # The path where Fuze Mediaboard is hosted.
 define(`_ROOT_URL', `/')
 # Path must start and end with a '/'. For example:
 # define(`_ROOT_URL', `/mediaboard/')
 define(`_FAVICON_URL', `https://fuze.page/favicon.ico')
+
+# it is required that the thumbnail_file_format setting in config.ini matches this.
+define(`_THUMBNAIL_FILE_FORMAT', `jpg')
 
 # Also edit the parser_->body_limit in http_session.cpp
 define(`_FILE_SIZE_LIMIT_MB', `100')

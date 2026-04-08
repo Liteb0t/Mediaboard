@@ -1,5 +1,4 @@
 :root {
-	--side-margins: 0.5em;
 	--monospace-font: Noto Mono, DejaVu Sans Mono, Consolas, Monaco, Liberation Mono, monospace;
 	--name-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
 	--interactive-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
@@ -10,6 +9,7 @@
 body {
 	max-width: 80rem;
 	margin: 0 auto;
+	padding: 0 8px;
 	display: flex;
 	flex-flow: column;
 	height: 100vh;

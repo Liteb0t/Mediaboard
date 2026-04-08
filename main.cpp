@@ -29,7 +29,7 @@
 #include <string>
 #include <vector>
 
-const std::string current_version = "0.1";
+const std::string current_version = "0.0.6";
 
 int main(int argc, char* argv[]) {
 	Magick::InitializeMagick(*argv);  // Required on Windows and MacOS
@@ -37,13 +37,12 @@ int main(int argc, char* argv[]) {
 	// Check command line arguments.
 	std::string config_file;
 	unsigned short server_port, postgresql_port;
-	std::string admin_password, media_location_relative_str, database_engine, sqlite_database_path, postgresql_uri, postgresql_user, postgresql_host, postgresql_database_name;
+	std::string admin_password, media_location_relative_str, database_engine, sqlite_database_path, postgresql_uri, postgresql_user, postgresql_host, thumbnail_file_format, postgresql_database_name;
 	int threads;
 	bool postgresql_use_uri;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
 		("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
-		// ("initdb,i", "Initialise the PostgreSQL database")
 		("config,c", boost::program_options::value<std::string>(&config_file)->default_value("config.ini"), "location of configuration file.")
 		("version,v", "Show version string.")
 		("help,h", "Show list of options.");
@@ -53,7 +52,7 @@ int main(int argc, char* argv[]) {
 	universal_options.add_options()
 		("media_path,m", boost::program_options::value<std::string>(&media_location_relative_str)->default_value("."),  "File path where user-submitted media is stored.")
 		("server_port,p", boost::program_options::value<unsigned short>(&server_port)->default_value(8300), "The port which the server will serve. Make sure it isn't already in use by another service.")
-		("database_engine,d", boost::program_options::value<std::string>(&database_engine)->default_value("sqlite"), "Choices are \"postgres\" and \"sqlite\". The latter is recommended for beginners.")
+		("database_engine,d", boost::program_options::value<std::string>(&database_engine)->default_value("postgres"), "Choices are \"postgres\" and \"sqlite\" (experimental). The latter is recommended for beginners.")
 		("postgresql_use_uri", boost::program_options::value<bool>(&postgresql_use_uri)->default_value(false), "If true, use postgresql_uri to connect.")
 		("postgresql_uri,u", boost::program_options::value<std::string>(&postgresql_uri)->default_value("fuze_mediaboard@localhost:5432"),  "Connection string for the PostgreSQL database.")
 		("postgresql_user,U", boost::program_options::value<std::string>(&postgresql_user)->default_value("mediaboard_server"),  "User which will access the PostgreSQL database.")
@@ -61,7 +60,8 @@ int main(int argc, char* argv[]) {
 		("postgresql_port,p", boost::program_options::value<unsigned short>(&postgresql_port)->default_value(5432), "The port at which the database is available.")
 		("postgresql_database_name,n", boost::program_options::value<std::string>(&postgresql_database_name)->default_value("fuze_mediaboard"), "Name of the PostgreSQL database.")
 		("sqlite_database_path,s", boost::program_options::value<std::string>(&postgresql_uri)->default_value("database/sqlite_data.db"),  "File where SQLite data is stored.")
-		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.");
+		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.")
+		("thumbnail_file_format", boost::program_options::value<std::string>(&thumbnail_file_format)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.");
 
 	boost::program_options::options_description command_line_options;
 	command_line_options.add(command_line_specific_options).add(universal_options);
@@ -151,7 +151,7 @@ int main(int argc, char* argv[]) {
 	boost::asio::io_context io_context;
 
 	std::cout << "Initialising shared state..." << std::endl;
-	boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection));
+	boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection, thumbnail_file_format));
 	state->start();
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;

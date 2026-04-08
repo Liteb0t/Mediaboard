@@ -16,7 +16,7 @@ public:
 	Thread(PermissionObjectBase* permission_parent, json thread_json, DatabaseConnection* db);
 	Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db);
 	std::string dumpThread() const;
-	json asJson() const { return this->thread_as_json; };
+	json asJson() const { return this->thread_as_json; }
 	// int getNumberOfPosts() const { return this->posts.size(); };
 	// void addInitialPost(json post_json, bool save_to_database);
 	void createPostFromStruct(struct db_post_struct* post_struct);
@@ -30,20 +30,20 @@ public:
 	void addListener(websocket_session* listener);
 	void removeListener(websocket_session* listener);
 	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
-	std::string dumpLastPost() const;
 	nlohmann::json getMessagesAsJson(std::string key) const;
 	std::string dumpPost(int message_id, std::string key) const;
 	std::string dumpPermissions(int client_id) const;
 	void markAsDeleted();
 	std::time_t getLastPostTime() const { return this->last_post_timestamp; }
-	int number_of_posts;
 	bool isDeleted() const { return this->deleted; }
+	json getPermissionsAsJson(int client_id) const;
 private:
 	DatabaseConnection* db;
 	int id;
 	std::time_t last_post_timestamp;
 	// std::vector<Post> posts;
 	std::map<int, Post> posts;
+	int reply_count = 0;
 	std::unordered_set<websocket_session*> listeners;
 	// char subject[256];
 	// char upload_timestamp[20];

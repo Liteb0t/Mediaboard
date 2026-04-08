@@ -9,18 +9,13 @@ Thread::Thread(PermissionObjectBase* permission_parent, json thread_json, Databa
 			db(db) {
 	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
-	this->number_of_posts = 0;
-	// if (save_to_database) {
-		// ID and timestamp are not initially known
-		this->id = db_store_thread(1, this->permission_object_id);
-		std::cout << "this->id: " << this->id << std::endl;
-		this->thread_as_json["id"] = this->id;
-		thread_json["post_zero"]["thread_id"] = this->id;
-		this->createPostFromJson(thread_json["post_zero"]);
-	// }
-	// else {
-	// 	this->id = thread_json["id"].template get<int>();
-	// }
+	// ID and timestamp are not initially known
+	this->id = db_store_thread(this->permission_object_id);
+	std::cout << "this->id: " << this->id << std::endl;
+	this->thread_as_json["id"] = this->id;
+	thread_json["post_zero"]["thread_id"] = this->id;
+	this->createPostFromJson(thread_json["post_zero"]);
+	this->thread_as_json["reply_count"] = 0;
 }
 
 // Cache thread using db_interface struct
@@ -30,11 +25,10 @@ Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct*
 	// this->cacheAllPermissions();
 	this->id = thread_struct->id;
 	this->deleted = thread_struct->deleted;
-	this->number_of_posts = thread_struct->number_of_posts;
 	// json thread_as_json;
 	this->thread_as_json["id"] = this->id;
 	this->thread_as_json["deleted"] = this->deleted;
-	this->thread_as_json["number_of_posts"] = this->number_of_posts;
+	this->thread_as_json["reply_count"] = 0;
 }
 
 std::string Thread::dumpThread() const {
@@ -43,32 +37,36 @@ std::string Thread::dumpThread() const {
 
 void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
 	Post post(post_struct, db);
-	if (post.getIdInThread() == 0) {
+	if (post.getIdInThread() == 0)
 		this->thread_as_json["post_zero"] = post.asJson();
+	else if (!post.isDeleted()) {
+		reply_count++;
+		this->thread_as_json["reply_count"] = this->reply_count;
 	}
 	this->posts.emplace(post.getIdInThread(), post);
-	// this->number_of_posts++;
-	// this->thread_as_json["number_of_posts"] = this->number_of_posts;
 	this->last_post_timestamp = post.getUploadTimestamp();
 }
 
 int Thread::createPostFromJson(json post_json) {
-	post_json["id_in_thread"] = this->number_of_posts;
+	post_json["id_in_thread"] = this->posts.size();
 	// const std::string placeholder_key(KEY_LENGTH+1, 'T');
 	// post_json["key"] = placeholder_key;
 	Post post(post_json, db); // Key is deleted from post_json in its constructor
-	if (this->number_of_posts == 0) {
+	if (this->posts.empty())
 		this->thread_as_json["post_zero"] = post.asJson();
+	else {
+		this->reply_count++;
+		this->thread_as_json["reply_count"] = this->reply_count;
 	}
 	this->posts.emplace(post.getIdInThread(), post);
-	this->number_of_posts++; // number_of_posts gets updated in the database too, in db_store_post()
-	this->thread_as_json["number_of_posts"] = this->number_of_posts;
 	this->last_post_timestamp = post.getUploadTimestamp();
 	return post.getIdInThread();
 }
 
 void Thread::deleteMessage(int message_id) {
 	this->posts.at(message_id).markAsDeleted();
+	this->reply_count--;
+	this->thread_as_json["reply_count"] = this->reply_count;
 	std::cout << "Erased message " << message_id << " from thread " << this->id << std::endl;
 }
 
@@ -112,4 +110,12 @@ void Thread::addListener(websocket_session* listener) {
 
 void Thread::removeListener(websocket_session* listener) {
 	listeners.erase(listener);
+}
+
+json Thread::getPermissionsAsJson(int client_id) const {
+	json permissions_as_json;
+	permissions_as_json["manage_permissions"] = this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS);
+	permissions_as_json["send_message"] = this->userHasPermission(client_id, PERMISSION::SEND_MESSAGE);
+	permissions_as_json["delete_post"] = this->userHasPermission(client_id, PERMISSION::DELETE_POST);
+	return permissions_as_json;
 }

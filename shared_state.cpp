@@ -12,15 +12,17 @@
 #include "websocket_session.hpp"
 #include <iostream>
 
-shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db)
+shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format)
 		: PermissionManager(0, db),
 		program_location(std::move(parent_directory)),
 		media_location(std::move(media_location)),
-		db(db) {
+		db(db),
+		thumbnail_file_format(thumbnail_file_format) {
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
 // hence a seperate start() function is used
+// UPDATE 0.0.6: permission-managed objects no longer use shared pointers
 void shared_state::start() {
 	Board main_board(this, db);
 	this->boards.emplace(0, main_board);

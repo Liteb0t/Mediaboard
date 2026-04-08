@@ -386,6 +386,7 @@ http::message_generator handle_request(
 				nlohmann::json response_json;
 				response_json["server_permissions"]["manage_permissions"] = state->userHasPermission(user_id, PERMISSION::MANAGE_PERMISSIONS);
 				response_json["server_permissions"]["create_thread"] = state->userHasPermission(user_id, PERMISSION::CREATE_THREAD);
+				// response_json["server_permissions"]["delete_post"] = state->userHasPermission(user_id, PERMISSION::DELETE_POST);
 				return api_response_json(http::status::ok, response_json);
 			}
 			else if (req_location.substr(5) == "users/") {
@@ -431,7 +432,6 @@ http::message_generator handle_request(
 		else if (ec) // Handle an unknown error
 			return server_error(ec.message());
 
-		/*
 		std::string filename;
 		if (is_media) {
 			int filename_start_index = req_location.rfind("/") + 1;
@@ -448,7 +448,6 @@ http::message_generator handle_request(
 				is_media = false;
 			std::cout << "Is media. Filename: " << filename << std::endl;
 		}
-		*/
 
 		// Cache the size since we need it after the move
 		auto const size = body.size();
@@ -459,11 +458,11 @@ http::message_generator handle_request(
 			std::make_tuple(std::move(body)),
 			std::make_tuple(http::status::ok, req.version())
 		};
-		// if (is_media) {
+		if (is_media) {
 			// Only set when the filename is long enough to include the UUID.
 			// In other words, we know it's a user-uploaded file.
-		// 	res.set("Content-Disposition", "attachment; filename=\"" + filename + "\"");
-		// }
+			res.set("Content-Disposition", "inline; filename=\"" + filename + "\"");
+		}
 		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
 		res.set(http::field::content_type, mime_type(req_location));
 		res.content_length(size);
@@ -594,7 +593,7 @@ http::message_generator handle_request(
 					thumbnail.strip(); // Removes metadata
 					thumbnail.resize("150x150");
 					thumbnail.quality(50);
-					thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.jxl", state->getMediaLocation().string(), out_filename));
+					thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->getThumbnailFileFormat()));
 				}
 				catch( Magick::Warning& magick_warning ) {
 					std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Thumbnail might not be made." << std::endl;
@@ -673,7 +672,6 @@ http::message_generator handle_request(
 					}
 					else {
 						int new_message_thread_id = post_json["thread_id"].template get<int>();
-						// TODO authorize user
 						if (state->main_board()->threadExists(new_message_thread_id)) {
 							if (!state->main_board()->getThread(new_message_thread_id)->userHasPermission(client.first, PERMISSION::SEND_MESSAGE))
 								return api_response(http::status::forbidden, std::string("User lacks permission SEND_MESSAGE within this thread."));

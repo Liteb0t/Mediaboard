@@ -181,12 +181,11 @@ int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_N
 	return post_id;
 }
 
-int db_store_thread(int number_of_posts_, int _new_permission_object_id) {
+int db_store_thread(int _new_permission_object_id) {
 	printf("Executing db_store_thread\n");
 	EXEC SQL BEGIN DECLARE SECTION;
 	int thread_id;
 	int new_permission_object_id = _new_permission_object_id;
-	// int number_of_posts = number_of_posts_;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL SELECT nextval('thread_id_seq') INTO :thread_id;
 	EXEC SQL EXECUTE create_thread_stmt USING :thread_id, :new_permission_object_id;
@@ -322,20 +321,18 @@ struct db_thread_array* db_retrieve_threads() {
 	initThreadArray(&thread_list, 100);
 	EXEC SQL BEGIN DECLARE SECTION;
 	int thread_id;
-	int number_of_posts;
 	char deleted;
 	int permission_object_id;
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL DECLARE thread_getter CURSOR FOR
-		SELECT id, number_of_posts, deleted, permission_object_id FROM thread
+		SELECT id, deleted, permission_object_id FROM thread
 		ORDER BY id;
 	EXEC SQL OPEN thread_getter;
 	EXEC SQL WHENEVER NOT FOUND DO BREAK; // Exits the while loop when `thread_getter` has retreived all threads
 	while (true) {
-		EXEC SQL FETCH thread_getter INTO :thread_id, :number_of_posts, :deleted, :permission_object_id;
+		EXEC SQL FETCH thread_getter INTO :thread_id, :deleted, :permission_object_id;
 		struct db_thread_struct thread;
 		thread.id = thread_id;
-		thread.number_of_posts = number_of_posts;
 		thread.deleted = deleted == 't';
 		thread.permission_object_id = permission_object_id;
 		insertToThreadArray(&thread_list, thread);

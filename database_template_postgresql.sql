@@ -238,7 +238,6 @@ ALTER TABLE public.test OWNER TO postgres;
 
 CREATE TABLE public.thread (
     id integer,
-    number_of_posts integer,
     deleted boolean DEFAULT false,
     permission_object_id integer
 );

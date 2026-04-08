@@ -12,8 +12,9 @@ DatabaseConnectionPostgreSQL::DatabaseConnectionPostgreSQL(const std::string& po
 	this->migrateIfVersionIsNewer(program_version_string);
 }
 DatabaseConnectionPostgreSQL::DatabaseConnectionPostgreSQL(const std::string& postgresql_user, const std::string& postgresql_host, const unsigned short postgresql_port, const std::string& postgresql_database_name, const std::string& program_version_string) {
-	std::string libpq_connection_string = std::format("user={} host={} port={} dbname={}", postgresql_user, postgresql_host, postgresql_port, postgresql_database_name);
-	std::cout << "[DatabaseConnectionPostgreSQL] libpq connection string: " << libpq_connection_string << std::endl;
+	const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
+	std::string libpq_connection_string = std::format("user={} host={} port={} dbname={} password={}", postgresql_user, postgresql_host, postgresql_port, postgresql_database_name, password);
+	// std::cout << "[DatabaseConnectionPostgreSQL] libpq connection string: " << libpq_connection_string << std::endl;
 	this->db = PQconnectdb(libpq_connection_string.c_str());
 	switch (PQstatus(this->db)) {
 		case CONNECTION_BAD:

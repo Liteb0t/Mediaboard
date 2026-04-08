@@ -86,9 +86,8 @@ std::string Board::dumpAllThreads(int client_id) const {
 				std::cout << "client with ID " << client_id << "has manage_permissions" << std::endl;
 				thread_json["client_permissions"]["manage_permissions"] = true;
 			}
-			thread_json["client_permissions"]["send_message"] = thread->userHasPermission(client_id, PERMISSION::SEND_MESSAGE);
 			*/
-			// TODO place in JSON client permission status for DELETE_POST
+			thread_json["client_permissions"] = thread->getPermissionsAsJson(client_id);
 			multiple_thread_json["threads"].push_back(thread_json);
 		}
 	}
@@ -98,7 +97,7 @@ std::string Board::dumpAllThreads(int client_id) const {
 std::string Board::dumpThread(int thread_id, int client_id, std::string key) const {
 	nlohmann::json thread_json;
 	thread_json["messages"] = this->threads.at(thread_id).getMessagesAsJson(key);
-	thread_json["client_permissions"]["send_message"] = this->threads.at(thread_id).userHasPermission(client_id, PERMISSION::SEND_MESSAGE);
+	thread_json["client_permissions"] = this->threads.at(thread_id).getPermissionsAsJson(client_id);
 	return thread_json.dump();
 }
 
