@@ -83,7 +83,7 @@ void db_connect(const char* _target, const char* _user) {
 	const char* user = _user;
 	const char* password = getenv(DATABASE_PASSWORD_ENVIRONMENT_VARIABLE);
 	const char* upload_post_prepared_stmt = "INSERT INTO post(id, thread, id_in_thread, name, upload_timestamp, content, files[0], files[1], files[2], files[3], key) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);";
-	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, number_of_posts, permission_object_id) VALUES (?, 0, ?);";
+	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, permission_object_id) VALUES (?, ?);";
 	const char* mark_post_as_deleted_prepared_stmt = "UPDATE post SET deleted = true WHERE id = ?;";
 	const char* mark_thread_as_deleted_prepared_stmt = "UPDATE thread SET deleted = true WHERE id = ?;";
 	const char* create_account_prepared_stmt = "INSERT INTO account(id, username, password_hash, key) VALUES (?, ?, ?, ?);";
