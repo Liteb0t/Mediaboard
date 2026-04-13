@@ -14,7 +14,7 @@
 #include <nlohmann/json.hpp>
 using json = nlohmann::json;
 
-websocket_session::websocket_session(boost::asio::ip::tcp::socket&& socket, boost::shared_ptr<shared_state> const& state)
+websocket_session::websocket_session(boost::asio::ip::tcp::socket&& socket, shared_state* state)
 		: ws_(std::move(socket)) , state_(state) {
 }
 

@@ -7,9 +7,11 @@
 // Official repository: https://github.com/vinniefalco/CppCon2018
 //
 
+#include "FuzeHttp.hpp"
 #include "field_lengths.h"
 #include "http_session.hpp"
 #include "permission_managed_object.hpp"
+#include "shared_state.hpp"
 #include "websocket_session.hpp"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/beast/http/status.hpp>
@@ -27,6 +29,12 @@
 #include <sstream>
 #include <string>
 using json = nlohmann::json;
+
+http_session::http_session(boost::asio::ip::tcp::socket&& socket, shared_state* state, FuzeHttp::Controller<shared_state*>* controller)
+		: stream_(std::move(socket)),
+		state_(state),
+		controller(controller) {
+}
 
 //------------------------------------------------------------------------------
 
@@ -137,7 +145,8 @@ template <typename T> auto api_response_T(T status, beast::string_view message) 
 // request), is type-erased in message_generator.
 template <class Body, class Allocator>
 http::message_generator handle_request(
-		boost::shared_ptr<shared_state> const& state,
+		shared_state* state,
+		FuzeHttp::Controller<shared_state*>* controller,
 		http::request<Body, http::basic_fields<Allocator>>&& req) {
 	// Returns a bad request response
 	auto const bad_request = [&req](beast::string_view why) {
@@ -226,6 +235,9 @@ http::message_generator handle_request(
 	else
 		req_location = decoded_url;
 	std::cout << "req_location: " << req_location << std::endl;
+
+	// Matches paths in urls.cpp
+	controller->matchPathAndExecute(state, req_location);
 
 	auto const getNumberFromPath = [&req_location](int start_index) {
 		std::size_t found = req_location.find_first_not_of("0123456789", start_index+1);
@@ -1238,10 +1250,6 @@ http::message_generator handle_request(
 
 //------------------------------------------------------------------------------
 
-http_session::http_session(boost::asio::ip::tcp::socket&& socket, boost::shared_ptr<shared_state> const& state)
-		: stream_(std::move(socket)), state_(state) {
-}
-
 void http_session::run() {
 	do_read();
 }
@@ -1298,7 +1306,7 @@ void http_session::on_read(beast::error_code ec, std::size_t) {
 	}
 
 	// Handle request
-	http::message_generator msg = handle_request(state_, parser_->release());
+	http::message_generator msg = handle_request(state_, controller, parser_->release());
 	// http::message_generator msg = handle_request(state_->doc_root(), parser_->release());
 
 	// Determine if we should close the connection

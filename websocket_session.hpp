@@ -27,7 +27,7 @@
 */
 class websocket_session : public boost::enable_shared_from_this<websocket_session> {
 public:
-	websocket_session(boost::asio::ip::tcp::socket&& socket, boost::shared_ptr<shared_state> const& state);
+	websocket_session(boost::asio::ip::tcp::socket&& socket, shared_state* state);
 	~websocket_session();
 
 	template<class Body, class Allocator>
@@ -41,7 +41,7 @@ private:
 	int tracking_thread;
 	beast::flat_buffer buffer_;
 	websocket::stream<beast::tcp_stream> ws_;
-	boost::shared_ptr<shared_state> state_;
+	shared_state* state_;
 	std::vector<boost::shared_ptr<std::string const>> queue_;
 
 	void fail(beast::error_code ec, char const* what);

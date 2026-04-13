@@ -151,7 +151,8 @@ int main(int argc, char* argv[]) {
 	boost::asio::io_context io_context;
 
 	std::cout << "Initialising shared state..." << std::endl;
-	boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection, thumbnail_file_format));
+	// boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection, thumbnail_file_format));
+	shared_state* state = new shared_state(location, media_location, database_connection, thumbnail_file_format);
 	state->start();
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
@@ -197,6 +198,7 @@ int main(int argc, char* argv[]) {
 		std::cout << "Thread closed." << std::endl;
 	else
 		std::cout << "All " << threads << " threads closed." << std::endl;
+	delete state;
 	delete database_connection;
 
 	return EXIT_SUCCESS;

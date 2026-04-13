@@ -10,15 +10,15 @@
 #ifndef BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 
+#include "beast.hpp"
+#include "board.hpp"
+#include "DatabaseConnection.hpp"
+#include "permission_managed_object.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/smart_ptr.hpp>
 #include <mutex>
 #include <string>
 #include <unordered_set>
-#include "beast.hpp"
-#include "board.hpp"
-#include "DatabaseConnection.hpp"
-#include "permission_managed_object.hpp"
 
 // Forward declaration
 class websocket_session;
@@ -65,7 +65,6 @@ public:
 
 	void join  (websocket_session* session);
 	void leave (websocket_session* session);
-	void send  (std::string message);
 	void sendToThread (std::string message, int thread_id);
 
 private:

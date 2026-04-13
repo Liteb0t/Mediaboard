@@ -11,7 +11,7 @@
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_LISTENER_HPP
 
 #include "beast.hpp"
-
+#include "FuzeHttp.hpp"
 #include <boost/asio.hpp>
 #include <boost/smart_ptr.hpp>
 #include <memory>
@@ -23,14 +23,15 @@ class shared_state;
 // Accepts incoming connections and launches the sessions
 class listener : public boost::enable_shared_from_this<listener> {
 public:
-	listener(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint,  boost::shared_ptr<shared_state> const& state);
+	listener(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint, shared_state* state);
 
 	// Start accepting incoming connections
 	void run();
 private:
+	FuzeHttp::Controller<shared_state*>* controller;
 	boost::asio::io_context& io_context_;
 	boost::asio::ip::tcp::acceptor acceptor_;
-	boost::shared_ptr<shared_state> state_;
+	shared_state* state_;
 
 	void fail(beast::error_code ec, char const* what);
 	void on_accept(beast::error_code ec, boost::asio::ip::tcp::socket socket);

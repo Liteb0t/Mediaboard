@@ -9,10 +9,13 @@
 
 #include "listener.hpp"
 #include "http_session.hpp"
+#include "shared_state.hpp"
+#include "urls.hpp"
 #include <iostream>
 
-listener::listener(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint, boost::shared_ptr<shared_state> const& state)
-		: io_context_(io_context) , acceptor_(io_context) , state_(state) {
+listener::listener(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint, shared_state* state)
+		: io_context_(io_context) , acceptor_(io_context) , state_(state), controller(new FuzeHttp::Controller<shared_state*>()) {
+	addURLsToController(this->controller);
 	beast::error_code ec;
 
 	// Open the acceptor
@@ -72,7 +75,8 @@ void listener::on_accept(beast::error_code ec, boost::asio::ip::tcp::socket sock
 		// Launch a new session for this connection
 		boost::make_shared<http_session>(
 			std::move(socket),
-			state_)->run();
+			state_,
+			controller)->run();
 	}
 
 	// The new connection gets its own strand

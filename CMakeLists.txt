@@ -58,7 +58,9 @@ target_sources(MediaboardServer
     post.cpp
     shared_state.cpp
     thread.cpp
+    urls.cpp
     user.cpp
+    views.cpp
     websocket_session.cpp
 )
 configure_file(config.ini ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
