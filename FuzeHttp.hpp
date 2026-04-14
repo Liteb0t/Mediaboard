@@ -1,10 +1,13 @@
 #pragma once
+#include "beast.hpp"
 #include <charconv>
 #include <string>
 #include <sys/un.h>
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/algorithm/string.hpp>
+#include <boost/optional.hpp>
+#include <boost/json.hpp>
 #include <iostream>
 #include <sstream>
 #include <variant>
@@ -13,6 +16,18 @@
 #include <type_traits> // For std::conditional_t
 
 namespace FuzeHttp {
+// URL decoding in C http://www.geekhideout.com/urlcode.shtml
+char fromHex(char ch);
+
+std::string getDecodedURL(boost::string_view raw_URL);
+
+std::string_view getPathName(const std::string& source_URL);
+
+struct Response {
+	beast::http::status status;
+	boost::optional<boost::json::object> json;
+	boost::optional<std::string> error_message;
+};
 // https://stackoverflow.com/a/79894118/18658154
 // Type Filtering Logic
 template<typename... Ts> struct TypeList {};
@@ -35,7 +50,7 @@ struct Filter<TypeList<T, Rest...>, Pred, TypeList<Out...>> {
 
 template<typename StateType, typename T> struct MakeFuncPtr;
 template<typename StateType, typename... Args>
-struct MakeFuncPtr<StateType, TypeList<Args...>> { using type = void(*)(StateType, Args...); };
+struct MakeFuncPtr<StateType, TypeList<Args...>> { using type = Response(*)(StateType, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req, Args...); };
 
 template<typename T> struct MakeArgTuple;
 template<typename... Args>
@@ -54,7 +69,7 @@ template<typename StateType>
 class Path {
 public:
 	virtual size_t getPathSize() const = 0;
-	virtual void executeView(StateType state) const = 0;
+	virtual Response executeView(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) const = 0;
 	virtual bool attemptPathMatch(std::string_view section, size_t index) = 0;
 };
 
@@ -81,8 +96,8 @@ public:
 		}
 		std::cout << "Final path length: " << this->path.size() << std::endl;
 	}
-	void executeView(StateType state) const override {
-		std::apply(view_func, std::tuple_cat(std::tie(state), view_args));
+	Response executeView(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) const override {
+		return std::apply(view_func, std::tuple_cat(std::tie(state, req), view_args));
 	}
 	size_t getPathSize() const override {
 		return this->path.size();
@@ -192,18 +207,16 @@ public:
 		id_counter++;
 	}
 
-	void matchPathAndExecute(StateType state, std::string_view location) {
-		// boost::algorithm::trim_left(location_);
-		// location = location.substr(location.starts_with('/') ? 1 : 0,
-		// 						   location.ends_with('/') ? location.length() - 1 : location.length());
-		// boost::algorithm::trim_right(location_);
-		std::cout << "[Controller] location: " << location << std::endl;
-		// std::list<std::forward_list<std::variant<std::string, int>>::const_iterator> matched_views;
+	Response matchPathAndExecute(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
+		std::string decoded_url = FuzeHttp::getDecodedURL(req.target());
+		std::string_view path_name = FuzeHttp::getPathName(decoded_url);
+		std::cout << "[Controller] path_name: " << path_name << std::endl;
+
 		std::unordered_set<int> matched_views = all_views;
 		std::string_view section;
-		size_t i, location_start_bound = location.starts_with('/') ? 1 : 0, location_end_bound;
-		for (i = 0; (location_end_bound = location.find('/', location_start_bound)) != std::string_view::npos; i++) {
-			section = location.substr(location_start_bound, location_end_bound - location_start_bound);
+		size_t i, location_start_bound = path_name.starts_with('/') ? 1 : 0, location_end_bound;
+		for (i = 0; (location_end_bound = path_name.find('/', location_start_bound)) != std::string_view::npos; i++) {
+			section = path_name.substr(location_start_bound, location_end_bound - location_start_bound);
 			std::cout << "[" <<section<<"]";
 			// for (std::list<std::forward_list<std::variant<std::string, int>>::const_iterator>::const_iterator view = matched_views.begin(); view != matched_views.end(); view++) {
 			for (int view_id : matched_views) {
@@ -227,10 +240,13 @@ public:
 		}
 		if (matched_views.size() >= 1) {
 			std::cout << "Matching finished: number of matches: " << matched_views.size() << std::endl;
-			views.at(*matched_views.begin())->executeView(state);
+			return views.at(*matched_views.begin())->executeView(state, req);
 		}
 		else {
-			std::cout << "No patterns were matched to location " << location << std::endl;
+			Response res;
+			res.status = http::status::not_found;
+			std::cout << "No patterns were matched to path_name " << path_name << std::endl;
+			return res;
 		}
 	}
 private:

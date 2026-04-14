@@ -1,4 +1,5 @@
 #pragma once
 #include "shared_state.hpp"
+#include "FuzeHttp.hpp"
 
-void testView(shared_state* state, std::string var);
+FuzeHttp::Response testView(shared_state* state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req, std::string var);

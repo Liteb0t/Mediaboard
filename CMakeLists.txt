@@ -14,7 +14,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd t
 
 # Find dependencies sneeded by the project
 cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
-find_package(Boost 1.88 COMPONENTS filesystem program_options REQUIRED)
+find_package(Boost 1.88 COMPONENTS filesystem json program_options REQUIRED)
 
 find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
 add_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
@@ -37,6 +37,7 @@ add_executable(MediaboardServer)
 target_link_libraries(MediaboardServer
   PRIVATE
     Boost::filesystem
+    Boost::json
     Boost::program_options
     ${ImageMagick_LIBRARIES}
     nlohmann_json::nlohmann_json
@@ -50,6 +51,7 @@ target_sources(MediaboardServer
     DatabaseConnectionPostgreSQL.cpp
     DatabaseConnectionSQLite.cpp
     db_interface.c
+    FuzeHttp.cpp
     group.cpp
     http_session.cpp
     listener.cpp

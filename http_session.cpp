@@ -15,8 +15,10 @@
 #include "websocket_session.hpp"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/beast/http/status.hpp>
+#include <boost/beast/http/string_body_fwd.hpp>
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/json/serialize.hpp>
 #include <boost/locale.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -96,11 +98,6 @@ void sanitiseFileName(std::string* file_name) {
 		}
 	}
 }
-	
-// URL decoding in C http://www.geekhideout.com/urlcode.shtml
-char from_hex(char ch) {
-	return std::isdigit(ch) ? ch - '0' : std::tolower(ch) - 'a' + 10;
-}
 
 // Append an HTTP rel-path to a local filesystem path.
 // The returned path is normalized for the platform.
@@ -143,11 +140,10 @@ template <typename T> auto api_response_T(T status, beast::string_view message) 
 //
 // The concrete type of the response message (which depends on the
 // request), is type-erased in message_generator.
-template <class Body, class Allocator>
 http::message_generator handle_request(
 		shared_state* state,
 		FuzeHttp::Controller<shared_state*>* controller,
-		http::request<Body, http::basic_fields<Allocator>>&& req) {
+		http::request<http::string_body, http::basic_fields<std::allocator<char>>>&& req) {
 	// Returns a bad request response
 	auto const bad_request = [&req](beast::string_view why) {
 		http::response<http::string_body> res{http::status::bad_request, req.version()};
@@ -199,63 +195,51 @@ http::message_generator handle_request(
 		res.prepare_payload();
 		return res;
 	};
-	
-	// URL decoding in C http://www.geekhideout.com/urlcode.shtml
-	std::string decoded_url;
-	decoded_url.reserve(req.target().length()+1);
-	for (boost::string_view::const_iterator i = req.target().begin(), n = req.target().end(); i != n; i++) {
-		std::string::value_type c = (*i);
-		if (c == '%') {
-			if (i+1 != n && i+2 != n) {
-				decoded_url += from_hex(*(i+1)) << 4 | from_hex(*(i+2));
-				i += 2;
-			}
-		}
-		else if (c == '+')
-			decoded_url += ' ';
-		else
-			decoded_url +=  c;
-	}
 
-	std::cout << "Decoded URL: " << decoded_url << std::endl;
-
-	// Request path must be absolute and not contain "..".
-	if( decoded_url.empty() ||
-		decoded_url[0] != '/' ||
-		decoded_url[0] == '?' ||
-		decoded_url.find("..") != std::string::npos)
-		return bad_request("Illegal request-target");
-
-	// req_location excludes URL parameters (stuff after '?')
-	std::string req_location;
-	// int decoded_url_last_slash_index = decoded_url.rfind('/');
-	int decoded_url_last_questionmark_index = decoded_url.rfind('?');
-	if (decoded_url_last_questionmark_index != std::string::npos)
-		req_location = decoded_url.substr(0, decoded_url_last_questionmark_index);
-	else
-		req_location = decoded_url;
-	std::cout << "req_location: " << req_location << std::endl;
+	std::string decoded_url = FuzeHttp::getDecodedURL(req.target());
+	std::string_view path_name = FuzeHttp::getPathName(decoded_url);
 
 	// Matches paths in urls.cpp
-	controller->matchPathAndExecute(state, req_location);
+	FuzeHttp::Response basic_res = controller->matchPathAndExecute(state, req);
+	std::cout << "[http_session] basic_res.status: " << basic_res.status << std::endl;
+	if (basic_res.status != http::status::not_found) {
+		if (basic_res.json) {
+			http::response<http::string_body> res{basic_res.status, req.version()};
+			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+			res.set(http::field::content_type, "application/json");
+			res.keep_alive(req.keep_alive());
+			res.body() = boost::json::serialize(basic_res.json.get());
+			res.prepare_payload();
+			return res;
+		}
+		else {
+			http::response<http::empty_body> res{basic_res.status, req.version()};
+			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+			if (basic_res.error_message)
+				res.set("message", basic_res.error_message.get());
+			res.keep_alive(req.keep_alive());
+			res.prepare_payload();
+			return res;
+		}
+	}
 
-	auto const getNumberFromPath = [&req_location](int start_index) {
-		std::size_t found = req_location.find_first_not_of("0123456789", start_index+1);
+	auto const getNumberFromPath = [&path_name](int start_index) {
+		std::size_t found = path_name.find_first_not_of("0123456789", start_index+1);
 
 		if (found == start_index) {
 			throw (std::string("Invalid group ID; cannot be empty."));
 		}
-		else if (req_location[start_index] == '/') {
+		else if (path_name[start_index] == '/') {
 			throw (std::string("First character cannot be a /. Try adding +1."));
 		}
-		else if (req_location[found] != '/') {
+		else if (path_name[found] != '/') {
 			throw (std::string("Invalid group ID; trailing '/' not found."));
 		}
 		else {
 			int number_in_url;
 			// Get number ID from URL substring
-			std::cout << "Substring: " << req_location.substr(start_index, found - start_index) << std::endl;
-			std::from_chars(req_location.substr(start_index, found - start_index).data(), req_location.substr(start_index, found - start_index).data() + req_location.substr(start_index, found - start_index).size(), number_in_url);
+			std::cout << "Substring: " << path_name.substr(start_index, found - start_index) << std::endl;
+			std::from_chars(path_name.substr(start_index, found - start_index).data(), path_name.substr(start_index, found - start_index).data() + path_name.substr(start_index, found - start_index).size(), number_in_url);
 			return std::make_pair(number_in_url, found);
 		}
 		throw ("Program should not reach here.");
@@ -306,12 +290,7 @@ http::message_generator handle_request(
 		// Make sure we can handle the method
 	if 		(req.method() == http::verb::get) {
 		bool is_media;
-		// Build the path to the requested file
-		if (req_location.substr(0, 7) == "/media/") {
-			is_media = true;
-		}
-		else if (req_location.substr(0, 5) == "/api/") {
-			is_media = false;
+		if (path_name.substr(0, 5) == "/api/") {
 			std::pair<int, std::string> client;
 			try {
 				client = getUserFromToken();
@@ -321,19 +300,19 @@ http::message_generator handle_request(
 			}
 			http::response<http::string_body> res;
 			res.set(http::field::content_type, "application/json");
-			if (req_location.substr(5) == "threads/") {
+			if (path_name.substr(5) == "threads/") {
 				res.result(http::status::ok);
 				res.body() = state->main_board()->dumpAllThreads(client.first);
 			}
-			else if (req_location.substr(5, 7) == "server/") {
-				if (req_location.substr(12, 12) == "permissions/") {
+			else if (path_name.substr(5, 7) == "server/") {
+				if (path_name.substr(12, 12) == "permissions/") {
 					res.body() = state->dumpPermissions(client.first);
 					res.result(http::status::ok);
 				}
 				else
 					return api_response(http::status::bad_request, std::string("Bad URL. Do better next time."));
 			}
-			else if (req_location.substr(5, 7) == "thread/") {
+			else if (path_name.substr(5, 7) == "thread/") {
 				std::pair<int, int> thread_in_path;
 				try {
 					 thread_in_path = getNumberFromPath(12);
@@ -342,7 +321,7 @@ http::message_generator handle_request(
 					return api_response(http::status::bad_request, error_text);
 				}
 				if (state->main_board()->threadExists(thread_in_path.first)) {
-					if (req_location.substr(thread_in_path.second) == "/permissions/") {
+					if (path_name.substr(thread_in_path.second) == "/permissions/") {
 						res.body() = state->main_board()->dumpPermissionsInThread(thread_in_path.first, client.first);
 					}
 					else {
@@ -361,9 +340,9 @@ http::message_generator handle_request(
 					res.result(404);
 				}
 			}
-			else if (req_location.substr(5, 6) == "group/") { // TODO add /members/ to end of URL check
-				std::size_t found = req_location.find_first_not_of("0123456789", 11);
-				if (req_location[found] != '/') {
+			else if (path_name.substr(5, 6) == "group/") { // TODO add /members/ to end of URL check
+				std::size_t found = path_name.find_first_not_of("0123456789", 11);
+				if (path_name[found] != '/') {
 					return api_response(http::status::bad_request, std::string("Invalid group ID; trailing '/' not found."));
 				}
 				else if (found == 11) {
@@ -372,7 +351,7 @@ http::message_generator handle_request(
 				else {
 					int group_in_url;
 					// Get group ID from URL substring
-					std::from_chars(req_location.substr(11, found).data(), req_location.substr(11, found).data() + req_location.substr(11, found).size(), group_in_url);
+					std::from_chars(path_name.substr(11, found).data(), path_name.substr(11, found).data() + path_name.substr(11, found).size(), group_in_url);
 					std::cout << "group_id_url: " << group_in_url << std::endl;
 					if (state->groupExists(group_in_url)) {
 						// res.body() = state->dumpMembersInGroup(group_in_url);
@@ -383,14 +362,14 @@ http::message_generator handle_request(
 						return api_response(http::status::bad_request, std::string("Group '") + std::to_string(group_in_url) + "' not found.");
 				}
 			}
-			else if (req_location.substr(5) == "groups/") {
+			else if (path_name.substr(5) == "groups/") {
 				res.body() = state->dumpAllGroups(client.first);
 				res.result(http::status::ok);
 			}
 			// Currently only used for checking if the client has MANAGE_PERMISSIONS on the server level, so the frontend can determine whether to show the "manage server" tab
-			else if (req_location.substr(5, 5) == "user/") {
+			else if (path_name.substr(5, 5) == "user/") {
 				int user_id;
-				if (req_location.substr(10) == "client/")
+				if (path_name.substr(10) == "client/")
 					user_id = client.first;
 				else {
 					return api_response(http::status::not_implemented, std::string("only /user/client/ is implemented"));
@@ -401,7 +380,7 @@ http::message_generator handle_request(
 				// response_json["server_permissions"]["delete_post"] = state->userHasPermission(user_id, PERMISSION::DELETE_POST);
 				return api_response_json(http::status::ok, response_json);
 			}
-			else if (req_location.substr(5) == "users/") {
+			else if (path_name.substr(5) == "users/") {
 				res.body() = state->dumpAllUsers(client.first);
 				int user_rank = state->getUserRank(client.first);
 				res.set("Client-Rank", std::to_string(user_rank));
@@ -413,23 +392,24 @@ http::message_generator handle_request(
 			res.prepare_payload();
 			return res;
 		}
-		else {
+		// Build the path to the requested file
+		if (path_name.substr(0, 7) == "/media/")
+			is_media = true;
+		else
 			is_media = false;
-			if (req_location.ends_with("/")) // So /thread/1/ and such will redirect to index.html
-				req_location = "frontend/index.html";
-			else
-				req_location = "frontend" + req_location;
-			// std::cout << "Opening non-media location: " << req_location << std::endl;
-		}
 		// Check if path leads to a directory
 		boost::filesystem::path filesystem_path;
 		if (is_media)
-			filesystem_path = std::format("{}/{}", state->getMediaLocation().string(), req_location.substr(7));
-		else
-			filesystem_path = std::format("{}/{}", state->getProgramLocation().string(), req_location);
+			filesystem_path = std::format("{}/{}", state->getMediaLocation().string(), path_name.substr(7));
+		else {
+			if (path_name.ends_with("/")) // So /thread/1/ and such will redirect to index.html
+				filesystem_path = std::format("{}/frontend/index.html", state->getProgramLocation().string());
+			else
+				filesystem_path = std::format("{}/frontend{}", state->getProgramLocation().string(), path_name);
+		}
 		std::cout << "Attempting to open " << filesystem_path << std::endl;
 		if (!boost::filesystem::exists(filesystem_path))
-			return not_found(req_location);
+			return not_found(path_name);
 		if (!boost::filesystem::is_regular_file(filesystem_path))
 			return bad_request("Is a directory.");
 
@@ -440,14 +420,14 @@ http::message_generator handle_request(
 
 		// Handle the case where the file doesn't exist
 		if (ec == boost::system::errc::no_such_file_or_directory)
-			return not_found(req_location);
+			return not_found(path_name);
 		else if (ec) // Handle an unknown error
 			return server_error(ec.message());
 
 		std::string filename;
 		if (is_media) {
-			int filename_start_index = req_location.rfind("/") + 1;
-			filename = req_location.substr(filename_start_index, req_location.length() - filename_start_index);
+			int filename_start_index = path_name.rfind("/") + 1;
+			filename = path_name.substr(filename_start_index, path_name.length() - filename_start_index);
 			int filename_extension_index;
 			if ((filename_extension_index = filename.rfind(".")) == -1) {
 				filename_extension_index = filename.size();
@@ -476,7 +456,7 @@ http::message_generator handle_request(
 			res.set("Content-Disposition", "inline; filename=\"" + filename + "\"");
 		}
 		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-		res.set(http::field::content_type, mime_type(req_location));
+		res.set(http::field::content_type, mime_type(filesystem_path.string()));
 		res.content_length(size);
 		res.keep_alive(req.keep_alive());
 		return res;
@@ -627,7 +607,7 @@ http::message_generator handle_request(
 			res.keep_alive(req.keep_alive());
 			return res;
 		}
-		else if (req_location.substr(0, 5) == "/api/") {
+		else if (path_name.substr(0, 5) == "/api/") {
 			std::pair<int, std::string> client;
 			try {
 				client = getUserFromToken();
@@ -635,12 +615,12 @@ http::message_generator handle_request(
 			catch(std::string error_text) {
 				return api_response(http::status::bad_request, error_text);
 			}
-			if (req_location == "/api/message/" || req_location == "/api/thread/") {
+			if (path_name == "/api/message/" || path_name == "/api/thread/") {
 				http::response<http::empty_body> res;
 				json request_json = json::parse(req.body());
 				bool is_thread;
 				json post_json;
-				if (req_location == "/api/thread/") {
+				if (path_name == "/api/thread/") {
 					is_thread = true;
 					if (request_json.contains("thread") &&
 						request_json["thread"].contains("post_zero")) {
@@ -708,7 +688,7 @@ http::message_generator handle_request(
 				return res;
 			}
 			// The URL extends past /thread/, used for permission management
-			else if (req_location.substr(0, 12) == "/api/thread/") {
+			else if (path_name.substr(0, 12) == "/api/thread/") {
 				std::pair<int, int> thread_in_url;
 				try {
 					thread_in_url = getNumberFromPath(12);
@@ -718,7 +698,7 @@ http::message_generator handle_request(
 				}
 
 				boost::shared_ptr<Thread> thread = state->getThread(0, thread_in_url.first);
-				if (req_location.substr(thread_in_url.second, 19) == "/permissions/group/") {
+				if (path_name.substr(thread_in_url.second, 19) == "/permissions/group/") {
 					int group_id;
 					try {
 						group_id = getNumberFromPath(thread_in_url.second+19).first;
@@ -736,7 +716,7 @@ http::message_generator handle_request(
 						return api_response(http::status::ok, std::string("Group permission collection created"));
 					}
 				}
-				else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
+				else if (path_name.substr(thread_in_url.second, 18) == "/permissions/user/") {
 					int user_id;
 					try {
 						user_id = getNumberFromPath(thread_in_url.second+18).first;
@@ -781,7 +761,7 @@ http::message_generator handle_request(
 				return api_response(http::status::ok, std::string("Group created"));
 			}
 			// For now assume the URL ends with add_groups/
-			else if (req_location.substr(0, 10) == "/api/user/") {
+			else if (path_name.substr(0, 10) == "/api/user/") {
 				int user_in_url;
 				try {
 					user_in_url = getNumberFromPath(10).first;
@@ -802,9 +782,9 @@ http::message_generator handle_request(
 				BasicResponse function_response = state->addUserToGroups(client.first, user_in_url, groups_to_add);
 				return api_response(function_response.status, function_response.message);
 			}
-			else if (req_location.substr(0, 12) == "/api/server/") {
-				std::cout << req_location.substr(12, 18) << std::endl;
-				if (req_location.substr(12, 18) == "permissions/group/") {
+			else if (path_name.substr(0, 12) == "/api/server/") {
+				std::cout << path_name.substr(12, 18) << std::endl;
+				if (path_name.substr(12, 18) == "permissions/group/") {
 					int group_in_url;
 					try {
 						group_in_url = getNumberFromPath(12+18).first;
@@ -819,7 +799,7 @@ http::message_generator handle_request(
 					else
 						return api_response(http::status::forbidden, std::string("Client lacks permission MANAGE_PERMISSIONS for this group"));
 				}
-				else if (req_location.substr(12, 17) == "permissions/user/") {
+				else if (path_name.substr(12, 17) == "permissions/user/") {
 					int user_in_url;
 					try {
 						user_in_url = getNumberFromPath(12+17).first;
@@ -862,7 +842,7 @@ http::message_generator handle_request(
 			else
 				return api_response(http::status::not_found, std::string("/api/ sub-URL not found."));
 		}
-		else if (req_location.substr(0, 14) == "/registration/") {
+		else if (path_name.substr(0, 14) == "/registration/") {
 			json request_json;
 			try {
 				request_json = json::parse(req.body());
@@ -936,7 +916,7 @@ http::message_generator handle_request(
 			else
 				return api_response(http::status::bad_request, "ordered_groups not found in JSON request");
 		}
-		else if (req_location.substr(0, 24) == "/api/server/permissions/") {
+		else if (path_name.substr(0, 24) == "/api/server/permissions/") {
 			json request_json;
 			int _permission_number, _permission_setting;
 			try {
@@ -954,7 +934,7 @@ http::message_generator handle_request(
 				return api_response(http::status::bad_request, std::string("Invalid permission setting in JSON"));
 			THREE_STATE_SETTING permission_setting = static_cast<THREE_STATE_SETTING>(_permission_setting);
 
-			if (req_location.substr(24, 6) == "group/") {
+			if (path_name.substr(24, 6) == "group/") {
 				int group_id;
 				try {
 					group_id = getNumberFromPath(24+6).first;
@@ -969,7 +949,7 @@ http::message_generator handle_request(
 				else
 					return api_response(http::status::forbidden, std::string("Permission denied for this client"));
 			}
-			else if (req_location.substr(24, 5) == "user/") {
+			else if (path_name.substr(24, 5) == "user/") {
 				int user_id;
 				try {
 					user_id = getNumberFromPath(24+5).first;
@@ -987,7 +967,7 @@ http::message_generator handle_request(
 			else
 				return api_response(http::status::not_found, std::string("/api/server/permissions sub-URL not found"));
 		}
-		else if (req_location.substr(0, 12) == "/api/thread/") {
+		else if (path_name.substr(0, 12) == "/api/thread/") {
 			// Assume we edit permissions, because that is the only feature implemented for PUT /api/thread/
 			std::pair<int, int> thread_in_url;
 			try {
@@ -1017,7 +997,7 @@ http::message_generator handle_request(
 				return api_response(http::status::bad_request, std::string("Invalid permission setting in JSON"));
 			THREE_STATE_SETTING permission_setting = static_cast<THREE_STATE_SETTING>(_permission_setting);
 
-			if (req_location.substr(thread_in_url.second, 19) == "/permissions/group/") {
+			if (path_name.substr(thread_in_url.second, 19) == "/permissions/group/") {
 				std::pair<int, int> group_in_url;
 				try {
 					group_in_url = getNumberFromPath(thread_in_url.second+19);
@@ -1032,7 +1012,7 @@ http::message_generator handle_request(
 				else
 					return api_response(http::status::forbidden, std::string("Permission denied for this client"));
 			}
-			else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
+			else if (path_name.substr(thread_in_url.second, 18) == "/permissions/user/") {
 				std::pair<int, int> user_in_url;
 				try {
 					user_in_url = getNumberFromPath(thread_in_url.second+18);
@@ -1054,7 +1034,7 @@ http::message_generator handle_request(
 			return not_found(req.target());
 	}
 	else if (req.method() == http::verb::delete_) {
-		if (req_location.substr(0, 10) == "/api/post/") {
+		if (path_name.substr(0, 10) == "/api/post/") {
 			int thread_id, message_id;
 			std::pair<int, int> thread_in_url/*, message_in_url*/;
 			try {
@@ -1109,11 +1089,11 @@ http::message_generator handle_request(
 			}
 
 			std::pair<int, int> group_in_url = getNumberFromPath(11);
-			std::cout << "Group in URL: " << group_in_url.first << ", req_location.length(): " << req_location.length() << ", group.second: " << group_in_url.second << std::endl;
+			std::cout << "Group in URL: " << group_in_url.first << ", path_name.length(): " << path_name.length() << ", group.second: " << group_in_url.second << std::endl;
 			if (state->userHasPermissionForGroup(client.first, PERMISSION::MANAGE_PERMISSIONS, group_in_url.first)) {
-				if (req_location.length() > group_in_url.second+1) {
-					std::cout << req_location.substr(group_in_url.second+1, 7) << std::endl;
-					if (req_location.substr(group_in_url.second+1, 7) == "member/") {
+				if (path_name.length() > group_in_url.second+1) {
+					std::cout << path_name.substr(group_in_url.second+1, 7) << std::endl;
+					if (path_name.substr(group_in_url.second+1, 7) == "member/") {
 						std::pair<int, int> member_in_url = getNumberFromPath(group_in_url.second+1+7);
 						state->removeUserFromGroup(member_in_url.first, group_in_url.first);
 						return api_response(http::status::ok, std::string("Member dismissed from group"));
@@ -1132,9 +1112,9 @@ http::message_generator handle_request(
 			// BasicResponse function_response = state->deleteGroup(client.first, group_in_url.first);
 			// return api_response(function_response.status, function_response.message);
 		}
-		else if (req_location.substr(0, 12) == "/api/server/") {
-			std::cout << req_location.substr(12, 18) << std::endl;
-			if (req_location.substr(12, 18) == "permissions/group/") {
+		else if (path_name.substr(0, 12) == "/api/server/") {
+			std::cout << path_name.substr(12, 18) << std::endl;
+			if (path_name.substr(12, 18) == "permissions/group/") {
 				// TODO check if group exists
 				std::pair<int, std::string> client;
 				try {
@@ -1152,7 +1132,7 @@ http::message_generator handle_request(
 					return api_response(http::status::unauthorized, std::string("Couldn't remove group permission collection; Permission denied for this client"));
 				// return api_response(http::status::not_implemented, std::string("Group ID: " + std::to_string(group_in_url.first) + " but action not implemented"));
 			}
-			else if (req_location.substr(12, 17) == "permissions/user/") {
+			else if (path_name.substr(12, 17) == "permissions/user/") {
 				std::pair<int, std::string> client;
 				try {
 					client = getUserFromToken();
@@ -1174,7 +1154,7 @@ http::message_generator handle_request(
 			else
 				return api_response(http::status::not_found, std::string("/api/server sub-URL not found"));
 		}
-		else if (req_location.substr(0, 12) == "/api/thread/") {
+		else if (path_name.substr(0, 12) == "/api/thread/") {
 			std::pair<int, std::string> client;
 			try {
 				client = getUserFromToken();
@@ -1192,7 +1172,7 @@ http::message_generator handle_request(
 			}
 			boost::shared_ptr<Thread> thread = state->getThread(0, thread_in_url.first);
 
-			if (req_location.substr(thread_in_url.second, 19) == "/permissions/group/") {
+			if (path_name.substr(thread_in_url.second, 19) == "/permissions/group/") {
 				int group_id;
 				try {
 					group_id = getNumberFromPath(thread_in_url.second+19).first;
@@ -1207,7 +1187,7 @@ http::message_generator handle_request(
 				else
 					return api_response(http::status::forbidden, std::string("Permission denied for this client"));
 			}
-			else if (req_location.substr(thread_in_url.second, 18) == "/permissions/user/") {
+			else if (path_name.substr(thread_in_url.second, 18) == "/permissions/user/") {
 				int user_id;
 				try {
 					user_id = getNumberFromPath(thread_in_url.second+18).first;
