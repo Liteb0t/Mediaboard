@@ -2,7 +2,7 @@
 #include "db_interface.h"
 // #include <array>
 // #include <memory>
-// #include <string>
+#include <string>
 
 enum struct USER_OR_GROUP {USER, GROUP};
 
@@ -28,7 +28,9 @@ class DatabaseConnection {
 public:
 	virtual ~DatabaseConnection() {
 	}
-	// virtual void init() = 0;
+	// typedef enum { SUCCESS, USERNAME_TAKEN, UNKNOWN_ERROR } CREATE_ACCOUNT_RETURN_CODE;
+	// virtual CREATE_ACCOUNT_RETURN_CODE createAccount(const std::string& username, const char* password_hash, const unsigned char* contini_value);
+
 	virtual int getUniquePermissionObjectId() const = 0;
 	virtual int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) = 0;
 	virtual int storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) = 0;

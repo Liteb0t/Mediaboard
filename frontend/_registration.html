@@ -30,8 +30,9 @@
 				</div>-->
 				<!--JSON is used instead of standard HTTP so this is not used
 				<input type="submit">-->
-				<input type="button" value="Log in" id="post_button" class="RightAligned" onclick="loginAction()">
-				<input type="button" value="Register" id="post_button" class="RightAligned" onclick="registerAction()">
+				<input type="button" value="Log in"  onclick="loginAction()">
+				<input type="button" value="Register" onclick="registerAction()">
+				<input type="button" value="Register (new)" onclick="newRegisterAction()">
 				<!--<a class="Button RightAligned" href="_ROOT_URL">Return</a>-->
 			</form>
 			<div id="error_messages"></div>
@@ -72,6 +73,16 @@ async function registerAction() {
 		localStorage.setItem("account_username", account_username_input.value);
 		localStorage.setItem("name", account_username_input.value);
 	}
+}
+async function newRegisterAction() {
+	const data = {
+		username: account_username_input.value
+	};
+	const fetch_response = await fetch("_ROOT_URL" + "registration_test/", {
+		method: "POST",
+		body: JSON.stringify(data)
+	});
+	console.log(fetch_response);
 }
 async function sendRegistrationFormData(endpoint) {
 	error_messages.textContent = "";

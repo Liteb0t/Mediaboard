@@ -8,7 +8,7 @@ public:
 	DatabaseConnectionPostgreSQL(const std::string& postgresql_uri, const std::string& program_version_string);
 	DatabaseConnectionPostgreSQL(const std::string& postgresql_user, const std::string& postgresql_host, const unsigned short postgresql_port, const std::string& postgresql_database_name, const std::string& current_version);
 	~DatabaseConnectionPostgreSQL();
-	// void init() override {};
+
 	int getUniquePermissionObjectId() const override { return db_get_unique_permission_object_id(); }
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
 	int storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) override;

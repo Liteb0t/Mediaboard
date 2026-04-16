@@ -23,6 +23,8 @@ std::string getDecodedURL(boost::string_view raw_URL);
 
 std::string_view getPathName(const std::string& source_URL);
 
+typedef const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& Request;
+
 struct Response {
 	beast::http::status status;
 	boost::optional<boost::json::object> json;
@@ -214,17 +216,13 @@ public:
 
 		std::unordered_set<int> matched_views = all_views;
 		std::string_view section;
-		size_t i, location_start_bound = path_name.starts_with('/') ? 1 : 0, location_end_bound;
-		for (i = 0; (location_end_bound = path_name.find('/', location_start_bound)) != std::string_view::npos; i++) {
+		size_t section_index, location_start_bound = path_name.starts_with('/') ? 1 : 0, location_end_bound;
+		for (section_index = 0; (location_end_bound = path_name.find('/', location_start_bound)) != std::string_view::npos; section_index++) {
 			section = path_name.substr(location_start_bound, location_end_bound - location_start_bound);
 			std::cout << "[" <<section<<"]";
-			// for (std::list<std::forward_list<std::variant<std::string, int>>::const_iterator>::const_iterator view = matched_views.begin(); view != matched_views.end(); view++) {
-			for (int view_id : matched_views) {
-				bool is_match = views.at(view_id)->attemptPathMatch(section, i);
-				if (!is_match) {
-					matched_views.erase(view_id);
-				}
-			}
+			std::erase_if(matched_views, [this, &section, section_index](const int view_id){
+				return this->views.at(view_id)->attemptPathMatch(section, section_index) == false;
+			});
 			std::cout << '.' << std::endl;
 			if (matched_views.size() == 0)
 				break;
@@ -232,12 +230,9 @@ public:
 				location_start_bound = location_end_bound + 1;
 		}
 		// Remove matches for URLs shorter than the pattern
-		for (int view_id : matched_views) {
-			if (views.at(view_id)->getPathSize() > i) {
-				std::cout << "View " << view_id << " path size " << views.at(view_id)->getPathSize() << " is longer than " << i << ". Removing." << std::endl;
-				matched_views.erase(view_id);
-			}
-		}
+		std::erase_if(matched_views, [this, section_index](const int view_id){
+			return this->views.at(view_id)->getPathSize() > section_index;
+		});
 		if (matched_views.size() >= 1) {
 			std::cout << "Matching finished: number of matches: " << matched_views.size() << std::endl;
 			return views.at(*matched_views.begin())->executeView(state, req);

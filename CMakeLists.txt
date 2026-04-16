@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Required on FreeBSD
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd to use
+set(SODIUM_DISABLE_TESTS ON)
 
 # Find dependencies sneeded by the project
 cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
@@ -44,6 +45,7 @@ target_link_libraries(MediaboardServer
     ${ECPG_LIB}
     PostgreSQL::PostgreSQL
     SQLite3::SQLite3
+    sodium
 )
 target_sources(MediaboardServer
   PRIVATE
@@ -78,6 +80,7 @@ add_dependencies(MediaboardServer
   frontend
 )
 add_subdirectory(frontend)
+add_subdirectory(dependencies)
 
 install(
   TARGETS MediaboardServer
