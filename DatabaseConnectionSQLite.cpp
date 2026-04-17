@@ -18,7 +18,7 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 		sqlite3_close(db);
 		return;
 	}
-	// char* error_message;
+	char* error_message;
 	sqlite3_stmt* stmt;
 	ec = sqlite3_prepare_v2(this->db, "SELECT version FROM _info", -1, &stmt, NULL);
 	if (ec != SQLITE_OK) { // We will assume this means the database is not populated
@@ -38,7 +38,7 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 	else {
 		int number_of_columns = sqlite3_column_count(stmt);
 		// std::cout << "[DatabaseConnectionSQLite] number_of_columns: " << number_of_columns << std::endl;
-		if (sqlite3_step(stmt) == SQLITE_ROW || sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+		if (sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
 			const unsigned char* text = sqlite3_column_text(stmt, 0); //get the value from at that column as text
 			// printf("= %s \n", text);
 			std::string database_version_string = std::string(reinterpret_cast<const char*>(text));
@@ -74,13 +74,41 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 		else {
 			std::cout << "[DatabaseConnectionSQLite] No version string found. Database is bugged out." << std::endl;
 		}
-		sqlite3_finalize(stmt);
 	}
+	sqlite3_finalize(stmt);
 	// Prepared statements
 	ec = sqlite3_prepare_v2(this->db, "INSERT INTO account(id, username, password_hash, key) VALUES (?, ?, ?, ?)", -1, &create_account_prepared_stmt, NULL);
 	if (ec != SQLITE_OK) {
-		std::cerr << "Couldn't prepare create_account_prepared_stmt" << std::endl;
+		std::cerr << "Couldn't prepare create_account_prepared_stmt: " << error_message << std::endl;
+		sqlite3_free(&error_message);
 	}
+}
+
+void DatabaseConnectionSQLite::getSecret(char* secret_base64) {
+	sqlite3_stmt* stmt;
+	int ec = sqlite3_prepare_v2(this->db, "SELECT value_base64 FROM _secret", -1, &stmt, NULL);
+	if (ec == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+		std::cout << "[DatabaseConnectionSQLite] Found secret" << std::endl;
+		const char* db_secret = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)) {
+			strcpy(secret_base64, db_secret);
+			return;
+		}
+		std::cerr << "[DatabaseConnectionSQLite] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
+		this->execWriteOnlyStatement("DELETE FROM _secret");
+	}
+	unsigned char bytes[128];
+	randombytes_buf(bytes, 128);
+	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING), bytes, 128, sodium_base64_VARIANT_URLSAFE_NO_PADDING);
+	std::cout << "[DatabaseConnectionSQLite] Generated new secret: " << secret_base64 << std::endl;
+	try {
+		this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _secret(value_base64 TEXT NOT NULL)");
+		this->execWriteOnlyStatement(std::format("INSERT INTO _secret(value_base64) VALUES ('{}')", secret_base64));
+	}
+	catch (std::exception& exception) {
+		std::cerr << "[DatabaseConnectionSQLite] Could not save secret to database: " << exception.what() << std::endl;
+	}
+	sqlite3_finalize(stmt);
 }
 
 DatabaseConnectionSQLite::~DatabaseConnectionSQLite() {
@@ -97,7 +125,7 @@ int callback(void* unused, int number_of_columns, char** columns, char** column_
 	return 0;
 }
 
-void DatabaseConnectionSQLite::execWriteOnlyStatement(std::string& statement) {
+void DatabaseConnectionSQLite::execWriteOnlyStatement(const std::string& statement) {
 	this->execWriteOnlyStatement(statement.c_str());
 }
 void DatabaseConnectionSQLite::execWriteOnlyStatement(const char* statement) {

@@ -18,6 +18,7 @@ shared_state::shared_state(boost::filesystem::path parent_directory, boost::file
 		media_location(std::move(media_location)),
 		db(db),
 		thumbnail_file_format(thumbnail_file_format) {
+	db->getSecret(this->secret_base64);
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error

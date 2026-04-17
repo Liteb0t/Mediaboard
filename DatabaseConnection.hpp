@@ -2,6 +2,7 @@
 #include "db_interface.h"
 // #include <array>
 // #include <memory>
+#include <sodium.h>
 #include <string>
 
 enum struct USER_OR_GROUP {USER, GROUP};
@@ -24,12 +25,14 @@ enum struct PERMISSION {  // Mirrors PermissionCollection.permissions in _permis
 
 enum struct THREE_STATE_SETTING { DENY, INHERIT, ALLOW };
 
+typedef struct {unsigned char value[128];} IntermediateSalt;
+
 class DatabaseConnection {
 public:
 	virtual ~DatabaseConnection() {
 	}
 	// typedef enum { SUCCESS, USERNAME_TAKEN, UNKNOWN_ERROR } CREATE_ACCOUNT_RETURN_CODE;
-	// virtual CREATE_ACCOUNT_RETURN_CODE createAccount(const std::string& username, const char* password_hash, const unsigned char* contini_value);
+	// virtual CREATE_ACCOUNT_RETURN_CODE createAccount(const std::string& username, const char* password_hash, const unsigned char* intermediate_salt);
 
 	virtual int getUniquePermissionObjectId() const = 0;
 	virtual int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) = 0;
@@ -43,9 +46,11 @@ public:
 	virtual void declareGroupCursor() = 0;
 	virtual db_group_struct* getValueFromGroupCursor() = 0;
 	virtual void closeGroupCursor() = 0;
+
 	virtual void declareGroupHeirarchyCursor() = 0;
 	virtual db_group_heirarchy_struct* getValueFromGroupHeirarchyCursor() = 0;
 	virtual void closeGroupHeirarchyCursor() = 0;
+
 	virtual void declareGroupMemberCursor() = 0;
 	virtual db_group_member_struct* getValueFromGroupMemberCursor() = 0;
 	virtual void closeGroupMemberCursor() = 0;
@@ -53,7 +58,10 @@ public:
 	virtual void declarePermissionCollectionCursor(int permission_object_id) = 0;
 	virtual db_permission_collection_struct* getValueFromPermissionCollectionCursor() = 0;
 	virtual void closePermissionCollectionCursor() = 0;
+
 	virtual void declarePermissionSettingCursor(int permission_collection_id) = 0;
 	virtual db_permission_setting_struct* getValueFromPermissionSettingCursor() = 0;
 	virtual void closePermissionSettingCursor() = 0;
+
+	virtual void getSecret(char* secret_base64) = 0;
 };

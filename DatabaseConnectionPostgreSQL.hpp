@@ -36,6 +36,7 @@ public:
 	void closePermissionSettingCursor() override { db_free_cursor_for_permission_setting(); };
 private:
 	PGconn* db;
+	void getSecret(char* secret_base64) override;
 	void migrateIfVersionIsNewer(const std::string& program_version_string);
 	void writeDatabaseVersion(const std::string& program_version_string);
 	// const std::string getDatabaseVersion() const override;

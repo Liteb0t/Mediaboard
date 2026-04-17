@@ -153,7 +153,6 @@ void db_create_administrator(const char* _password) {
 
 int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_NAME+1], time_t upload_timestamp_, const char* content_, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key_[KEY_LENGTH+1]) {
 	EXEC SQL BEGIN DECLARE SECTION;
-	int number_of_posts;
 	int post_id;
 	int thread_id = thread_id_;
 	int id_in_thread = id_in_thread_;
@@ -166,12 +165,6 @@ int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_N
 	const char* file_4 = files[3]; const int file_4_indicator = file_count - 4;
 	const char* key = key_;
 	EXEC SQL END DECLARE SECTION;
-	EXEC SQL SELECT number_of_posts INTO :number_of_posts FROM thread WHERE id = :thread_id;
-	EXEC SQL COMMIT;
-	number_of_posts++;
-	EXEC SQL UPDATE thread 
-		SET number_of_posts = :number_of_posts
-		WHERE id = :thread_id;
 	// strcpy(data, data_);
 	strftime(upload_timestamp, 20, "%Y-%m-%d %H:%M:%S", gmtime(&upload_timestamp_));
 	printf("[DB Interface] Storing post\nName: %s\nTimestamp: %s\nContent: %s[END]\n", name, upload_timestamp, content);

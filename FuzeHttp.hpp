@@ -9,7 +9,6 @@
 #include <boost/optional.hpp>
 #include <boost/json.hpp>
 #include <iostream>
-#include <sstream>
 #include <variant>
 #include <tuple>
 #include <vector>
@@ -199,7 +198,6 @@ private:
 template<typename StateType>
 class Controller {
 public:
-
 	template<typename... Types>
 	constexpr void addPattern(typename MakeFuncPtr<StateType, typename Filter<TypeList<Types...>, IsViewArg>::type>::type view, Types... args) {
 		// ViewPath<Types...> vp(view, std::move(args)...);

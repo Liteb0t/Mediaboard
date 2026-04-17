@@ -4,7 +4,6 @@
 #include <format>
 #include <iostream>
 #include <libpq-fe.h>
-#include <sqlite3.h>
 #include <sstream>
 
 DatabaseConnectionPostgreSQL::DatabaseConnectionPostgreSQL(const std::string& postgresql_uri, const std::string& program_version_string) {
@@ -32,6 +31,34 @@ DatabaseConnectionPostgreSQL::DatabaseConnectionPostgreSQL(const std::string& po
 	this->migrateIfVersionIsNewer(program_version_string);
 }
 
+void DatabaseConnectionPostgreSQL::getSecret(char* secret_base64) {
+	// TODO change secret on a yearly basis
+	PGresult* result =  PQexec(this->db, "SELECT value_base64 FROM _secret");
+	ExecStatusType status = PQresultStatus(result);
+	if (status == PGRES_TUPLES_OK && PQntuples(result) != 0) {
+		std::cerr << "[DatabaseConnectionPostgreSQL] Found secret" << std::endl;
+		const char* db_secret = PQgetvalue(result, 0, 0);
+		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)) {
+			strcpy(secret_base64, db_secret);
+			return;
+		}
+		std::cerr << "[DatabaseConnectionPostgreSQL] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
+		this->execWriteOnlyStatement("DELETE FROM _secret");
+	}
+	unsigned char random_bytes[128];
+	randombytes_buf(random_bytes, 128);
+	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING), random_bytes, 128, sodium_base64_VARIANT_URLSAFE_NO_PADDING);
+	std::cout << "[DatabaseConnectionPostgreSQL] Generated new secret: " << secret_base64 << std::endl;
+	try {
+		this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _secret(value_base64 TEXT NOT NULL)");
+		this->execWriteOnlyStatement(std::format("INSERT INTO _secret(value_base64) VALUES ('{}')", secret_base64));
+	}
+	catch (std::exception& exception) {
+		std::cerr << "[DatabaseConnectionPostgreSQL] Could not save secret to database: " << exception.what() << std::endl;
+	}
+	PQclear(result);
+}
+
 DatabaseConnectionPostgreSQL::~DatabaseConnectionPostgreSQL() {
 	std::cout << "[DatabaseConnectionPostgreSQL] Closing connection..." << std::endl;
 	db_disconnect();
@@ -42,7 +69,6 @@ void DatabaseConnectionPostgreSQL::execWriteOnlyStatement(const std::string& sta
 }
 void DatabaseConnectionPostgreSQL::execWriteOnlyStatement(const char* statement) {
 	std::cout << "[DatabaseConnectionPostgreSQL] " << statement << std::endl;
-	int ec; char* error_message;
 	PGresult* result =  PQexec(this->db, statement);
 	ExecStatusType status = PQresultStatus(result);
 	switch (status) {
@@ -58,6 +84,7 @@ void DatabaseConnectionPostgreSQL::execWriteOnlyStatement(const char* statement)
 			throw std::runtime_error(std::format("Unknown PWresStatus: {}", PQresStatus(status)));
 			break;
 	}
+	PQclear(result);
 }
 
 void DatabaseConnectionPostgreSQL::execMultipleWriteOnlyStatements(std::istream& stream) {

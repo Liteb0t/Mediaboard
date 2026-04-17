@@ -17,10 +17,11 @@ private:
 	sqlite3_stmt* stmt;
 	sqlite3_stmt* stmt2; // Used when two cursors are active at once, for the "inner" cursor
 	sqlite3_stmt* create_account_prepared_stmt;
+	void getSecret(char* secret_base6) override;
 	void writeDatabaseVersion(const std::string& program_version_string);
 	// const std::string getDatabaseVersion() const override;
 	// void connectToDatabase(const std::string& connection_target) override;
-	void execWriteOnlyStatement(std::string& statement);
+	void execWriteOnlyStatement(const std::string& statement);
 	void execWriteOnlyStatement(const char* statement);
 	void execMultipleWriteOnlyStatements(std::istream& stream);
 	bool writeMigrations(std::ostream& stream, const std::string& database_version_string);
