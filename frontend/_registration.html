@@ -48,9 +48,12 @@
 			<div class="ToolBar"><a class="Button" href="_ROOT_URL">Proceed</a><button onclick="registration_success_dialog.close()">Close</button></div>
 		</dialog>
 	</body>
+<script type="module" src="static/argon2.umd.min.js"></script>
 <script>
 "use strict";
 const registration_url = "registration/";
+const pwhash_opslimit = 2;
+const pwhash_memlimit = 128 << 10; // left value is in kilobytes
 let password_is_visible = false;
 async function loginAction() {
 	const fetch_response = await sendRegistrationFormData("login");
@@ -75,15 +78,74 @@ async function registerAction() {
 	}
 }
 async function newRegisterAction() {
-	const data = {
-		username: account_username_input.value
+	const new_account_username = account_username_input.value;
+	// Retrieve a new salt from the server
+	let req_data = {
+		username: new_account_username
 	};
-	const fetch_response = await fetch("_ROOT_URL" + "registration_test/", {
+	const request_new_account_parameters_response = await fetch("_ROOT_URL" + "registration/request_new_account_parameters", {
 		method: "POST",
-		body: JSON.stringify(data)
+		body: JSON.stringify(req_data)
 	});
-	console.log(fetch_response);
+	console.log(request_new_account_parameters_response);
+	if (!(request_new_account_parameters_response && request_new_account_parameters_response.ok)) {
+		let res_message = request_new_account_parameters_response.headers.get("message");
+		error_messages.innerText = `Could not request new account_parameters: ` + res_message ? res_message : request_new_account_parameters_response.statusText;
+		return;
+	}
+
+	// Store the client's password into the hash
+	let response_json, salt, hashed_password;
+	try {
+		response_json = await request_new_account_parameters_response.json();
+		const salt_base64 = response_json["salt_base64"];
+		// const salt = atob(salt_base64);
+		hashed_password = await hashwasm.argon2id({
+			password: account_password_input.value,
+			salt: salt_base64,
+			iterations: pwhash_opslimit,
+			parallelism: 1,
+			memorySize: pwhash_memlimit,
+			hashLength: 128,
+			outputType: "encoded"
+		});
+	}
+	catch (error) {
+		error_messages.innerText = error.message;
+		return;
+	}
+	console.log(hashed_password);
+
+	// Send the new hash to the server
+	req_data = {
+		username: new_account_username,
+		hashed_password: hashed_password
+	};
+	const create_new_account_response = await fetch("_ROOT_URL" + "registration/create_new_account", {
+		method: "POST",
+		body: JSON.stringify(req_data)
+	});
+	if (!(create_new_account_response && create_new_account_response.ok)) {
+		let res_message = create_new_account_response.headers.get("message");
+		error_messages.innerText = `Could not create new account: ` + res_message ? res_message : create_new_account_response.statusText;
+		return;
+	}
+	let authorisation_token;
+	try {
+		response_json = await create_new_account_response.json();
+		authorisation_token = response_json["authorisation_token"];
+	}
+	catch (error) {
+		error_messages.innerText = error.message;
+		return;
+	}
+	registered_as.textContent = new_account_username;
+	registration_success_dialog.showModal();
+	localStorage.setItem("authorisation_token", authorisation_token);
+	localStorage.setItem("account_username", new_account_username);
+	localStorage.setItem("name", new_account_username);
 }
+
 async function sendRegistrationFormData(endpoint) {
 	error_messages.textContent = "";
 	const data = {

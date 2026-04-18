@@ -33,6 +33,10 @@ const std::string current_version = "0.0.6";
 
 int main(int argc, char* argv[]) {
 	Magick::InitializeMagick(*argv);  // Required on Windows and MacOS
+	if (sodium_init() < 0) {
+		std::cerr << "libsodium couldn't be initialised" << std::endl;
+		return 1;
+	}
 
 	// Check command line arguments.
 	std::string config_file;

@@ -1,5 +1,8 @@
 #include "views.hpp"
 #include "DatabaseConnection.hpp"
+#include "FuzeHttp.hpp"
+#include "permission_managed_object.hpp"
+#include "shared_state.hpp"
 #include "sodium/crypto_generichash.h"
 #include <boost/beast/http/status.hpp>
 #include <iostream>
@@ -47,13 +50,44 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 	crypto_generichash(salt, sizeof salt,
 					reinterpret_cast<const unsigned char*>(username.c_str()), username.size(),
 					   intermediate_salt, sizeof intermediate_salt);
-	char salt_base64[sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
-	sodium_bin2base64(salt_base64, sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE_NO_PADDING), salt, crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE_NO_PADDING);
+	char salt_base64[sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE)];
+	sodium_bin2base64(salt_base64, sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE), salt, crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE);
 	boost::json::object json = {
-		{ "salt_base64", salt_base64 },
-		{ "pwhash_opslimit", state->client_pwhash_opslimit },
-		{ "pwhash_memlimit", state->client_pwhash_memlimit }
+		{ "salt_base64", salt_base64 }
+		// ,{ "pwhash_opslimit", state->client_pwhash_opslimit }
+		// ,{ "pwhash_memlimit", state->client_pwhash_memlimit }
 	};
 	return FuzeHttp::Response{.status = http::status::ok, .json = std::move(json)};
 }
 
+FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) {
+	boost::json::value req_json;
+	boost::json::string username;
+	try {
+		req_json = boost::json::parse(req.body());
+		username = req_json.at("username").as_string();
+	}
+	catch(const std::exception& e) {
+		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = std::format("[registerAccount] {}", e.what())};
+	}
+	if (username.size() > ACCOUNT_MAX_USERNAME)
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("Username length {} is over the limit of {}", username.size(), ACCOUNT_MAX_USERNAME)};
+	else if (username.empty())
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("Username cannot be empty")};
+
+	IntermediateSalt intermediate_salt;
+	auto it = state->intermediate_account_registrations.find(username.c_str());
+	if (it == state->intermediate_account_registrations.end())
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("You must call registration/request_new_account_parameters before creating a new account")};
+	memcpy(intermediate_salt.value, it->second.value, 128);
+	state->intermediate_account_registrations.erase(it);
+	// int user_id = state->db->createAccount(username, intermediate_salt);
+	std::cout << "Created account " << username << std::endl;
+	boost::json::object json = {
+		{"token", FuzeHttp::generateAuthorisationToken(BUILTIN_USERS::PUBLIC)} // TODO replace with new user ID
+	};
+	return FuzeHttp::Response{
+		.status = http::status::created,
+		.json = std::move(json)
+	};
+}

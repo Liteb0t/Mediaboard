@@ -76,7 +76,7 @@ private:
 	const boost::filesystem::path media_location;
 	const boost::filesystem::path program_location;
 	const std::string thumbnail_file_format;
-	char secret_base64[sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
+	char secret_base64[sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)];
 
 	// This mutex synchronizes all access to sessions_
 	std::mutex mutex_;

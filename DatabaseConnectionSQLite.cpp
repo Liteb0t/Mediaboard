@@ -90,16 +90,16 @@ void DatabaseConnectionSQLite::getSecret(char* secret_base64) {
 	if (ec == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
 		std::cout << "[DatabaseConnectionSQLite] Found secret" << std::endl;
 		const char* db_secret = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)) {
+		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)) {
 			strcpy(secret_base64, db_secret);
 			return;
 		}
-		std::cerr << "[DatabaseConnectionSQLite] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
+		std::cerr << "[DatabaseConnectionSQLite] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
 		this->execWriteOnlyStatement("DELETE FROM _secret");
 	}
 	unsigned char bytes[128];
 	randombytes_buf(bytes, 128);
-	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING), bytes, 128, sodium_base64_VARIANT_URLSAFE_NO_PADDING);
+	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE), bytes, 128, sodium_base64_VARIANT_URLSAFE);
 	std::cout << "[DatabaseConnectionSQLite] Generated new secret: " << secret_base64 << std::endl;
 	try {
 		this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _secret(value_base64 TEXT NOT NULL)");

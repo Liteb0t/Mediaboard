@@ -3,6 +3,7 @@
 include(`tokens.m4')
 */
 
+// Use when identity authorisation is required.
 class API {
 	static {
         API.api_url = "api/";

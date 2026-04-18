@@ -38,16 +38,16 @@ void DatabaseConnectionPostgreSQL::getSecret(char* secret_base64) {
 	if (status == PGRES_TUPLES_OK && PQntuples(result) != 0) {
 		std::cerr << "[DatabaseConnectionPostgreSQL] Found secret" << std::endl;
 		const char* db_secret = PQgetvalue(result, 0, 0);
-		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)) {
+		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)) {
 			strcpy(secret_base64, db_secret);
 			return;
 		}
-		std::cerr << "[DatabaseConnectionPostgreSQL] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
+		std::cerr << "[DatabaseConnectionPostgreSQL] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
 		this->execWriteOnlyStatement("DELETE FROM _secret");
 	}
 	unsigned char random_bytes[128];
 	randombytes_buf(random_bytes, 128);
-	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE_NO_PADDING), random_bytes, 128, sodium_base64_VARIANT_URLSAFE_NO_PADDING);
+	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE), random_bytes, 128, sodium_base64_VARIANT_URLSAFE);
 	std::cout << "[DatabaseConnectionPostgreSQL] Generated new secret: " << secret_base64 << std::endl;
 	try {
 		this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _secret(value_base64 TEXT NOT NULL)");

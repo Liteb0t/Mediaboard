@@ -1,7 +1,9 @@
 #pragma once
 #include "beast.hpp"
+#include "permission_managed_object.hpp"
 #include <charconv>
 #include <string>
+#include <string_view>
 #include <sys/un.h>
 #include <unordered_map>
 #include <unordered_set>
@@ -29,6 +31,9 @@ struct Response {
 	boost::optional<boost::json::object> json;
 	boost::optional<std::string> error_message;
 };
+
+std::string generateAuthorisationToken(int user_id = BUILTIN_USERS::PUBLIC);
+
 // https://stackoverflow.com/a/79894118/18658154
 // Type Filtering Logic
 template<typename... Ts> struct TypeList {};
@@ -208,24 +213,37 @@ public:
 	}
 
 	Response matchPathAndExecute(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
+		if (!req.target().starts_with('/'))
+			return Response{.status = http::status::bad_request};
+
 		std::string decoded_url = FuzeHttp::getDecodedURL(req.target());
 		std::string_view path_name = FuzeHttp::getPathName(decoded_url);
 		std::cout << "[Controller] path_name: " << path_name << std::endl;
 
 		std::unordered_set<int> matched_views = all_views;
 		std::string_view section;
-		size_t section_index, location_start_bound = path_name.starts_with('/') ? 1 : 0, location_end_bound;
-		for (section_index = 0; (location_end_bound = path_name.find('/', location_start_bound)) != std::string_view::npos; section_index++) {
-			section = path_name.substr(location_start_bound, location_end_bound - location_start_bound);
-			std::cout << "[" <<section<<"]";
+		size_t section_index;
+		size_t location_start_bound = 0;
+		size_t location_end_bound;
+		for (section_index = 0; location_start_bound < path_name.size(); section_index++) {
+			location_start_bound++;
+			location_end_bound = path_name.find('/', location_start_bound);
+			if (location_end_bound == std::string_view::npos)
+				section = path_name.substr(location_start_bound);
+			else
+				section = path_name.substr(location_start_bound, location_end_bound - location_start_bound);
+
+			// std::cout << "[" <<section<<"]";
 			std::erase_if(matched_views, [this, &section, section_index](const int view_id){
 				return this->views.at(view_id)->attemptPathMatch(section, section_index) == false;
 			});
-			std::cout << '.' << std::endl;
+			// std::cout << '.' << std::endl;
 			if (matched_views.size() == 0)
 				break;
-			else
-				location_start_bound = location_end_bound + 1;
+			else {
+				location_start_bound = location_end_bound;
+				std::cout << location_start_bound << ',' <<location_end_bound << ',' <<path_name.size();
+			}
 		}
 		// Remove matches for URLs shorter than the pattern
 		std::erase_if(matched_views, [this, section_index](const int view_id){

@@ -1,5 +1,7 @@
 #include "FuzeHttp.hpp"
 
+constexpr std::chrono::duration authorization_token_lifespan = std::chrono::days(365);
+
 char FuzeHttp::fromHex(char ch) {
 	return std::isdigit(ch) ? ch - '0' : std::tolower(ch) - 'a' + 10;
 }
@@ -33,10 +35,22 @@ std::string FuzeHttp::getDecodedURL(boost::string_view raw_URL) {
 
 std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 	// path_name excludes URL parameters (stuff after '?')
+	// removes trailing / but leaves first /
 	std::string_view path_name = source_URL;
 	int decoded_url_questionmark_index = source_URL.rfind('?');
 	if (decoded_url_questionmark_index != std::string::npos)
 		path_name = path_name.substr(0, decoded_url_questionmark_index);
+	if (path_name.back() == '/')
+		path_name = path_name.substr(0, path_name.size() - 1);
 	std::cout << "path_name: " << path_name << std::endl;
 	return path_name;
+}
+
+std::string FuzeHttp::generateAuthorisationToken(int user_id) {
+	unsigned char random_bytes[128];
+	randombytes_buf(random_bytes, 128);
+	char random_base64[sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)];
+	sodium_bin2base64(random_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE), random_bytes, 128, sodium_base64_VARIANT_URLSAFE);
+	std::chrono::time_point<std::chrono::steady_clock> expiration_date = std::chrono::steady_clock::now() + authorization_token_lifespan;
+	return std::format("{}.{}.{}", random_base64, std::chrono::duration_cast<std::chrono::minutes>(expiration_date.time_since_epoch()), user_id);
 }
