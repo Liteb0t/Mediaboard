@@ -1,6 +1,7 @@
 #include "DatabaseConnectionPostgreSQL.hpp"
 #include "DatabaseConnection.hpp"
 #include "db_interface.h"
+#include "permission_managed_object.hpp"
 #include <format>
 #include <iostream>
 #include <libpq-fe.h>
@@ -38,16 +39,16 @@ void DatabaseConnectionPostgreSQL::getSecret(char* secret_base64) {
 	if (status == PGRES_TUPLES_OK && PQntuples(result) != 0) {
 		std::cerr << "[DatabaseConnectionPostgreSQL] Found secret" << std::endl;
 		const char* db_secret = PQgetvalue(result, 0, 0);
-		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)) {
+		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)) {
 			strcpy(secret_base64, db_secret);
 			return;
 		}
 		std::cerr << "[DatabaseConnectionPostgreSQL] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
 		this->execWriteOnlyStatement("DELETE FROM _secret");
 	}
-	unsigned char random_bytes[128];
-	randombytes_buf(random_bytes, 128);
-	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE), random_bytes, 128, sodium_base64_VARIANT_URLSAFE);
+	unsigned char random_bytes[crypto_pwhash_SALTBYTES];
+	randombytes_buf(random_bytes, crypto_pwhash_SALTBYTES);
+	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE), random_bytes, crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE);
 	std::cout << "[DatabaseConnectionPostgreSQL] Generated new secret: " << secret_base64 << std::endl;
 	try {
 		this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _secret(value_base64 TEXT NOT NULL)");
@@ -156,6 +157,109 @@ v0_0_5:
 	stream << "UPDATE permission_collection SET permission_group_id = NULL WHERE permission_group_id = -1;";
 	std::cout << "Finished writing migrations" << std::endl;
 	return true; // Migrations were made
+}
+
+int DatabaseConnectionPostgreSQL::createAccount(const char* username, const char* password_hash_hash_base64, const char* intermediate_salt_base64) {
+	PGresult* result;
+	ExecStatusType status;
+	std::string new_account_id;
+	result =  PQexec(this->db, "SELECT nextval('account_id_autoincrement')");
+	status = PQresultStatus(result);
+	if (status == PGRES_TUPLES_OK && PQntuples(result) != 0) {
+		new_account_id = PQgetvalue(result, 0, 0);
+	}
+	else {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("An error occured when attempting to create account: {}", error_message));
+		else
+			throw std::runtime_error("An unknown error occured when attempting to create account.");
+	}
+	PQclear(result);
+
+	std::cout << "[DatabaseConnectionPostgreSQL] New account ID: " <<new_account_id << std::endl;
+	const char* params[4] = {new_account_id.c_str(), username, password_hash_hash_base64, intermediate_salt_base64};
+	result =  PQexecParams(this->db, "INSERT INTO account(id, username, password_hash_hash_base64, intermediate_salt_base64) VALUES ($1::integer, $2::text, $3::text, $4::text)", 4, NULL, params, NULL, NULL, 0);
+	status = PQresultStatus(result);
+	if (status == PGRES_COMMAND_OK) {
+		PQclear(result);
+		return std::stoi(new_account_id);
+	}
+	else {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("An error occured when attempting to create account: {}", error_message));
+		else
+			throw std::runtime_error("An unknown error occured when attempting to create account.");
+	}
+}
+
+int DatabaseConnectionPostgreSQL::getAccountByUsername(const std::string& username) {
+	std::string new_account_id;
+	PGresult* result;
+	ExecStatusType status;
+	const char* params[1] = {username.c_str()};
+	result =  PQexecParams(this->db, "SELECT id FROM account WHERE username = $1::text", 1, NULL, params, NULL, NULL, 0);;
+	status = PQresultStatus(result);
+	if (status == PGRES_TUPLES_OK) {
+		if (PQntuples(result) != 0)
+			return std::atoi(PQgetvalue(result, 0, 0));
+		else
+			return BUILTIN_USERS::PUBLIC;
+	}
+	else {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("Error occured in getAccountByUsername: {}", error_message));
+		else
+			throw std::runtime_error("Error occured in getAccountByUsername.");
+	}
+}
+
+std::string DatabaseConnectionPostgreSQL::getIntermediateSaltFromAccount(int account_id) {
+	std::string account_id_ = std::to_string(account_id);
+	PGresult* result;
+	ExecStatusType status;
+	const char* params[1] = {account_id_.c_str()};
+	result =  PQexecParams(this->db, "SELECT intermediate_salt_base64 FROM account WHERE id = $1::integer", 1, NULL, params, NULL, NULL, 0);;
+	status = PQresultStatus(result);
+	if (status == PGRES_TUPLES_OK) {
+		if (PQntuples(result) != 0)
+			return PQgetvalue(result, 0, 0);
+		else
+			return "";
+	}
+	else {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("Error occured in getIntermediateSaltFromAccount: {}", error_message));
+		else
+			throw std::runtime_error("Error occured in getIntermediateSaltFromAccount.");
+	}
+}
+
+bool DatabaseConnectionPostgreSQL::userMatchesPassword(int account_id, const std::string& password_hash_hash_base64) {
+	std::string account_id_ = std::to_string(account_id);
+	PGresult* result;
+	ExecStatusType status;
+	const char* params[1] = {password_hash_hash_base64.c_str()};
+	result =  PQexecParams(this->db, "SELECT id FROM account WHERE password_hash_hash_base64 = $1::text", 1, NULL, params, NULL, NULL, 0);;
+	status = PQresultStatus(result);
+	if (status == PGRES_TUPLES_OK) {
+		return (PQntuples(result) != 0);
+	}
+	else {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("Error occured in userMatchesPassword: {}", error_message));
+		else
+			throw std::runtime_error("Error occured in userMatchesPassword.");
+	}
 }
 
 int DatabaseConnectionPostgreSQL::storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) {

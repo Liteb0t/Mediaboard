@@ -16,7 +16,6 @@ private:
 	sqlite3* db;
 	sqlite3_stmt* stmt;
 	sqlite3_stmt* stmt2; // Used when two cursors are active at once, for the "inner" cursor
-	sqlite3_stmt* create_account_prepared_stmt;
 	void getSecret(char* secret_base6) override;
 	void writeDatabaseVersion(const std::string& program_version_string);
 	// const std::string getDatabaseVersion() const override;
@@ -25,6 +24,11 @@ private:
 	void execWriteOnlyStatement(const char* statement);
 	void execMultipleWriteOnlyStatements(std::istream& stream);
 	bool writeMigrations(std::ostream& stream, const std::string& database_version_string);
+
+	int createAccount(const char* username, const char* password_hash, const char* intermediate_salt_base64) override;
+	int getAccountByUsername(const std::string& username) override;
+	std::string getIntermediateSaltFromAccount(int account_id) override;
+	bool userMatchesPassword(int account_id, const std::string& password_hash_hash_base64) override;
 
 	void declareAccountCursor() override;
 	db_account_struct* getValueFromAccountCursor() override;

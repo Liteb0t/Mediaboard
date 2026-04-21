@@ -86,9 +86,7 @@ void db_connect(const char* _target, const char* _user) {
 	const char* create_thread_prepared_stmt = "INSERT INTO thread(id, permission_object_id) VALUES (?, ?);";
 	const char* mark_post_as_deleted_prepared_stmt = "UPDATE post SET deleted = true WHERE id = ?;";
 	const char* mark_thread_as_deleted_prepared_stmt = "UPDATE thread SET deleted = true WHERE id = ?;";
-	const char* create_account_prepared_stmt = "INSERT INTO account(id, username, password_hash, key) VALUES (?, ?, ?, ?);";
 	const char* create_permission_group_stmt = "INSERT INTO permission_group(id, name) VALUES (?, ?)";
-	const char* add_administrator_account_stmt = "INSERT INTO account(id, username, password_hash, key, administrator) VALUES (1, 'Administrator', ?, ?, 't');";
 	// char connection_target[256];
 	EXEC SQL END DECLARE SECTION;
 	if (password)
@@ -104,9 +102,7 @@ void db_connect(const char* _target, const char* _user) {
 	EXEC SQL PREPARE create_thread_stmt FROM :create_thread_prepared_stmt;
 	EXEC SQL PREPARE mark_post_as_deleted_stmt FROM :mark_post_as_deleted_prepared_stmt;
 	EXEC SQL PREPARE mark_thread_as_deleted_stmt FROM :mark_thread_as_deleted_prepared_stmt;
-	EXEC SQL PREPARE create_account_prepared_stmt FROM :create_account_prepared_stmt;
 	EXEC SQL PREPARE create_permission_group_stmt FROM :create_permission_group_stmt;
-	EXEC SQL PREPARE add_administrator_account_stmt FROM :add_administrator_account_stmt;
 }
 
 void db_test() {
@@ -134,6 +130,7 @@ database_version_not_null:
 	return database_version;
 }
 
+/*
 void db_create_administrator(const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	const char* password = _password;
@@ -150,6 +147,7 @@ void db_create_administrator(const char* _password) {
 	EXEC SQL INSERT INTO permission_group_account(group_id, account_id) VALUES (0, 1); // Add to the Administrators group. Administrator account ID is always 1 (defined in user.hpp)
 	EXEC SQL COMMIT;
 }
+*/
 
 int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_NAME+1], time_t upload_timestamp_, const char* content_, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key_[KEY_LENGTH+1]) {
 	EXEC SQL BEGIN DECLARE SECTION;
@@ -217,6 +215,7 @@ int db_account_username_exists(const char* _username) {
 		return 0;
 }
 
+/*
 int db_store_account(const char* _username, const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int account_id;
@@ -237,7 +236,9 @@ int db_store_account(const char* _username, const char* _password) {
 	EXEC SQL COMMIT;
 	return account_id;
 }
+*/
 
+/*
 const char* db_fetch_key(const char* _username, const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	const char* username = _username;
@@ -263,6 +264,7 @@ const char* db_fetch_key(const char* _username, const char* _password) {
 	}
 	return key;
 }
+*/
 
 int db_account_matches_password(int _account_id, const char* _password) {
 	EXEC SQL BEGIN DECLARE SECTION;

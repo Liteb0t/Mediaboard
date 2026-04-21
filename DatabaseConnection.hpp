@@ -25,14 +25,16 @@ enum struct PERMISSION {  // Mirrors PermissionCollection.permissions in _permis
 
 enum struct THREE_STATE_SETTING { DENY, INHERIT, ALLOW };
 
-typedef struct {unsigned char value[128];} IntermediateSalt;
+typedef struct {unsigned char value[crypto_pwhash_SALTBYTES];} IntermediateSalt;
 
 class DatabaseConnection {
 public:
 	virtual ~DatabaseConnection() {
 	}
-	// typedef enum { SUCCESS, USERNAME_TAKEN, UNKNOWN_ERROR } CREATE_ACCOUNT_RETURN_CODE;
-	// virtual CREATE_ACCOUNT_RETURN_CODE createAccount(const std::string& username, const char* password_hash, const unsigned char* intermediate_salt);
+	virtual int createAccount(const char* username, const char* password_hash_hash, const char* intermediate_salt_base64) = 0;
+	virtual int getAccountByUsername(const std::string& username) = 0;
+	virtual std::string getIntermediateSaltFromAccount(int account_id) = 0;
+	virtual bool userMatchesPassword(int account_id, const std::string& password_hash_hash_base64) = 0;
 
 	virtual int getUniquePermissionObjectId() const = 0;
 	virtual int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) = 0;

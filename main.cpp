@@ -123,8 +123,8 @@ int main(int argc, char* argv[]) {
 	}
 
 	if (variable_map.count("create_administrator")) {
-		db_create_administrator(admin_password.c_str());
-		std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
+		// db_create_administrator(admin_password.c_str());
+		// std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
 		delete database_connection;
 		return 0;
 	}

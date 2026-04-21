@@ -28,10 +28,11 @@ typedef const http::request<http::string_body, http::basic_fields<std::allocator
 
 struct Response {
 	beast::http::status status;
+	std::unordered_map<std::string, std::string> headers;
 	boost::optional<boost::json::object> json;
 	boost::optional<std::string> error_message;
 };
-
+using Headers = std::unordered_map<std::string, std::string>;
 std::string generateAuthorisationToken(int user_id = BUILTIN_USERS::PUBLIC);
 
 // https://stackoverflow.com/a/79894118/18658154
@@ -242,7 +243,6 @@ public:
 				break;
 			else {
 				location_start_bound = location_end_bound;
-				std::cout << location_start_bound << ',' <<location_end_bound << ',' <<path_name.size();
 			}
 		}
 		// Remove matches for URLs shorter than the pattern

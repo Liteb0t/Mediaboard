@@ -36,6 +36,11 @@ public:
 	boost::optional<nlohmann::json> json;
 };
 
+struct Session {
+	int user_id;
+	// TODO add expiry
+};
+
 // Represents the shared server state
 class shared_state : public PermissionManager {
 public:
@@ -48,6 +53,7 @@ public:
 	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
 
 	std::unordered_map<std::string /*username*/, IntermediateSalt> intermediate_account_registrations;
+	void addSession(const std::string& id_base64, Session&& session);
 
 	// Board main_board;
 	Board* main_board() { return &(this->boards.at(0)); }
@@ -76,13 +82,15 @@ private:
 	const boost::filesystem::path media_location;
 	const boost::filesystem::path program_location;
 	const std::string thumbnail_file_format;
-	char secret_base64[sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)];
+	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
 
 	// This mutex synchronizes all access to sessions_
 	std::mutex mutex_;
 
-	// Keep a list of all the connected clients
+	// Keep a list of all the websocket-connected clients
 	std::unordered_set<websocket_session*> sessions_;
+	// HTTP sessions. Client validates using a cookie
+	std::unordered_map<std::string, Session> sessions;
 
 	// std::unordered_map<int, Board> boards;
 	std::unordered_map<int, Board> boards;

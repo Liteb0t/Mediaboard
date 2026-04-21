@@ -1,4 +1,4 @@
-CREATE TABLE account(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password_hash TEXT, key TEXT);
+CREATE TABLE account(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password_hash_hash_base64 TEXT, intermediate_salt_base64 TEXT);
 CREATE TABLE permission_group(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);
 CREATE TABLE permission_group_heirarchy(rank INTEGER, permission_group INTEGER);
 CREATE TABLE permission_group_account(group_id INTEGER, account_id INTEGER);

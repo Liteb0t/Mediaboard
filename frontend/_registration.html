@@ -117,17 +117,17 @@ async function newRegisterAction() {
 	console.log(hashed_password);
 
 	// Send the new hash to the server
-	req_data = {
+	const create_new_account_data = {
 		username: new_account_username,
-		hashed_password: hashed_password
+		password_hash: hashed_password
 	};
 	const create_new_account_response = await fetch("_ROOT_URL" + "registration/create_new_account", {
 		method: "POST",
-		body: JSON.stringify(req_data)
+		body: JSON.stringify(create_new_account_data)
 	});
 	if (!(create_new_account_response && create_new_account_response.ok)) {
 		let res_message = create_new_account_response.headers.get("message");
-		error_messages.innerText = `Could not create new account: ` + res_message ? res_message : create_new_account_response.statusText;
+		error_messages.innerText = "Could not create new account: " + res_message ? res_message : create_new_account_response.statusText;
 		return;
 	}
 	let authorisation_token;

@@ -1,5 +1,6 @@
 #include "DatabaseConnectionSQLite.hpp"
 #include "db_interface.h"
+#include "permission_managed_object.hpp"
 #include <format>
 #include <iostream>
 #include <fstream>
@@ -76,12 +77,6 @@ DatabaseConnectionSQLite::DatabaseConnectionSQLite(const boost::filesystem::path
 		}
 	}
 	sqlite3_finalize(stmt);
-	// Prepared statements
-	ec = sqlite3_prepare_v2(this->db, "INSERT INTO account(id, username, password_hash, key) VALUES (?, ?, ?, ?)", -1, &create_account_prepared_stmt, NULL);
-	if (ec != SQLITE_OK) {
-		std::cerr << "Couldn't prepare create_account_prepared_stmt: " << error_message << std::endl;
-		sqlite3_free(&error_message);
-	}
 }
 
 void DatabaseConnectionSQLite::getSecret(char* secret_base64) {
@@ -90,16 +85,16 @@ void DatabaseConnectionSQLite::getSecret(char* secret_base64) {
 	if (ec == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
 		std::cout << "[DatabaseConnectionSQLite] Found secret" << std::endl;
 		const char* db_secret = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
-		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)) {
+		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)) {
 			strcpy(secret_base64, db_secret);
 			return;
 		}
-		std::cerr << "[DatabaseConnectionSQLite] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
+		std::cerr << "[DatabaseConnectionSQLite] Secret contains unexpected number of characters (expected " << sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)-1 << ", received " << strlen(db_secret) << ')' << std::endl;
 		this->execWriteOnlyStatement("DELETE FROM _secret");
 	}
-	unsigned char bytes[128];
-	randombytes_buf(bytes, 128);
-	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE), bytes, 128, sodium_base64_VARIANT_URLSAFE);
+	unsigned char bytes[crypto_pwhash_SALTBYTES];
+	randombytes_buf(bytes, crypto_pwhash_SALTBYTES);
+	sodium_bin2base64(secret_base64, sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE), bytes, crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE);
 	std::cout << "[DatabaseConnectionSQLite] Generated new secret: " << secret_base64 << std::endl;
 	try {
 		this->execWriteOnlyStatement("CREATE TABLE IF NOT EXISTS _secret(value_base64 TEXT NOT NULL)");
@@ -181,6 +176,20 @@ void DatabaseConnectionSQLite::firstTimeSetup(const boost::filesystem::path& dat
 	}
 }
 
+int DatabaseConnectionSQLite::createAccount(const char* username, const char* password_hash, const char* intermediate_salt_base64) {
+	const char* params[3] = {username, password_hash, intermediate_salt_base64};
+	int ec = sqlite3_prepare_v2(this->db, "INSERT INTO account(username, password_hash, intermediate_salt_base64) VALUES (?, ?, ?)", -1, &stmt, NULL);
+	sqlite3_bind_text(stmt, 1, username, sizeof username, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 2, password_hash, sizeof password_hash, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 3, intermediate_salt_base64, sizeof intermediate_salt_base64, SQLITE_STATIC);
+	if (ec == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+		return sqlite3_column_int(stmt, 0);
+	}
+	else {
+		throw std::runtime_error("An unknown error occured when attempting to create account.");
+	}
+}
+
 int DatabaseConnectionSQLite::storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) {
 	int new_permission_collection_id;
 	this->execWriteOnlyStatement(std::format("INSERT INTO permission_collection(permission_object_id, account_id, permission_group_id) VALUES ({}, {}, {})", permission_object_id, user_or_group == USER_OR_GROUP::USER ? std::to_string(user_or_group_id) : std::string("NULL"), user_or_group == USER_OR_GROUP::GROUP ? std::to_string(user_or_group_id) : std::string("NULL")).c_str())
@@ -194,6 +203,63 @@ int DatabaseConnectionSQLite::storePermissionCollection(int permission_object_id
 	}
 	sqlite3_finalize(this->stmt);
 	return new_permission_collection_id;
+}
+
+int DatabaseConnectionSQLite::getAccountByUsername(const std::string& username) {
+	int account_id;
+	int ec = sqlite3_prepare_v2(this->db, "SELECT id FROM account WHERE username = ?", -1, &this->stmt, NULL);
+	sqlite3_bind_text(this->stmt, 1, username.c_str(), username.length(), SQLITE_STATIC);
+	if (ec == SQLITE_OK && sqlite3_step(this->stmt) == SQLITE_ROW) {
+		if (sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+			account_id = sqlite3_column_int(stmt, 0);
+			sqlite3_finalize(this->stmt);
+			return account_id;
+		}
+		else {
+			sqlite3_finalize(this->stmt);
+			return BUILTIN_USERS::PUBLIC;
+		}
+	}
+	else {
+		throw std::runtime_error("[DatabaseConnectionSQLite] Error occured in getAccountByUsername");
+	}
+}
+
+std::string DatabaseConnectionSQLite::getIntermediateSaltFromAccount(int account_id) {
+	int ec = sqlite3_prepare_v2(this->db, "SELECT intermediate_salt_base64 FROM account WHERE id = ?", -1, &this->stmt, NULL);
+	sqlite3_bind_int(this->stmt, 1, account_id);
+	if (ec == SQLITE_OK && sqlite3_step(this->stmt) == SQLITE_ROW) {
+		if (sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+			std::string salt = reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0));
+			sqlite3_finalize(this->stmt);
+			return salt;
+		}
+		else {
+			sqlite3_finalize(this->stmt);
+			return "";
+		}
+	}
+	else {
+		throw std::runtime_error("[DatabaseConnectionSQLite] Error occured in getIntermediateSaltFromAccount");
+	}
+}
+
+bool DatabaseConnectionSQLite::userMatchesPassword(int account_id, const std::string& password_hash_hash_base64) {
+	int ec = sqlite3_prepare_v2(this->db, "SELECT id FROM account WHERE password_hash_hash_base64 = ?", -1, &this->stmt, NULL);
+	sqlite3_bind_text(this->stmt, 1, password_hash_hash_base64.c_str(), password_hash_hash_base64.length(), SQLITE_STATIC);
+	if (ec == SQLITE_OK && sqlite3_step(this->stmt) == SQLITE_ROW) {
+		if (sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+			sqlite3_finalize(this->stmt);
+			return true;
+		}
+		else {
+			sqlite3_finalize(this->stmt);
+			return false;
+		}
+	}
+	else {
+		throw std::runtime_error("[DatabaseConnectionSQLite] Error occured in userMatchesPassword");
+	}
 }
 
 int DatabaseConnectionSQLite::storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) {

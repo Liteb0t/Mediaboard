@@ -204,6 +204,7 @@ http::message_generator handle_request(
 	std::cout << "[http_session] basic_res.status: " << basic_res.status << std::endl;
 	if (basic_res.status != http::status::not_found) {
 		if (basic_res.json) {
+			std::cout << "[http_session] with JSON" << std::endl;
 			http::response<http::string_body> res{basic_res.status, req.version()};
 			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
 			res.set(http::field::content_type, "application/json");
@@ -213,11 +214,14 @@ http::message_generator handle_request(
 			return res;
 		}
 		else {
-			http::response<http::empty_body> res{basic_res.status, req.version()};
+			std::cout << "[http_session] no JSON" << std::endl;
+			http::response<http::string_body> res{http::status::internal_server_error, req.version()};
 			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+			res.set(http::field::content_type, "text/plain");
 			if (basic_res.error_message)
 				res.set("message", basic_res.error_message.get());
 			res.keep_alive(req.keep_alive());
+			res.body() = "An error occurred: '" + basic_res.error_message.get() + "'";
 			res.prepare_payload();
 			return res;
 		}
@@ -402,7 +406,7 @@ http::message_generator handle_request(
 		if (is_media)
 			filesystem_path = std::format("{}/{}", state->getMediaLocation().string(), path_name.substr(7));
 		else {
-			if (path_name.ends_with("/")) // So /thread/1/ and such will redirect to index.html
+			if (path_name.empty() || path_name.ends_with("/")) // So /thread/1/ and such will redirect to index.html
 				filesystem_path = std::format("{}/frontend/index.html", state->getProgramLocation().string());
 			else
 				filesystem_path = std::format("{}/frontend{}", state->getProgramLocation().string(), path_name);

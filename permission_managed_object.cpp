@@ -99,7 +99,7 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 PermissionManager::PermissionManager(int permission_object_id, DatabaseConnection* db)
 		: PermissionObjectBase(0, db) {
 	this->cacheAllGroups();
-	this->cacheAllUsers();
+	// this->cacheAllUsers();
 	this->grantDefaultAdminPrivileges();
 }
 

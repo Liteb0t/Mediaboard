@@ -9,7 +9,7 @@ User::User(struct db_account_struct* account_struct)
 
 // Register new user into the database
 User::User(std::string username, std::string password) 
-		: id(db_store_account(username.c_str(), password.c_str()))
-		, key(std::string(db_fetch_key(username.c_str(), password.c_str()))) // TODO remove inefficiency caused by database searching for username
+		: id(0)
+		, key(std::string(""))
 		, username(username) {
 }

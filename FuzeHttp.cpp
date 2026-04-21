@@ -47,10 +47,10 @@ std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 }
 
 std::string FuzeHttp::generateAuthorisationToken(int user_id) {
-	unsigned char random_bytes[128];
-	randombytes_buf(random_bytes, 128);
-	char random_base64[sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE)];
-	sodium_bin2base64(random_base64, sodium_base64_ENCODED_LEN(128, sodium_base64_VARIANT_URLSAFE), random_bytes, 128, sodium_base64_VARIANT_URLSAFE);
+	unsigned char random_bytes[crypto_generichash_BYTES];
+	randombytes_buf(random_bytes, crypto_generichash_BYTES);
+	char random_base64[sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE)];
+	sodium_bin2base64(random_base64, sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE), random_bytes, 128, sodium_base64_VARIANT_URLSAFE);
 	std::chrono::time_point<std::chrono::steady_clock> expiration_date = std::chrono::steady_clock::now() + authorization_token_lifespan;
 	return std::format("{}.{}.{}", random_base64, std::chrono::duration_cast<std::chrono::minutes>(expiration_date.time_since_epoch()), user_id);
 }

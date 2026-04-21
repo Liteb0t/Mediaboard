@@ -64,6 +64,10 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	}
 }
 
+void shared_state::addSession(const std::string& id_base64, Session&& session) {
+	this->sessions.emplace(id_base64, session);
+}
+
 std::string shared_state::dumpAllGroups(int client_id) const {
 	std::cout << "Dumping from ordered_groups_vec: ";
 
