@@ -54,3 +54,18 @@ std::string FuzeHttp::generateAuthorisationToken(int user_id) {
 	std::chrono::time_point<std::chrono::steady_clock> expiration_date = std::chrono::steady_clock::now() + authorization_token_lifespan;
 	return std::format("{}.{}.{}", random_base64, std::chrono::duration_cast<std::chrono::minutes>(expiration_date.time_since_epoch()), user_id);
 }
+
+void FuzeHttp::generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t password_hash_hash_base64_len, const char* password_hash_base64, size_t password_hash_base64_len) {
+	// hash of password hash in base64 is stored in DB
+	unsigned char password_hash_hash[crypto_generichash_BYTES];
+	crypto_generichash(
+		password_hash_hash, crypto_generichash_BYTES,
+		reinterpret_cast<const unsigned char*>(password_hash_base64), password_hash_base64_len,
+		NULL, 0
+	);
+	sodium_bin2base64(
+		password_hash_hash_base64, password_hash_hash_base64_len,
+		password_hash_hash, sizeof password_hash_hash,
+		sodium_base64_VARIANT_URLSAFE
+	);
+}

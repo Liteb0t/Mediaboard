@@ -203,28 +203,23 @@ http::message_generator handle_request(
 	FuzeHttp::Response basic_res = controller->matchPathAndExecute(state, req);
 	std::cout << "[http_session] basic_res.status: " << basic_res.status << std::endl;
 	if (basic_res.status != http::status::not_found) {
+		http::response<http::string_body> res{basic_res.status, req.version()};
+		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
+		if (basic_res.headers) {
+			for (auto& header : basic_res.headers.value())
+				res.set(header.first, header.second);
+		}
+		if (basic_res.error_message)
+			res.set("message", basic_res.error_message.value());
 		if (basic_res.json) {
-			std::cout << "[http_session] with JSON" << std::endl;
-			http::response<http::string_body> res{basic_res.status, req.version()};
-			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
 			res.set(http::field::content_type, "application/json");
-			res.keep_alive(req.keep_alive());
-			res.body() = boost::json::serialize(basic_res.json.get());
-			res.prepare_payload();
-			return res;
+			res.body() = boost::json::serialize(basic_res.json.value());
 		}
-		else {
-			std::cout << "[http_session] no JSON" << std::endl;
-			http::response<http::string_body> res{http::status::internal_server_error, req.version()};
-			res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-			res.set(http::field::content_type, "text/plain");
-			if (basic_res.error_message)
-				res.set("message", basic_res.error_message.get());
-			res.keep_alive(req.keep_alive());
-			res.body() = "An error occurred: '" + basic_res.error_message.get() + "'";
-			res.prepare_payload();
-			return res;
-		}
+		else if (basic_res.error_message)
+			res.body() = "An error occurred: '" + basic_res.error_message.value() + "'";
+		res.keep_alive(req.keep_alive());
+		res.prepare_payload();
+		return res;
 	}
 
 	auto const getNumberFromPath = [&path_name](int start_index) {

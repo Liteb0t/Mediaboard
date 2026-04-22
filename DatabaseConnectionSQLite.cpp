@@ -176,10 +176,9 @@ void DatabaseConnectionSQLite::firstTimeSetup(const boost::filesystem::path& dat
 	}
 }
 
-int DatabaseConnectionSQLite::createAccount(const char* username, const char* password_hash, const char* intermediate_salt_base64) {
-	const char* params[3] = {username, password_hash, intermediate_salt_base64};
+int DatabaseConnectionSQLite::createAccount(const std::string& username, const char* password_hash, const char* intermediate_salt_base64) {
 	int ec = sqlite3_prepare_v2(this->db, "INSERT INTO account(username, password_hash, intermediate_salt_base64) VALUES (?, ?, ?)", -1, &stmt, NULL);
-	sqlite3_bind_text(stmt, 1, username, sizeof username, SQLITE_STATIC);
+	sqlite3_bind_text(stmt, 1, username.c_str(), username.length(), SQLITE_STATIC);
 	sqlite3_bind_text(stmt, 2, password_hash, sizeof password_hash, SQLITE_STATIC);
 	sqlite3_bind_text(stmt, 3, intermediate_salt_base64, sizeof intermediate_salt_base64, SQLITE_STATIC);
 	if (ec == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW && sqlite3_column_type(stmt, 0) != SQLITE_NULL) {

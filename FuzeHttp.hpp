@@ -8,7 +8,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/algorithm/string.hpp>
-#include <boost/optional.hpp>
 #include <boost/json.hpp>
 #include <iostream>
 #include <variant>
@@ -28,12 +27,41 @@ typedef const http::request<http::string_body, http::basic_fields<std::allocator
 
 struct Response {
 	beast::http::status status;
-	std::unordered_map<std::string, std::string> headers;
-	boost::optional<boost::json::object> json;
-	boost::optional<std::string> error_message;
+	std::optional<std::unordered_map<std::string, std::string>> headers;
+	std::optional<boost::json::object> json;
+	std::optional<std::string> error_message;
 };
 using Headers = std::unordered_map<std::string, std::string>;
 std::string generateAuthorisationToken(int user_id = BUILTIN_USERS::PUBLIC);
+
+void generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t password_hash_hash_base64_len, const char* password_hash_base64, size_t password_hash_base64_len);
+
+template<typename StateType>
+void getSaltBase64(StateType state, const std::string& username, char* salt_base64) {
+	int user_id = state->db->getAccountByUsername(username);
+	unsigned char salt[crypto_pwhash_SALTBYTES];
+	if (user_id != BUILTIN_USERS::PUBLIC) {
+		std::string intermediate_salt_base64 = state->db->getIntermediateSaltFromAccount(user_id);
+		crypto_generichash(
+			salt, sizeof salt,
+			reinterpret_cast<const unsigned char*>(username.c_str()), username.length(),
+			reinterpret_cast<const unsigned char*>(intermediate_salt_base64.c_str()), intermediate_salt_base64.length()
+		);
+	}
+	else {
+		std::cout << "Username " << username << " not found. Generating fake salt." << std::endl;
+		crypto_generichash(
+			salt, sizeof salt,
+			reinterpret_cast<const unsigned char*>(username.c_str()), username.length(),
+			reinterpret_cast<const unsigned char*>(state->getSecret()), sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)
+		);
+	}
+	sodium_bin2base64(
+		salt_base64, sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE),
+		salt, crypto_pwhash_SALTBYTES,
+		sodium_base64_VARIANT_URLSAFE
+	);
+}
 
 // https://stackoverflow.com/a/79894118/18658154
 // Type Filtering Logic
@@ -93,15 +121,13 @@ public:
 		this->path = std::initializer_list<std::variant<const char*, int, std::string>>{ args... };
 		for (std::variant<const char*, int, std::string> s : std::initializer_list<std::variant<const char*, int, std::string>>{ args... }) {
 			// this->path.push_back(s);
-			if (std::holds_alternative<const char*>(s))
-				std::cout << "Found char array in list: " << std::get<const char*>(s) << std::endl;
-			else {
+			if (!std::holds_alternative<const char*>(s)) {
 				this->pattern_position_to_view_arg_index[index] = arg_index++;
-				std::cout << "Arg is not a char array!" << std::endl;
+				// std::cout << "Arg is not a char array!" << std::endl;
 			}
 			index++;
 		}
-		std::cout << "Final path length: " << this->path.size() << std::endl;
+		// std::cout << "Final path length: " << this->path.size() << std::endl;
 	}
 	Response executeView(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) const override {
 		return std::apply(view_func, std::tuple_cat(std::tie(state, req), view_args));
@@ -111,25 +137,25 @@ public:
 	}
 	bool attemptPathMatch(std::string_view section, size_t index) override {
 		// const Path* view = views.at(view_id);
-		std::cout << "Pattern " << index << '/' << this->path.size() << ' ';
+		// std::cout << "Pattern " << index << '/' << this->path.size() << ' ';
 		// std::forward_list<std::variant<std::string, int>>::const_iterator pattern = *view;
 		if (index >= this->path.size()) {
-			std::cout << ", erasing." << std::endl;
+			// std::cout << ", erasing." << std::endl;
 			return false;
 		}
-		std::cout << ", getting variant";
+		// std::cout << ", getting variant";
 		const std::variant<const char*, int, std::string> vari = this->path[index];
 
-		std::cout << "Section: \"" << section << "\"";
+		// std::cout << "Section: \"" << section << "\"";
 		if (vari.index() == 0) { // Not a view arg
 			std::string str = std::string(std::get<const char*>(vari));
-			std::cout << ", is const \"" << str << '"';
+			// std::cout << ", is const \"" << str << '"';
 			if (str == section) {
-				std::cout << ", matches!";
+				// std::cout << ", matches!";
 				return true;
 			}
 			else {
-				std::cout << ", " << section << " does not match " << str << std::endl;
+				// std::cout << ", " << section << " does not match " << str << std::endl;
 				return false;
 			}
 		}
@@ -137,9 +163,9 @@ public:
 			int value;
 			std::from_chars_result res = std::from_chars(section.data(), section.data() + section.size(), value);
 			if (res.ec == std::errc()) {
-				std::cout << ", found value " << value;
+				// std::cout << ", found value " << value;
 				this->setArg(pattern_position_to_view_arg_index[index], value);
-				std::cout << ", returning.";
+				// std::cout << ", returning.";
 				return true;
 			}
 			else {
@@ -151,7 +177,7 @@ public:
 			}
 		}
 		else { // String arg
-			std::cout << ", Is string \"" << section << '"';
+			// std::cout << ", Is string \"" << section << '"';
 			this->setArg(pattern_position_to_view_arg_index[index], section);
 			// this->setArg<(size_t)0, Functor, int, pattern_position_to_view_arg_index[index]>(pattern_position_to_view_arg_index[index], Functor(), section);
 			return true;

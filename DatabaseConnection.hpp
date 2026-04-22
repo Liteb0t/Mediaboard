@@ -31,7 +31,7 @@ class DatabaseConnection {
 public:
 	virtual ~DatabaseConnection() {
 	}
-	virtual int createAccount(const char* username, const char* password_hash_hash, const char* intermediate_salt_base64) = 0;
+	virtual int createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64) = 0;
 	virtual int getAccountByUsername(const std::string& username) = 0;
 	virtual std::string getIntermediateSaltFromAccount(int account_id) = 0;
 	virtual bool userMatchesPassword(int account_id, const std::string& password_hash_hash_base64) = 0;

@@ -159,7 +159,7 @@ v0_0_5:
 	return true; // Migrations were made
 }
 
-int DatabaseConnectionPostgreSQL::createAccount(const char* username, const char* password_hash_hash_base64, const char* intermediate_salt_base64) {
+int DatabaseConnectionPostgreSQL::createAccount(const std::string& username, const char* password_hash_hash_base64, const char* intermediate_salt_base64) {
 	PGresult* result;
 	ExecStatusType status;
 	std::string new_account_id;
@@ -179,7 +179,7 @@ int DatabaseConnectionPostgreSQL::createAccount(const char* username, const char
 	PQclear(result);
 
 	std::cout << "[DatabaseConnectionPostgreSQL] New account ID: " <<new_account_id << std::endl;
-	const char* params[4] = {new_account_id.c_str(), username, password_hash_hash_base64, intermediate_salt_base64};
+	const char* params[4] = {new_account_id.c_str(), username.c_str(), password_hash_hash_base64, intermediate_salt_base64};
 	result =  PQexecParams(this->db, "INSERT INTO account(id, username, password_hash_hash_base64, intermediate_salt_base64) VALUES ($1::integer, $2::text, $3::text, $4::text)", 4, NULL, params, NULL, NULL, 0);
 	status = PQresultStatus(result);
 	if (status == PGRES_COMMAND_OK) {

@@ -9,7 +9,7 @@ public:
 	DatabaseConnectionPostgreSQL(const std::string& postgresql_user, const std::string& postgresql_host, const unsigned short postgresql_port, const std::string& postgresql_database_name, const std::string& current_version);
 	~DatabaseConnectionPostgreSQL();
 
-	int createAccount(const char* username, const char* password_hash, const char* intermediate_salt_base64) override;
+	int createAccount(const std::string& username, const char* password_hash_hash_base64, const char* intermediate_salt_base64) override;
 	int getAccountByUsername(const std::string& username) override;
 	std::string getIntermediateSaltFromAccount(int account_id) override;
 	bool userMatchesPassword(int account_id, const std::string& password_hash_hash_base64) override;

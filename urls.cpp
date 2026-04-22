@@ -7,4 +7,6 @@ void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	controller->addPattern(testView, "test", std::string(""));
 	controller->addPattern(requestNewAccountParameters, "registration", "request_new_account_parameters");
 	controller->addPattern(createNewAccount, "registration", "create_new_account");
+	controller->addPattern(requestLoginParameters, "registration", "request_login_parameters");
+	controller->addPattern(login, "registration", "login");
 }
