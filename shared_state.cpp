@@ -10,6 +10,7 @@
 #include "permission_managed_object.hpp"
 #include "shared_state.hpp"
 #include "websocket_session.hpp"
+#include <chrono>
 #include <iostream>
 
 shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format)
@@ -19,6 +20,10 @@ shared_state::shared_state(boost::filesystem::path parent_directory, boost::file
 		db(db),
 		thumbnail_file_format(thumbnail_file_format) {
 	db->getSecret(this->secret_base64);
+}
+
+shared_state::~shared_state() {
+	this->clearExpiredSessions(); // TODO Ideally this would be called on an interval instead of on shutdown.
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
@@ -62,10 +67,6 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 		if(auto sp = wp.lock())
 			sp->send(ss);
 	}
-}
-
-void shared_state::addSession(const std::string& id_base64, Session&& session) {
-	this->sessions.emplace(id_base64, session);
 }
 
 std::string shared_state::dumpAllGroups(int client_id) const {
@@ -282,3 +283,42 @@ BasicResponse shared_state::addUserToGroups(int client_id, int user_id, std::vec
 	return BasicResponse(http::status::ok, std::string("Added user to groups")); // Success
 }
 
+std::string shared_state::addSession(int account_id) {
+	std::string id_base64;
+	do {
+		unsigned char session_id_bytes[128/8];
+		randombytes_buf(session_id_bytes, 128/8);
+		char session_id_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE)];
+		sodium_bin2base64(
+			session_id_base64, sizeof session_id_base64,
+			session_id_bytes, 128/8,
+			sodium_base64_VARIANT_URLSAFE
+		);
+		id_base64 = session_id_base64;
+	} while (this->sessions.contains(id_base64)); // It's not impossible for it to clash...
+	Session session{
+		.account_id = account_id,
+		.created_at = std::chrono::system_clock::now()
+	};
+	db->createSession(
+		id_base64,
+		session.account_id,
+		std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
+	);
+	this->sessions.emplace(id_base64, std::move(session));
+	return id_base64;
+}
+
+void shared_state::clearExpiredSessions() {
+	int initial_number_of_sessions = this->sessions.size();
+	std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
+	std::erase_if(this->sessions, [this, &current_time](const std::pair<std::string, Session>& session_pair){
+		if (session_pair.second.created_at + this->authorization_token_lifespan < current_time) {
+			db->deleteSession(session_pair.first);
+			return true;
+		}
+		else
+			return false;
+	});
+	std::cout << "[shared_state] Cleared " << initial_number_of_sessions - this->sessions.size() << " expired sessions." << std::endl;
+}

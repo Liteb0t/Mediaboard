@@ -32,7 +32,6 @@ struct Response {
 	std::optional<std::string> error_message;
 };
 using Headers = std::unordered_map<std::string, std::string>;
-std::string generateAuthorisationToken(int user_id = BUILTIN_USERS::PUBLIC);
 
 void generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t password_hash_hash_base64_len, const char* password_hash_base64, size_t password_hash_base64_len);
 

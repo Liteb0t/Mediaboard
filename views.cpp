@@ -106,11 +106,7 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = std::format("[createNewAccount] {}", e.what())};
 	}
 	std::cout << "Created account " << username << std::endl;
-	unsigned char session_id_bytes[128/8];
-	randombytes_buf(session_id_bytes, 128/8);
-	char session_id_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE)];
-	sodium_bin2base64(session_id_base64, sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE), session_id_bytes, 128/8, sodium_base64_VARIANT_URLSAFE);
-	state->addSession(session_id_base64, {.user_id = user_id});
+	std::string session_id_base64 = state->addSession(user_id);
 	return FuzeHttp::Response{
 		.status = http::status::created,
 		.headers = {{{"Set-Cookie", std::format("{}; HttpOnly", session_id_base64)}}}
@@ -155,7 +151,7 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 	}
 	catch(const std::exception& e) {
 		std::cout << "JSON error" << std::endl;
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[registerAccount] {}", e.what())};
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[login] {}", e.what())};
 	}
 	std::string username = std::string(username_j);
 	if (username.length() > ACCOUNT_MAX_USERNAME)
@@ -171,15 +167,15 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 	int user_id = state->db->getAccountByUsername(username);
 	if (user_id != BUILTIN_USERS::PUBLIC) {
 		if (state->db->userMatchesPassword(user_id, password_hash_hash_base64)) {
-			// Add session so client can authenticate via browser cookie
-			unsigned char session_id_bytes[128/8];
-			randombytes_buf(session_id_bytes, 128/8);
-			char session_id_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE)];
-			sodium_bin2base64(session_id_base64, sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE), session_id_bytes, 128/8, sodium_base64_VARIANT_URLSAFE);
-			// TODO add expiration
-			state->addSession(session_id_base64, {
-				.user_id = user_id
-			});
+			std::string session_id_base64;
+			try {
+				session_id_base64 = state->addSession(user_id); // Add session so client can authenticate via browser cookie
+			}
+			catch(const std::exception& e) {
+				std::string error_text = std::format("[login] {}", e.what());
+				std::cout << error_text << std::endl;
+				return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_text};
+			}
 			return FuzeHttp::Response{
 				.status = http::status::accepted,
 				.headers = FuzeHttp::Headers{{"Set-Cookie", std::format("{}; HttpOnly", session_id_base64)}}

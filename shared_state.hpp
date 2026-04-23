@@ -37,23 +37,21 @@ public:
 };
 
 struct Session {
-	int user_id;
-	// TODO add expiry
+	int account_id;
+	std::chrono::time_point<std::chrono::system_clock> created_at;
 };
 
 // Represents the shared server state
 class shared_state : public PermissionManager {
 public:
 	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative, DatabaseConnection* database_connection, std::string thumbnail_file_format);
+	~shared_state();
 	void start();
 
 	DatabaseConnection* db;
 
 	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
 	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
-
-	std::unordered_map<std::string /*username*/, IntermediateSalt> intermediate_account_registrations;
-	void addSession(const std::string& id_base64, Session&& session);
 
 	// Board main_board;
 	Board* main_board() { return &(this->boards.at(0)); }
@@ -78,6 +76,9 @@ public:
 	const boost::filesystem::path& getProgramLocation() const { return program_location; }
 	const std::string& getThumbnailFileFormat() const { return thumbnail_file_format; }
 	const char* getSecret() const { return this->secret_base64; }
+
+	std::string addSession(int account_id);
+	void clearExpiredSessions();
 private:
 	const boost::filesystem::path media_location;
 	const boost::filesystem::path program_location;
@@ -89,12 +90,13 @@ private:
 
 	// Keep a list of all the websocket-connected clients
 	std::unordered_set<websocket_session*> sessions_;
-	// HTTP sessions. Client validates using a cookie
-	std::unordered_map<std::string, Session> sessions;
 
 	// std::unordered_map<int, Board> boards;
 	std::unordered_map<int, Board> boards;
 	// std::vector<int> ordered_boards;
+	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);
+	// HTTP sessions. Client validates using a cookie
+	std::unordered_map<std::string, Session> sessions;
 };
 
 #endif

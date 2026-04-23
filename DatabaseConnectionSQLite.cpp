@@ -261,6 +261,30 @@ bool DatabaseConnectionSQLite::userMatchesPassword(int account_id, const std::st
 	}
 }
 
+void DatabaseConnectionSQLite::createSession(const std::string& id_base64, int session__account_id, time_t session__created_at) {
+	int ec = sqlite3_prepare_v2(this->db, "INSERT INTO account(username, password_hash, intermediate_salt_base64) VALUES (?, ?, ?)", -1, &stmt, NULL);
+	sqlite3_bind_text(stmt, 1, id_base64.c_str(), id_base64.length(), SQLITE_STATIC);
+	sqlite3_bind_int(stmt, 2, session__account_id);
+	sqlite3_bind_int(stmt, 3, session__created_at);
+	if (ec == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW) {
+		return;
+	}
+	else {
+		throw std::runtime_error("An unknown error occured when attempting to create session.");
+	}
+}
+
+void DatabaseConnectionSQLite::deleteSession(const std::string& id_base64) {
+	int ec = sqlite3_prepare_v2(this->db, "DELETE FROM session WHERE id_base64 = ?", -1, &stmt, NULL);
+	sqlite3_bind_text(stmt, 1, id_base64.c_str(), id_base64.length(), SQLITE_STATIC);
+	if (ec == SQLITE_OK && sqlite3_step(stmt) == SQLITE_ROW) {
+		return;
+	}
+	else {
+		throw std::runtime_error("An unknown error occured when attempting to delete session.");
+	}
+}
+
 int DatabaseConnectionSQLite::storePermissionSetting(int permission_collection_id, PERMISSION permission, THREE_STATE_SETTING setting) {
 	int new_permission_setting_id;
 	this->execWriteOnlyStatement(std::format("INSERT INTO permission_setting(permission_collection_id, permission_number, setting) VALUES ({}, {}, {})", permission_collection_id, static_cast<int>(permission), static_cast<int>(setting)).c_str());

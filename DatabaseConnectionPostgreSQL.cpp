@@ -224,7 +224,7 @@ std::string DatabaseConnectionPostgreSQL::getIntermediateSaltFromAccount(int acc
 	PGresult* result;
 	ExecStatusType status;
 	const char* params[1] = {account_id_.c_str()};
-	result =  PQexecParams(this->db, "SELECT intermediate_salt_base64 FROM account WHERE id = $1::integer", 1, NULL, params, NULL, NULL, 0);;
+	result =  PQexecParams(this->db, "SELECT intermediate_salt_base64 FROM account WHERE id = $1::integer", 1, NULL, params, NULL, NULL, 0);
 	status = PQresultStatus(result);
 	if (status == PGRES_TUPLES_OK) {
 		if (PQntuples(result) != 0)
@@ -247,7 +247,7 @@ bool DatabaseConnectionPostgreSQL::userMatchesPassword(int account_id, const std
 	PGresult* result;
 	ExecStatusType status;
 	const char* params[1] = {password_hash_hash_base64.c_str()};
-	result =  PQexecParams(this->db, "SELECT id FROM account WHERE password_hash_hash_base64 = $1::text", 1, NULL, params, NULL, NULL, 0);;
+	result =  PQexecParams(this->db, "SELECT id FROM account WHERE password_hash_hash_base64 = $1::text", 1, NULL, params, NULL, NULL, 0);
 	status = PQresultStatus(result);
 	if (status == PGRES_TUPLES_OK) {
 		return (PQntuples(result) != 0);
@@ -259,6 +259,40 @@ bool DatabaseConnectionPostgreSQL::userMatchesPassword(int account_id, const std
 			throw std::runtime_error(std::format("Error occured in userMatchesPassword: {}", error_message));
 		else
 			throw std::runtime_error("Error occured in userMatchesPassword.");
+	}
+}
+
+void DatabaseConnectionPostgreSQL::createSession(const std::string& id_base64, int session__account_id, time_t session__created_at) {
+	PGresult* result;
+	ExecStatusType status;
+	std::string session__account_id_str = std::to_string(session__account_id);
+	std::string session__created_at_str = std::to_string(session__created_at);
+	const char* params[3] = {id_base64.c_str(), session__account_id_str.c_str(), session__created_at_str.c_str()};
+	result =  PQexecParams(this->db, "INSERT INTO session(id_base64, account_id, created_at) VALUES ($1::text, $2::integer, $3::integer)", 3, NULL, params, NULL, NULL, 0);
+	status = PQresultStatus(result);
+	if (status != PGRES_COMMAND_OK) {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("Error occured in createSession: {}", error_message));
+		else
+			throw std::runtime_error("Error occured in createSession.");
+	}
+}
+
+void DatabaseConnectionPostgreSQL::deleteSession(const std::string& id_base64) {
+	PGresult* result;
+	ExecStatusType status;
+	const char* params[1] = {id_base64.c_str()};
+	result =  PQexecParams(this->db, "DELETE FROM session WHERE id_base64 = $1::text", 1, NULL, params, NULL, NULL, 0);
+	status = PQresultStatus(result);
+	if (status != PGRES_COMMAND_OK) {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("Error occured in deleteSession: {}", error_message));
+		else
+			throw std::runtime_error("Error occured in deleteSession.");
 	}
 }
 

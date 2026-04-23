@@ -13,6 +13,8 @@ public:
 	int getAccountByUsername(const std::string& username) override;
 	std::string getIntermediateSaltFromAccount(int account_id) override;
 	bool userMatchesPassword(int account_id, const std::string& password_hash_hash_base64) override;
+	void createSession(const std::string& id_base64, int session__account_id, time_t session__created_at) override;
+	void deleteSession(const std::string& id_base64) override;
 
 	int getUniquePermissionObjectId() const override { return db_get_unique_permission_object_id(); }
 	int storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) override;
