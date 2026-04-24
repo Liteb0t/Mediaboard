@@ -23,13 +23,18 @@ std::string getDecodedURL(boost::string_view raw_URL);
 
 std::string_view getPathName(const std::string& source_URL);
 
+inline std::string formatCookie(const std::string& session_id_base64) {
+	return std::format("Session={}; Path=/; HttpOnly", session_id_base64);
+}
+
 typedef const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& Request;
 
 struct Response {
 	beast::http::status status;
 	std::optional<std::unordered_map<std::string, std::string>> headers;
-	std::optional<boost::json::object> json;
 	std::optional<std::string> error_message;
+	std::optional<boost::json::object> json;
+	std::optional<std::string> body;
 };
 using Headers = std::unordered_map<std::string, std::string>;
 
@@ -104,7 +109,7 @@ class Path {
 public:
 	virtual size_t getPathSize() const = 0;
 	virtual Response executeView(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) const = 0;
-	virtual bool attemptPathMatch(std::string_view section, size_t index) = 0;
+	virtual bool attemptPathMatch(http::verb req_method, std::string_view section, size_t index) = 0;
 };
 
 template<typename StateType, class... AllArgs>
@@ -113,8 +118,9 @@ class ViewPath : public Path<StateType> {
 	using FuncPtr = typename MakeFuncPtr<StateType, FilteredTypes>::type;
 	using ArgTuple = typename MakeArgTuple<FilteredTypes>::type;
 public:
-	constexpr ViewPath(FuncPtr v, AllArgs... args)
-			: view_func(v) {
+	constexpr ViewPath(http::verb req_method, FuncPtr v, AllArgs... args)
+			: view_func(v),
+			req_method(req_method) {
 		size_t arg_index, index;
 		arg_index = index = 0;
 		this->path = std::initializer_list<std::variant<const char*, int, std::string>>{ args... };
@@ -134,14 +140,11 @@ public:
 	size_t getPathSize() const override {
 		return this->path.size();
 	}
-	bool attemptPathMatch(std::string_view section, size_t index) override {
-		// const Path* view = views.at(view_id);
-		// std::cout << "Pattern " << index << '/' << this->path.size() << ' ';
-		// std::forward_list<std::variant<std::string, int>>::const_iterator pattern = *view;
-		if (index >= this->path.size()) {
-			// std::cout << ", erasing." << std::endl;
+	bool attemptPathMatch(http::verb req_method, std::string_view section, size_t index) override {
+		if (req_method != this->req_method)
 			return false;
-		}
+		if (index >= this->path.size())
+			return false;
 		// std::cout << ", getting variant";
 		const std::variant<const char*, int, std::string> vari = this->path[index];
 
@@ -201,7 +204,7 @@ private:
 	}
 	FuncPtr view_func;
 	ArgTuple view_args;
-	std::vector<int> test;
+	http::verb req_method;
 	std::vector<std::variant<const char*, int, std::string>> path;
 	// std::unordered_set<int, int> pattern_position_to_view_arg_index; // maps arg Pattern position to View arg position
 	std::array<int, sizeof...(AllArgs)> pattern_position_to_view_arg_index; // maps arg Pattern position to View arg position
@@ -230,10 +233,10 @@ template<typename StateType>
 class Controller {
 public:
 	template<typename... Types>
-	constexpr void addPattern(typename MakeFuncPtr<StateType, typename Filter<TypeList<Types...>, IsViewArg>::type>::type view, Types... args) {
+	constexpr void addPattern(http::verb req_method, typename MakeFuncPtr<StateType, typename Filter<TypeList<Types...>, IsViewArg>::type>::type view, Types... args) {
 		// ViewPath<Types...> vp(view, std::move(args)...);
 		all_views.emplace(id_counter);
-		views.emplace(id_counter, new ViewPath<StateType, Types...>(view, std::move(args)...));
+		views.emplace(id_counter, new ViewPath<StateType, Types...>(req_method, view, std::move(args)...));
 		// std::cout << "views[" << id_counter << "] length: " << views.at(id_counter)->path.size() << std::endl;
 		id_counter++;
 	}
@@ -260,8 +263,8 @@ public:
 				section = path_name.substr(location_start_bound, location_end_bound - location_start_bound);
 
 			// std::cout << "[" <<section<<"]";
-			std::erase_if(matched_views, [this, &section, section_index](const int view_id){
-				return this->views.at(view_id)->attemptPathMatch(section, section_index) == false;
+			std::erase_if(matched_views, [this, &req, &section, section_index](const int view_id){
+				return this->views.at(view_id)->attemptPathMatch(req.method(), section, section_index) == false;
 			});
 			// std::cout << '.' << std::endl;
 			if (matched_views.size() == 0)

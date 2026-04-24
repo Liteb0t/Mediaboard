@@ -13,6 +13,23 @@
 #include <chrono>
 #include <iostream>
 
+template<class Map>
+std::string generateKeyBase64(const Map& map) {
+	std::string key_base64;
+	do {
+		unsigned char session_id_bytes[128/8];
+		randombytes_buf(session_id_bytes, 128/8);
+		char session_id_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE)];
+		sodium_bin2base64(
+			session_id_base64, sizeof session_id_base64,
+			session_id_bytes, 128/8,
+			sodium_base64_VARIANT_URLSAFE
+		);
+		key_base64 = session_id_base64;
+	} while (map.contains(key_base64)); // It's not impossible for it to clash...
+	return key_base64;
+}
+
 shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format)
 		: PermissionManager(0, db),
 		program_location(std::move(parent_directory)),
@@ -284,29 +301,18 @@ BasicResponse shared_state::addUserToGroups(int client_id, int user_id, std::vec
 }
 
 std::string shared_state::addSession(int account_id) {
-	std::string id_base64;
-	do {
-		unsigned char session_id_bytes[128/8];
-		randombytes_buf(session_id_bytes, 128/8);
-		char session_id_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE)];
-		sodium_bin2base64(
-			session_id_base64, sizeof session_id_base64,
-			session_id_bytes, 128/8,
-			sodium_base64_VARIANT_URLSAFE
-		);
-		id_base64 = session_id_base64;
-	} while (this->sessions.contains(id_base64)); // It's not impossible for it to clash...
 	Session session{
 		.account_id = account_id,
 		.created_at = std::chrono::system_clock::now()
 	};
+	std::string key_base64 = generateKeyBase64(this->sessions);
 	db->createSession(
-		id_base64,
+		key_base64,
 		session.account_id,
 		std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
 	);
-	this->sessions.emplace(id_base64, std::move(session));
-	return id_base64;
+	this->sessions.emplace(key_base64, std::move(session));
+	return key_base64;
 }
 
 void shared_state::clearExpiredSessions() {
@@ -322,3 +328,86 @@ void shared_state::clearExpiredSessions() {
 	});
 	std::cout << "[shared_state] Cleared " << initial_number_of_sessions - this->sessions.size() << " expired sessions." << std::endl;
 }
+
+int shared_state::getClientIdFromSession(const std::string& session_id_base64) const {
+	if (std::unordered_map<std::string, Session>::const_iterator session = this->sessions.find(session_id_base64); session != this->sessions.end())
+		return session->second.account_id;
+	else
+		return BUILTIN_USERS::PUBLIC;
+}
+
+// For now, only used to create the admin account. therefore granted_group_id will be BUILTIN_GROUPS::ADMINISTRATORS
+std::string shared_state::createInviteLink(int granted_group_id) {
+	Invite invite{
+		.granted_group_id = granted_group_id,
+		.created_at = std::chrono::system_clock::now()
+	};
+	std::string key_base64 = generateKeyBase64(this->sessions);
+	// TODO save invite to database
+	// db->createSession(
+	// 	key_base64,
+	// 	session.account_id,
+	// 	std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
+	// );
+	this->invites.emplace(key_base64, std::move(invite));
+	return key_base64;
+}
+/* I was unable to generate a key here that would work with the frontend WASM module.
+void shared_state::createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password) {
+	unsigned char intermediate_salt[crypto_pwhash_SALTBYTES];
+	randombytes_buf(intermediate_salt, crypto_pwhash_SALTBYTES);
+	char intermediate_salt_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
+	sodium_bin2base64(
+		intermediate_salt_base64, sizeof intermediate_salt_base64,
+		intermediate_salt, crypto_pwhash_SALTBYTES,
+		sodium_base64_VARIANT_URLSAFE
+	);
+	std::string intermediate_salt_base64_str = intermediate_salt_base64;
+	unsigned char salt[crypto_pwhash_SALTBYTES];
+	crypto_generichash(
+		salt, crypto_pwhash_SALTBYTES,
+		reinterpret_cast<const unsigned char*>(username.c_str()), username.length(),
+		reinterpret_cast<const unsigned char*>(intermediate_salt_base64_str.c_str()), intermediate_salt_base64_str.length()
+	);
+	char salt_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
+	sodium_bin2base64(
+		salt_base64, sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE),
+		salt, crypto_pwhash_SALTBYTES,
+		sodium_base64_VARIANT_URLSAFE
+	);
+
+	unsigned char password_hash[crypto_pwhash_STRBYTES];
+	std::cout <<
+		"Password: " <<password <<
+		"\nintermediate_salt_base64: " << intermediate_salt_base64_str <<
+		"\nsalt_base64: " <<salt_base64 <<
+		"\nlimits: " << this->client_pwhash_opslimit << ", " << (this->client_pwhash_memlimit >> 10) << std::endl;
+	int res = crypto_pwhash(
+		password_hash, sizeof password_hash,
+		password.c_str(), password.length(),
+		reinterpret_cast<const unsigned char*>(salt_base64),
+		this->client_pwhash_opslimit,
+		this->client_pwhash_memlimit, crypto_pwhash_ALG_ARGON2ID13
+	);
+
+	std::cout << "[shared_state] password_hash: " << password_hash << std::endl;
+
+	char password_hash_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_STRBYTES, sodium_base64_VARIANT_URLSAFE)];
+	sodium_bin2base64(
+		password_hash_base64, sizeof password_hash_base64,
+		password_hash, sizeof password_hash,
+		sodium_base64_VARIANT_URLSAFE
+	);
+	std::cout << "[shared_state] password_hash_base64: " << password_hash_base64 << std::endl;
+
+	char password_hash_hash_base64[sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE)];
+	FuzeHttp::generatePasswordHashHashBase64(
+		password_hash_hash_base64, sizeof password_hash_hash_base64,
+		password_hash_base64, sizeof password_hash_base64
+	);
+
+	int user_id = db->createAccount(username, std::move(password_hash_hash_base64), intermediate_salt_base64);
+	std::cout << "Created owner account " << username << std::endl;
+	// std::string session_id_base64 = state->addSession(user_id);
+}
+*/

@@ -7,3 +7,5 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req);
+FuzeHttp::Response threads(shared_state* state, FuzeHttp::Request req);
+FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req);

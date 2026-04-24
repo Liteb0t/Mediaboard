@@ -41,6 +41,11 @@ struct Session {
 	std::chrono::time_point<std::chrono::system_clock> created_at;
 };
 
+struct Invite {
+	int granted_group_id;
+	std::chrono::time_point<std::chrono::system_clock> created_at;
+};
+
 // Represents the shared server state
 class shared_state : public PermissionManager {
 public:
@@ -78,7 +83,11 @@ public:
 	const char* getSecret() const { return this->secret_base64; }
 
 	std::string addSession(int account_id);
+	int getClientIdFromSession(const std::string& session_id_base64) const;
 	void clearExpiredSessions();
+
+	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
+	std::string createInviteLink(int granted_group_id = static_cast<int>(BUILTIN_GROUPS::USERS));
 private:
 	const boost::filesystem::path media_location;
 	const boost::filesystem::path program_location;
@@ -96,7 +105,8 @@ private:
 	// std::vector<int> ordered_boards;
 	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);
 	// HTTP sessions. Client validates using a cookie
-	std::unordered_map<std::string, Session> sessions;
+	std::unordered_map<std::string /*key_base64*/, Session> sessions;
+	std::unordered_map<std::string /*key_base64*/, Invite> invites;
 };
 
 #endif

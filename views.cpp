@@ -44,6 +44,7 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 		sodium_base64_VARIANT_URLSAFE
 	);
 	std::string intermediate_salt_base64_str = intermediate_salt_base64;
+	std::cout << "intermediate_salt_base64: " << intermediate_salt_base64_str << std::endl;
 	unsigned char salt[crypto_pwhash_SALTBYTES];
 	crypto_generichash(
 		salt, crypto_pwhash_SALTBYTES,
@@ -60,9 +61,10 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 		.status = http::status::ok,
 		.json = {{
 			{ "intermediate_salt_base64", intermediate_salt_base64 },
-			{ "salt_base64", salt_base64 }
-			// ,{ "pwhash_opslimit", state->client_pwhash_opslimit }
-			// ,{ "pwhash_memlimit", state->client_pwhash_memlimit }
+			{ "salt_base64", salt_base64 },
+			{ "password_hash_length", crypto_pwhash_STRBYTES },
+			{ "pwhash_opslimit", state->client_pwhash_opslimit },
+			{ "pwhash_memlimit", state->client_pwhash_memlimit }
 		}}
 	};
 }
@@ -109,7 +111,7 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 	std::string session_id_base64 = state->addSession(user_id);
 	return FuzeHttp::Response{
 		.status = http::status::created,
-		.headers = {{{"Set-Cookie", std::format("{}; HttpOnly", session_id_base64)}}}
+		.headers = {{{"Set-Cookie", FuzeHttp::formatCookie(session_id_base64)}}}
 	};
 }
 
@@ -133,9 +135,10 @@ FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request
 	char salt_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
 	FuzeHttp::getSaltBase64(state, username, salt_base64);
 	boost::json::object json = {
-		{ "salt_base64", salt_base64 }
-		// ,{ "pwhash_opslimit", state->client_pwhash_opslimit }
-		// ,{ "pwhash_memlimit", state->client_pwhash_memlimit }
+		{ "salt_base64", salt_base64 },
+		{ "password_hash_length", crypto_pwhash_STRBYTES },
+		{ "pwhash_opslimit", state->client_pwhash_opslimit },
+		{ "pwhash_memlimit", state->client_pwhash_memlimit }
 	};
 	return FuzeHttp::Response{.status = http::status::ok, .json = std::move(json)};
 }
@@ -165,25 +168,54 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 		password_hash_base64.c_str(), password_hash_base64.size()
 	);
 	int user_id = state->db->getAccountByUsername(username);
-	if (user_id != BUILTIN_USERS::PUBLIC) {
-		if (state->db->userMatchesPassword(user_id, password_hash_hash_base64)) {
-			std::string session_id_base64;
-			try {
-				session_id_base64 = state->addSession(user_id); // Add session so client can authenticate via browser cookie
-			}
-			catch(const std::exception& e) {
-				std::string error_text = std::format("[login] {}", e.what());
-				std::cout << error_text << std::endl;
-				return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_text};
-			}
-			return FuzeHttp::Response{
-				.status = http::status::accepted,
-				.headers = FuzeHttp::Headers{{"Set-Cookie", std::format("{}; HttpOnly", session_id_base64)}}
-			};
+	if (user_id != BUILTIN_USERS::PUBLIC && state->db->userMatchesPassword(user_id, password_hash_hash_base64)) {
+		std::string session_id_base64;
+		try {
+			session_id_base64 = state->addSession(user_id); // Add session so client can authenticate via browser cookie
 		}
+		catch(const std::exception& e) {
+			std::string error_text = std::format("[login] {}", e.what());
+			std::cout << error_text << std::endl;
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_text};
+		}
+		return FuzeHttp::Response{
+			.status = http::status::accepted,
+			.headers = FuzeHttp::Headers{{"Set-Cookie", FuzeHttp::formatCookie(session_id_base64)}}
+		};
 	}
+	else {
+		return FuzeHttp::Response{
+			.status = http::status::unauthorized,
+			.error_message = std::string("Password is incorrect or the user doesn't exist.")
+		};
+	}
+}
+
+FuzeHttp::Response threads(shared_state* state, FuzeHttp::Request req) {
+	auto cookie_header = req.find("Cookie");
+	if (cookie_header == req.end())
+		return FuzeHttp::Response{.status = http::status::unauthorized, .error_message = "Cookie required but none was found."};
+	std::string session_id_base64 = cookie_header->value();
+	int client_id = state->getClientIdFromSession(session_id_base64);
 	return FuzeHttp::Response{
-		.status = http::status::unauthorized,
-		.error_message = std::string("Password is incorrect or the user doesn't exist.")
+		.status = http::status::ok,
+		.body = state->main_board()->dumpAllThreads(client_id)
+	};
+}
+
+FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req) {
+	auto cookie_header = req.find("Cookie");
+	if (cookie_header == req.end())
+		return FuzeHttp::Response{.status = http::status::unauthorized, .error_message = "Cookie required but none was found."};
+	std::string session_id_base64 = cookie_header->value();
+	int client_id = state->getClientIdFromSession(session_id_base64);
+	return FuzeHttp::Response{
+		.status = http::status::ok,
+		.json = {{
+			{"server_permissions", {
+				{"manage_permissions", state->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS)},
+				{"create_thread", state->userHasPermission(client_id, PERMISSION::CREATE_THREAD)}
+			}}
+		}}
 	};
 }

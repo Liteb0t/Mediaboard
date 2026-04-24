@@ -217,6 +217,8 @@ http::message_generator handle_request(
 		}
 		else if (basic_res.error_message)
 			res.body() = "An error occurred: '" + basic_res.error_message.value() + "'";
+		else if (basic_res.body)
+			res.body() = basic_res.body.value();
 		res.keep_alive(req.keep_alive());
 		res.prepare_payload();
 		return res;

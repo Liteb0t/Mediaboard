@@ -15,6 +15,7 @@
 #include "DatabaseConnectionSQLite.hpp"
 #include "listener.hpp"
 #include "migrations.hpp"
+#include "permission_managed_object.hpp"
 #include "shared_state.hpp"
 #include <boost/asio/signal_set.hpp>
 #include <boost/dll.hpp>
@@ -71,7 +72,13 @@ int main(int argc, char* argv[]) {
 	command_line_options.add(command_line_specific_options).add(universal_options);
 
 	boost::program_options::variables_map variable_map;
-	store(boost::program_options::parse_command_line(argc, argv, command_line_options), variable_map);
+	try {
+		store(boost::program_options::parse_command_line(argc, argv, command_line_options), variable_map);
+	}
+	catch (const std::exception& exception) {
+		std::cout << exception.what() << std::endl;
+		return 1;
+	}
 	boost::program_options::notify(variable_map);
 
 	if (variable_map.count("help")) {
@@ -122,19 +129,14 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 
-	if (variable_map.count("create_administrator")) {
-		// db_create_administrator(admin_password.c_str());
-		// std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
-		delete database_connection;
-		return 0;
-	}
 	std::cout << "Set port: " << server_port << std::endl;
 	boost::filesystem::path media_location;
 	try {
 		media_location = boost::filesystem::canonical(media_location_relative_str, location);
 	}
-	catch (const std::exception* exception) {
-		std::cout << exception->what();
+	catch (const std::exception& exception) {
+		std::cout << exception.what() << std::endl;
+		return 1;
 	}
 	if (!boost::filesystem::exists(media_location.string() + "/media")) {
 		std::cout << media_location.string() + "/media" << " doesn't exist. Creating..." << std::endl;
@@ -158,6 +160,20 @@ int main(int argc, char* argv[]) {
 	// boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection, thumbnail_file_format));
 	shared_state* state = new shared_state(location, media_location, database_connection, thumbnail_file_format);
 	state->start();
+	if (variable_map.count("create_administrator")) {
+		// try {
+		// 	state->createOwnerAccount(database_connection, "Administrator", admin_password);
+		// }
+		// catch (const std::exception& exception) {
+		// 	std::cout << exception.what() << std::endl;
+		// 	delete database_connection;
+		// 	return 1;
+		// }
+		// std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
+		// delete database_connection;
+		// return 0;
+		std::string invite_key = state->createInviteLink(static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS));
+	}
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;
 	boost::make_shared<listener>(
