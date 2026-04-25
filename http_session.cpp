@@ -269,7 +269,7 @@ http::message_generator handle_request(
 		if (key.length() == KEY_LENGTH) {
 			int client_id;
 			if (username == "Public") {
-				client_id = static_cast<int>(BUILTIN_USERS::PUBLIC);
+				client_id = static_cast<int>(User::PUBLIC);
 				return std::make_pair(client_id, key);
 			}
 			else {

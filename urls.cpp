@@ -13,4 +13,5 @@ void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	controller->addPattern(verb::post, login, "registration", "login");
 	controller->addPattern(verb::get, threads, "api", "threads");
 	controller->addPattern(verb::get, client, "api", "user", "client");
+	controller->addPattern(verb::get, acceptInvite, "invite", std::string(""));
 }

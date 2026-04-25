@@ -82,12 +82,13 @@ public:
 	const std::string& getThumbnailFileFormat() const { return thumbnail_file_format; }
 	const char* getSecret() const { return this->secret_base64; }
 
-	std::string addSession(int account_id);
+	std::string createSession(int account_id);
 	int getClientIdFromSession(const std::string& session_id_base64) const;
 	void clearExpiredSessions();
 
 	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
-	std::string createInviteLink(int granted_group_id = static_cast<int>(BUILTIN_GROUPS::USERS));
+	std::string createInvite(int granted_group_id = static_cast<int>(BUILTIN_GROUPS::USERS));
+	int getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const; // returns PUBLIC if none found
 private:
 	const boost::filesystem::path media_location;
 	const boost::filesystem::path program_location;

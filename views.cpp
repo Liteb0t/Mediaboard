@@ -21,9 +21,11 @@ FuzeHttp::Response testView(shared_state* state, FuzeHttp::Request req, std::str
 FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Request req) {
 	boost::json::value req_json;
 	boost::json::string username_j;
+	boost::json::value invite_key_j;
 	try {
 		req_json = boost::json::parse(req.body());
 		username_j = req_json.at("username").as_string();
+		invite_key_j = req_json.at("invite");
 	}
 	catch(const std::exception& e) {
 		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = std::format("[registerAccount] {}", e.what())};
@@ -35,6 +37,17 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("Username cannot be empty")};
 	// TODO check for bad characters in username
 	// Note: closed registration is required for resistance to account enumeration attacks.
+	if (invite_key_j.is_string()) {
+		std::string invite_key = invite_key_j.as_string().c_str();
+		int granted_group = state->getGrantedGroupIdFromInvite(invite_key);
+		if (granted_group == static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
+			return FuzeHttp::Response{
+				.status = http::status::bad_request,
+				.body = "This invite link is invalid. It may have expired, or it might never had existed to begin with."
+			};
+		}
+	}
+
 	unsigned char intermediate_salt[crypto_pwhash_SALTBYTES];
 	randombytes_buf(intermediate_salt, crypto_pwhash_SALTBYTES);
 	char intermediate_salt_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
@@ -70,14 +83,16 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 }
 
 FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) {
-	boost::json::value req_json;
+	boost::json::value req_json, invite_key_j;
 	boost::json::string username_j, password_hash_base64, intermediate_salt_base64;
+	std::optional<int> invite_granted_group_id;
 	std::cout << "createNewAccount called" << std::endl;
 	try {
 		req_json = boost::json::parse(req.body());
 		username_j = req_json.at("username").as_string();
 		intermediate_salt_base64 = req_json.at("intermediate_salt_base64").as_string();
 		password_hash_base64 = req_json.at("password_hash_base64").as_string();
+		invite_key_j = req_json.at("invite");
 	}
 	catch(const std::exception& e) {
 		std::cout << "JSON error" << std::endl;
@@ -93,6 +108,17 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 	else if (state->db->getAccountByUsername(username.data()))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("There already exists an account with this username.")};
 
+	if (invite_key_j.is_string()) {
+		std::string invite_key = invite_key_j.as_string().c_str();
+		invite_granted_group_id = state->getGrantedGroupIdFromInvite(invite_key);
+		if (invite_granted_group_id == static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
+			return FuzeHttp::Response{
+				.status = http::status::bad_request,
+				.body = "This invite link is invalid. It may have expired, or it might never had existed to begin with."
+			};
+		}
+	}
+
 	char password_hash_hash_base64[sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE)];
 	FuzeHttp::generatePasswordHashHashBase64(
 		password_hash_hash_base64, sizeof password_hash_hash_base64,
@@ -102,13 +128,19 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 	int user_id;
 	try {
 		user_id = state->db->createAccount(username, std::move(password_hash_hash_base64), intermediate_salt_base64.c_str());
+		if (invite_granted_group_id) {
+			state->addUserToGroup(user_id, invite_granted_group_id.value());
+			std::cout << "add user to group" << std::endl;
+			if (invite_granted_group_id.value() == static_cast<int>(BUILTIN_GROUPS::OWNER))
+				state->db->setOwner(user_id);
+		}
 	}
 	catch(const std::exception& e) {
 		std::cout << "createAccount error" << std::endl;
 		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = std::format("[createNewAccount] {}", e.what())};
 	}
 	std::cout << "Created account " << username << std::endl;
-	std::string session_id_base64 = state->addSession(user_id);
+	std::string session_id_base64 = state->createSession(user_id);
 	return FuzeHttp::Response{
 		.status = http::status::created,
 		.headers = {{{"Set-Cookie", FuzeHttp::formatCookie(session_id_base64)}}}
@@ -168,10 +200,10 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 		password_hash_base64.c_str(), password_hash_base64.size()
 	);
 	int user_id = state->db->getAccountByUsername(username);
-	if (user_id != BUILTIN_USERS::PUBLIC && state->db->userMatchesPassword(user_id, password_hash_hash_base64)) {
+	if (user_id != User::PUBLIC && state->db->userMatchesPassword(user_id, password_hash_hash_base64)) {
 		std::string session_id_base64;
 		try {
-			session_id_base64 = state->addSession(user_id); // Add session so client can authenticate via browser cookie
+			session_id_base64 = state->createSession(user_id); // Add session so client can authenticate via browser cookie
 		}
 		catch(const std::exception& e) {
 			std::string error_text = std::format("[login] {}", e.what());
@@ -216,6 +248,23 @@ FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req) {
 				{"manage_permissions", state->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS)},
 				{"create_thread", state->userHasPermission(client_id, PERMISSION::CREATE_THREAD)}
 			}}
+		}}
+	};
+}
+
+FuzeHttp::Response acceptInvite(shared_state* state, FuzeHttp::Request req, std::string invite_key_base64) {
+	std::cout << "Checking invite link '" << invite_key_base64 << "'" << std::endl;
+	int granted_group = state->getGrantedGroupIdFromInvite(invite_key_base64);
+	if (granted_group == static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
+		return FuzeHttp::Response{
+			.status = http::status::bad_request,
+			.body = "This invite link is invalid. It may have expired, or it might never had existed to begin with."
+		};
+	}
+	return FuzeHttp::Response{
+		.status = http::status::temporary_redirect,
+		.headers = {{
+			{"Location", std::format("/registration.html?invite={}", invite_key_base64)}
 		}}
 	};
 }

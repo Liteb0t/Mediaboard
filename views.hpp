@@ -9,3 +9,4 @@ FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request
 FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response threads(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req);
+FuzeHttp::Response acceptInvite(shared_state* state, FuzeHttp::Request req, std::string invite_key_base64);

@@ -11,7 +11,11 @@
 #include <nlohmann/json.hpp>
 #include <vector>
 
-enum class BUILTIN_GROUPS { ADMINISTRATORS, USERS, PUBLIC };
+enum class BUILTIN_GROUPS {
+	OWNER = 0,
+	USERS = 1,
+	PUBLIC = 2
+};
 
 class PermissionObjectBase {
 public:
@@ -113,7 +117,6 @@ private:
 class PermissionManager : public PermissionObjectBase {
 public:
 	PermissionManager(int permission_object_id, DatabaseConnection* db);
-	void grantDefaultAdminPrivileges();
 	const std::vector<int>* getOrderedGroups() const {
 		return &(this->ordered_groups);
 	}
@@ -131,9 +134,9 @@ public:
 		return it != this->groups.end();
 	}
 	int getUserRank(int user_id) const {
-		if (user_id == static_cast<int>(BUILTIN_USERS::OWNER))
+		if (this->owner_id && user_id == this->owner_id.value())
 			return 0; // This is the most privileged rank
-		else if (user_id == static_cast<int>(BUILTIN_USERS::PUBLIC))
+		else if (user_id == static_cast<int>(User::PUBLIC))
 			return this->ordered_groups.size(); // This is the least privileged rank
 		int i;
 		for (i = 0; i < this->ordered_groups.size() - 2; i++) { // 2 is subtracted because USERS and PUBLIC are hard-coded groups
@@ -177,17 +180,18 @@ public:
 		db_remove_member_from_group(user_id, group_id);
 	}
 	int addGroup(std::string group_name, int group_rank);
+	void addUserToGroup(int user_id, int group_id) {
+		this->groups.at(group_id).addMember(user_id);
+		db_add_member_to_group(user_id, group_id);
+	}
 
 	// PermissionManager is the highest level, so there is no parent to inherit from
 	bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const { return inherited_permission; }
 	bool passInheritedPermissionForUser( bool inherited_permission, PERMISSION permission, int user_id ) const { return inherited_permission; }
+	const std::optional<int> owner_id;
 protected:
 	const Group* getGroup(int group_id) const {
 		return &(this->groups.at(group_id));
-	}
-	void addUserToGroup(int user_id, int group_id) {
-		this->groups.at(group_id).addMember(user_id);
-		db_add_member_to_group(user_id, group_id);
 	}
 	bool userExists(int user_id) const {
 		std::unordered_map<int, User>::const_iterator it = this->users.find(user_id);
@@ -221,6 +225,7 @@ protected:
 		this->saveGroupHeirarchy(); // Apply changes to the database
 	}
 private:
+	void grantOwnerPrivileges();
 	void saveGroupHeirarchy() const;
 	std::unordered_map<int, User> users;
 	std::unordered_map<std::string, int> username_to_id_map;

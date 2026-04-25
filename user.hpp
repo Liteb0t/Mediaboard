@@ -1,13 +1,9 @@
 #include <string>
 #include "db_interface.h"
 
-enum BUILTIN_USERS {
-	PUBLIC = 0,
-	OWNER = 1
-};
-
 class User {
 public:
+	static const int PUBLIC = 0;
 	User(struct db_account_struct* account_struct);
 	User(std::string username, std::string password);
 	bool passwordMatches(std::string password) const {

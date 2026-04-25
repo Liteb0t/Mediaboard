@@ -37,7 +37,7 @@ void DatabaseConnectionPostgreSQL::getSecret(char* secret_base64) {
 	PGresult* result =  PQexec(this->db, "SELECT value_base64 FROM _secret");
 	ExecStatusType status = PQresultStatus(result);
 	if (status == PGRES_TUPLES_OK && PQntuples(result) != 0) {
-		std::cerr << "[DatabaseConnectionPostgreSQL] Found secret" << std::endl;
+		std::cout << "[DatabaseConnectionPostgreSQL] Found secret" << std::endl;
 		const char* db_secret = PQgetvalue(result, 0, 0);
 		if (strlen(db_secret)+1 == sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)) {
 			strcpy(secret_base64, db_secret);
@@ -159,6 +159,52 @@ v0_0_5:
 	return true; // Migrations were made
 }
 
+std::optional<int> DatabaseConnectionPostgreSQL::getOwnerIdIfExists() {
+	PGresult* result =  PQexec(this->db, "SELECT account_id FROM _owner");
+	ExecStatusType status = PQresultStatus(result);
+	if (status == PGRES_TUPLES_OK) {
+		if (PQntuples(result) != 0) {
+			const char* account_id_str = PQgetvalue(result, 0, 0);
+			std::cout << "[DatabaseConnectionPostgreSQL] Found owner " << account_id_str << std::endl;
+			int account_id = std::atoi(account_id_str);
+			PQclear(result);
+			return account_id;
+		}
+		else {
+			PQclear(result);
+			return {};
+		}
+	}
+	else {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("Error occured in getOwnerIdIfExists: {}", error_message));
+		else
+			throw std::runtime_error("Error occured in getOwnerIdIfExists.");
+	}
+}
+
+void DatabaseConnectionPostgreSQL::setOwner(int account_id) {
+	PGresult* result;
+	ExecStatusType status;
+	std::string account_id_str = std::to_string(account_id);
+	const char* params[1] = {account_id_str.c_str()};
+	std::cout << "[DatabaseConnectionPostgreSQL] setOwner()" << std::endl;
+	this->execWriteOnlyStatement("DELETE FROM _owner");
+	result =  PQexecParams(this->db, "INSERT INTO _owner(account_id) VALUES ($1::integer)", 1, NULL, params, NULL, NULL, 0);
+	status = PQresultStatus(result);
+	if (status != PGRES_COMMAND_OK) {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("Error occured in setOwner: {}", error_message));
+		else
+			throw std::runtime_error("Error occured in setOwner.");
+	}
+	PQclear(result);
+}
+
 int DatabaseConnectionPostgreSQL::createAccount(const std::string& username, const char* password_hash_hash_base64, const char* intermediate_salt_base64) {
 	PGresult* result;
 	ExecStatusType status;
@@ -207,7 +253,7 @@ int DatabaseConnectionPostgreSQL::getAccountByUsername(const std::string& userna
 		if (PQntuples(result) != 0)
 			return std::atoi(PQgetvalue(result, 0, 0));
 		else
-			return BUILTIN_USERS::PUBLIC;
+			return User::PUBLIC;
 	}
 	else {
 		std::string error_message = PQresultErrorMessage(result);
@@ -295,6 +341,26 @@ void DatabaseConnectionPostgreSQL::deleteSession(const std::string& id_base64) {
 			throw std::runtime_error("Error occured in deleteSession.");
 	}
 }
+
+/*
+void DatabaseConnectionPostgreSQL::addGroupToAccount(int group_id, int account_id) {
+	PGresult* result;
+	ExecStatusType status;
+	std::string group_id_str = std::to_string(group_id);
+	std::string account_id_str = std::to_string(account_id);
+	const char* params[2] = {group_id_str.c_str(), account_id_str.c_str()};
+	result =  PQexecParams(this->db, "INSERT INTO permission_group_account(group_id, account_id) VALUES ($1, $2)", 2, NULL, params, NULL, NULL, 0);
+	status = PQresultStatus(result);
+	if (status != PGRES_COMMAND_OK) {
+		std::string error_message = PQresultErrorMessage(result);
+		PQclear(result);
+		if (error_message[0] != '\0')
+			throw std::runtime_error(std::format("Error occured in addGroupToAccount: {}", error_message));
+		else
+			throw std::runtime_error("Error occured in addGroupToAccount.");
+	}
+}
+*/
 
 int DatabaseConnectionPostgreSQL::storePermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id) {
 	return db_store_permission_collection(permission_object_id,

@@ -176,6 +176,25 @@ void DatabaseConnectionSQLite::firstTimeSetup(const boost::filesystem::path& dat
 	}
 }
 
+std::optional<int> DatabaseConnectionSQLite::getOwnerIdIfExists() {
+	int account_id;
+	int ec = sqlite3_prepare_v2(this->db, "SELECT account_id FROM _owner", -1, &this->stmt, NULL);
+	if (ec == SQLITE_OK && sqlite3_step(this->stmt) == SQLITE_ROW) {
+		if (sqlite3_column_type(stmt, 0) != SQLITE_NULL) {
+			account_id = sqlite3_column_int(stmt, 0);
+			sqlite3_finalize(this->stmt);
+			return account_id;
+		}
+		else {
+			sqlite3_finalize(this->stmt);
+			return {};
+		}
+	}
+	else {
+		throw std::runtime_error("[DatabaseConnectionSQLite] Error occured in getOwnerIdIfExists");
+	}
+}
+
 int DatabaseConnectionSQLite::createAccount(const std::string& username, const char* password_hash, const char* intermediate_salt_base64) {
 	int ec = sqlite3_prepare_v2(this->db, "INSERT INTO account(username, password_hash, intermediate_salt_base64) VALUES (?, ?, ?)", -1, &stmt, NULL);
 	sqlite3_bind_text(stmt, 1, username.c_str(), username.length(), SQLITE_STATIC);
@@ -216,7 +235,7 @@ int DatabaseConnectionSQLite::getAccountByUsername(const std::string& username) 
 		}
 		else {
 			sqlite3_finalize(this->stmt);
-			return BUILTIN_USERS::PUBLIC;
+			return User::PUBLIC;
 		}
 	}
 	else {

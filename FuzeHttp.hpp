@@ -44,7 +44,7 @@ template<typename StateType>
 void getSaltBase64(StateType state, const std::string& username, char* salt_base64) {
 	int user_id = state->db->getAccountByUsername(username);
 	unsigned char salt[crypto_pwhash_SALTBYTES];
-	if (user_id != BUILTIN_USERS::PUBLIC) {
+	if (user_id != User::PUBLIC) {
 		std::string intermediate_salt_base64 = state->db->getIntermediateSaltFromAccount(user_id);
 		crypto_generichash(
 			salt, sizeof salt,

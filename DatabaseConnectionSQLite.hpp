@@ -25,6 +25,9 @@ private:
 	void execMultipleWriteOnlyStatements(std::istream& stream);
 	bool writeMigrations(std::ostream& stream, const std::string& database_version_string);
 
+	std::optional<int> getOwnerIdIfExists() override;
+	void setOwner(int account_id) override { // "not implemented";
+	};
 	int createAccount(const std::string& username, const char* password_hash, const char* intermediate_salt_base64) override;
 	int getAccountByUsername(const std::string& username) override;
 	std::string getIntermediateSaltFromAccount(int account_id) override;

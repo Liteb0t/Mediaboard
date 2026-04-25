@@ -30,9 +30,8 @@
 				</div>-->
 				<!--JSON is used instead of standard HTTP so this is not used
 				<input type="submit">-->
-				<input type="button" value="Log in"  onclick="newLoginAction()">
+				<input type="button" value="Log in"  onclick="loginAction()">
 				<input type="button" value="Register" onclick="registerAction()">
-				<input type="button" value="Register (new)" onclick="newRegisterAction()">
 				<!--<a class="Button RightAligned" href="_ROOT_URL">Return</a>-->
 			</form>
 			<div id="error_messages"></div>
@@ -53,36 +52,24 @@
 "use strict";
 const registration_url = "registration/";
 let password_is_visible = false;
-async function loginAction() {
-	const fetch_response = await sendRegistrationFormData("login");
-	console.log(fetch_response);
-	if (fetch_response && fetch_response.ok) {
-		let response_body_as_JSON = await fetch_response.json();
-		logged_in_as.textContent = account_username_input.value;
-		login_success_dialog.showModal();
-		localStorage.setItem("account_key", response_body_as_JSON.account_key);
-		localStorage.setItem("account_username", account_username_input.value);
-	}
+const url_params = new URLSearchParams(location.search);
+let url_params_invite;
+if (url_params.get("invite")) {
+	url_params_invite = url_params.get("invite");
 }
+
 async function registerAction() {
-	const fetch_response = await sendRegistrationFormData("create_account");
-	if (fetch_response && fetch_response.ok) {
-		let response_body_as_JSON = await fetch_response.json();
-		registered_as.textContent = account_username_input.value;
-		registration_success_dialog.showModal();
-		localStorage.setItem("account_key", response_body_as_JSON.account_key);
-		localStorage.setItem("account_username", account_username_input.value);
-		localStorage.setItem("name", account_username_input.value);
-	}
-}
-async function newRegisterAction() {
 	try {
 		const new_account_username = account_username_input.value;
+		let request_account_parameters_data = {
+			username: new_account_username
+		};
+		if (url_params_invite) {
+			request_account_parameters_data["invite"] = url_params_invite;
+		}
 		const request_new_account_parameters_response = await fetch("_ROOT_URL" + "registration/request_new_account_parameters", {
 			method: "POST",
-			body: JSON.stringify({
-				username: new_account_username
-			})
+			body: JSON.stringify(request_account_parameters_data)
 		});
 		console.log(request_new_account_parameters_response);
 		if (!(request_new_account_parameters_response && request_new_account_parameters_response.ok)) {
@@ -116,13 +103,18 @@ async function newRegisterAction() {
 		const password_hash_base64 = hashed_password.toBase64({alphabet: "base64url"});
 		console.log(`[newRegisterAction] password_hash_base64: ${password_hash_base64}`);
 		// Send the new hash to the server
+
+		let create_new_account_data = {
+			intermediate_salt_base64: intermediate_salt_base64,
+			username: new_account_username,
+			password_hash_base64: password_hash_base64
+		};
+		if (url_params_invite) {
+			create_new_account_data["invite"] = url_params_invite;
+		}
 		const create_new_account_response = await fetch("_ROOT_URL" + "registration/create_new_account", {
 			method: "POST",
-			body: JSON.stringify({
-				intermediate_salt_base64: intermediate_salt_base64,
-				username: new_account_username,
-				password_hash_base64: password_hash_base64
-			})
+			body: JSON.stringify(create_new_account_data)
 		});
 		if (!(create_new_account_response && create_new_account_response.ok)) {
 			const res_message = create_new_account_response.headers.get("message");
@@ -140,7 +132,7 @@ async function newRegisterAction() {
 	}
 }
 
-async function newLoginAction() {
+async function loginAction() {
 	try {
 		const username_input = account_username_input.value;
 		// first get the salt from the server
@@ -205,39 +197,6 @@ async function newLoginAction() {
 	}
 }
 
-async function sendRegistrationFormData(endpoint) {
-	error_messages.textContent = "";
-	const data = {
-		username: account_username_input.value
-		,password: account_password_input.value
-		// ,remain_logged_in: remain_logged_in.checked
-	};
-	let fetch_response;
-	try {
-		if (account_username_input.value.length === 0)
-			throw new Error("Username cannot be empty");
-		if (account_password_input.value.length === 0)
-			throw new Error("Password cannot be empty");
-		fetch_response = await fetch("_ROOT_URL" + registration_url + endpoint + "/", {
-			method: "POST",
-			body: JSON.stringify(data)
-		});
-		if (!fetch_response.ok) {
-			let header_error_message = fetch_response.headers.get("message");
-			if (header_error_message == null) {
-				throw new Error(`ERROR ${fetch_response.status}\n${fetch_response.statusText}`);
-			}
-			else {
-				throw new Error(`ERROR ${fetch_response.status}\n${fetch_response.statusText}\n${header_error_message}`);
-			}
-		}
-	}
-	catch (error) {
-		error_messages.innerText = error.message;
-		console.error(error.message);
-	}
-	return fetch_response;
-}
 function togglePasswordVisibility() {
 	if (password_is_visible) {
 		account_password_input.type="password";

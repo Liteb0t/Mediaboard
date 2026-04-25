@@ -1,3 +1,4 @@
+CREATE TABLE _owner(account_id INTEGER NOT NULL);
 CREATE TABLE account(id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password_hash_hash_base64 TEXT, intermediate_salt_base64 TEXT);
 CREATE TABLE session(id_base64 TEXT PRIMARY KEY, account_id INTEGER, created_at INTEGER);
 CREATE TABLE permission_group(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT);

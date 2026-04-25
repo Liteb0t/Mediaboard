@@ -3,15 +3,15 @@
 #include "db_interface.h"
 #include <iostream>
 
-PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseConnection* db)
+PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseConnection* db) // On extraction from database
 		: permission_object_id(permission_object_id),
 		db(db) {
 	this->cacheAllPermissions();
 }
 
-PermissionObjectBase::PermissionObjectBase(DatabaseConnection* db)
-: permission_object_id(db->getUniquePermissionObjectId()),
-db(db) {
+PermissionObjectBase::PermissionObjectBase(DatabaseConnection* db) // On new object creation
+		: permission_object_id(db->getUniquePermissionObjectId()),
+		db(db) {
 }
 
 void PermissionObjectBase::cacheAllPermissions() {
@@ -97,17 +97,19 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 }
 
 PermissionManager::PermissionManager(int permission_object_id, DatabaseConnection* db)
-		: PermissionObjectBase(0, db) {
+		: PermissionObjectBase(0, db),
+		owner_id(db->getOwnerIdIfExists()) {
 	this->cacheAllGroups();
 	// this->cacheAllUsers();
-	this->grantDefaultAdminPrivileges();
+	if (this->owner_id)
+		this->grantOwnerPrivileges();
 }
 
-// Grants all permissions to the Administrators group
-void PermissionManager::grantDefaultAdminPrivileges() {
-	std::cout << "[PermissionManager] grantDefaultAdminPrivileges()" << std::endl;
+// Grants all permissions to the Owner group
+void PermissionManager::grantOwnerPrivileges() {
+	std::cout << "[PermissionManager] grantOwnerPrivileges()" << std::endl;
 	for (int permission_number = 0; permission_number < static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS); permission_number++) {
-		if (!this->passPermissionForGroup(false, static_cast<PERMISSION>(permission_number), static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS)))
+		if (!this->passPermissionForGroup(false, static_cast<PERMISSION>(permission_number), static_cast<int>(BUILTIN_GROUPS::OWNER)))
 			this->setGroupPermission(0, static_cast<PERMISSION>(permission_number), THREE_STATE_SETTING::ALLOW);
 	}
 }

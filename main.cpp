@@ -47,7 +47,8 @@ int main(int argc, char* argv[]) {
 	bool postgresql_use_uri;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
-		("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
+		// ("create_administrator,a", boost::program_options::value<std::string>(&admin_password), "Create \"Administrator\" account with the specified password.")
+		("create_owner,o", "Generates a link to create the server owner's account.")
 		("config,c", boost::program_options::value<std::string>(&config_file)->default_value("config.ini"), "location of configuration file.")
 		("version,v", "Show version string.")
 		("help,h", "Show list of options.");
@@ -135,7 +136,7 @@ int main(int argc, char* argv[]) {
 		media_location = boost::filesystem::canonical(media_location_relative_str, location);
 	}
 	catch (const std::exception& exception) {
-		std::cout << exception.what() << std::endl;
+		std::cerr << exception.what() << std::endl;
 		return 1;
 	}
 	if (!boost::filesystem::exists(media_location.string() + "/media")) {
@@ -158,9 +159,16 @@ int main(int argc, char* argv[]) {
 
 	std::cout << "Initialising shared state..." << std::endl;
 	// boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection, thumbnail_file_format));
-	shared_state* state = new shared_state(location, media_location, database_connection, thumbnail_file_format);
-	state->start();
-	if (variable_map.count("create_administrator")) {
+	shared_state* state;
+	try {
+		state = new shared_state(location, media_location, database_connection, thumbnail_file_format);
+		state->start();
+	}
+	catch (const std::exception& exception) {
+		std::cerr << "[shared_state] " << exception.what() << std::endl;
+		return 1;
+	}
+	if (variable_map.count("create_owner")) {
 		// try {
 		// 	state->createOwnerAccount(database_connection, "Administrator", admin_password);
 		// }
@@ -172,7 +180,8 @@ int main(int argc, char* argv[]) {
 		// std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
 		// delete database_connection;
 		// return 0;
-		std::string invite_key = state->createInviteLink(static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS));
+		std::string invite_key = state->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
+		std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << server_port << "/invite/" << invite_key << std::endl;
 	}
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;

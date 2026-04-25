@@ -181,7 +181,7 @@ BasicResponse shared_state::setGroupHeirarchy(int client_id, std::vector<int> or
 		if (group_rank <= user_rank && group_id != existing_group_at_this_rank)
 			return BasicResponse(http::status::bad_request, std::string("Permission denied; attempted to change order of groups greater than or equal to your rank.") /*" group_rank: " + std::to_string(group_rank) + ", user_rank: " + std::to_string(user_rank)*/);
 	}
-	if (ordered_groups[0] != static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS) ||
+	if (ordered_groups[0] != static_cast<int>(BUILTIN_GROUPS::OWNER) ||
 			ordered_groups[ordered_groups.size()-2] != static_cast<int>(BUILTIN_GROUPS::USERS) ||
 			ordered_groups[ordered_groups.size()-1] != static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
 		return BasicResponse(http::status::bad_request, std::string("Attempted to change heirarchy of locked groups"));
@@ -300,7 +300,7 @@ BasicResponse shared_state::addUserToGroups(int client_id, int user_id, std::vec
 	return BasicResponse(http::status::ok, std::string("Added user to groups")); // Success
 }
 
-std::string shared_state::addSession(int account_id) {
+std::string shared_state::createSession(int account_id) {
 	Session session{
 		.account_id = account_id,
 		.created_at = std::chrono::system_clock::now()
@@ -333,11 +333,11 @@ int shared_state::getClientIdFromSession(const std::string& session_id_base64) c
 	if (std::unordered_map<std::string, Session>::const_iterator session = this->sessions.find(session_id_base64); session != this->sessions.end())
 		return session->second.account_id;
 	else
-		return BUILTIN_USERS::PUBLIC;
+		return User::PUBLIC;
 }
 
 // For now, only used to create the admin account. therefore granted_group_id will be BUILTIN_GROUPS::ADMINISTRATORS
-std::string shared_state::createInviteLink(int granted_group_id) {
+std::string shared_state::createInvite(int granted_group_id) {
 	Invite invite{
 		.granted_group_id = granted_group_id,
 		.created_at = std::chrono::system_clock::now()
@@ -349,9 +349,18 @@ std::string shared_state::createInviteLink(int granted_group_id) {
 	// 	session.account_id,
 	// 	std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
 	// );
+	std::cout << "[shared_state] Created invite with key " << key_base64 << std::endl;
 	this->invites.emplace(key_base64, std::move(invite));
 	return key_base64;
 }
+
+int shared_state::getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const { // returns USERS if none found
+	if (std::unordered_map<std::string, Invite>::const_iterator invite = this->invites.find(invite_key_base64); invite != this->invites.end())
+		return invite->second.granted_group_id;
+	else
+		return static_cast<int>(BUILTIN_GROUPS::PUBLIC);
+}
+
 /* I was unable to generate a key here that would work with the frontend WASM module.
 void shared_state::createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password) {
 	unsigned char intermediate_salt[crypto_pwhash_SALTBYTES];
