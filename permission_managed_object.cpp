@@ -106,6 +106,7 @@ PermissionManager::PermissionManager(int permission_object_id, DatabaseConnectio
 }
 
 // Grants all permissions to the Owner group
+// This will no longer be needed when the database can populate the entries on first start
 void PermissionManager::grantOwnerPrivileges() {
 	std::cout << "[PermissionManager] grantOwnerPrivileges()" << std::endl;
 	for (int permission_number = 0; permission_number < static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS); permission_number++) {

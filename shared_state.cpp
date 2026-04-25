@@ -15,28 +15,29 @@
 
 template<class Map>
 std::string generateKeyBase64(const Map& map) {
-	std::string key_base64;
+	// _NO_PADDING variant is used because the key is not expected to be converted back into binary
+	char key_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
 	do {
-		unsigned char session_id_bytes[128/8];
-		randombytes_buf(session_id_bytes, 128/8);
-		char session_id_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE)];
+		unsigned char key_bytes[128/8];
+		randombytes_buf(key_bytes, 128/8);
 		sodium_bin2base64(
-			session_id_base64, sizeof session_id_base64,
-			session_id_bytes, 128/8,
-			sodium_base64_VARIANT_URLSAFE
+			key_base64, sizeof key_base64,
+			key_bytes, 128/8,
+			sodium_base64_VARIANT_URLSAFE_NO_PADDING
 		);
-		key_base64 = session_id_base64;
 	} while (map.contains(key_base64)); // It's not impossible for it to clash...
 	return key_base64;
 }
 
-shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format)
+shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format, FuzeDBI* fuze_database_interface)
 		: PermissionManager(0, db),
 		program_location(std::move(parent_directory)),
 		media_location(std::move(media_location)),
 		db(db),
-		thumbnail_file_format(thumbnail_file_format) {
+		thumbnail_file_format(thumbnail_file_format),
+		fuze_dbi(fuze_database_interface) {
 	db->getSecret(this->secret_base64);
+	fuze_dbi->exec<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
 }
 
 shared_state::~shared_state() {

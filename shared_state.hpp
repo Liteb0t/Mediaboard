@@ -13,6 +13,7 @@
 #include "beast.hpp"
 #include "board.hpp"
 #include "DatabaseConnection.hpp"
+#include "FuzeDBI.hpp"
 #include "permission_managed_object.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/smart_ptr.hpp>
@@ -49,11 +50,12 @@ struct Invite {
 // Represents the shared server state
 class shared_state : public PermissionManager {
 public:
-	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative, DatabaseConnection* database_connection, std::string thumbnail_file_format);
+	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative, DatabaseConnection* database_connection, std::string thumbnail_file_format, FuzeDBI* fuze_database_interface);
 	~shared_state();
 	void start();
 
 	DatabaseConnection* db;
+	FuzeDBI* fuze_dbi;
 
 	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
 	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.

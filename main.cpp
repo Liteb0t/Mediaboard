@@ -129,6 +129,7 @@ int main(int argc, char* argv[]) {
 		std::cerr << "Error: unknown database engine \"" << database_engine << "\". Must be \"postgres\" or \"sqlite\"." << std::endl;
 		return EXIT_FAILURE;
 	}
+	FuzeDBI* fuze_database_interface = new FuzeDBI(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name, current_version);
 
 	std::cout << "Set port: " << server_port << std::endl;
 	boost::filesystem::path media_location;
@@ -161,7 +162,7 @@ int main(int argc, char* argv[]) {
 	// boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection, thumbnail_file_format));
 	shared_state* state;
 	try {
-		state = new shared_state(location, media_location, database_connection, thumbnail_file_format);
+		state = new shared_state(location, media_location, database_connection, thumbnail_file_format, fuze_database_interface);
 		state->start();
 	}
 	catch (const std::exception& exception) {

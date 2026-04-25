@@ -16,6 +16,7 @@
 		<!--Navbar can go here-->
 		<main>
 			<h2>Authentication - _SITE_NAME</h2>
+			<p id="invite_information" style="display: none">You have been invited to join this server.</p>
 			<form action="" method="POST" autocomplete="account">
 				<div class="FormGrid">
 				<label for="account_username_input">Username</label>
@@ -30,7 +31,7 @@
 				</div>-->
 				<!--JSON is used instead of standard HTTP so this is not used
 				<input type="submit">-->
-				<input type="button" value="Log in"  onclick="loginAction()">
+				<input id="login_button" type="button" value="Log in"  onclick="loginAction()">
 				<input type="button" value="Register" onclick="registerAction()">
 				<!--<a class="Button RightAligned" href="_ROOT_URL">Return</a>-->
 			</form>
@@ -47,6 +48,11 @@
 			<div class="ToolBar"><a class="Button" href="_ROOT_URL">Proceed</a><button onclick="registration_success_dialog.close()">Close</button></div>
 		</dialog>
 	</body>
+<style>
+#invite_information {
+	color: #228;
+}
+</style>
 <script type="module" src="static/argon2.umd.min.js"></script>
 <script>
 "use strict";
@@ -56,6 +62,8 @@ const url_params = new URLSearchParams(location.search);
 let url_params_invite;
 if (url_params.get("invite")) {
 	url_params_invite = url_params.get("invite");
+	invite_information.style["display"] = "inherit";
+	login_button.style["display"] = "none";
 }
 
 async function registerAction() {
