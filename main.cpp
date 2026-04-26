@@ -129,7 +129,7 @@ int main(int argc, char* argv[]) {
 		std::cerr << "Error: unknown database engine \"" << database_engine << "\". Must be \"postgres\" or \"sqlite\"." << std::endl;
 		return EXIT_FAILURE;
 	}
-	FuzeDBI* fuze_database_interface = new FuzeDBI(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name, current_version);
+	FuzeDBI::Connection* fuze_database_interface = new FuzeDBI::Connection(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name, current_version);
 
 	std::cout << "Set port: " << server_port << std::endl;
 	boost::filesystem::path media_location;

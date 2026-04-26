@@ -29,7 +29,7 @@ std::string generateKeyBase64(const Map& map) {
 	return key_base64;
 }
 
-shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format, FuzeDBI* fuze_database_interface)
+shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
 		: PermissionManager(0, db),
 		program_location(std::move(parent_directory)),
 		media_location(std::move(media_location)),
@@ -37,11 +37,14 @@ shared_state::shared_state(boost::filesystem::path parent_directory, boost::file
 		thumbnail_file_format(thumbnail_file_format),
 		fuze_dbi(fuze_database_interface) {
 	db->getSecret(this->secret_base64);
-	fuze_dbi->exec<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
-	auto version = fuze_dbi->exec<std::string>("SELECT (version) FROM _info");
+	// fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
+	auto version = fuze_dbi->query<std::string>("SELECT (version) FROM _info");
 	std::cout << "[shared_state] version: " <<version << std::endl;
-	auto toople = fuze_dbi->exec<std::tuple<int, std::string>>("SELECT id, username FROM account");
+	auto toople = fuze_dbi->query<std::tuple<int, std::string>>("SELECT id, username FROM account");
 	std::cout << "id: " << std::get<0>(toople) << ", username: " << std::get<1>(toople) << std::endl;
+	for (auto row : fuze_dbi->queryRows<std::tuple<int, int>>("SELECT permission_number, setting FROM permission_setting")) {
+		std::cout << std::get<0>(row) << '_' << std::get<1>(row) << std::endl;
+	}
 }
 
 shared_state::~shared_state() {
