@@ -3,13 +3,13 @@
 #include <sstream>
 #include <iostream>
 
-Board::Board(PermissionObjectBase* permission_parent, DatabaseConnection* db)
-		: PermissionManagedObject(permission_parent, db),
+Board::Board(PermissionObjectBase* permission_parent, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
+		: PermissionManagedObject(permission_parent, db, fuze_dbi),
 		db(db) {
 }
 
 int Board::createThread(json thread_json) {
-	Thread thread(this, thread_json, db);
+	Thread thread(this, thread_json, db, fuze_dbi);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(thread.getLastPostTime(), thread.getId()));
 	return thread.getId();
@@ -49,7 +49,7 @@ void Board::cacheAllThreads() {
 		// thread_json["id"] = thread_list->array[i].id;
 		// thread_json["number_of_posts"] = thread_list->array[i].number_of_posts;
 		// Thread thread(thread_json, false);
-		Thread thread(this, &thread_list->array[i], db);
+		Thread thread(this, &thread_list->array[i], db, fuze_dbi);
 		std::cout << thread.getId() << ", ";
 		this->threads.insert(std::make_pair(thread.getId(), thread));
 	}

@@ -275,9 +275,9 @@ http::message_generator handle_request(
 			else {
 				if (state->userExists(username)) {
 					client_id = state->getIdFromUsername(username);
-					if (state->checkUserKey(client_id, key))
-						return std::make_pair(client_id, key);
-					else
+					// if (state->checkUserKey(client_id, key))
+					//	return std::make_pair(client_id, key);
+					// else
 						throw (std::string("Key does not match user."));
 				}
 				else
@@ -842,35 +842,6 @@ http::message_generator handle_request(
 			}
 			else
 				return api_response(http::status::not_found, std::string("/api/ sub-URL not found."));
-		}
-		else if (path_name.substr(0, 14) == "/registration/") {
-			json request_json;
-			try {
-				request_json = json::parse(req.body());
-			}
-			catch (const json::exception& exception) {
-				return api_response(http::status::bad_request, exception.what());
-			}
-			if (req.target().substr(14,15) == "create_account/") {
-				BasicResponse function_response = state->createAccount(request_json);
-				if (function_response.json)
-					return api_response_json(function_response.status, function_response.json.get());
-				else // The request was invalid
-					return api_response(function_response.status, function_response.message);
-			}
-			else if (req.target().substr(14,6) == "login/") {
-				BasicResponse function_response = state->getKeyFromPassword(request_json);
-				if (function_response.json) {
-					std::cout << "There is function response JSON" << std::endl;
-					return api_response_json(function_response.status, function_response.json.get());
-				}
-				else { // The request was invalid
-					std::cout << "There is NO function response JSON" << std::endl;
-					return api_response(function_response.status, function_response.message);
-				}
-			}
-			else
-				return api_response(http::status::not_found, std::string("/registration/ sub-URL not found"));
 		}
 		else {
 			std::cout << "Unknown target: " << req.target() << std::endl;

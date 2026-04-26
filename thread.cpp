@@ -4,8 +4,8 @@
 #include <cstring>
 
 // Save thread when JSON is received
-Thread::Thread(PermissionObjectBase* permission_parent, json thread_json, DatabaseConnection* db)
-			: PermissionManagedObject(permission_parent, db),
+Thread::Thread(PermissionObjectBase* permission_parent, json thread_json, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
+			: PermissionManagedObject(permission_parent, db, fuze_dbi),
 			db(db) {
 	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
@@ -19,8 +19,8 @@ Thread::Thread(PermissionObjectBase* permission_parent, json thread_json, Databa
 }
 
 // Cache thread using db_interface struct
-Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db)
-			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id, db),
+Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
+			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id, db, fuze_dbi),
 			db(db) {
 	// this->cacheAllPermissions();
 	this->id = thread_struct->id;

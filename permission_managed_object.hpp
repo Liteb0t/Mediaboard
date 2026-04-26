@@ -2,6 +2,7 @@
 #define PERMISSION_MANAGED_OBJECT
 
 #include "DatabaseConnection.hpp"
+#include "FuzeDBI.hpp"
 #include "group.hpp"
 #include "permission_collection.hpp"
 #include "user.hpp"
@@ -19,8 +20,8 @@ enum class BUILTIN_GROUPS {
 
 class PermissionObjectBase {
 public:
-	PermissionObjectBase(int permission_object_id, DatabaseConnection* db); // retrieve from database
-	PermissionObjectBase(DatabaseConnection* db); // save new object to database
+	PermissionObjectBase(int permission_object_id, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi); // retrieve from database
+	PermissionObjectBase(DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi); // save new object to database
 	void cacheAllPermissions();
 	void addGroupPermissionCollection(int group_id) {
 		std::cout << "[PermissionObjectBase] adding group permission_collection for group " << group_id << std::endl;
@@ -109,6 +110,7 @@ protected:
 	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
 	int permission_object_id; // Used to identify this object in the database
 	DatabaseConnection* db;
+	FuzeDBI::Connection* fuze_dbi;
 private:
 	std::unordered_map<int, PermissionCollection> group_permissions;
 	std::unordered_map<int, PermissionCollection> user_permissions;
@@ -116,7 +118,7 @@ private:
 
 class PermissionManager : public PermissionObjectBase {
 public:
-	PermissionManager(int permission_object_id, DatabaseConnection* db);
+	PermissionManager(int permission_object_id, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi);
 	const std::vector<int>* getOrderedGroups() const {
 		return &(this->ordered_groups);
 	}
@@ -152,9 +154,9 @@ public:
 		std::unordered_map<std::string, int>::const_iterator it = this->username_to_id_map.find(username);
 	   	return it != this->username_to_id_map.end();
 	};
-	bool checkUserKey(int user_id, std::string key) const {
-		return this->users.at(user_id).keyMatches(key);
-	}
+	// bool checkUserKey(int user_id, std::string key) const {
+	// 	return this->users.at(user_id).keyMatches(key);
+	// }
 	const boost::shared_ptr<std::unordered_map<int, User>> getUsers() const {
 		return boost::make_shared<std::unordered_map<int, User>>(this->users);
 	}
@@ -184,6 +186,7 @@ public:
 		this->groups.at(group_id).addMember(user_id);
 		db_add_member_to_group(user_id, group_id);
 	}
+	int createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64);
 
 	// PermissionManager is the highest level, so there is no parent to inherit from
 	bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const { return inherited_permission; }
@@ -203,20 +206,20 @@ protected:
 	// const User* getUser(std::string username) const {
 	// 	return &(this->users.at(this->usename_to_id_map.at(username)));
 	// }
-	bool checkUserPassword(int user_id, std::string password) const {
-		return this->users.at(user_id).passwordMatches(password);
-	}
-	std::string getUserKey(int user_id) const {
-		return this->users.at(user_id).getKey();
-	}
-	const User* createUser(std::string username, std::string password) {
-		User new_user(username, password);
-		this->users.emplace(new_user.getId(), new_user);
-		this->username_to_id_map.emplace(username, new_user.getId());
-		// Every registered account is implicitly a member of the "Users" group
-		// this->groups.at(static_cast<int>(BUILTIN_GROUPS::USERS)).addMember(new_user.getId());
-		return &(this->users.at(new_user.getId()));
-	}
+	// bool checkUserPassword(int user_id, std::string password) const {
+	// 	return this->users.at(user_id).passwordMatches(password);
+	// }
+	// std::string getUserKey(int user_id) const {
+	// 	return this->users.at(user_id).getKey();
+	// }
+	// const User* createUser(std::string username, std::string password) {
+	// 	User new_user(username, password);
+	// 	this->users.emplace(new_user.getId(), new_user);
+	// 	this->username_to_id_map.emplace(username, new_user.getId());
+	// 	// Every registered account is implicitly a member of the "Users" group
+	// 	// this->groups.at(static_cast<int>(BUILTIN_GROUPS::USERS)).addMember(new_user.getId());
+	// 	return &(this->users.at(new_user.getId()));
+	// }
 	void cacheAllGroups();
 	void cacheAllUsers();
 
@@ -236,12 +239,12 @@ private:
 class PermissionManagedObject : public PermissionObjectBase {
 public:
 	// Existing object
-	PermissionManagedObject(PermissionObjectBase* parent_object, int permission_object_id, DatabaseConnection* db)
-			: PermissionObjectBase(permission_object_id, db), parent_object(parent_object) {
+	PermissionManagedObject(PermissionObjectBase* parent_object, int permission_object_id, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
+			: PermissionObjectBase(permission_object_id, db, fuze_dbi), parent_object(parent_object) {
 	}
 	// New object
-	PermissionManagedObject(PermissionObjectBase* parent_object, DatabaseConnection* db)
-			: PermissionObjectBase(db), parent_object(parent_object) {
+	PermissionManagedObject(PermissionObjectBase* parent_object, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
+			: PermissionObjectBase(db, fuze_dbi), parent_object(parent_object) {
 	}
 	const std::vector<int>* getOrderedGroups() const {
 		return this->parent_object->getOrderedGroups();

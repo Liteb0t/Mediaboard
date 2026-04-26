@@ -19,13 +19,14 @@ FuzeHttp::Response testView(shared_state* state, FuzeHttp::Request req, std::str
 }
 
 FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Request req) {
-	boost::json::value req_json;
+	boost::json::object req_json;
 	boost::json::string username_j;
-	boost::json::value invite_key_j;
+	std::optional<std::string> invite_key;
 	try {
-		req_json = boost::json::parse(req.body());
+		req_json = boost::json::parse(req.body()).as_object();
 		username_j = req_json.at("username").as_string();
-		invite_key_j = req_json.at("invite");
+		if (boost::json::object::const_iterator invite_key_it = req_json.find("invite"); invite_key_it != req_json.end())
+			invite_key = req_json.at("invite").as_string().c_str();
 	}
 	catch(const std::exception& e) {
 		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = std::format("[registerAccount] {}", e.what())};
@@ -37,9 +38,8 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("Username cannot be empty")};
 	// TODO check for bad characters in username
 	// Note: closed registration is required for resistance to account enumeration attacks.
-	if (invite_key_j.is_string()) {
-		std::string invite_key = invite_key_j.as_string().c_str();
-		int granted_group = state->getGrantedGroupIdFromInvite(invite_key);
+	if (invite_key) {
+		int granted_group = state->getGrantedGroupIdFromInvite(invite_key.value());
 		if (granted_group == static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
 			return FuzeHttp::Response{
 				.status = http::status::bad_request,
@@ -83,16 +83,18 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 }
 
 FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) {
-	boost::json::value req_json, invite_key_j;
+	boost::json::object req_json;
 	boost::json::string username_j, password_hash_base64, intermediate_salt_base64;
+	std::optional<std::string> invite_key;
 	std::optional<int> invite_granted_group_id;
 	std::cout << "createNewAccount called" << std::endl;
 	try {
-		req_json = boost::json::parse(req.body());
+		req_json = boost::json::parse(req.body()).as_object();
 		username_j = req_json.at("username").as_string();
 		intermediate_salt_base64 = req_json.at("intermediate_salt_base64").as_string();
 		password_hash_base64 = req_json.at("password_hash_base64").as_string();
-		invite_key_j = req_json.at("invite");
+		if (boost::json::object::const_iterator invite_key_it = req_json.find("invite"); invite_key_it != req_json.end())
+			invite_key = req_json.at("invite").as_string().c_str();
 	}
 	catch(const std::exception& e) {
 		std::cout << "JSON error" << std::endl;
@@ -108,9 +110,8 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 	else if (state->db->getAccountByUsername(username.data()))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("There already exists an account with this username.")};
 
-	if (invite_key_j.is_string()) {
-		std::string invite_key = invite_key_j.as_string().c_str();
-		invite_granted_group_id = state->getGrantedGroupIdFromInvite(invite_key);
+	if (invite_key) {
+		invite_granted_group_id = state->getGrantedGroupIdFromInvite(invite_key.value());
 		if (invite_granted_group_id == static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
 			return FuzeHttp::Response{
 				.status = http::status::bad_request,
@@ -127,7 +128,7 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 
 	int user_id;
 	try {
-		user_id = state->db->createAccount(username, std::move(password_hash_hash_base64), intermediate_salt_base64.c_str());
+		user_id = state->createAccount(username, std::move(password_hash_hash_base64), intermediate_salt_base64.c_str());
 		if (invite_granted_group_id) {
 			state->addUserToGroup(user_id, invite_granted_group_id.value());
 			std::cout << "add user to group" << std::endl;

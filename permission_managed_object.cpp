@@ -3,15 +3,17 @@
 #include "db_interface.h"
 #include <iostream>
 
-PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseConnection* db) // On extraction from database
+PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi) // On extraction from database
 		: permission_object_id(permission_object_id),
-		db(db) {
+		db(db),
+		fuze_dbi(fuze_dbi) {
 	this->cacheAllPermissions();
 }
 
-PermissionObjectBase::PermissionObjectBase(DatabaseConnection* db) // On new object creation
+PermissionObjectBase::PermissionObjectBase(DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi) // On new object creation
 		: permission_object_id(db->getUniquePermissionObjectId()),
-		db(db) {
+		db(db),
+		fuze_dbi(fuze_dbi) {
 }
 
 void PermissionObjectBase::cacheAllPermissions() {
@@ -96,8 +98,8 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 	return permission_collections_json;
 }
 
-PermissionManager::PermissionManager(int permission_object_id, DatabaseConnection* db)
-		: PermissionObjectBase(0, db),
+PermissionManager::PermissionManager(int permission_object_id, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
+		: PermissionObjectBase(0, db, fuze_dbi),
 		owner_id(db->getOwnerIdIfExists()) {
 	this->cacheAllGroups();
 	// this->cacheAllUsers();
@@ -192,6 +194,13 @@ void PermissionManager::cacheAllGroups() {
 		std::cout << "[PermissionManager] No issues were found." << std::endl;
 	else
 		std::cout << "[PermissionManager] Test failed." << std::endl;
+}
+
+int PermissionManager::createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64) {
+	int new_account_id = fuze_dbi->query<int>("SELECT account_id FROM _sequences");
+	fuze_dbi->query<void>("UPDATE _sequences SET account_id = $1", new_account_id+1);
+	fuze_dbi->query<void>("INSERT INTO account(id, username, password_hash_hash_base64, intermediate_salt_base64) VALUES ($1, $2, $3, $4)", new_account_id, username.c_str(), password_hash_hash, intermediate_salt_base64);
+	return new_account_id;
 }
 
 int PermissionManager::addGroup(std::string group_name, int group_rank) {

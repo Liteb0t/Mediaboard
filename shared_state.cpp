@@ -30,14 +30,14 @@ std::string generateKeyBase64(const Map& map) {
 }
 
 shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
-		: PermissionManager(0, db),
+		: PermissionManager(0, db, fuze_database_interface),
 		program_location(std::move(parent_directory)),
 		media_location(std::move(media_location)),
 		db(db),
-		thumbnail_file_format(thumbnail_file_format),
-		fuze_dbi(fuze_database_interface) {
+		thumbnail_file_format(thumbnail_file_format) {
 	db->getSecret(this->secret_base64);
-	// fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
+	/* FuzeDBI demo
+	fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
 	auto version = fuze_dbi->query<std::string>("SELECT (version) FROM _info");
 	std::cout << "[shared_state] version: " <<version << std::endl;
 	auto toople = fuze_dbi->query<std::tuple<int, std::string>>("SELECT id, username FROM account");
@@ -45,6 +45,7 @@ shared_state::shared_state(boost::filesystem::path parent_directory, boost::file
 	for (auto row : fuze_dbi->queryRows<std::tuple<int, int>>("SELECT permission_number, setting FROM permission_setting")) {
 		std::cout << std::get<0>(row) << '_' << std::get<1>(row) << std::endl;
 	}
+	*/
 }
 
 shared_state::~shared_state() {
@@ -55,7 +56,7 @@ shared_state::~shared_state() {
 // hence a seperate start() function is used
 // UPDATE 0.0.6: permission-managed objects no longer use shared pointers
 void shared_state::start() {
-	Board main_board(this, db);
+	Board main_board(this, db, fuze_dbi);
 	this->boards.emplace(0, main_board);
 	this->boards.at(0).cacheAllThreads();
 }
@@ -200,7 +201,7 @@ BasicResponse shared_state::setGroupHeirarchy(int client_id, std::vector<int> or
 
 	return BasicResponse(http::status::ok, std::string("Updated group heirarchy")); // Success
 }
-
+/*
 BasicResponse shared_state::createAccount(json account_json) {
 	if (	   account_json.contains("username")
 			&& account_json.contains("password")
@@ -224,7 +225,6 @@ BasicResponse shared_state::createAccount(json account_json) {
 	else
 		return BasicResponse(http::status::bad_request, std::string("One or more JSON fields missing from request"));
 }
-
 BasicResponse shared_state::getKeyFromPassword(json request_json) const {
 	if (	   request_json.contains("username")
 			&& request_json.contains("password")
@@ -249,6 +249,7 @@ BasicResponse shared_state::getKeyFromPassword(json request_json) const {
 	else
 		return BasicResponse(http::status::bad_request, std::string("One or more JSON fields missing from request"));
 }
+*/
 
 std::string shared_state::dumpAllUsers(int client_id) const {
 	json users_json;

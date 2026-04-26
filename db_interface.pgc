@@ -130,25 +130,6 @@ database_version_not_null:
 	return database_version;
 }
 
-/*
-void db_create_administrator(const char* _password) {
-	EXEC SQL BEGIN DECLARE SECTION;
-	const char* password = _password;
-	char hashed_password[60+1];
-	char key[8+1];
-
-	EXEC SQL END DECLARE SECTION;
-	EXEC SQL DELETE FROM permission_group_account WHERE account_id = 1; // account id 0 is reserved for Public (unregistered users). Id 1 is reserved for Administrator
-	EXEC SQL DELETE FROM account WHERE username = 'Administrator';
-	EXEC SQL SELECT crypt(:password, gen_salt('bf')) INTO :hashed_password;
-	strncpy(key, &hashed_password[25], 8); // Copying 8 characters from the index 25 takes 4 characters from the salt and 4 from the hash
-	key[8] = '\0';
-	EXEC SQL EXECUTE add_administrator_account_stmt USING :hashed_password, :key;
-	EXEC SQL INSERT INTO permission_group_account(group_id, account_id) VALUES (0, 1); // Add to the Administrators group. Administrator account ID is always 1 (defined in user.hpp)
-	EXEC SQL COMMIT;
-}
-*/
-
 int db_store_post(int thread_id_, int id_in_thread_, const char name_[POST_MAX_NAME+1], time_t upload_timestamp_, const char* content_, char files[4][POST_MAX_FILE_NAME_WITH_UUID+1], int file_count, const char key_[KEY_LENGTH+1]) {
 	EXEC SQL BEGIN DECLARE SECTION;
 	int post_id;
@@ -200,87 +181,6 @@ void db_mark_thread_as_deleted(int _thread_id) {
 	EXEC SQL END DECLARE SECTION;
 	EXEC SQL EXECUTE mark_thread_as_deleted_stmt USING :thread_id;
 	EXEC SQL COMMIT;
-}
-
-int db_account_username_exists(const char* _username) {
-	EXEC SQL BEGIN DECLARE SECTION;
-	const char* username = _username;
-	char username_exists;
-	EXEC SQL END DECLARE SECTION;
-	EXEC SQL SELECT exists (SELECT 1 FROM account WHERE username = :username LIMIT 1) INTO :username_exists;
-	EXEC SQL COMMIT;
-	if (username_exists == 't')
-		return 1;
-	else
-		return 0;
-}
-
-/*
-int db_store_account(const char* _username, const char* _password) {
-	EXEC SQL BEGIN DECLARE SECTION;
-	int account_id;
-	const char* username = _username;
-	const char* password = _password;
-	char hashed_password[60+1];
-	char key[8+1];
-	EXEC SQL END DECLARE SECTION;
-	printf("Calling db_store_account with username: %s, password: %s\n", username, password);
-	EXEC SQL SELECT crypt(:password, gen_salt('bf')) INTO :hashed_password;
-	EXEC SQL COMMIT;
-	strncpy(key, &hashed_password[25], 8); // Copying 8 characters from the index 25 takes 4 characters from the salt and 4 from the hash
-	key[8] = '\0';
-	printf("hashed_password: %s\n", hashed_password);
-	printf("key: %s\n", key);
-	EXEC SQL SELECT nextval('account_id_seq') INTO :account_id;
-	EXEC SQL EXECUTE create_account_prepared_stmt USING :account_id, :username, :hashed_password, :key;
-	EXEC SQL COMMIT;
-	return account_id;
-}
-*/
-
-/*
-const char* db_fetch_key(const char* _username, const char* _password) {
-	EXEC SQL BEGIN DECLARE SECTION;
-	const char* username = _username;
-	const char* password = _password;
-	static char key[8+1];
-	char hashed_password[61];
-	char passwords_match;
-	EXEC SQL END DECLARE SECTION;
-	printf("Calling db_fetch_key with username: %s, password: %s\n", username, password);
-	hashed_password[0] = '\0';
-	EXEC SQL SELECT password_hash INTO :hashed_password FROM account WHERE username = :username;
-	EXEC SQL COMMIT;
-	if (hashed_password[0] == '\0')
-		key[0] = '\0';
-	else {
-		printf("Username exists. hashed_password: %s\n", hashed_password);
-		EXEC SQL SELECT (:hashed_password = crypt(:password, :hashed_password)) INTO :passwords_match;
-		if (passwords_match == 't') {
-			EXEC SQL SELECT key INTO :key FROM account WHERE username = :username;
-			EXEC SQL COMMIT;
-		}
-		EXEC SQL COMMIT;
-	}
-	return key;
-}
-*/
-
-int db_account_matches_password(int _account_id, const char* _password) {
-	EXEC SQL BEGIN DECLARE SECTION;
-	int account_id = _account_id;
-	const char* password = _password;
-	char hashed_password[61];
-	char passwords_match;
-	EXEC SQL END DECLARE SECTION;
-	hashed_password[0] = '\0';
-	EXEC SQL SELECT password_hash INTO :hashed_password FROM account WHERE id = :account_id;
-	EXEC SQL COMMIT;
-	EXEC SQL SELECT (:hashed_password = crypt(:password, :hashed_password)) INTO :passwords_match;
-	if (passwords_match == 't')
-		return 1;
-	else
-		return 0;
 }
 
 char db_change_password(int _account_id, const char* _old_password, const char* _new_password) {

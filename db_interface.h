@@ -97,12 +97,7 @@ extern "C" {
 	void db_mark_post_as_deleted(int post_id);
 	void db_mark_thread_as_deleted(int _thread_id);
 		// Accounts
-	int db_account_username_exists(const char* _username);
-	// int db_store_account(const char* username, const char* password);
-	// const char* db_fetch_key(const char* username, const char* password);
-	int db_account_matches_password(int _account_id, const char* _password);
 	char db_change_password(int _account_id, const char* old_password, const char* new_password);
-	// void db_create_administrator(const char* _password);
 		// Permissions
 	int db_store_group(const char name_[GROUP_MAX_NAME+1]);
 	void db_delete_group(int _group_id);

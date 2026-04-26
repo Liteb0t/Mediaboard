@@ -25,7 +25,7 @@ template<class ReturnType>
 class QueryIterator; // Forward declaration
 
 class Connection {
-	enum class PARAMETER_TYPE { CHAR_ARRAY = 0, STRING = 1, INT8 = 2 };
+	enum class PARAMETER_TYPE { CHAR_ARRAY = 0, STRING = 1, INT = 2 };
 public:
 #if FUZEDBI_INTERFACE == FUZEDBI_POSTGRES
 	Connection(const std::string& postgresql_user, const std::string& postgresql_host, const unsigned short postgresql_port, const std::string& postgresql_database_name, const std::string& program_version_string) {
@@ -155,17 +155,17 @@ private:
 		const char* params[sizeof...(args)];
 		Oid pg_types[sizeof...(args)];
 		int param_i = 0;
-		for (std::variant<const char*, std::string, int8_t> arg : std::initializer_list<std::variant<const char*, std::string, int8_t>>{ args... }) {
+		for (std::variant<const char*, std::string, int> arg : std::initializer_list<std::variant<const char*, std::string, int>>{ args... }) {
 			if (arg.index() == static_cast<int>(PARAMETER_TYPE::CHAR_ARRAY)) {
 				params[param_i] = std::get<const char*>(arg);
 				pg_types[param_i] = 25;
 			}
-			else if (arg.index() == static_cast<int>(PARAMETER_TYPE::STRING)) {
+			else if (arg.index() == static_cast<int>(PARAMETER_TYPE::STRING)) { // TODO fix string args resulting in formatting error
 				params[param_i] = std::get<std::string>(arg).c_str();
 				pg_types[param_i] = 25;
 			}
-			else if (arg.index() == static_cast<int>(PARAMETER_TYPE::INT8)) {
-				params[param_i] = std::to_string(std::get<int8_t>(arg)).c_str();
+			else if (arg.index() == static_cast<int>(PARAMETER_TYPE::INT)) {
+				params[param_i] = std::to_string(std::get<int>(arg)).c_str();
 				pg_types[param_i] = 20;
 			}
 			else

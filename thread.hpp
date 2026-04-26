@@ -13,8 +13,8 @@ class websocket_session;
 class Thread : public PermissionManagedObject {
 public:
 	// Thread();
-	Thread(PermissionObjectBase* permission_parent, json thread_json, DatabaseConnection* db);
-	Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db);
+	Thread(PermissionObjectBase* permission_parent, json thread_json, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi);
+	Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi);
 	std::string dumpThread() const;
 	json asJson() const { return this->thread_as_json; }
 	// int getNumberOfPosts() const { return this->posts.size(); };

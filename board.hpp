@@ -12,7 +12,7 @@ class websocket_session; // Forward declaration
 
 class Board : public PermissionManagedObject {
 public:
-	Board(PermissionObjectBase* permission_parent, DatabaseConnection* db);
+	Board(PermissionObjectBase* permission_parent, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi);
 	int createThread(json thread_json);
 	int createPost(json post_json);
 	void deleteThread(int thread_id);

@@ -55,7 +55,7 @@ public:
 	void start();
 
 	DatabaseConnection* db;
-	FuzeDBI::Connection* fuze_dbi;
+	// FuzeDBI::Connection* fuze_dbi;
 
 	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
 	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
@@ -65,7 +65,7 @@ public:
 
 	std::string dumpAllGroups(int client_id) const;
 	BasicResponse setGroupHeirarchy(int client_id, std::vector<int> ordered_groups);
-	BasicResponse createAccount(nlohmann::json user_json);
+	// BasicResponse createAccount(nlohmann::json user_json);
 	std::string dumpMembersInGroup(int group_id) const;
 	std::string dumpMembersInGroupAsArray(int group_id) const;
 	std::string dumpAllUsers(int client_id) const;
