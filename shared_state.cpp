@@ -38,6 +38,10 @@ shared_state::shared_state(boost::filesystem::path parent_directory, boost::file
 		fuze_dbi(fuze_database_interface) {
 	db->getSecret(this->secret_base64);
 	fuze_dbi->exec<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
+	auto version = fuze_dbi->exec<std::string>("SELECT (version) FROM _info");
+	std::cout << "[shared_state] version: " <<version << std::endl;
+	auto toople = fuze_dbi->exec<std::tuple<int, std::string>>("SELECT id, username FROM account");
+	std::cout << "id: " << std::get<0>(toople) << ", username: " << std::get<1>(toople) << std::endl;
 }
 
 shared_state::~shared_state() {

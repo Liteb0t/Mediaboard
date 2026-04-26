@@ -210,7 +210,9 @@ private:
 	std::array<int, sizeof...(AllArgs)> pattern_position_to_view_arg_index; // maps arg Pattern position to View arg position
 	// std::tuple<FilteredTypes> view_args;
 
-	// This helper returns a 1-element tuple if T is integral, otherwise an empty tuple.
+	// TODO get filtered tuple at compile time
+	/*
+	// This helper returns a 1-element tuple if T is integral, otherwise an empty tuple.*
 	template<typename T>
 	auto wrap_if_integral(T&& val) const {
 		if constexpr (std::is_integral_v<std::decay_t<T>>) {
@@ -219,14 +221,13 @@ private:
 			return std::tuple<>{};
 		}
 	}
-
-	// TODO get filtered tuple at compile time
-	// template<size_t... Is>
-	// void invoke_helper(std::index_sequence<Is...>) const {
-	//     // tuple_cat joins all the 1-element and 0-element tuples into one flat list
-	//     auto filtered_args = std::tuple_cat(wrap_if_integral(std::get<Is>(view_args))...);
-	//     std::apply(view_func, filtered_args);
-	// }
+	template<size_t... Is>
+	void invoke_helper(std::index_sequence<Is...>) const {
+	    // tuple_cat joins all the 1-element and 0-element tuples into one flat list
+	    auto filtered_args = std::tuple_cat(wrap_if_integral(std::get<Is>(view_args))...);
+	    std::apply(view_func, filtered_args);
+	}
+	*/
 };
 
 template<typename StateType>
