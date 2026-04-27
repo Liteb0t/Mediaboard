@@ -1,51 +1,47 @@
 #include "permission_managed_object.hpp"
-#include "DatabaseConnection.hpp"
-#include "db_interface.h"
 #include <iostream>
 
-PermissionObjectBase::PermissionObjectBase(int permission_object_id, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi) // On extraction from database
+PermissionObjectBase::PermissionObjectBase(int permission_object_id, FuzeDBI::Connection* fuze_dbi) // On extraction from database
 		: permission_object_id(permission_object_id),
-		db(db),
 		fuze_dbi(fuze_dbi) {
 	this->cacheAllPermissions();
 }
 
-PermissionObjectBase::PermissionObjectBase(DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi) // On new object creation
-		: permission_object_id(db->getUniquePermissionObjectId()),
-		db(db),
-		fuze_dbi(fuze_dbi) {
+PermissionObjectBase::PermissionObjectBase(FuzeDBI::Connection* fuze_dbi) // On new object creation
+		: fuze_dbi(fuze_dbi),
+		permission_object_id(fuze_dbi->query<int>("SELECT permission_object_id FROM _sequences")) {
+	fuze_dbi->query<void>("UPDATE _sequences SET permission_object_id = $1", this->permission_object_id+1);
 }
 
 void PermissionObjectBase::cacheAllPermissions() {
 	std::cout << "[PermissionObjectBase] retrieving permissions for " << this->permission_object_id << ": ";
-	db->declarePermissionCollectionCursor(this->permission_object_id);
-	while (true) {
-		db_permission_collection_struct* permission_collection = db->getValueFromPermissionCollectionCursor();
-		if (!permission_collection->has_value)
-			break;
-		std::cout << permission_collection->id << ", ";
-		PermissionCollection new_permission_collection(permission_collection->id, permission_collection->account_id, permission_collection->group_id);
+	for (auto permission_collection_tuple : fuze_dbi->queryRows<std::tuple<int, int, int>>("SELECT id, account_id, permission_group_id FROM permission_collection")) {
+		PermissionCollection new_permission_collection(std::get<0>(permission_collection_tuple), std::get<1>(permission_collection_tuple), std::get<2>(permission_collection_tuple));
 
-		// Add settings, if any
-		db->declarePermissionSettingCursor(permission_collection->id);
-		while (true) {
-			db_permission_setting_struct* permission_setting = db->getValueFromPermissionSettingCursor();
-			if (permission_setting->has_value)
-				new_permission_collection.addPermissionSetting(permission_setting);
-			else
-				break;
+		for (auto permission_setting_tuple : fuze_dbi->queryRows<std::tuple<int, int, int>>("SELECT id, permission_number, setting WHERE permission_collection_id = $1", new_permission_collection.getId())) {
+			new_permission_collection.addPermissionSetting(std::get<0>(permission_setting_tuple), std::get<1>(permission_setting_tuple), static_cast<THREE_STATE_SETTING>(std::get<2>(permission_setting_tuple)));
 		}
-		db->closePermissionSettingCursor();
+		// // Add settings, if any
+		// db->declarePermissionSettingCursor(permission_collection->id);
+		// while (true) {
+		// 	db_permission_setting_struct* permission_setting = db->getValueFromPermissionSettingCursor();
+		// 	if (permission_setting->has_value)
+		// 		new_permission_collection.addPermissionSetting(permission_setting);
+		// 	else
+		// 		break;
+		// }
+		// db->closePermissionSettingCursor();
 
-		if (new_permission_collection.getUserOrGroupEnumValue() == USER_OR_GROUP::USER)
-			this->user_permissions.emplace(permission_collection->account_id, new_permission_collection);
+		if (new_permission_collection.getAccountOrGroupEnumValue() == ACCOUNT_OR_GROUP::ACCOUNT)
+			this->account_permissions.emplace(std::get<1>(permission_collection_tuple), new_permission_collection);
 		else
-			this->group_permissions.emplace(permission_collection->group_id, new_permission_collection);
+			this->group_permissions.emplace(std::get<2>(permission_collection_tuple), new_permission_collection);
 	}
-	db->closePermissionCollectionCursor();
+	// db->closePermissionCollectionCursor();
 	std::cout << "done." << std::endl;
 }
 
+/*
 nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_id) const {
 	nlohmann::json permission_collections_json;
 	// client_rank not used because client_editable status is given by dumpAllGroups()/dumpAllUsers()
@@ -97,14 +93,14 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 
 	return permission_collections_json;
 }
-
-PermissionManager::PermissionManager(int permission_object_id, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
-		: PermissionObjectBase(0, db, fuze_dbi),
-		owner_id(db->getOwnerIdIfExists()) {
-	this->cacheAllGroups();
+*/
+PermissionManager::PermissionManager(int permission_object_id, FuzeDBI::Connection* fuze_dbi)
+		: PermissionObjectBase(0, fuze_dbi),
+		owner_id(/*db->getOwnerIdIfExists()*/ 0) {
+	// this->cacheAllGroups();
 	// this->cacheAllUsers();
-	if (this->owner_id)
-		this->grantOwnerPrivileges();
+	// if (this->owner_id)
+	// 	this->grantOwnerPrivileges();
 }
 
 // Grants all permissions to the Owner group
@@ -117,19 +113,16 @@ void PermissionManager::grantOwnerPrivileges() {
 	}
 }
 
-void PermissionManager::cacheAllUsers() {
+/*
+void PermissionManager::cacheAllAccounts() {
 	std::cout << "[PermissionManager] Retreiving accounts from database... ";
-	db->declareAccountCursor();
-	while (true) {
-		struct db_account_struct* account_struct = db->getValueFromAccountCursor();
-		if (!account_struct->has_value)
-			break;
-		std::cout << account_struct->id << ", ";
-		User user(account_struct);
-		this->users.emplace(account_struct->id, user);
-		this->username_to_id_map.emplace(user.getUsername(), account_struct->id);
+	for (auto user_t : fuze_dbi->queryRows<std::tuple<int, std::string>>("SELECT id, username FROM account")) {
+		std::cout << std::get<0>(user_t) << ", ";
+		this->users.emplace(std::get<0>(user_t), User{
+			.id = std::get<0>(user_t),
+			.username = std::get<1>(user_t)
+		});
 	}
-	db->closeAccountCursor();
 	std::cout << "done." << std::endl;
 }
 
@@ -195,13 +188,19 @@ void PermissionManager::cacheAllGroups() {
 	else
 		std::cout << "[PermissionManager] Test failed." << std::endl;
 }
+*/
 
 int PermissionManager::createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64) {
 	int new_account_id = fuze_dbi->query<int>("SELECT account_id FROM _sequences");
 	fuze_dbi->query<void>("UPDATE _sequences SET account_id = $1", new_account_id+1);
 	fuze_dbi->query<void>("INSERT INTO account(id, username, password_hash_hash_base64, intermediate_salt_base64) VALUES ($1, $2, $3, $4)", new_account_id, username.c_str(), password_hash_hash, intermediate_salt_base64);
+	this->accounts.emplace(new_account_id, Account{
+		.id = new_account_id,
+		.username = username
+	});
 	return new_account_id;
 }
+
 
 int PermissionManager::addGroup(std::string group_name, int group_rank) {
 	Group new_group(group_name);
@@ -216,18 +215,22 @@ int PermissionManager::addGroup(std::string group_name, int group_rank) {
 
 void PermissionManager::saveGroupHeirarchy() const {
 	std::cout << "[PermissionManager] Saving new group heirarchy: ";
-	for (int i = 0; i < this->ordered_groups.size(); i++)
-		std::cout << i << ": " << this->ordered_groups[i] << ", ";
-	std::cout << "done." << std::endl;
-
-	struct db_group_heirarchy_array group_heirarchy;
-	initGroupHeirarchyArray(&group_heirarchy, this->ordered_groups.size());
-	for (int i = 0; i < this->ordered_groups.size(); i++) {
-		struct db_group_heirarchy_struct group;
-		group.rank = i;
-		group.group_id = this->ordered_groups[i];
-		insertToGroupHeirarchyArray(&group_heirarchy, group);
+	for (int rank = 0; rank < this->ordered_groups.size(); rank++) {
+		fuze_dbi->query<void>("INSERT INTO permission_group_heirarchy(rank, permission_group) VALUES ($1, $2)", rank, this->ordered_groups[rank]);
+		std::cout << rank << ": " << this->ordered_groups[rank] << ", ";
 	}
-	db_update_group_heirarchy(&group_heirarchy);
-	freeGroupHeirarchyArray(&group_heirarchy);
+	std::cout << "done." << std::endl;
 }
+
+/*
+bool PermissionManagedObject::isOwnedBy(const Client& client) const {
+	if (!this->owner_account_id)
+		return false;
+	else if (client.account_id && client.account_id.value() == this->owner_account_id)
+		return true;
+	else if (client.session_id == this->owner.value().session_id)
+		return true;
+	else
+		return false;
+}
+*/

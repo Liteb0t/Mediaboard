@@ -1,27 +1,16 @@
 #include "permission_setting.hpp"
-#include "db_interface.h"
-#include <iostream>
 #include <unordered_map>
+
+enum struct ACCOUNT_OR_GROUP {ACCOUNT, GROUP};
 
 class PermissionCollection {
 public:
-	PermissionCollection(int id, int user_id, int group_id)
+	// PermissionCollection(int id, std::optional<int> account_id, std::optional<int> group_id)
+	PermissionCollection(int id, int account_id, int group_id)
 			: id(id),
-			user_id(user_id),
+			account_id(account_id),
 			group_id(group_id),
-			user_or_group(user_id != -1 ? USER_OR_GROUP::USER : USER_OR_GROUP::GROUP) {
-		std::cout << "Caching permission collection with user_id " << user_id << " and group_id " << group_id << std::endl;
-	}
-	PermissionCollection(int permission_object_id, USER_OR_GROUP user_or_group, int user_or_group_id, DatabaseConnection* db)
-			: user_or_group(user_or_group),
-			user_id(user_or_group == USER_OR_GROUP::USER ? user_or_group_id : -1),
-			group_id(user_or_group == USER_OR_GROUP::GROUP ? user_or_group_id : -1),
-			id(db->storePermissionCollection(permission_object_id, user_or_group, user_or_group_id)) {
-				// this->id = db_store_permission_collection(permission_object_id, this->user_id, this->group_id);
-		std::cout << "Storing permission collection with user_id " << user_id << " and group_id " << group_id << std::endl;
-	}
-	void removeFromDatabase() {
-		db_delete_permission_collection(this->id);
+			account_or_group(account_id != -1 ? ACCOUNT_OR_GROUP::ACCOUNT : ACCOUNT_OR_GROUP::GROUP) {
 	}
 	bool passPermission(PERMISSION permission_type, bool inherited_permission) const {
 		auto permission_iterator = permission_map.find(permission_type);
@@ -31,21 +20,12 @@ public:
 		else
 			return inherited_permission;
 	}
-	void addPermissionSetting(db_permission_setting_struct* db_permission_setting) {
-		PermissionSetting permission_setting(db_permission_setting);
-		permission_map.emplace(static_cast<PERMISSION>(db_permission_setting->permission_number), permission_setting);
+	void addPermissionSetting(int permission_setting_id, int permission_number, THREE_STATE_SETTING setting) {
+		PermissionSetting permission_setting(permission_setting_id, setting);
+		permission_map.emplace(static_cast<PERMISSION>(permission_number), permission_setting);
 	}
-	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting, DatabaseConnection* db) {
-		auto permission_iterator = this->permission_map.find(permission_type);
-		if (permission_iterator == this->permission_map.end()) {
-			// std::cout << "PermissionCollection " << this->id << ": permission " << static_cast<int>(permission_type) << " not found" << std::endl;
-			PermissionSetting permission_setting(this->id, permission_type, setting, db);
-			this->permission_map.emplace(permission_type, permission_setting);
-		}
-		else {
-			permission_iterator->second.set(setting, db);
-		}
-	}
+	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting) { permission_map.at(permission_type).set(setting);	}
+	bool containsPermissionType(PERMISSION permission_type) const { return this->permission_map.contains(permission_type); }
 	/*
 	void deletePermission(PERMISSION permission_type) {
 		std::unordered_map<PERMISSION, PermissionSetting>::const_iterator it = this->permission_map.find(permission_type);
@@ -56,13 +36,13 @@ public:
 	const std::unordered_map<PERMISSION, PermissionSetting>* getPermissionMap() const {
 		return &(this->permission_map);
 	}
-	const USER_OR_GROUP getUserOrGroupEnumValue() const { return this->user_or_group; }
-
+	const ACCOUNT_OR_GROUP getAccountOrGroupEnumValue() const { return this->account_or_group; }
+	int getId() const { return this->id; }
 private:
 	const int id;
 	// int permission_object_id;
-	const USER_OR_GROUP user_or_group;
-	const int user_id;
-	const int group_id;
+	const ACCOUNT_OR_GROUP account_or_group;
+	const std::optional<int> account_id;
+	const std::optional<int> group_id;
 	std::unordered_map<PERMISSION, PermissionSetting> permission_map;
 };

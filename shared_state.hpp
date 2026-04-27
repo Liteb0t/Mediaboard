@@ -12,8 +12,8 @@
 
 #include "beast.hpp"
 #include "board.hpp"
-#include "DatabaseConnection.hpp"
 #include "FuzeDBI.hpp"
+#include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
 #include <boost/filesystem.hpp>
 #include <boost/smart_ptr.hpp>
@@ -37,24 +37,13 @@ public:
 	boost::optional<nlohmann::json> json;
 };
 
-struct Session {
-	int account_id;
-	std::chrono::time_point<std::chrono::system_clock> created_at;
-};
-
-struct Invite {
-	int granted_group_id;
-	std::chrono::time_point<std::chrono::system_clock> created_at;
-};
-
 // Represents the shared server state
-class shared_state : public PermissionManager {
+class shared_state : public PermissionManager, public FuzeHttp::State {
 public:
-	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative, DatabaseConnection* database_connection, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface);
+	shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location_relative, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface);
 	~shared_state();
 	void start();
 
-	DatabaseConnection* db;
 	// FuzeDBI::Connection* fuze_dbi;
 
 	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
@@ -63,17 +52,17 @@ public:
 	// Board main_board;
 	Board* main_board() { return &(this->boards.at(0)); }
 
-	std::string dumpAllGroups(int client_id) const;
-	BasicResponse setGroupHeirarchy(int client_id, std::vector<int> ordered_groups);
+	std::string dumpAllGroups(const Client& client) const;
+	BasicResponse setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups);
 	// BasicResponse createAccount(nlohmann::json user_json);
 	std::string dumpMembersInGroup(int group_id) const;
 	std::string dumpMembersInGroupAsArray(int group_id) const;
-	std::string dumpAllUsers(int client_id) const;
-	std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
-	boost::shared_ptr<Thread> getThread(int board_id, int thread_id) const { return this->boards.at(board_id).getThread(thread_id); }
+	std::string dumpAllUsers(const Client& client) const;
+	//std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
+	//boost::shared_ptr<Thread> getThread(int board_id, int thread_id) const { return this->boards.at(board_id).getThread(thread_id); }
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
 	BasicResponse getKeyFromPassword(nlohmann::json request_json) const;
-	BasicResponse addUserToGroups(int client_id, int user_id, std::vector<int> groups_by_id);
+	BasicResponse addUserToGroups(const Client& client, int user_id, std::vector<int> groups_by_id);
 
 	void join  (websocket_session* session);
 	void leave (websocket_session* session);
@@ -85,7 +74,7 @@ public:
 	const char* getSecret() const { return this->secret_base64; }
 
 	std::string createSession(int account_id);
-	int getClientIdFromSession(const std::string& session_id_base64) const;
+	const std::optional<Client> getClientFromSession(const std::string& session_id_base64) const;
 	void clearExpiredSessions();
 
 	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
@@ -108,8 +97,6 @@ private:
 	// std::vector<int> ordered_boards;
 	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);
 	// HTTP sessions. Client validates using a cookie
-	std::unordered_map<std::string /*key_base64*/, Session> sessions;
-	std::unordered_map<std::string /*key_base64*/, Invite> invites;
 };
 
 #endif

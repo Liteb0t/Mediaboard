@@ -11,8 +11,8 @@
 */
 //------------------------------------------------------------------------------
 
-#include "DatabaseConnectionPostgreSQL.hpp"
-#include "DatabaseConnectionSQLite.hpp"
+// #include "DatabaseConnectionPostgreSQL.hpp"
+// #include "DatabaseConnectionSQLite.hpp"
 #include "listener.hpp"
 #include "migrations.hpp"
 #include "permission_managed_object.hpp"
@@ -116,6 +116,7 @@ int main(int argc, char* argv[]) {
 		boost::filesystem::create_directory(database_location.string());
 	}
 
+	/*
 	DatabaseConnection* database_connection;
 	if (database_engine.starts_with("postgres")) {
 		if (postgresql_use_uri)
@@ -129,6 +130,7 @@ int main(int argc, char* argv[]) {
 		std::cerr << "Error: unknown database engine \"" << database_engine << "\". Must be \"postgres\" or \"sqlite\"." << std::endl;
 		return EXIT_FAILURE;
 	}
+	*/
 	FuzeDBI::Connection* fuze_database_interface = new FuzeDBI::Connection(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name, current_version);
 
 	std::cout << "Set port: " << server_port << std::endl;
@@ -162,7 +164,7 @@ int main(int argc, char* argv[]) {
 	// boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection, thumbnail_file_format));
 	shared_state* state;
 	try {
-		state = new shared_state(location, media_location, database_connection, thumbnail_file_format, fuze_database_interface);
+		state = new shared_state(location, media_location, thumbnail_file_format, fuze_database_interface);
 		state->start();
 	}
 	catch (const std::exception& exception) {
@@ -229,7 +231,7 @@ int main(int argc, char* argv[]) {
 	else
 		std::cout << "All " << threads << " threads closed." << std::endl;
 	delete state;
-	delete database_connection;
+	// delete database_connection;
 
 	return EXIT_SUCCESS;
 }

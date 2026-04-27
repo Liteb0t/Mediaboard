@@ -1,6 +1,7 @@
 #pragma once
 #include "beast.hpp"
 #include "permission_managed_object.hpp"
+#include <sodium.h>
 #include <charconv>
 #include <string>
 #include <string_view>
@@ -23,11 +24,23 @@ std::string getDecodedURL(boost::string_view raw_URL);
 
 std::string_view getPathName(const std::string& source_URL);
 
-inline std::string formatCookie(const std::string& session_id_base64) {
-	return std::format("Session={}; Path=/; HttpOnly", session_id_base64);
+inline std::string formatCookie(const std::string& session_id) {
+	return std::format("Session={}; Path=/; HttpOnly", session_id);
 }
 
 typedef const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& Request;
+
+struct Session {
+	const int id;
+	const int client_id;
+	// const std::string key;
+	const std::chrono::time_point<std::chrono::system_clock> created_at;
+};
+
+struct Invite {
+	const int granted_group_id;
+	const std::chrono::time_point<std::chrono::system_clock> created_at;
+};
 
 struct Response {
 	beast::http::status status;
@@ -42,10 +55,11 @@ void generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t pass
 
 template<typename StateType>
 void getSaltBase64(StateType state, const std::string& username, char* salt_base64) {
-	int user_id = state->db->getAccountByUsername(username);
 	unsigned char salt[crypto_pwhash_SALTBYTES];
-	if (user_id != User::PUBLIC) {
-		std::string intermediate_salt_base64 = state->db->getIntermediateSaltFromAccount(user_id);
+	std::optional<int> user_id = state->getIdFromUsername(username);
+	if (user_id) {
+		// std::string intermediate_salt_base64 = state->db->getIntermediateSaltFromAccount(user_id.value());
+		std::string intermediate_salt_base64 = "";
 		crypto_generichash(
 			salt, sizeof salt,
 			reinterpret_cast<const unsigned char*>(username.c_str()), username.length(),
@@ -108,7 +122,7 @@ template<typename StateType>
 class Path {
 public:
 	virtual size_t getPathSize() const = 0;
-	virtual Response executeView(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) const = 0;
+	virtual Response executeView(StateType state, Request& req) const = 0;
 	virtual bool attemptPathMatch(http::verb req_method, std::string_view section, size_t index) = 0;
 };
 
@@ -134,7 +148,7 @@ public:
 		}
 		// std::cout << "Final path length: " << this->path.size() << std::endl;
 	}
-	Response executeView(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) const override {
+	Response executeView(StateType state, Request& req) const override {
 		return std::apply(view_func, std::tuple_cat(std::tie(state, req), view_args));
 	}
 	size_t getPathSize() const override {
@@ -242,7 +256,7 @@ public:
 		id_counter++;
 	}
 
-	Response matchPathAndExecute(StateType state, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
+	Response matchPathAndExecute(StateType state, Request& req) {
 		if (!req.target().starts_with('/'))
 			return Response{.status = http::status::bad_request};
 
@@ -295,4 +309,12 @@ private:
 	std::unordered_map<int, Path<StateType>*> views;
 	int id_counter = 0;
 }; // class Controller
+
+class State {
+public: // TODO change to protected if possible
+	std::variant<Client, FuzeHttp::Response> getClient(FuzeHttp::Request req) const;
+	std::unordered_map<int, Client> clients;
+	std::unordered_map<std::string /*key_base64*/, Session> sessions;
+	std::unordered_map<std::string /*key_base64*/, Invite> invites;
+}; // class State
 } // namespace FuzeHttp

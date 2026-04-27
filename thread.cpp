@@ -4,9 +4,8 @@
 #include <cstring>
 
 // Save thread when JSON is received
-Thread::Thread(PermissionObjectBase* permission_parent, json thread_json, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
-			: PermissionManagedObject(permission_parent, db, fuze_dbi),
-			db(db) {
+Thread::Thread(PermissionObjectBase* permission_parent, json thread_json, FuzeDBI::Connection* fuze_dbi)
+			: PermissionManagedObject(permission_parent, fuze_dbi) {
 	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
 	// ID and timestamp are not initially known
@@ -19,9 +18,8 @@ Thread::Thread(PermissionObjectBase* permission_parent, json thread_json, Databa
 }
 
 // Cache thread using db_interface struct
-Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
-			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id, db, fuze_dbi),
-			db(db) {
+Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi)
+			: PermissionManagedObject(permission_parent, thread_struct->permission_object_id, fuze_dbi) {
 	// this->cacheAllPermissions();
 	this->id = thread_struct->id;
 	this->deleted = thread_struct->deleted;
@@ -36,7 +34,7 @@ std::string Thread::dumpThread() const {
 }
 
 void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
-	Post post(post_struct, db);
+	Post post(post_struct);
 	if (post.getIdInThread() == 0)
 		this->thread_as_json["post_zero"] = post.asJson();
 	else if (!post.isDeleted()) {
@@ -51,7 +49,7 @@ int Thread::createPostFromJson(json post_json) {
 	post_json["id_in_thread"] = this->posts.size();
 	// const std::string placeholder_key(KEY_LENGTH+1, 'T');
 	// post_json["key"] = placeholder_key;
-	Post post(post_json, db); // Key is deleted from post_json in its constructor
+	Post post(post_json); // Key is deleted from post_json in its constructor
 	if (this->posts.empty())
 		this->thread_as_json["post_zero"] = post.asJson();
 	else {
@@ -70,10 +68,10 @@ void Thread::deleteMessage(int message_id) {
 	std::cout << "Erased message " << message_id << " from thread " << this->id << std::endl;
 }
 
-bool Thread::keyMatchesMessage(std::string key, int message_id) const {
-	// std::cout << "[Thread] key :: message_key\n" << key << " :: " << this->posts.at(message_id).getKey() << std::endl;
-	return message_id != 0 && this->posts.at(message_id).getKey() == key; // Don't match key to message 0, because threads can't be deleted by regular users (yet?)
-}
+// bool Thread::keyMatchesMessage(std::string key, int message_id) const {
+// 	// std::cout << "[Thread] key :: message_key\n" << key << " :: " << this->posts.at(message_id).getKey() << std::endl;
+// 	return message_id != 0 && this->posts.at(message_id).getKey() == key; // Don't match key to message 0, because threads can't be deleted by regular users (yet?)
+// }
 
 nlohmann::json Thread::getMessagesAsJson(std::string key) const {
 	json multiple_post_json = json::array();
@@ -81,7 +79,7 @@ nlohmann::json Thread::getMessagesAsJson(std::string key) const {
 		if (!it->second.isDeleted()) {
 			// std::cout << "Dumping post " << this->id << "/" << it->second.getIdInThread() << std::endl;
 			json post_json = it->second.asJson();
-			post_json["is_author"] = keyMatchesMessage(key, it->first);
+			// post_json["is_author"] = keyMatchesMessage(key, it->first);
 			multiple_post_json.push_back(post_json);
 		}
 	}
@@ -90,14 +88,14 @@ nlohmann::json Thread::getMessagesAsJson(std::string key) const {
 
 std::string Thread::dumpPost(int message_id, std::string key) const {
 	json post_json = this->posts.at(message_id).asJson();
-	post_json["is_author"] = keyMatchesMessage(key, message_id);
+	// post_json["is_author"] = keyMatchesMessage(key, message_id);
 	return post_json.dump();
 }
 
-std::string Thread::dumpPermissions(int client_id) const {
-	return this->getPermissionCollectionsAsJson(client_id).dump();
-	// return "NOT IMPLEMENTED";
-}
+// std::string Thread::dumpPermissions(int client_id) const {
+// 	return this->getPermissionCollectionsAsJson(client_id).dump();
+// 	// return "NOT IMPLEMENTED";
+// }
 
 void Thread::markAsDeleted() {
 	this->deleted = true;
@@ -112,10 +110,10 @@ void Thread::removeListener(websocket_session* listener) {
 	listeners.erase(listener);
 }
 
-json Thread::getPermissionsAsJson(int client_id) const {
+json Thread::getPermissionsAsJson(const Client& client) const {
 	json permissions_as_json;
-	permissions_as_json["manage_permissions"] = this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS);
-	permissions_as_json["send_message"] = this->userHasPermission(client_id, PERMISSION::SEND_MESSAGE);
-	permissions_as_json["delete_post"] = this->userHasPermission(client_id, PERMISSION::DELETE_POST);
+	permissions_as_json["manage_permissions"] = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
+	permissions_as_json["send_message"] = this->clientHasPermission(client, PERMISSION::SEND_MESSAGE);
+	permissions_as_json["delete_post"] = this->clientHasPermission(client, PERMISSION::DELETE_POST);
 	return permissions_as_json;
 }

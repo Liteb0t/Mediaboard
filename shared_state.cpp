@@ -29,13 +29,12 @@ std::string generateKeyBase64(const Map& map) {
 	return key_base64;
 }
 
-shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, DatabaseConnection* db, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
-		: PermissionManager(0, db, fuze_database_interface),
+shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
+		: PermissionManager(0, fuze_database_interface),
 		program_location(std::move(parent_directory)),
 		media_location(std::move(media_location)),
-		db(db),
 		thumbnail_file_format(thumbnail_file_format) {
-	db->getSecret(this->secret_base64);
+	// db->getSecret(this->secret_base64);
 	/* FuzeDBI demo
 	fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
 	auto version = fuze_dbi->query<std::string>("SELECT (version) FROM _info");
@@ -56,9 +55,9 @@ shared_state::~shared_state() {
 // hence a seperate start() function is used
 // UPDATE 0.0.6: permission-managed objects no longer use shared pointers
 void shared_state::start() {
-	Board main_board(this, db, fuze_dbi);
+	Board main_board(this, fuze_dbi);
 	this->boards.emplace(0, main_board);
-	this->boards.at(0).cacheAllThreads();
+	// this->boards.at(0).cacheAllThreads();
 }
 
 void shared_state::join(websocket_session* session) {
@@ -95,14 +94,14 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	}
 }
 
-std::string shared_state::dumpAllGroups(int client_id) const {
+std::string shared_state::dumpAllGroups(const Client& client) const {
 	std::cout << "Dumping from ordered_groups_vec: ";
 
 	json groups_json;
 	groups_json["groups"] = json::object();
 	int group_editable_threshold;
-	if (this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS))
-		group_editable_threshold = this->getUserRank(client_id) + 1;
+	if (this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
+		group_editable_threshold = this->getClientRank(client) + 1;
 	else
 		group_editable_threshold = this->getOrderedGroups()->size();
 	for (int i = 0; i < this->getOrderedGroups()->size(); i++) {
@@ -144,9 +143,8 @@ std::string shared_state::dumpMembersInGroup(int group_id) const {
 	for (int member_id : members) {
 		std::string member_id_as_string = std::to_string(member_id);
 		members_json["members"][member_id_as_string] = nlohmann::json::object();
-		const User* user = this->getUser(member_id);
 		members_json["members"][member_id_as_string]["id"] = member_id;
-		members_json["members"][member_id_as_string]["username"] = user->getUsername();
+		members_json["members"][member_id_as_string]["username"] = this->getUsernameFromAccount(member_id);
 	}
 	return members_json.dump();
 }
@@ -157,12 +155,12 @@ std::string shared_state::dumpMembersInGroupAsArray(int group_id) const {
 }
 
 // Return non-zero when action is rejected. An error is returned to the user from http_session
-BasicResponse shared_state::setGroupHeirarchy(int client_id, std::vector<int> ordered_groups) {
+BasicResponse shared_state::setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups) {
 	int user_rank;
-	if (!this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS))
+	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::bad_request, std::string("Cannot change group heirarchy; permission denied."));
 	else
-		user_rank = this->getUserRank(client_id);
+		user_rank = this->getClientRank(client);
 
 	if (ordered_groups.size() != this->getOrderedGroups()->size()) {
 		return BasicResponse(http::status::bad_request, std::string("Number of groups does not match."));
@@ -251,21 +249,21 @@ BasicResponse shared_state::getKeyFromPassword(json request_json) const {
 }
 */
 
-std::string shared_state::dumpAllUsers(int client_id) const {
+std::string shared_state::dumpAllUsers(const Client& client) const {
 	json users_json;
 	users_json["users"] = json::object();
-	int client_rank = this->getUserRank(client_id);
-	bool client_has_manage_permissions_permission = this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS);
-	boost::shared_ptr<std::unordered_map<int, User>> _users = this->getUsers();
-	for (std::unordered_map<int, User>::const_iterator user_it = _users->begin(); user_it != _users->end(); user_it++) {
-		int user_id = user_it->first;
-		const User* user = this->getUser(user_id);
+	int client_rank = this->getClientRank(client);
+	bool client_has_manage_permissions_permission = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
+	// boost::shared_ptr<std::unordered_map<int, User>> _users = this->getUsers();
+	// for (std::unordered_map<int, User>::const_iterator user_it = _users->begin(); user_it != _users->end(); user_it++) {
+	for (auto& account : this->accounts) {
+		int user_id = account.first;
 		std::cout << user_id << ", ";
 		// json user_json = this->getUser(user_id)->asJson();
 		nlohmann::json user_json = json::object();
 		user_json["id"] = user_id;
-		user_json["username"] = user->getUsername();
-		int user_rank = this->getUserRank(user_id);
+		user_json["username"] = this->getUsernameFromAccount(user_id);
+		int user_rank = this->getClientRank(client);
 		user_json["rank"] = user_rank;
 		user_json["groups"] = json::array();
 		// int group_rank = 0;
@@ -284,12 +282,12 @@ std::string shared_state::dumpAllUsers(int client_id) const {
 	return users_json.dump();
 }
 
-BasicResponse shared_state::addUserToGroups(int client_id, int user_id, std::vector<int> groups_by_id) {
+BasicResponse shared_state::addUserToGroups(const Client& client, int user_id, std::vector<int> groups_by_id) {
 	int client_rank;
-	if (!this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS))
+	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::forbidden, std::string("Cannot change group heirarchy; permission denied."));
 	else
-		client_rank = this->getUserRank(client_id);
+		client_rank = this->getClientRank(client);
 	std::cout << "User has permission. ";
 	for (int group_id : groups_by_id) {
 		if (	static_cast<BUILTIN_GROUPS>(group_id) == BUILTIN_GROUPS::USERS
@@ -309,17 +307,17 @@ BasicResponse shared_state::addUserToGroups(int client_id, int user_id, std::vec
 	return BasicResponse(http::status::ok, std::string("Added user to groups")); // Success
 }
 
-std::string shared_state::createSession(int account_id) {
-	Session session{
-		.account_id = account_id,
+std::string shared_state::createSession(int client_id) {
+	FuzeHttp::Session session{
+		.client_id = client_id,
 		.created_at = std::chrono::system_clock::now()
 	};
 	std::string key_base64 = generateKeyBase64(this->sessions);
-	db->createSession(
-		key_base64,
-		session.account_id,
-		std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
-	);
+	// db->createSession(
+	// 	key_base64,
+	// 	session.client_id,
+	// 	std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
+	// );
 	this->sessions.emplace(key_base64, std::move(session));
 	return key_base64;
 }
@@ -327,9 +325,9 @@ std::string shared_state::createSession(int account_id) {
 void shared_state::clearExpiredSessions() {
 	int initial_number_of_sessions = this->sessions.size();
 	std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
-	std::erase_if(this->sessions, [this, &current_time](const std::pair<std::string, Session>& session_pair){
+	std::erase_if(this->sessions, [this, &current_time](const std::pair<std::string, FuzeHttp::Session>& session_pair){
 		if (session_pair.second.created_at + this->authorization_token_lifespan < current_time) {
-			db->deleteSession(session_pair.first);
+			// db->deleteSession(session_pair.first);
 			return true;
 		}
 		else
@@ -338,16 +336,16 @@ void shared_state::clearExpiredSessions() {
 	std::cout << "[shared_state] Cleared " << initial_number_of_sessions - this->sessions.size() << " expired sessions." << std::endl;
 }
 
-int shared_state::getClientIdFromSession(const std::string& session_id_base64) const {
-	if (std::unordered_map<std::string, Session>::const_iterator session = this->sessions.find(session_id_base64); session != this->sessions.end())
-		return session->second.account_id;
+const std::optional<Client> shared_state::getClientFromSession(const std::string& session_id_base64) const {
+	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator session = this->sessions.find(session_id_base64); session != this->sessions.end())
+		return this->clients.at(session->second.client_id);
 	else
-		return User::PUBLIC;
+		return {};
 }
 
 // For now, only used to create the admin account. therefore granted_group_id will be BUILTIN_GROUPS::ADMINISTRATORS
 std::string shared_state::createInvite(int granted_group_id) {
-	Invite invite{
+	FuzeHttp::Invite invite{
 		.granted_group_id = granted_group_id,
 		.created_at = std::chrono::system_clock::now()
 	};
@@ -364,7 +362,7 @@ std::string shared_state::createInvite(int granted_group_id) {
 }
 
 int shared_state::getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const { // returns USERS if none found
-	if (std::unordered_map<std::string, Invite>::const_iterator invite = this->invites.find(invite_key_base64); invite != this->invites.end())
+	if (std::unordered_map<std::string, FuzeHttp::Invite>::const_iterator invite = this->invites.find(invite_key_base64); invite != this->invites.end())
 		return invite->second.granted_group_id;
 	else
 		return static_cast<int>(BUILTIN_GROUPS::PUBLIC);

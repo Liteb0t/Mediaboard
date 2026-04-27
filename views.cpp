@@ -1,5 +1,4 @@
 #include "views.hpp"
-#include "DatabaseConnection.hpp"
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
 #include "shared_state.hpp"
@@ -107,7 +106,7 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("password_hash_base64 length {} is over the limit of 500", password_hash_base64.size())};
 	else if (username.empty())
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("Username cannot be empty")};
-	else if (state->db->getAccountByUsername(username.data()))
+	else if (state->accountExists(username.data()))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("There already exists an account with this username.")};
 
 	if (invite_key) {
@@ -132,8 +131,8 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 		if (invite_granted_group_id) {
 			state->addUserToGroup(user_id, invite_granted_group_id.value());
 			std::cout << "add user to group" << std::endl;
-			if (invite_granted_group_id.value() == static_cast<int>(BUILTIN_GROUPS::OWNER))
-				state->db->setOwner(user_id);
+			//if (invite_granted_group_id.value() == static_cast<int>(BUILTIN_GROUPS::OWNER))
+			//	state->db->setOwner(user_id);
 		}
 	}
 	catch(const std::exception& e) {
@@ -200,11 +199,11 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 		password_hash_hash_base64, sizeof password_hash_hash_base64,
 		password_hash_base64.c_str(), password_hash_base64.size()
 	);
-	int user_id = state->db->getAccountByUsername(username);
-	if (user_id != User::PUBLIC && state->db->userMatchesPassword(user_id, password_hash_hash_base64)) {
+	std::optional<int> account_id = state->getIdFromUsername(username);
+	if (account_id && state->accountMatchesPassword(account_id.value(), password_hash_hash_base64)) {
 		std::string session_id_base64;
 		try {
-			session_id_base64 = state->createSession(user_id); // Add session so client can authenticate via browser cookie
+			session_id_base64 = state->createSession(account_id.value()); // Add session so client can authenticate via browser cookie
 		}
 		catch(const std::exception& e) {
 			std::string error_text = std::format("[login] {}", e.what());
@@ -225,29 +224,25 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 }
 
 FuzeHttp::Response threads(shared_state* state, FuzeHttp::Request req) {
-	auto cookie_header = req.find("Cookie");
-	if (cookie_header == req.end())
-		return FuzeHttp::Response{.status = http::status::unauthorized, .error_message = "Cookie required but none was found."};
-	std::string session_id_base64 = cookie_header->value();
-	int client_id = state->getClientIdFromSession(session_id_base64);
+	std::variant<Client, FuzeHttp::Response> client = state->getClient(req);
+	if (client.index() != 0)
+		return std::get<1>(client);
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.body = state->main_board()->dumpAllThreads(client_id)
+		.body = state->main_board()->dumpAllThreads(std::get<0>(client))
 	};
 }
 
 FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req) {
-	auto cookie_header = req.find("Cookie");
-	if (cookie_header == req.end())
-		return FuzeHttp::Response{.status = http::status::unauthorized, .error_message = "Cookie required but none was found."};
-	std::string session_id_base64 = cookie_header->value();
-	int client_id = state->getClientIdFromSession(session_id_base64);
+	std::variant<Client, FuzeHttp::Response> client = state->getClient(req);
+	if (client.index() != 0)
+		return std::get<1>(client);
 	return FuzeHttp::Response{
 		.status = http::status::ok,
 		.json = {{
 			{"server_permissions", {
-				{"manage_permissions", state->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS)},
-				{"create_thread", state->userHasPermission(client_id, PERMISSION::CREATE_THREAD)}
+				{"manage_permissions", state->clientHasPermission(std::get<0>(client), PERMISSION::MANAGE_PERMISSIONS)},
+				{"create_thread", state->clientHasPermission(std::get<0>(client), PERMISSION::CREATE_THREAD)}
 			}}
 		}}
 	};

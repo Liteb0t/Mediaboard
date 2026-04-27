@@ -13,8 +13,8 @@ class websocket_session;
 class Thread : public PermissionManagedObject {
 public:
 	// Thread();
-	Thread(PermissionObjectBase* permission_parent, json thread_json, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi);
-	Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi);
+	Thread(PermissionObjectBase* permission_parent, json thread_json, FuzeDBI::Connection* fuze_dbi);
+	Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi);
 	std::string dumpThread() const;
 	json asJson() const { return this->thread_as_json; }
 	// int getNumberOfPosts() const { return this->posts.size(); };
@@ -24,7 +24,7 @@ public:
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
 	void deleteMessage(int message_id);
-	bool keyMatchesMessage(std::string key, int message_id) const;
+	// bool keyMatchesMessage(std::string key, int message_id) const;
 	bool messageExists(int message_id) const { std::map<int, Post>::const_iterator it = posts.find(message_id); return it != posts.end(); };
 	int getId() const { return this->id; };
 	void addListener(websocket_session* listener);
@@ -32,13 +32,12 @@ public:
 	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
 	nlohmann::json getMessagesAsJson(std::string key) const;
 	std::string dumpPost(int message_id, std::string key) const;
-	std::string dumpPermissions(int client_id) const;
+	// std::string dumpPermissions(int client_id) const;
 	void markAsDeleted();
 	std::time_t getLastPostTime() const { return this->last_post_timestamp; }
 	bool isDeleted() const { return this->deleted; }
-	json getPermissionsAsJson(int client_id) const;
+	json getPermissionsAsJson(const Client& client) const;
 private:
-	DatabaseConnection* db;
 	int id;
 	std::time_t last_post_timestamp;
 	// std::vector<Post> posts;

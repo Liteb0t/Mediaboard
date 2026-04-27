@@ -247,6 +247,7 @@ http::message_generator handle_request(
 		return std::make_pair(-1, found);
 	};
 
+	/*
 	auto const getUserFromToken	= [&req, &state]() {
 		std::string token;
 		// boost::intrusive::list_iterator<boost::intrusive::bhtraits<boost::beast::http::basic_fields<std::allocator<char>>::element, boost::intrusive::list_node_traits<void*>, boost::intrusive::normal_link, boost::intrusive::dft_tag, 1>, true> it = req.begin();
@@ -287,11 +288,14 @@ http::message_generator handle_request(
 		// client id -1 means there was an error
 		return std::make_pair(-1, key);
 	};
+	*/
 
 		// Make sure we can handle the method
 	if 		(req.method() == http::verb::get) {
 		bool is_media;
 		if (path_name.substr(0, 5) == "/api/") {
+			http::response<http::string_body> res;
+			/*
 			std::pair<int, std::string> client;
 			try {
 				client = getUserFromToken();
@@ -299,7 +303,6 @@ http::message_generator handle_request(
 			catch(std::string error_text) {
 				return api_response(http::status::bad_request, error_text);
 			}
-			http::response<http::string_body> res;
 			res.set(http::field::content_type, "application/json");
 			if (path_name.substr(5) == "threads/") {
 				res.result(http::status::ok);
@@ -341,7 +344,8 @@ http::message_generator handle_request(
 					res.result(404);
 				}
 			}
-			else if (path_name.substr(5, 6) == "group/") { // TODO add /members/ to end of URL check
+			else */
+			if (path_name.substr(5, 6) == "group/") { // TODO add /members/ to end of URL check
 				std::size_t found = path_name.find_first_not_of("0123456789", 11);
 				if (path_name[found] != '/') {
 					return api_response(http::status::bad_request, std::string("Invalid group ID; trailing '/' not found."));
@@ -363,6 +367,7 @@ http::message_generator handle_request(
 						return api_response(http::status::bad_request, std::string("Group '") + std::to_string(group_in_url) + "' not found.");
 				}
 			}
+			/*
 			else if (path_name.substr(5) == "groups/") {
 				res.body() = state->dumpAllGroups(client.first);
 				res.result(http::status::ok);
@@ -387,6 +392,7 @@ http::message_generator handle_request(
 				res.set("Client-Rank", std::to_string(user_rank));
 				res.result(http::status::ok);
 			}
+			*/
 			else {
 				return api_response(http::status::bad_request, "That API endpoint does not exist");
 			}
@@ -608,6 +614,7 @@ http::message_generator handle_request(
 			res.keep_alive(req.keep_alive());
 			return res;
 		}
+		/*
 		else if (path_name.substr(0, 5) == "/api/") {
 			std::pair<int, std::string> client;
 			try {
@@ -758,7 +765,7 @@ http::message_generator handle_request(
 					return api_response(http::status::bad_request, exception.what());
 				}
 				int new_group_rank = state->getUserRank(client.first) + 1;
-				/*int new_group_id = */state->addGroup(new_group_name, new_group_rank);
+				state->addGroup(new_group_name, new_group_rank);
 				return api_response(http::status::ok, std::string("Group created"));
 			}
 			// For now assume the URL ends with add_groups/
@@ -843,6 +850,7 @@ http::message_generator handle_request(
 			else
 				return api_response(http::status::not_found, std::string("/api/ sub-URL not found."));
 		}
+		*/
 		else {
 			std::cout << "Unknown target: " << req.target() << std::endl;
 			std::cout << "Unknown target: " << decoded_url << std::endl;
@@ -852,7 +860,9 @@ http::message_generator handle_request(
 			return res;
 		}
 	}
+	/*
 	else if (req.method() == http::verb::put) {
+
 		std::pair<int, std::string> client;
 		try {
 			client = getUserFromToken();
@@ -1005,10 +1015,12 @@ http::message_generator handle_request(
 		else
 			return not_found(req.target());
 	}
+	*/
+	/*
 	else if (req.method() == http::verb::delete_) {
 		if (path_name.substr(0, 10) == "/api/post/") {
 			int thread_id, message_id;
-			std::pair<int, int> thread_in_url/*, message_in_url*/;
+			std::pair<int, int> thread_in_url;
 			try {
 				thread_in_url = getNumberFromPath(10);
 			}
@@ -1181,6 +1193,7 @@ http::message_generator handle_request(
 			return api_response(http::status::bad_request, std::string("Unknown target: ") + std::string(req.target()));
 		}
 	}
+	*/
 	/*
 	else if(req.method() == http::verb::head) {
 		http::response<http::empty_body> res{http::status::ok, req.version()};

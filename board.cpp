@@ -3,13 +3,12 @@
 #include <sstream>
 #include <iostream>
 
-Board::Board(PermissionObjectBase* permission_parent, DatabaseConnection* db, FuzeDBI::Connection* fuze_dbi)
-		: PermissionManagedObject(permission_parent, db, fuze_dbi),
-		db(db) {
+Board::Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi)
+		: PermissionManagedObject(permission_parent, fuze_dbi) {
 }
 
 int Board::createThread(json thread_json) {
-	Thread thread(this, thread_json, db, fuze_dbi);
+	Thread thread(this, thread_json, fuze_dbi);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(thread.getLastPostTime(), thread.getId()));
 	return thread.getId();
@@ -37,6 +36,7 @@ void Board::deleteMessageFromThread(int message_id, int thread_id) {
 	}
 }
 
+/*
 bool Board::keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const {
 	return this->threads.at(thread_id).keyMatchesMessage(key, message_id);
 }
@@ -73,27 +73,6 @@ void Board::cacheAllThreads() {
 	std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 }
 
-std::string Board::dumpAllThreads(int client_id) const {
-	json multiple_thread_json;
-	multiple_thread_json["type"] = "thread_catalog";
-	multiple_thread_json["threads"] = json::array();
-	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
-		boost::shared_ptr<Thread> thread = this->getThread(it->second);
-		if (!this->threads.at(it->second).isDeleted() && thread->userHasPermission(client_id, PERMISSION::VIEW_THREAD)) {
-			nlohmann::json thread_json = thread->asJson();
-			/*
-			if (this->userHasPermission(client_id, PERMISSION::MANAGE_PERMISSIONS)) {
-				std::cout << "client with ID " << client_id << "has manage_permissions" << std::endl;
-				thread_json["client_permissions"]["manage_permissions"] = true;
-			}
-			*/
-			thread_json["client_permissions"] = thread->getPermissionsAsJson(client_id);
-			multiple_thread_json["threads"].push_back(thread_json);
-		}
-	}
-	return multiple_thread_json.dump();
-}
-
 std::string Board::dumpThread(int thread_id, int client_id, std::string key) const {
 	nlohmann::json thread_json;
 	thread_json["messages"] = this->threads.at(thread_id).getMessagesAsJson(key);
@@ -103,6 +82,22 @@ std::string Board::dumpThread(int thread_id, int client_id, std::string key) con
 
 std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {
 	return this->threads.at(thread_id).dumpPermissions(client_id);
+}
+*/
+
+std::string Board::dumpAllThreads(const Client& client) const {
+	json multiple_thread_json;
+	multiple_thread_json["type"] = "thread_catalog";
+	multiple_thread_json["threads"] = json::array();
+	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
+		// boost::shared_ptr<Thread> thread = this->getThread(it->second);
+		if (!this->threads.at(it->second).isDeleted() && this->threads.at(it->second).clientHasPermission(client, PERMISSION::VIEW_THREAD)) {
+			nlohmann::json thread_json = this->threads.at(it->second).asJson();
+			thread_json["client_permissions"] = this->threads.at(it->second).getPermissionsAsJson(client);
+			multiple_thread_json["threads"].push_back(thread_json);
+		}
+	}
+	return multiple_thread_json.dump();
 }
 
 void Board::addListenerToThread(websocket_session* listener, int thread_id) {

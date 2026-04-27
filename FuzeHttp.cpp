@@ -44,6 +44,22 @@ std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 	return path_name;
 }
 
+std::variant<Client, FuzeHttp::Response> FuzeHttp::State::getClient(FuzeHttp::Request req) const {
+	auto cookie_header = req.find("Cookie");
+	if (cookie_header == req.end())
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Cookie required but none was found."};
+	std::string session_id_base64 = cookie_header->value();
+	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator it = this->sessions.find(session_id_base64); it != this->sessions.end()) {
+		return this->clients.at(it->second.client_id);
+		// return Client{
+		// 	.account_id = session->second.account_id,
+		// 	.session_id = session_id_base64
+		// };
+	}
+	else
+		return FuzeHttp::Response{.status = http::status::unauthorized, .error_message = "Session ID is invalid. It may have expired, or it may never had existed to begin with."};
+}
+
 void FuzeHttp::generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t password_hash_hash_base64_len, const char* password_hash_base64, size_t password_hash_base64_len) {
 	// hash of password hash in base64 is stored in DB
 	unsigned char password_hash_hash[crypto_generichash_BYTES];

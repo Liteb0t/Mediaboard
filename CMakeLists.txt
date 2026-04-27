@@ -50,8 +50,6 @@ target_link_libraries(MediaboardServer
 target_sources(MediaboardServer
   PRIVATE
     board.cpp
-    DatabaseConnectionPostgreSQL.cpp
-    DatabaseConnectionSQLite.cpp
     db_interface.c
     FuzeHttp.cpp
     group.cpp
@@ -63,7 +61,6 @@ target_sources(MediaboardServer
     shared_state.cpp
     thread.cpp
     urls.cpp
-    user.cpp
     views.cpp
     websocket_session.cpp
 )
