@@ -224,33 +224,34 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 }
 
 FuzeHttp::Response threads(shared_state* state, FuzeHttp::Request req) {
-	// std::variant<Client, FuzeHttp::Response> client = state->getClient(req);
-	// if (client.index() != 0)
-	// 	return std::get<1>(client);
-	std::optional<Client> client = state->getClientIfExists(req);
+	std::variant<FuzeHttp::Client, FuzeHttp::Response> client = state->getRequiredClient(req);
+	if (client.index() != 0)
+		return std::get<1>(client);
+	// std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.body = state->main_board()->dumpAllThreads(client)
+		.body = state->main_board()->dumpAllThreads(std::get<0>(client))
 	};
 }
 
 FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req) {
-	std::variant<Client, FuzeHttp::Response> client = state->getRequiredClient(req);
-	if (client.index() != 0)
-		return std::get<1>(client);
+	// std::variant<Client, FuzeHttp::Response> client = state->getRequiredClient(req);
+	// if (client.index() != 0)
+	// 	return std::get<1>(client);
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.json = {{
-			{"server_permissions", {
-				{"manage_permissions", state->clientHasPermission(std::get<0>(client), PERMISSION::MANAGE_PERMISSIONS)},
-				{"create_thread", state->clientHasPermission(std::get<0>(client), PERMISSION::CREATE_THREAD)}
-			}}
-		}}
+		// .json = {{
+		// 	{"server_permissions", {
+		// 		{"manage_permissions", state->clientHasPermission(std::get<0>(client), PERMISSION::MANAGE_PERMISSIONS)},
+		// 		{"create_thread", state->clientHasPermission(std::get<0>(client), PERMISSION::CREATE_THREAD)}
+		// 	}}
+		// }}
 	};
 }
 
-FuzeHttp::Response acceptInvite(shared_state* state, FuzeHttp::Request req, std::string invite_key_base64) {
+FuzeHttp::Response acceptInvite(shared_state* state, FuzeHttp::Request req, FuzeHttp::Client client, std::string invite_key_base64) {
 	std::cout << "Checking invite link '" << invite_key_base64 << "'" << std::endl;
+	// std::cout << "client ID is " << client.id << std::endl;
 	int granted_group = state->getGrantedGroupIdFromInvite(invite_key_base64);
 	if (granted_group == static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
 		return FuzeHttp::Response{

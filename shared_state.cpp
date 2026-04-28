@@ -31,6 +31,8 @@ std::string generateKeyBase64(const Map& map) {
 
 shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
 		: PermissionManager(0, fuze_database_interface),
+		State(fuze_database_interface),
+		fuze_dbi(fuze_database_interface),
 		program_location(std::move(parent_directory)),
 		media_location(std::move(media_location)),
 		thumbnail_file_format(thumbnail_file_format) {
@@ -94,7 +96,7 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	}
 }
 
-std::string shared_state::dumpAllGroups(const Client& client) const {
+std::string shared_state::dumpAllGroups(const FuzeHttp::Client& client) const {
 	std::cout << "Dumping from ordered_groups_vec: ";
 
 	json groups_json;
@@ -155,7 +157,7 @@ std::string shared_state::dumpMembersInGroupAsArray(int group_id) const {
 }
 
 // Return non-zero when action is rejected. An error is returned to the user from http_session
-BasicResponse shared_state::setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups) {
+BasicResponse shared_state::setGroupHeirarchy(const FuzeHttp::Client& client, std::vector<int> ordered_groups) {
 	int user_rank;
 	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::bad_request, std::string("Cannot change group heirarchy; permission denied."));
@@ -249,7 +251,7 @@ BasicResponse shared_state::getKeyFromPassword(json request_json) const {
 }
 */
 
-std::string shared_state::dumpAllUsers(const Client& client) const {
+std::string shared_state::dumpAllUsers(const FuzeHttp::Client& client) const {
 	json users_json;
 	users_json["users"] = json::object();
 	int client_rank = this->getClientRank(client);
@@ -282,7 +284,7 @@ std::string shared_state::dumpAllUsers(const Client& client) const {
 	return users_json.dump();
 }
 
-BasicResponse shared_state::addUserToGroups(const Client& client, int user_id, std::vector<int> groups_by_id) {
+BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id) {
 	int client_rank;
 	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::forbidden, std::string("Cannot change group heirarchy; permission denied."));
@@ -336,7 +338,7 @@ void shared_state::clearExpiredSessions() {
 	std::cout << "[shared_state] Cleared " << initial_number_of_sessions - this->sessions.size() << " expired sessions." << std::endl;
 }
 
-const std::optional<Client> shared_state::getClientFromSession(const std::string& session_id_base64) const {
+const std::optional<FuzeHttp::Client> shared_state::getClientFromSession(const std::string& session_id_base64) const {
 	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator session = this->sessions.find(session_id_base64); session != this->sessions.end())
 		return this->clients.at(session->second.client_id);
 	else

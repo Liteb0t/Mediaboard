@@ -1,5 +1,4 @@
 #include "post.hpp"
-#include "db_interface.h"
 #include <boost/json/serialize.hpp>
 #include <chrono>
 #include <string>
@@ -52,7 +51,7 @@ Post::Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connect
 		this->name = "Anonymous"; // Blank username becoming Anonymous is intended behaviour
 		this->post_as_json["name"] = this->name;
 	}
-	else if (this->name.length() > POST_MAX_NAME) {
+	else if (this->name.length() > static_cast<size_t>(MESSAGE_FIELDS::MAX_NAME)) {
 		this->name = "Bad Username"; 
 		this->post_as_json["name"] = this->name;
 	}
@@ -61,7 +60,7 @@ Post::Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connect
 	// 	this->content = "I'm speechless."; // Post looks ugly with empty content.
 	// 	this->post_as_json["content"] = this->content;
 	// }
-	if (this->content.length() > POST_MAX_CONTENT) {
+	if (this->content.length() > static_cast<size_t>(MESSAGE_FIELDS::MAX_CONTENT)) {
 		this->content = "I have much to say.";
 		this->post_as_json["content"] = this->content;
 	}
@@ -76,7 +75,7 @@ Post::Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connect
 	this->files_i = 0;
 	while (it != file_vector.end() && files_i < 4) {
 		const boost::json::string filename = it->as_string();
-		if (filename.size() <= POST_MAX_FILE_NAME_WITH_UUID) {
+		if (filename.size() <= static_cast<size_t>(MESSAGE_FIELDS::MAX_FILE_NAME_WITH_UUID)) {
 			this->files.push_back(filename.c_str());
 			// fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, filename.c_str());
 		}
@@ -98,5 +97,5 @@ std::string Post::dumpPost() const {
 
 void Post::markAsDeleted() {
 	this->deleted = true;
-	db_mark_post_as_deleted(this->id);
+	// db_mark_post_as_deleted(this->id);
 }

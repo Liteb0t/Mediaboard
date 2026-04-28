@@ -52,17 +52,17 @@ public:
 	// Board main_board;
 	Board* main_board() { return &(this->boards.at(0)); }
 
-	std::string dumpAllGroups(const Client& client) const;
-	BasicResponse setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups);
+	std::string dumpAllGroups(const FuzeHttp::Client& client) const;
+	BasicResponse setGroupHeirarchy(const FuzeHttp::Client& client, std::vector<int> ordered_groups);
 	// BasicResponse createAccount(nlohmann::json user_json);
 	std::string dumpMembersInGroup(int group_id) const;
 	std::string dumpMembersInGroupAsArray(int group_id) const;
-	std::string dumpAllUsers(const Client& client) const;
+	std::string dumpAllUsers(const FuzeHttp::Client& client) const;
 	//std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
 	//boost::shared_ptr<Thread> getThread(int board_id, int thread_id) const { return this->boards.at(board_id).getThread(thread_id); }
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
 	BasicResponse getKeyFromPassword(nlohmann::json request_json) const;
-	BasicResponse addUserToGroups(const Client& client, int user_id, std::vector<int> groups_by_id);
+	BasicResponse addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id);
 
 	void join  (websocket_session* session);
 	void leave (websocket_session* session);
@@ -73,8 +73,8 @@ public:
 	const std::string& getThumbnailFileFormat() const { return thumbnail_file_format; }
 	const char* getSecret() const { return this->secret_base64; }
 
-	std::string createSession(int account_id);
-	const std::optional<Client> getClientFromSession(const std::string& session_id_base64) const;
+	std::string createSession(int client_id);
+	const std::optional<FuzeHttp::Client> getClientFromSession(const std::string& session_id_base64) const;
 	void clearExpiredSessions();
 
 	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
@@ -85,6 +85,7 @@ private:
 	const boost::filesystem::path program_location;
 	const std::string thumbnail_file_format;
 	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
+	FuzeDBI::Connection* fuze_dbi;
 
 	// This mutex synchronizes all access to sessions_
 	std::mutex mutex_;

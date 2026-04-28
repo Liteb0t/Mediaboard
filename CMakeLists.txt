@@ -62,9 +62,7 @@ target_sources(MediaboardServer
     websocket_session.cpp
 )
 configure_file(config.ini ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
-configure_file(database_template_postgresql.sql ${CMAKE_CURRENT_BINARY_DIR}/database/database_template_postgresql.sql COPYONLY)
-configure_file(database_template_sqlite.sql ${CMAKE_CURRENT_BINARY_DIR}/database/database_template_sqlite.sql COPYONLY)
-configure_file(default_groups.sql ${CMAKE_CURRENT_BINARY_DIR}/database/default_groups.sql COPYONLY)
+configure_file(database_template.sql ${CMAKE_CURRENT_BINARY_DIR}/database/database_template.sql COPYONLY)
 add_custom_command(
   OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/db_interface.c
   COMMAND ecpg ${CMAKE_CURRENT_SOURCE_DIR}/db_interface.pgc

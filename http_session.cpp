@@ -191,7 +191,7 @@ http::message_generator handle_request(
 		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
 		res.set(http::field::content_type, "text/html");
 		res.keep_alive(req.keep_alive());
-		res.body() = "An error occurred: '" + std::string(what) + "'";
+		res.body() = "A server error occurred: '" + std::string(what) + "'";
 		res.prepare_payload();
 		return res;
 	};
@@ -200,7 +200,15 @@ http::message_generator handle_request(
 	std::string_view path_name = FuzeHttp::getPathName(decoded_url);
 
 	// Matches paths in urls.cpp
-	FuzeHttp::Response basic_res = controller->matchPathAndExecute(state, req);
+	FuzeHttp::Response basic_res;
+	try {
+		basic_res = controller->matchPathAndExecute(state, req);
+	}
+	catch(const std::exception& e) {
+		std::string error_text = std::format("[http_session] {}", e.what());
+		std::cerr << error_text << std::endl;
+		return server_error(error_text);
+	}
 	std::cout << "[http_session] basic_res.status: " << basic_res.status << std::endl;
 	if (basic_res.status != http::status::not_found) {
 		http::response<http::string_body> res{basic_res.status, req.version()};
@@ -216,7 +224,7 @@ http::message_generator handle_request(
 			res.body() = boost::json::serialize(basic_res.json.value());
 		}
 		else if (basic_res.error_message)
-			res.body() = "An error occurred: '" + basic_res.error_message.value() + "'";
+			res.body() = basic_res.error_message.value();
 		else if (basic_res.body)
 			res.body() = basic_res.body.value();
 		res.keep_alive(req.keep_alive());

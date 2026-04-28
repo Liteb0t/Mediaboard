@@ -152,27 +152,33 @@ private:
 	}
 	template<class... Args>
 	PGresult* exec(const std::string& statement, Args... args) {
-		const char* params[sizeof...(args)];
+		char* params[sizeof...(args)];
 		Oid pg_types[sizeof...(args)];
 		int param_i = 0;
 		for (std::variant<const char*, std::string, int> arg : std::initializer_list<std::variant<const char*, std::string, int>>{ args... }) {
 			if (arg.index() == static_cast<int>(PARAMETER_TYPE::CHAR_ARRAY)) {
-				params[param_i] = std::get<const char*>(arg);
+				params[param_i] = strdup(std::get<const char*>(arg));
 				pg_types[param_i] = 25;
 			}
 			else if (arg.index() == static_cast<int>(PARAMETER_TYPE::STRING)) { // TODO fix string args resulting in formatting error
-				params[param_i] = std::get<std::string>(arg).c_str();
+				params[param_i] = strdup(std::get<std::string>(arg).c_str());
 				pg_types[param_i] = 25;
 			}
 			else if (arg.index() == static_cast<int>(PARAMETER_TYPE::INT)) {
-				params[param_i] = std::to_string(std::get<int>(arg)).c_str();
+				params[param_i] = strdup(std::to_string(std::get<int>(arg)).c_str());
 				pg_types[param_i] = 20;
 			}
 			else
 				throw std::runtime_error("Arg variant unknown");
 			param_i++;
 		}
+		// for (char* param : params) {
+		// 	std::cout << "[FuzeDBI] param " << param << std::endl;
+		// }
 		PGresult* result = PQexecParams(this->db, statement.c_str(), sizeof...(args), pg_types, params, NULL, NULL, 0);
+		for (int param_i = 0; param_i < sizeof...(args); param_i++) {
+			free(params[param_i]);
+		}
 		return result;
 	}
 #endif

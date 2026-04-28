@@ -15,7 +15,7 @@ public:
 	void deleteMessageFromThread(int message_id, int thread_id);
 	// std::string dumpLastThread() const;
 	// bool keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const;
-	std::string dumpAllThreads(const std::optional<Client>& client) const;
+	std::string dumpAllThreads(const std::optional<FuzeHttp::Client>& client) const;
 	// std::string dumpThread(int thread_id, int client_id, std::string key) const;
 	// std::string dumpPermissionsInThread(int thread_id, int client_id) const;
 	bool threadExists(int thread_id) const { std::unordered_map<int, Thread>::const_iterator it = threads.find(thread_id); return it != threads.end(); };
@@ -47,6 +47,7 @@ public:
 	void removeGroupPermissionCollectionFromThread(int group_id, int thread_id) { this->threads.at(thread_id).removeGroupPermissionCollection(group_id); }
 	void removeAccountPermissionCollectionFromThread(int account_id, int thread_id) { this->threads.at(thread_id).removeAccountPermissionCollection(account_id); }
 private:
+	FuzeDBI::Connection* fuze_dbi;
 	std::unordered_map<int, Thread> threads;
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
 };

@@ -1,4 +1,3 @@
-#include "db_interface.h"
 #include "permission_managed_object.hpp"
 #include "post.hpp"
 #include <ctime>
@@ -17,7 +16,7 @@ public:
 	boost::json::object asJson() const { return this->thread_as_json; }
 	// int getNumberOfPosts() const { return this->posts.size(); };
 	// void addInitialPost(json post_json, bool save_to_database);
-	void createPostFromStruct(struct db_post_struct* post_struct);
+	// void createPostFromStruct(struct db_post_struct* post_struct);
 	int createPostFromJson(boost::json::object post_json, int author_client_id);
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
@@ -34,8 +33,9 @@ public:
 	void markAsDeleted();
 	std::chrono::time_point<std::chrono::system_clock> getLastPostTime() const { return this->last_post_created_at; }
 	bool isDeleted() const { return this->deleted; }
-	boost::json::object getPermissionsAsJson(const std::optional<Client>& client) const;
+	boost::json::object getPermissionsAsJson(const std::optional<FuzeHttp::Client>& client) const;
 private:
+	FuzeDBI::Connection* fuze_dbi;
 	int id;
 	std::chrono::time_point<std::chrono::system_clock> last_post_created_at;
 	// std::vector<Post> posts;

@@ -1,6 +1,7 @@
 #pragma once
+#include "FuzeDBI.hpp"
 #include "beast.hpp"
-#include "permission_managed_object.hpp"
+// #include "permission_managed_object.hpp"
 #include <sodium.h>
 #include <charconv>
 #include <string>
@@ -41,6 +42,15 @@ struct Invite {
 	const int granted_group_id;
 	const std::chrono::time_point<std::chrono::system_clock> created_at;
 };
+
+struct Client {
+	int id;
+	std::optional<int> account_id;
+	// const std::string session_id;
+};
+
+template<typename... Option>
+struct Requires {};
 
 struct Response {
 	beast::http::status status;
@@ -86,7 +96,10 @@ void getSaltBase64(StateType state, const std::string& username, char* salt_base
 template<typename... Ts> struct TypeList {};
 
 template<typename T>
-struct IsViewArg : std::disjunction<std::is_same<T, int>, std::is_same<T, std::string>> {};
+struct IsViewArg : std::disjunction<std::is_same<T, int>, std::is_same<T, std::string>, std::is_same<T, Client>> {};
+
+template<typename T>
+struct IsPathArg : std::disjunction<IsViewArg<T>, std::is_same<T, const char*>> {};
 
 template<typename In, template<typename> class Pred, typename Out = TypeList<>>
 struct Filter;
@@ -122,58 +135,72 @@ template<typename StateType>
 class Path {
 public:
 	virtual size_t getPathSize() const = 0;
-	virtual Response executeView(StateType state, Request& req) const = 0;
+	virtual Response executeView(StateType state, Request& req) = 0;
 	virtual bool attemptPathMatch(http::verb req_method, std::string_view section, size_t index) = 0;
 };
 
 template<typename StateType, class... AllArgs>
 class ViewPath : public Path<StateType> {
+	// using PathArgs = typename Filter<TypeList<AllArgs...>, IsPathArg>::type;
 	using FilteredTypes = typename Filter<TypeList<AllArgs...>, IsViewArg>::type;
+	// using FilteredTypes = typename Filter<TypeList<AllArgs...>, IsExtraArg>::type;
 	using FuncPtr = typename MakeFuncPtr<StateType, FilteredTypes>::type;
 	using ArgTuple = typename MakeArgTuple<FilteredTypes>::type;
+	// using ExtrasTuple = typename MakeArgTuple<FilteredExtraTypes>::type;
 public:
 	constexpr ViewPath(http::verb req_method, FuncPtr v, AllArgs... args)
 			: view_func(v),
 			req_method(req_method) {
 		size_t arg_index, index;
 		arg_index = index = 0;
-		this->path = std::initializer_list<std::variant<const char*, int, std::string>>{ args... };
-		for (std::variant<const char*, int, std::string> s : std::initializer_list<std::variant<const char*, int, std::string>>{ args... }) {
-			// this->path.push_back(s);
-			if (!std::holds_alternative<const char*>(s)) {
+		// this->all_args = std::initializer_list<std::variant<const char*, int, std::string>>{ args... };
+		// int all_args_i = 0;
+		for (std::variant<const char*, int, std::string, Client> var : std::initializer_list<std::variant<const char*, int, std::string, Client>>{ args... }) {
+			this->all_args[index] = var;
+			if (var.index() == 3) {
+				this->path_starts_at++;
+			}
+			if (!std::holds_alternative<const char*>(var)) {
 				this->pattern_position_to_view_arg_index[index] = arg_index++;
 				// std::cout << "Arg is not a char array!" << std::endl;
 			}
 			index++;
 		}
-		// std::cout << "Final path length: " << this->path.size() << std::endl;
+		// std::cout << "Final all_args length: " << this->all_args.size() << std::endl;
 	}
-	Response executeView(StateType state, Request& req) const override {
-		return std::apply(view_func, std::tuple_cat(std::tie(state, req), view_args));
+	Response executeView(StateType state, Request& req) override {
+		if (this->all_args[0].index() == 3) { // There is a Client{} parameter in the view
+			std::cout << "Insert client here" << std::endl;
+			std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+			if (!client) {
+				client = state->createClient();
+			}
+			this->setArg(0, client);
+			//return std::apply(view_func, std::tuple_cat(std::tie(state, req, client), /* extra_args */ view_args));
+		}
+		//else
+			return std::apply(view_func, std::tuple_cat(std::tie(state, req), /* extra_args */ view_args));
 	}
 	size_t getPathSize() const override {
-		return this->path.size();
+		return this->all_args.size() - this->path_starts_at;
 	}
 	bool attemptPathMatch(http::verb req_method, std::string_view section, size_t index) override {
+		index += this->path_starts_at;
+		// std::cout << "Path starts at " << this->path_starts_at << std::endl;
 		if (req_method != this->req_method)
 			return false;
-		if (index >= this->path.size())
+		if (index >= this->all_args.size()) {
+			// std::cout << "Index " << index << "Is greater than number of args " << this->all_args.size() << std::endl;
 			return false;
+		}
 		// std::cout << ", getting variant";
-		const std::variant<const char*, int, std::string> vari = this->path[index];
+		const std::variant<const char*, int, std::string, Client> vari = this->all_args[index];
 
 		// std::cout << "Section: \"" << section << "\"";
 		if (vari.index() == 0) { // Not a view arg
 			std::string str = std::string(std::get<const char*>(vari));
 			// std::cout << ", is const \"" << str << '"';
-			if (str == section) {
-				// std::cout << ", matches!";
-				return true;
-			}
-			else {
-				// std::cout << ", " << section << " does not match " << str << std::endl;
-				return false;
-			}
+			return str == section;
 		}
 		else if (vari.index() == 1) { // Integer arg
 			int value;
@@ -185,19 +212,21 @@ public:
 				return true;
 			}
 			else {
-				if (res.ec == std::errc::invalid_argument)
-					std::cout << ", this is not a number.\n";
-				if (res.ec == std::errc::result_out_of_range)
-					std::cout << ", this number is larger than an int.\n";
+				// if (res.ec == std::errc::invalid_argument)
+					// std::cout << ", this is not a number.\n";
+				// if (res.ec == std::errc::result_out_of_range)
+					// std::cout << ", this number is larger than an int.\n";
 				return false;
 			}
 		}
-		else { // String arg
+		else if (vari.index() == 2) { // String arg
 			// std::cout << ", Is string \"" << section << '"';
 			this->setArg(pattern_position_to_view_arg_index[index], section);
 			// this->setArg<(size_t)0, Functor, int, pattern_position_to_view_arg_index[index]>(pattern_position_to_view_arg_index[index], Functor(), section);
 			return true;
 		}
+		else
+			throw std::runtime_error(std::format("Variant {} is not a path arg", vari.index()));
 	}
 private:
 	// https://stackoverflow.com/a/28440573/18658154
@@ -218,9 +247,11 @@ private:
 	}
 	FuncPtr view_func;
 	ArgTuple view_args;
+	// ExtrasTuple extra_args;
 	http::verb req_method;
-	std::vector<std::variant<const char*, int, std::string>> path;
-	// std::unordered_set<int, int> pattern_position_to_view_arg_index; // maps arg Pattern position to View arg position
+	// std::vector<std::variant<Client, const char*, int, std::string>> path;
+	std::array<std::variant<const char*, int, std::string, Client>, sizeof...(AllArgs)> all_args;
+	int path_starts_at = 0;
 	std::array<int, sizeof...(AllArgs)> pattern_position_to_view_arg_index; // maps arg Pattern position to View arg position
 	// std::tuple<FilteredTypes> view_args;
 
@@ -247,11 +278,12 @@ private:
 template<typename StateType>
 class Controller {
 public:
-	template<typename... Types>
-	constexpr void addPattern(http::verb req_method, typename MakeFuncPtr<StateType, typename Filter<TypeList<Types...>, IsViewArg>::type>::type view, Types... args) {
+	template</* template<typename...> class RequiresT, class... RequiresArgs, */typename... Types>
+	constexpr void addPattern(http::verb req_method, typename MakeFuncPtr<StateType, typename Filter<TypeList<Types...>, IsViewArg>::type>::type view,/* Requires<RequiresArgs...> options = {}, */Types... args) {
+	// constexpr void addPattern(http::verb req_method, View<> view, Options options, Types... args) {
 		// ViewPath<Types...> vp(view, std::move(args)...);
 		all_views.emplace(id_counter);
-		views.emplace(id_counter, new ViewPath<StateType, Types...>(req_method, view, std::move(args)...));
+		views.emplace(id_counter, new ViewPath<StateType, /*RequiresArgs..., */Types...>(req_method, view, std::move(args)...));
 		// std::cout << "views[" << id_counter << "] length: " << views.at(id_counter)->path.size() << std::endl;
 		id_counter++;
 	}
@@ -312,10 +344,14 @@ private:
 
 class State {
 public: // TODO change to protected if possible
+	State(FuzeDBI::Connection* fuze_dbi) : fuze_dbi(fuze_dbi) {}
 	std::optional<Client> getClientIfExists(FuzeHttp::Request req) const;
+	Client createClient(int account_id = -1);
 	std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;
+private:
+	FuzeDBI::Connection* fuze_dbi;
 }; // class State
 } // namespace FuzeHttp

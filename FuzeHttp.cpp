@@ -44,7 +44,19 @@ std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 	return path_name;
 }
 
-std::optional<Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Request req) const {
+FuzeHttp::Client FuzeHttp::State::createClient(int account_id) {
+	int new_client_id = fuze_dbi->query<int>("SELECT client_id FROM _sequences");
+	fuze_dbi->query<void>("UPDATE _sequences SET client_id = $1", new_client_id+1);
+	std::cout << "[FuzeHttp] Creating new client with ID " << new_client_id << std::endl;
+	fuze_dbi->query<void>("INSERT INTO client(id, account_id) VALUES ($1, $2)", new_client_id, account_id);
+	Client client{.id = new_client_id};
+	if (account_id > -1)
+		client.account_id = account_id;
+	this->clients.emplace(new_client_id, client);
+	return client;
+}
+
+std::optional<FuzeHttp::Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Request req) const {
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
 		return {};
@@ -60,7 +72,7 @@ std::optional<Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Request req) 
 		return {};
 }
 
-std::variant<Client, FuzeHttp::Response> FuzeHttp::State::getRequiredClient(FuzeHttp::Request req) const {
+std::variant<FuzeHttp::Client, FuzeHttp::Response> FuzeHttp::State::getRequiredClient(FuzeHttp::Request req) const {
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Cookie required but none was found."};

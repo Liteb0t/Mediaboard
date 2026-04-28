@@ -5,7 +5,8 @@
 #include <iostream>
 
 Board::Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi)
-		: PermissionManagedObject(permission_parent, fuze_dbi) {
+		: PermissionManagedObject(permission_parent, fuze_dbi),
+		fuze_dbi(fuze_dbi) {
 }
 
 int Board::createThread(boost::json::object thread_json, int author_client_id) {
@@ -86,7 +87,7 @@ std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {
 }
 */
 
-std::string Board::dumpAllThreads(const std::optional<Client>& client) const {
+std::string Board::dumpAllThreads(const std::optional<FuzeHttp::Client>& client) const {
 	boost::json::array threads_json = boost::json::array();
 	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
 		// boost::shared_ptr<Thread> thread = this->getThread(it->second);

@@ -1,6 +1,7 @@
 #ifndef PERMISSION_MANAGED_OBJECT
 #define PERMISSION_MANAGED_OBJECT
 
+#include "FuzeHttp.hpp"
 #include "FuzeDBI.hpp"
 #include "group.hpp"
 #include "permission_collection.hpp"
@@ -15,12 +16,6 @@ enum class BUILTIN_GROUPS {
 	PUBLIC = 2
 };
 
-struct Client {
-	const int id;
-	std::optional<int> account_id;
-	// const std::string session_id;
-};
-
 struct Account {
 	static const int PUBLIC = 0;
 	const int id;
@@ -28,6 +23,8 @@ struct Account {
 };
 
 class PermissionObjectBase {
+	friend class PermissionManagedObject;
+	friend class PermissionManager;
 public:
 	PermissionObjectBase(int permission_object_id, FuzeDBI::Connection* fuze_dbi); // retrieve from database
 	PermissionObjectBase(FuzeDBI::Connection* fuze_dbi); // save new object to database
@@ -79,10 +76,10 @@ public:
 	virtual std::vector<int> getOrderedGroupsContainingMember(int user_id) const = 0;
 	virtual bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const = 0;
 	virtual bool passInheritedPermissionForAccount(bool inherited_permission, PERMISSION permission, int account_id) const = 0;
-	virtual int getClientRank(const Client& client) const = 0;
+	virtual int getClientRank(const FuzeHttp::Client& client) const = 0;
 	virtual int getGroupRank(int group_id) const = 0;
 	// virtual const boost::shared_ptr<std::unordered_map<int, Account>> getAccounts() const = 0;
-	bool clientHasPermission(const std::optional<Client>& client, PERMISSION permission) const {
+	bool clientHasPermission(const std::optional<FuzeHttp::Client>& client, PERMISSION permission) const {
 		bool inherited_permission = false;
 		// PUBLIC and USERS are built-in, that is, they are never placed in an account's group list. This is because every account is implicitly a part of these two groups
 		inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::PUBLIC));
@@ -96,12 +93,12 @@ public:
 		}
 		return inherited_permission;
 	}
-	bool clientHasPermissionForGroup(const Client& client, PERMISSION permission, int group_id) const {
+	bool clientHasPermissionForGroup(const FuzeHttp::Client& client, PERMISSION permission, int group_id) const {
 		if (!this->clientHasPermission(client, permission))
 			return false;
 		return this->getClientRank(client) < this->getGroupRank(group_id);
 	}
-	bool clientHasPermissionForClient(const Client& client, PERMISSION permission, const Client& _client) const {
+	bool clientHasPermissionForClient(const FuzeHttp::Client& client, PERMISSION permission, const FuzeHttp::Client& _client) const {
 		if (!this->clientHasPermission(client, permission))
 			return false;
 		return this->getClientRank(client) < this->getClientRank(_client);
@@ -111,8 +108,8 @@ public:
 protected:
 	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
 	int permission_object_id; // Used to identify this object in the database
-	FuzeDBI::Connection* fuze_dbi;
 private:
+	FuzeDBI::Connection* fuze_dbi;
 	std::unordered_map<int, PermissionCollection> group_permissions;
 	std::unordered_map<int, PermissionCollection> account_permissions;
 };
@@ -136,7 +133,7 @@ public:
 		std::unordered_map<int, Group>::const_iterator it = this->groups.find(group_id); 
 		return it != this->groups.end();
 	}
-	int getClientRank(const Client& client) const override {
+	int getClientRank(const FuzeHttp::Client& client) const override {
 		if (!client.account_id)
 			return this->ordered_groups.size(); // This is the least privileged rank
 		int account_id = client.account_id.value();
@@ -254,14 +251,14 @@ public:
 	PermissionManagedObject(PermissionObjectBase* parent_object, FuzeDBI::Connection* fuze_dbi)
 			: PermissionObjectBase(fuze_dbi), parent_object(parent_object) {
 	}
-	bool isOwnedBy(const Client& client) const;
+	bool isOwnedBy(const FuzeHttp::Client& client) const;
 	const std::vector<int>* getOrderedGroups() const override {
 		return this->parent_object->getOrderedGroups();
 	}
 	std::vector<int> getOrderedGroupsContainingMember(int user_id) const override {
 		return this->parent_object->getOrderedGroupsContainingMember(user_id);
 	}
-	int getClientRank(const Client& client) const override {
+	int getClientRank(const FuzeHttp::Client& client) const override {
 		return this->parent_object->getClientRank(client);
 	}
 	int getGroupRank(int group_id) const override {

@@ -6,7 +6,8 @@
 
 // Save thread when JSON is received
 Thread::Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi)
-			: PermissionManagedObject(permission_parent, fuze_dbi) {
+		: PermissionManagedObject(permission_parent, fuze_dbi),
+		fuze_dbi(fuze_dbi) {
 	// thread_json.erase("key");
 	this->thread_as_json = thread_json;
 	// ID and timestamp are not initially known
@@ -112,7 +113,7 @@ void Thread::removeListener(websocket_session* listener) {
 	listeners.erase(listener);
 }
 
-boost::json::object Thread::getPermissionsAsJson(const std::optional<Client>& client) const {
+boost::json::object Thread::getPermissionsAsJson(const std::optional<FuzeHttp::Client>& client) const {
 	// json permissions_as_json;
 	// permissions_as_json["manage_permissions"] = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
 	// permissions_as_json["send_message"] = this->clientHasPermission(client, PERMISSION::SEND_MESSAGE);
