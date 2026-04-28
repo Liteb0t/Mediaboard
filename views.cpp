@@ -224,17 +224,18 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 }
 
 FuzeHttp::Response threads(shared_state* state, FuzeHttp::Request req) {
-	std::variant<Client, FuzeHttp::Response> client = state->getClient(req);
-	if (client.index() != 0)
-		return std::get<1>(client);
+	// std::variant<Client, FuzeHttp::Response> client = state->getClient(req);
+	// if (client.index() != 0)
+	// 	return std::get<1>(client);
+	std::optional<Client> client = state->getClientIfExists(req);
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.body = state->main_board()->dumpAllThreads(std::get<0>(client))
+		.body = state->main_board()->dumpAllThreads(client)
 	};
 }
 
 FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req) {
-	std::variant<Client, FuzeHttp::Response> client = state->getClient(req);
+	std::variant<Client, FuzeHttp::Response> client = state->getRequiredClient(req);
 	if (client.index() != 0)
 		return std::get<1>(client);
 	return FuzeHttp::Response{

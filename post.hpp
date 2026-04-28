@@ -1,21 +1,20 @@
 #include <string>
 #include <ctime>
-#include <nlohmann/json.hpp>
+#include <boost/json.hpp>
+#include "FuzeDBI.hpp"
 #include "field_lengths.h"
-
-using json = nlohmann::json;
 
 class Post {
 public:
-	Post(struct db_post_struct* post_struct);
-	Post(json post_json);
+	// Post(struct db_post_struct* post_struct);
+	Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
 	std::string dumpPost() const;
-	json asJson() const { return this->post_as_json; };
+	boost::json::object asJson() const { return this->post_as_json; };
 	int getId() const { return this->id; };
 	int getIdInThread() const { return this->id_in_thread; };
 	// std::string getKey() const { return this->key; }
-	std::time_t getUploadTimestamp() const { return this->upload_timestamp; }
-	void createFromJSON(json post_json);
+	std::chrono::time_point<std::chrono::system_clock> createdAt() const { return this->created_at; }
+	void createFromJSON(boost::json::object post_json);
 	void markAsDeleted();
 	bool isDeleted() const { return this->deleted; }
 private:
@@ -23,12 +22,12 @@ private:
 	int thread_id;
 	int id_in_thread;
 	// char upload_timestamp[20];
-	std::time_t upload_timestamp;
-	char files[4][POST_MAX_FILE_NAME_WITH_UUID+1];
+	std::vector<std::string> files;
 	short files_i;
 	std::string name;
 	std::string content;
-	json post_as_json;
+	boost::json::object post_as_json;
+	std::chrono::time_point<std::chrono::system_clock> created_at;
 	// std::string key;
 	bool deleted;
 };

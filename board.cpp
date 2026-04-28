@@ -1,5 +1,6 @@
 #include "board.hpp"
 // #include "db_interface.h"
+#include <boost/json/serialize.hpp>
 #include <sstream>
 #include <iostream>
 
@@ -7,19 +8,19 @@ Board::Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_
 		: PermissionManagedObject(permission_parent, fuze_dbi) {
 }
 
-int Board::createThread(json thread_json) {
-	Thread thread(this, thread_json, fuze_dbi);
+int Board::createThread(boost::json::object thread_json, int author_client_id) {
+	Thread thread(this, thread_json, author_client_id, fuze_dbi);
 	this->threads.emplace(thread.getId(), thread);
-	this->ordered_threads.insert(std::make_pair(thread.getLastPostTime(), thread.getId()));
+	this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread.getLastPostTime().time_since_epoch()).count(), thread.getId()));
 	return thread.getId();
 }
 
-int Board::createPost(json post_json) {
-	int thread_id = post_json["thread_id"].template get<int>();
+int Board::createPost(boost::json::object post_json, int author_client_id) {
+	int thread_id = post_json["thread_id"].as_int64();
 	Thread* thread = &this->threads.at(thread_id);
-	std::time_t old_post_time = thread->getLastPostTime();
-	int new_post_id =  thread->createPostFromJson(post_json);
-	std::time_t new_post_time = thread->getLastPostTime();
+	std::time_t old_post_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastPostTime().time_since_epoch()).count();
+	int new_post_id = thread->createPostFromJson(post_json, author_client_id);
+	std::time_t new_post_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastPostTime().time_since_epoch()).count();
 	this->ordered_threads.erase(std::make_pair(old_post_time, thread_id));
 	this->ordered_threads.insert(std::make_pair(new_post_time, thread_id));
 	return new_post_id;
@@ -85,19 +86,20 @@ std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {
 }
 */
 
-std::string Board::dumpAllThreads(const Client& client) const {
-	json multiple_thread_json;
-	multiple_thread_json["type"] = "thread_catalog";
-	multiple_thread_json["threads"] = json::array();
+std::string Board::dumpAllThreads(const std::optional<Client>& client) const {
+	boost::json::array threads_json = boost::json::array();
 	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
 		// boost::shared_ptr<Thread> thread = this->getThread(it->second);
 		if (!this->threads.at(it->second).isDeleted() && this->threads.at(it->second).clientHasPermission(client, PERMISSION::VIEW_THREAD)) {
-			nlohmann::json thread_json = this->threads.at(it->second).asJson();
+			boost::json::object thread_json = this->threads.at(it->second).asJson();
 			thread_json["client_permissions"] = this->threads.at(it->second).getPermissionsAsJson(client);
-			multiple_thread_json["threads"].push_back(thread_json);
+			threads_json.emplace_back(thread_json);
 		}
 	}
-	return multiple_thread_json.dump();
+	return boost::json::serialize(boost::json::value{
+		{"type", "thread_catalog"},
+		{"threads", threads_json}
+	});
 }
 
 void Board::addListenerToThread(websocket_session* listener, int thread_id) {

@@ -82,17 +82,17 @@ public:
 	virtual int getClientRank(const Client& client) const = 0;
 	virtual int getGroupRank(int group_id) const = 0;
 	// virtual const boost::shared_ptr<std::unordered_map<int, Account>> getAccounts() const = 0;
-	bool clientHasPermission(const Client& client, PERMISSION permission) const {
+	bool clientHasPermission(const std::optional<Client>& client, PERMISSION permission) const {
 		bool inherited_permission = false;
 		// PUBLIC and USERS are built-in, that is, they are never placed in an account's group list. This is because every account is implicitly a part of these two groups
 		inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::PUBLIC));
-		if (client.account_id) {
+		if (client && client.value().account_id) {
 			inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::USERS));
-			std::vector<int> user_ordered_groups = this->getOrderedGroupsContainingMember(client.id);
+			std::vector<int> user_ordered_groups = this->getOrderedGroupsContainingMember(client.value().id);
 			for (std::vector<int>::const_reverse_iterator it = user_ordered_groups.rbegin(); it != user_ordered_groups.rend(); it++) {
 				inherited_permission = this->passPermissionForGroup(inherited_permission, permission, *it);
 			}
-			inherited_permission = this->passPermissionForAccount(inherited_permission, permission, client.account_id.value());
+			inherited_permission = this->passPermissionForAccount(inherited_permission, permission, client.value().account_id.value());
 		}
 		return inherited_permission;
 	}

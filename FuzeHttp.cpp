@@ -44,7 +44,23 @@ std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 	return path_name;
 }
 
-std::variant<Client, FuzeHttp::Response> FuzeHttp::State::getClient(FuzeHttp::Request req) const {
+std::optional<Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Request req) const {
+	auto cookie_header = req.find("Cookie");
+	if (cookie_header == req.end())
+		return {};
+	std::string session_id_base64 = cookie_header->value();
+	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator it = this->sessions.find(session_id_base64); it != this->sessions.end()) {
+		return this->clients.at(it->second.client_id);
+		// return Client{
+		// 	.account_id = session->second.account_id,
+		// 	.session_id = session_id_base64
+		// };
+	}
+	else
+		return {};
+}
+
+std::variant<Client, FuzeHttp::Response> FuzeHttp::State::getRequiredClient(FuzeHttp::Request req) const {
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Cookie required but none was found."};

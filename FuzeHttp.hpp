@@ -312,7 +312,8 @@ private:
 
 class State {
 public: // TODO change to protected if possible
-	std::variant<Client, FuzeHttp::Response> getClient(FuzeHttp::Request req) const;
+	std::optional<Client> getClientIfExists(FuzeHttp::Request req) const;
+	std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;

@@ -22,8 +22,6 @@ add_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
 add_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
 include_directories(${ImageMagick_INCLUDE_DIRS})
 
-find_package(nlohmann_json REQUIRED) # maybe replace with boost::json later
-
 find_package(PostgreSQL REQUIRED)
 find_library(ECPG_LIB ecpg)
 include_directories (${PostgreSQL_INCLUDE_DIRS})
@@ -41,7 +39,6 @@ target_link_libraries(MediaboardServer
     Boost::json
     Boost::program_options
     ${ImageMagick_LIBRARIES}
-    nlohmann_json::nlohmann_json
     ${ECPG_LIB}
     PostgreSQL::PostgreSQL
     SQLite3::SQLite3

@@ -1,23 +1,21 @@
 #include "thread.hpp"
 #include <ctime>
-#include <nlohmann/json.hpp>
+#include <boost/json.hpp>
 #include <set>
 #include <utility>
-
-using json = nlohmann::json;
 
 class websocket_session; // Forward declaration
 
 class Board : public PermissionManagedObject {
 public:
 	Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi);
-	int createThread(json thread_json);
-	int createPost(json post_json);
+	int createThread(boost::json::object thread_json, int author_client_id);
+	int createPost(boost::json::object post_json, int author_client_id);
 	void deleteThread(int thread_id);
 	void deleteMessageFromThread(int message_id, int thread_id);
 	// std::string dumpLastThread() const;
 	// bool keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const;
-	std::string dumpAllThreads(const Client& client) const;
+	std::string dumpAllThreads(const std::optional<Client>& client) const;
 	// std::string dumpThread(int thread_id, int client_id, std::string key) const;
 	// std::string dumpPermissionsInThread(int thread_id, int client_id) const;
 	bool threadExists(int thread_id) const { std::unordered_map<int, Thread>::const_iterator it = threads.find(thread_id); return it != threads.end(); };

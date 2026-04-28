@@ -4,23 +4,21 @@
 #include <ctime>
 #include <string>
 #include <unordered_set>
-#include <nlohmann/json.hpp>
-
-using json = nlohmann::json;
+#include <boost/json.hpp>
 
 class websocket_session;
 
 class Thread : public PermissionManagedObject {
 public:
 	// Thread();
-	Thread(PermissionObjectBase* permission_parent, json thread_json, FuzeDBI::Connection* fuze_dbi);
-	Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi);
+	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
+	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi);
 	std::string dumpThread() const;
-	json asJson() const { return this->thread_as_json; }
+	boost::json::object asJson() const { return this->thread_as_json; }
 	// int getNumberOfPosts() const { return this->posts.size(); };
 	// void addInitialPost(json post_json, bool save_to_database);
 	void createPostFromStruct(struct db_post_struct* post_struct);
-	int createPostFromJson(json post_json);
+	int createPostFromJson(boost::json::object post_json, int author_client_id);
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
 	void deleteMessage(int message_id);
@@ -30,16 +28,16 @@ public:
 	void addListener(websocket_session* listener);
 	void removeListener(websocket_session* listener);
 	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
-	nlohmann::json getMessagesAsJson(std::string key) const;
+	boost::json::array getMessagesAsJson(std::string key) const;
 	std::string dumpPost(int message_id, std::string key) const;
 	// std::string dumpPermissions(int client_id) const;
 	void markAsDeleted();
-	std::time_t getLastPostTime() const { return this->last_post_timestamp; }
+	std::chrono::time_point<std::chrono::system_clock> getLastPostTime() const { return this->last_post_created_at; }
 	bool isDeleted() const { return this->deleted; }
-	json getPermissionsAsJson(const Client& client) const;
+	boost::json::object getPermissionsAsJson(const std::optional<Client>& client) const;
 private:
 	int id;
-	std::time_t last_post_timestamp;
+	std::chrono::time_point<std::chrono::system_clock> last_post_created_at;
 	// std::vector<Post> posts;
 	std::map<int, Post> posts;
 	int reply_count = 0;
@@ -50,6 +48,6 @@ private:
 	// short files_i;
 	// std::string name;
 	// std::string content;
-	json thread_as_json;
+	boost::json::object thread_as_json;
 	bool deleted;
 };
