@@ -47,7 +47,7 @@ Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::C
 	this->post_as_json = post_json;
 	this->post_as_json["type"] = "post";
 
-	this->id_in_thread = post_json["id_in_thread"].as_int64();
+	this->id_in_thread = post_json["id_in_thread"].as_uint64();
 	this->thread_id = post_json["thread_id"].as_int64();
 	// User input checking is done on front-end, so it's not high priority to return an http error when username or content is empty/too long.
 	this->name = post_json["name"].as_string();
@@ -66,9 +66,9 @@ Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::C
 	this->created_at = std::chrono::system_clock::now();
 	this->post_as_json["created_at"] = std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count();
 
-	// this->id = fuze_dbi->query<int>("SELECT message_id FROM _sequences");
-	// fuze_dbi->query<void>("UPDATE _sequences SET message_id = $1", this->id + 1);
-	// fuze_dbi->query<void>("INSERT INTO message(id, thread, id_in_thread, author_client_id, name, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->name, std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count(), this->content);
+	this->id = fuze_dbi->query<int>("SELECT message_id FROM _sequences");
+	fuze_dbi->query<void>("UPDATE _sequences SET message_id = $1", this->id + 1);
+	fuze_dbi->query<void>("INSERT INTO message(id, thread, id_in_thread, author_client_id, name, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->name, (int)std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count(), this->content);
 	boost::json::array files_json = post_json["files"].as_array();
 	if (this->content.length() == 0 && files_json.size() == 0) {
 		throw std::runtime_error("Message Cannot be empty");
@@ -79,7 +79,7 @@ Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::C
 		const boost::json::string filename = it->as_string();
 		if (filename.size() <= static_cast<size_t>(MESSAGE_FIELDS::MAX_FILE_NAME_WITH_UUID)) {
 			this->files.push_back(filename.c_str());
-			// fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, filename.c_str());
+			fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, filename.c_str());
 		}
 		else
 			std::cerr << "File name too long to save to database. Length: " << filename.size() << std::endl;

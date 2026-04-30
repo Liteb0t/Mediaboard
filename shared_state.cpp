@@ -235,31 +235,6 @@ BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int 
 	return BasicResponse(http::status::ok, std::string("Added user to groups")); // Success
 }
 
-// For now, only used to create the admin account. therefore granted_group_id will be BUILTIN_GROUPS::ADMINISTRATORS
-std::string shared_state::createInvite(int granted_group_id) {
-	FuzeHttp::Invite invite{
-		.granted_group_id = granted_group_id,
-		.created_at = std::chrono::system_clock::now()
-	};
-	std::string key_base64 = FuzeHttp::generateKeyBase64(this->sessions);
-	// TODO save invite to database
-	// db->createSession(
-	// 	key_base64,
-	// 	session.account_id,
-	// 	std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
-	// );
-	std::cout << "[shared_state] Created invite with key " << key_base64 << std::endl;
-	this->invites.emplace(key_base64, std::move(invite));
-	return key_base64;
-}
-
-int shared_state::getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const { // returns USERS if none found
-	if (std::unordered_map<std::string, FuzeHttp::Invite>::const_iterator invite = this->invites.find(invite_key_base64); invite != this->invites.end())
-		return invite->second.granted_group_id;
-	else
-		return static_cast<int>(BUILTIN_GROUPS::PUBLIC);
-}
-
 /* I was unable to generate a key here that would work with the frontend WASM module.
 void shared_state::createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password) {
 	unsigned char intermediate_salt[crypto_pwhash_SALTBYTES];

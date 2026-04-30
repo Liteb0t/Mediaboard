@@ -72,10 +72,6 @@ public:
 	const boost::filesystem::path& getProgramLocation() const { return program_location; }
 	const std::string& getThumbnailFileFormat() const { return thumbnail_file_format; }
 	const char* getSecret() const { return this->secret_base64; }
-
-	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
-	std::string createInvite(int granted_group_id = static_cast<int>(BUILTIN_GROUPS::USERS));
-	int getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const; // returns PUBLIC if none found
 private:
 	const boost::filesystem::path media_location;
 	const boost::filesystem::path program_location;

@@ -14,6 +14,10 @@ FuzeHttp::Response createThread(shared_state* state, FuzeHttp::Request req, Fuze
 		std::cerr << "JSON error" << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[createThread] {}", e.what())};
 	}
+	std::cout << "Client ID " << client.id << std::endl;
+	if (client.account_id) {
+		std::cout << "ACCOUNT_ID FOUND ";
+	}
 	if (!state->clientHasPermission(client, PERMISSION::CREATE_THREAD)) {
 		return FuzeHttp::Response{
 			.status = http::status::forbidden,

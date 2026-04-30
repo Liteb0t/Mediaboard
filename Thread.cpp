@@ -49,7 +49,7 @@ void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
 }
 */
 int Thread::createMessageFromJson(boost::json::object post_json, int author_client_id) {
-	post_json["id_in_thread"] = this->messages.size();
+	post_json.emplace("id_in_thread", this->messages.size());
 	// const std::string placeholder_key(KEY_LENGTH+1, 'T');
 	// post_json["key"] = placeholder_key;
 	Message message(post_json, author_client_id, fuze_dbi); // Key is deleted from post_json in its constructor

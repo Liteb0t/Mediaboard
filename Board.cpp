@@ -10,7 +10,7 @@ Board::Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_
 }
 
 int Board::createThread(boost::json::object thread_json, int author_client_id) {
-	Thread thread(this, thread_json, author_client_id, fuze_dbi);
+	Thread thread(this, thread_json.at("thread").as_object(), author_client_id, fuze_dbi);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread.getLastMessageTime().time_since_epoch()).count(), thread.getId()));
 	return thread.getId();
@@ -39,10 +39,6 @@ void Board::deleteMessageFromThread(int message_id, int thread_id) {
 }
 
 /*
-bool Board::keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const {
-	return this->threads.at(thread_id).keyMatchesMessage(key, message_id);
-}
-
 void Board::cacheAllThreads() {
 	std::cout << "[Board] Retrieving threads from database..." << std::endl;
 	struct db_thread_array* thread_list = db_retrieve_threads();

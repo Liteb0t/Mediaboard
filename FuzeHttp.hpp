@@ -185,17 +185,23 @@ public:
 		// std::cout << "Final all_args length: " << this->all_args.size() << std::endl;
 	}
 	Response executeView(StateType state, Request& req) override {
+		std::optional<int> set_session_for_client_id;
 		if (this->all_args[0].index() == 3) { // There is a Client{} parameter in the view
-			std::cout << "Insert client here" << std::endl;
 			std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
 			if (!client) {
-				client = state->createClient();
+				client = state->createClient(); // Create anonymous client, because accounts are assigned a client on login
+				set_session_for_client_id = client.value().id;
 			}
-			this->setArg(0, client);
-			//return std::apply(view_func, std::tuple_cat(std::tie(state, req, client), /* extra_args */ view_args));
+			// std::cout << "client ID is: " << client.value().id << std::endl;
+			this->setArg(0, client.value());
 		}
-		//else
-			return std::apply(view_func, std::tuple_cat(std::tie(state, req), /* extra_args */ view_args));
+		Response res = std::apply(view_func, std::tuple_cat(std::tie(state, req), /* extra_args */ view_args));
+		if (set_session_for_client_id) {
+			std::string session_id_base64 = state->createSession(set_session_for_client_id.value());
+			if (!res.headers) res.headers.emplace();
+			res.headers->insert({"Set-Cookie", formatCookie(session_id_base64)});
+		}
+		return res;
 	}
 	size_t getPathSize() const override {
 		return this->all_args.size() - this->path_starts_at;
@@ -363,12 +369,16 @@ public: // TODO change to protected if possible
 	State(FuzeDBI::Connection* fuze_dbi);
 	std::optional<Client> getClientIfExists(FuzeHttp::Request req) const;
 	Client createClient(std::optional<int> account_id = {});
+	// std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
 
 	std::string createSession(int client_id);
 	const std::optional<FuzeHttp::Client> getClientFromSession(const std::string& session_id_base64) const;
 	void clearExpiredSessions();
 
-	// std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
+	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
+	std::string createInvite(int granted_group_id);
+	int getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const; // returns PUBLIC if none found
+
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;

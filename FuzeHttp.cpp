@@ -1,4 +1,5 @@
 #include "FuzeHttp.hpp"
+#include "permission_managed_object.hpp"
 
 char FuzeHttp::fromHex(char ch) {
 	return std::isdigit(ch) ? ch - '0' : std::tolower(ch) - 'a' + 10;
@@ -109,6 +110,7 @@ std::optional<FuzeHttp::Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Req
 	// TODO trim if multiple cookies found
 	std::cout << "[FuzeHttp] Received session ID: '" <<session_id_base64 << "'" << std::endl;
 	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator it = this->sessions.find(session_id_base64); it != this->sessions.end()) {
+		std::cout << "found session";
 		return this->clients.at(it->second.client_id);
 	}
 	else
@@ -153,13 +155,38 @@ void FuzeHttp::State::clearExpiredSessions() {
 	std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
 	std::erase_if(this->sessions, [this, &current_time](const std::pair<std::string, FuzeHttp::Session>& session_pair){
 		if (session_pair.second.created_at + this->authorization_token_lifespan < current_time) {
-			// db->deleteSession(session_pair.first);
+			fuze_dbi->query<void>("DELETE FROM session WHERE key = $1", session_pair.first);
 			return true;
 		}
 		else
 			return false;
 	});
 	std::cout << "[shared_state] Cleared " << initial_number_of_sessions - this->sessions.size() << " expired sessions." << std::endl;
+}
+
+// For now, only used to create the admin account. therefore granted_group_id will be BUILTIN_GROUPS::ADMINISTRATORS
+std::string FuzeHttp::State::createInvite(int granted_group_id) {
+	FuzeHttp::Invite invite{
+		.granted_group_id = granted_group_id,
+		.created_at = std::chrono::system_clock::now()
+	};
+	std::string key_base64 = FuzeHttp::generateKeyBase64(this->sessions);
+	// TODO save invite to database
+	// db->createSession(
+	// 	key_base64,
+	// 	session.account_id,
+	// 	std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
+	// );
+	std::cout << "[shared_state] Created invite with key " << key_base64 << std::endl;
+	this->invites.emplace(key_base64, std::move(invite));
+	return key_base64;
+}
+
+int FuzeHttp::State::getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const { // returns USERS if none found
+	if (std::unordered_map<std::string, FuzeHttp::Invite>::const_iterator invite = this->invites.find(invite_key_base64); invite != this->invites.end())
+		return invite->second.granted_group_id;
+	else
+		return static_cast<int>(BUILTIN_GROUPS::PUBLIC);
 }
 
 const std::optional<FuzeHttp::Client> FuzeHttp::State::getClientFromSession(const std::string& session_id_base64) const {

@@ -610,7 +610,7 @@ function createPost(data, client_permissions) {
 		post_name_element.textContent = data.name;
 
 		let post_timestamp_element = document.createElement("time");
-		let post_date = new Date(data.upload_timestamp * 1000 - timezone_offset_seconds * 1000).toISOString();;
+		let post_date = new Date(data["created_at"] * 1000 - timezone_offset_seconds * 1000).toISOString();;
 		post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
 		post_timestamp_element.textContent = post_date;
 		post_timestamp_element.classList.add("Timestamp");
@@ -640,9 +640,6 @@ function createPost(data, client_permissions) {
 				if (server_response.ok) {
 					post_box_element.classList.add("Deleted");
 					delete_button_element.disabled = true;
-				}
-				else {
-					alert(`Error: Could not delete message\nResponse: ${server_response.status} ${server_response.statusText}`);
 				}
 			}
 			// post_header_element.appendChild(delete_button_element);
