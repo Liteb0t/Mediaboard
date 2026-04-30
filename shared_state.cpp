@@ -10,24 +10,9 @@
 #include "permission_managed_object.hpp"
 #include "shared_state.hpp"
 #include "websocket_session.hpp"
+#include <boost/json/serialize.hpp>
 #include <chrono>
 #include <iostream>
-
-template<class Map>
-std::string generateKeyBase64(const Map& map) {
-	// _NO_PADDING variant is used because the key is not expected to be converted back into binary
-	char key_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
-	do {
-		unsigned char key_bytes[128/8];
-		randombytes_buf(key_bytes, 128/8);
-		sodium_bin2base64(
-			key_base64, sizeof key_base64,
-			key_bytes, 128/8,
-			sodium_base64_VARIANT_URLSAFE_NO_PADDING
-		);
-	} while (map.contains(key_base64)); // It's not impossible for it to clash...
-	return key_base64;
-}
 
 shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
 		: PermissionManager(0, fuze_database_interface),
@@ -99,56 +84,47 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 std::string shared_state::dumpAllGroups(const FuzeHttp::Client& client) const {
 	std::cout << "Dumping from ordered_groups_vec: ";
 
-	json groups_json;
-	groups_json["groups"] = json::object();
+	boost::json::object groups_json;
+	boost::json::array group_heirarchy_json;
 	int group_editable_threshold;
 	if (this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
 		group_editable_threshold = this->getClientRank(client) + 1;
 	else
 		group_editable_threshold = this->getOrderedGroups()->size();
 	for (int i = 0; i < this->getOrderedGroups()->size(); i++) {
-	// for (int group_id : *(this->getOrderedGroups())) {
 		int group_id = (*(this->getOrderedGroups()))[i];
+		group_heirarchy_json.emplace_back(group_id);
 		std::cout << group_id << ", ";
-		json group_json = this->getGroup(group_id)->asJson();
-		if (i >= group_editable_threshold) {
-			group_json["heirarchy_editable"] = true;
-			group_json["permission_editable"] = true;
-		}
-		else {
-			group_json["heirarchy_editable"] = false;
-			group_json["permission_editable"] = false;
-		}
-		/*if (group_id == static_cast<int>(BUILTIN_GROUPS::ADMINISTRATORS))
-			group_json["lock_position"] = "top";
-		else*/ 
-		if (	   group_id == static_cast<int>(BUILTIN_GROUPS::USERS)
-				|| group_id == static_cast<int>(BUILTIN_GROUPS::PUBLIC))
-			group_json["heirarchy_editable"] = false;
-		groups_json["groups"][std::to_string(group_id)] = group_json;
-		// get user from key
-		// if group rank >= user rank (measured by the highest group the user is in), then
-			// group is locked to the top
-
+		boost::json::object group_json{
+			{"id", group_id},
+			{"name", this->getGroup(group_id)->getName()},
+			{"heirarchy_editable", i >= group_editable_threshold && (group_id == static_cast<int>(BUILTIN_GROUPS::USERS) || group_id == static_cast<int>(BUILTIN_GROUPS::PUBLIC))},
+			{"permission_editable", i >= group_editable_threshold}
+		};
+		groups_json.emplace(std::to_string(group_id), group_json);
 	}
 	std::cout << " done." << std::endl;
 
-	groups_json["group_heirarchy"] = *(this->getOrderedGroups());
-	return groups_json.dump();
+
+	return boost::json::serialize(boost::json::object{
+		{"groups", groups_json},
+		{"group_heirarchy", group_heirarchy_json}
+	});
 }
 
 std::string shared_state::dumpMembersInGroup(int group_id) const {
-	const Group* group = this->getGroup(group_id);
-	const std::unordered_set<int> members = group->getMembers();
-	nlohmann::json members_json;
-	members_json["members"] = nlohmann::json::object();
+	const std::unordered_set<int> members = this->getGroup(group_id)->getMembers();
+	boost::json::object members_json;
 	for (int member_id : members) {
-		std::string member_id_as_string = std::to_string(member_id);
-		members_json["members"][member_id_as_string] = nlohmann::json::object();
-		members_json["members"][member_id_as_string]["id"] = member_id;
-		members_json["members"][member_id_as_string]["username"] = this->getUsernameFromAccount(member_id);
+		boost::json::object member_json{
+			{"id", member_id},
+			{"username", this->getUsernameFromAccount(member_id)}
+		};
+		members_json.emplace(std::to_string(member_id), member_json);
 	}
-	return members_json.dump();
+	return boost::json::serialize(boost::json::object{
+		{"members", members_json},
+	});
 }
 
 std::string shared_state::dumpMembersInGroupAsArray(int group_id) const {
@@ -201,90 +177,40 @@ BasicResponse shared_state::setGroupHeirarchy(const FuzeHttp::Client& client, st
 
 	return BasicResponse(http::status::ok, std::string("Updated group heirarchy")); // Success
 }
-/*
-BasicResponse shared_state::createAccount(json account_json) {
-	if (	   account_json.contains("username")
-			&& account_json.contains("password")
-			) {
-		std::string username = account_json["username"].template get<std::string>();
-		if (username == "Administrator")
-			return BasicResponse(http::status::bad_request, std::string("Username reserved"));
-		else if (db_account_username_exists(username.c_str()))
-			return BasicResponse(http::status::bad_request, std::string("Username already exists"));
-
-		std::string password = account_json["password"].template get<std::string>();
-		if (password.length() < ACCOUNT_MIN_PASSWORD)
-			return BasicResponse(http::status::bad_request, "Password must contain at least " + std::to_string(ACCOUNT_MIN_PASSWORD) + " character(s)");
-		
-		const User* new_user = this->createUser(username, password);
-		json response_json;
-		// response_json["account_id"] = new_user->getId();
-		response_json["account_key"] = new_user->getKey();
-		return BasicResponse(http::status::created, response_json);
-	}
-	else
-		return BasicResponse(http::status::bad_request, std::string("One or more JSON fields missing from request"));
-}
-BasicResponse shared_state::getKeyFromPassword(json request_json) const {
-	if (	   request_json.contains("username")
-			&& request_json.contains("password")
-			) {
-		std::string username = request_json["username"].template get<std::string>();
-		if (this->userExists(username)) {
-			// const User* user = this->getUser(username);
-			int user_id = this->getIdFromUsername(username);
-			std::string password = request_json["password"].template get<std::string>();
-			if (this->checkUserPassword(user_id, password)) {
-				// Password is correct
-				json response_json;
-				response_json["account_key"] = this->getUserKey(user_id);
-				return BasicResponse(http::status::ok, response_json);
-			}
-			else
-				return BasicResponse(http::status::bad_request, std::string("The password is incorrect"));
-		}
-		else
-			return BasicResponse(http::status::bad_request, std::string("No user with that username was found"));
-	}
-	else
-		return BasicResponse(http::status::bad_request, std::string("One or more JSON fields missing from request"));
-}
-*/
 
 std::string shared_state::dumpAllUsers(const FuzeHttp::Client& client) const {
-	json users_json;
-	users_json["users"] = json::object();
+	boost::json::object users_json;
 	int client_rank = this->getClientRank(client);
 	bool client_has_manage_permissions_permission = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
-	// boost::shared_ptr<std::unordered_map<int, User>> _users = this->getUsers();
-	// for (std::unordered_map<int, User>::const_iterator user_it = _users->begin(); user_it != _users->end(); user_it++) {
 	for (auto& account : this->accounts) {
-		int user_id = account.first;
-		std::cout << user_id << ", ";
-		// json user_json = this->getUser(user_id)->asJson();
-		nlohmann::json user_json = json::object();
-		user_json["id"] = user_id;
-		user_json["username"] = this->getUsernameFromAccount(user_id);
-		int user_rank = this->getClientRank(client);
-		user_json["rank"] = user_rank;
-		user_json["groups"] = json::array();
-		// int group_rank = 0;
-		for (const int group_id : this->getOrderedGroupsContainingMember(user_id)) {
+		int account_id = account.first;
+		std::cout << account_id << ", ";
+		int account_rank = this->getAccountRank(account_id);
+		boost::json::object account_json {
+			{"id", account_id},
+			{"username", this->getUsernameFromAccount(account_id)},
+			{"rank", client_rank}
+		};
+		boost::json::array user_groups_json;
+		for (const int group_id : this->getOrderedGroupsContainingMember(account_id)) {
 			const Group* group = this->getGroup(group_id);
-			nlohmann::json group_json;
-			group_json["id"] = group->getId();
-			group_json["name"] = group->getName();
-			user_json["groups"].push_back(group_json);
+			user_groups_json.emplace_back(boost::json::object{
+				{"id", group->getId()},
+				{"name", group->getName()}
+			});
 		}
-		user_json["permission_editable"] = client_has_manage_permissions_permission && client_rank < user_rank;
-		users_json["users"][std::to_string(user_id)] = user_json;
+		account_json.emplace("groups", user_groups_json);
+		account_json.emplace("permission_editable", client_has_manage_permissions_permission && client_rank < account_rank);
+		users_json.emplace(std::to_string(account_id), account_json);
 	}
 	std::cout << " done." << std::endl;
 
-	return users_json.dump();
+	return boost::json::serialize(boost::json::object{
+		{"users", users_json}
+	});
 }
 
-BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id) {
+BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int account_id, std::vector<int> groups_by_id) {
 	int client_rank;
 	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::forbidden, std::string("Cannot change group heirarchy; permission denied."));
@@ -300,7 +226,7 @@ BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int 
 	for (int group_id : groups_by_id) {
 		// const Group* group = this->getGroup(group_id);
 		if (client_rank < this->getGroupRank(group_id)) {
-			this->addUserToGroup(user_id, group_id);
+			this->addAccountToGroup(account_id, group_id);
 		}
 		else {
 			return BasicResponse(http::status::forbidden, std::string("Permission denied; Attempted to add user to group with a rank greater than or equal to your own."));
@@ -309,49 +235,13 @@ BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int 
 	return BasicResponse(http::status::ok, std::string("Added user to groups")); // Success
 }
 
-std::string shared_state::createSession(int client_id) {
-	FuzeHttp::Session session{
-		.client_id = client_id,
-		.created_at = std::chrono::system_clock::now()
-	};
-	std::string key_base64 = generateKeyBase64(this->sessions);
-	// db->createSession(
-	// 	key_base64,
-	// 	session.client_id,
-	// 	std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
-	// );
-	this->sessions.emplace(key_base64, std::move(session));
-	return key_base64;
-}
-
-void shared_state::clearExpiredSessions() {
-	int initial_number_of_sessions = this->sessions.size();
-	std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
-	std::erase_if(this->sessions, [this, &current_time](const std::pair<std::string, FuzeHttp::Session>& session_pair){
-		if (session_pair.second.created_at + this->authorization_token_lifespan < current_time) {
-			// db->deleteSession(session_pair.first);
-			return true;
-		}
-		else
-			return false;
-	});
-	std::cout << "[shared_state] Cleared " << initial_number_of_sessions - this->sessions.size() << " expired sessions." << std::endl;
-}
-
-const std::optional<FuzeHttp::Client> shared_state::getClientFromSession(const std::string& session_id_base64) const {
-	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator session = this->sessions.find(session_id_base64); session != this->sessions.end())
-		return this->clients.at(session->second.client_id);
-	else
-		return {};
-}
-
 // For now, only used to create the admin account. therefore granted_group_id will be BUILTIN_GROUPS::ADMINISTRATORS
 std::string shared_state::createInvite(int granted_group_id) {
 	FuzeHttp::Invite invite{
 		.granted_group_id = granted_group_id,
 		.created_at = std::chrono::system_clock::now()
 	};
-	std::string key_base64 = generateKeyBase64(this->sessions);
+	std::string key_base64 = FuzeHttp::generateKeyBase64(this->sessions);
 	// TODO save invite to database
 	// db->createSession(
 	// 	key_base64,

@@ -5,11 +5,10 @@
 
 enum class MESSAGE_FIELDS : size_t { MAX_NAME = 32, MAX_CONTENT = 5000, MAX_FILE_NAME = 205, MAX_FILE_NAME_WITH_UUID = 205+36 };
 
-class Post {
+class Message {
 public:
-	// Post(struct db_post_struct* post_struct);
-	Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
-	std::string dumpPost() const;
+	Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
+	std::string dump() const;
 	boost::json::object asJson() const { return this->post_as_json; };
 	int getId() const { return this->id; };
 	int getIdInThread() const { return this->id_in_thread; };

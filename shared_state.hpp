@@ -11,7 +11,7 @@
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 
 #include "beast.hpp"
-#include "board.hpp"
+#include "Board.hpp"
 #include "FuzeDBI.hpp"
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
@@ -73,10 +73,6 @@ public:
 	const std::string& getThumbnailFileFormat() const { return thumbnail_file_format; }
 	const char* getSecret() const { return this->secret_base64; }
 
-	std::string createSession(int client_id);
-	const std::optional<FuzeHttp::Client> getClientFromSession(const std::string& session_id_base64) const;
-	void clearExpiredSessions();
-
 	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
 	std::string createInvite(int granted_group_id = static_cast<int>(BUILTIN_GROUPS::USERS));
 	int getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const; // returns PUBLIC if none found
@@ -96,7 +92,6 @@ private:
 	// std::unordered_map<int, Board> boards;
 	std::unordered_map<int, Board> boards;
 	// std::vector<int> ordered_boards;
-	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);
 	// HTTP sessions. Client validates using a cookie
 };
 

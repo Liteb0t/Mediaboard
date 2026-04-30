@@ -3,7 +3,7 @@
 
 #include "FuzeHttp.hpp"
 #include "FuzeDBI.hpp"
-#include "group.hpp"
+#include "Group.hpp"
 #include "permission_collection.hpp"
 #include <algorithm>
 #include <iostream>
@@ -17,7 +17,9 @@ enum class BUILTIN_GROUPS {
 };
 
 struct Account {
-	static const int PUBLIC = 0;
+	inline static const int PUBLIC = 0;
+	inline static const size_t MAX_USERNAME = 32;
+	inline static const size_t MIN_PASSWORD = 3;
 	const int id;
 	std::string username;
 };
@@ -30,14 +32,20 @@ public:
 	PermissionObjectBase(FuzeDBI::Connection* fuze_dbi); // save new object to database
 	void cacheAllPermissions();
 	void addGroupPermissionCollection(int group_id) {
+		int new_permission_collection_id = fuze_dbi->query<int>("SELECT permission_collection_id FROM _sequences");
+		fuze_dbi->query<void>("UPDATE _sequences SET permission_collection_id = $1", new_permission_collection_id+1);
+		fuze_dbi->query<void>("INSERT INTO permission_collection(id, permission_object_id, permission_group_id) VALUES ($1, $2, $3)", new_permission_collection_id, this->id, group_id);
 		std::cout << "[PermissionObjectBase] adding group permission_collection for group " << group_id << std::endl;
-		// PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::GROUP, group_id, db);
-		// this->group_permissions.emplace(group_id, permission_collection);
+		PermissionCollection permission_collection(new_permission_collection_id, {}, group_id);
+		this->group_permissions.emplace(group_id, permission_collection);
 	}
 	void addAccountPermissionCollection(int account_id) {
+		int new_permission_collection_id = fuze_dbi->query<int>("SELECT permission_collection_id FROM _sequences");
+		fuze_dbi->query<void>("UPDATE _sequences SET permission_collection_id = $1", new_permission_collection_id+1);
+		fuze_dbi->query<void>("INSERT INTO permission_collection(id, permission_object_id, account_id) VALUES ($1, $2, $3)", new_permission_collection_id, this->id, account_id);
 		std::cout << "[PermissionObjectBase] adding account permission_collection for account " << account_id << std::endl;
-		// PermissionCollection permission_collection(this->permission_object_id, USER_OR_GROUP::USER, account_id, db);
-		// this->account_permissions.emplace(account_id, permission_collection);
+		PermissionCollection permission_collection(new_permission_collection_id, account_id, {});
+		this->account_permissions.emplace(account_id, permission_collection);
 	}
 	void removeGroupPermissionCollection(int group_id) {
 		// this->group_permissions.at(group_id).removeFromDatabase();
@@ -51,12 +59,12 @@ public:
 		std::unordered_map<int, PermissionCollection>::const_iterator group_iterator = this->group_permissions.find(group_id);
 		if (group_iterator == this->group_permissions.end())
 			this->addGroupPermissionCollection(group_id);
-		this->group_permissions.at(group_id).setPermission(permission_type, setting);
+		this->group_permissions.at(group_id).setPermission(permission_type, setting, fuze_dbi);
 	}
 	void setAccountPermission(int user_id, PERMISSION permission_type, THREE_STATE_SETTING setting) {
 		if (auto it = this->account_permissions.find(user_id); it == this->account_permissions.end())
 			this->addAccountPermissionCollection(user_id);
-		this->account_permissions.at(user_id).setPermission(permission_type, setting);
+		this->account_permissions.at(user_id).setPermission(permission_type, setting, fuze_dbi);
 	}
 	bool passPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const {
 		inherited_permission = this->passInheritedPermissionForGroup(inherited_permission, permission, group_id);
@@ -85,7 +93,7 @@ public:
 		inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::PUBLIC));
 		if (client && client.value().account_id) {
 			inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::USERS));
-			std::vector<int> user_ordered_groups = this->getOrderedGroupsContainingMember(client.value().id);
+			std::vector<int> user_ordered_groups = this->getOrderedGroupsContainingMember(client.value().account_id.value());
 			for (std::vector<int>::const_reverse_iterator it = user_ordered_groups.rbegin(); it != user_ordered_groups.rend(); it++) {
 				inherited_permission = this->passPermissionForGroup(inherited_permission, permission, *it);
 			}
@@ -107,8 +115,9 @@ public:
 	bool permissionCollectionExistsForAccount(int account_id) const { return this->account_permissions.contains(account_id); }
 protected:
 	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
-	int permission_object_id; // Used to identify this object in the database
+	int getPermissionObjectId() const { return this->id; }
 private:
+	int id;
 	FuzeDBI::Connection* fuze_dbi;
 	std::unordered_map<int, PermissionCollection> group_permissions;
 	std::unordered_map<int, PermissionCollection> account_permissions;
@@ -136,7 +145,10 @@ public:
 	int getClientRank(const FuzeHttp::Client& client) const override {
 		if (!client.account_id)
 			return this->ordered_groups.size(); // This is the least privileged rank
-		int account_id = client.account_id.value();
+		else
+			return this->getAccountRank(client.account_id.value());
+	}
+	int getAccountRank(int account_id) const {
 		if (this->owner_id && account_id == this->owner_id.value())
 			return 0; // This is the most privileged rank
 		int i;
@@ -185,16 +197,19 @@ public:
 		this->ordered_groups.erase(it);
 		this->groups.erase(group_id);
 		this->saveGroupHeirarchy();
-		db_delete_group(group_id);
+		// db_delete_group(group_id);
 	}
 	void removeUserFromGroup(int user_id, int group_id) {
 		this->groups.at(group_id).removeMember(user_id);
-		db_remove_member_from_group(user_id, group_id);
+		// db_remove_member_from_group(user_id, group_id);
 	}
 	int addGroup(std::string group_name, int group_rank);
-	void addUserToGroup(int user_id, int group_id) {
-		this->groups.at(group_id).addMember(user_id);
-		db_add_member_to_group(user_id, group_id);
+	void addAccountToGroup(int account_id, int group_id) {
+		if (!this->groups.at(group_id).containsMember(account_id)) {
+			this->groups.at(group_id).addMember(account_id);
+			fuze_dbi->query<void>("INSERT INTO permission_group_account(permission_group_id, account_id) VALUES ($1, $2)", group_id, account_id);
+		}
+		// db_add_member_to_group(user_id, group_id);
 	}
 	int createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64);
 	bool accountExists(const std::string username) const { return this->username_to_id_map.contains(username); }
@@ -226,7 +241,7 @@ protected:
 	// 	return &(this->users.at(new_user.getId()));
 	// }
 	void cacheAllGroups();
-	void cacheAllUsers();
+	void cacheAllAccounts();
 
 	void setOrderedGroups(std::vector<int> ordered_groups) {
 		this->ordered_groups = ordered_groups;

@@ -46,19 +46,20 @@ target_link_libraries(MediaboardServer
 )
 target_sources(MediaboardServer
   PRIVATE
-    board.cpp
+    Board.cpp
     db_interface.c
     FuzeHttp.cpp
-    group.cpp
+    Group.cpp
     http_session.cpp
     listener.cpp
     main.cpp
+    Message.cpp
     permission_managed_object.cpp
-    post.cpp
     shared_state.cpp
-    thread.cpp
+    Thread.cpp
     urls.cpp
     views.cpp
+    views_registration.cpp
     websocket_session.cpp
 )
 configure_file(config.ini ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)

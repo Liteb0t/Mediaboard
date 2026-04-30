@@ -31,6 +31,21 @@ std::string FuzeHttp::getDecodedURL(boost::string_view raw_URL) {
 	return decoded_url;
 }
 
+void FuzeHttp::generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t password_hash_hash_base64_len, const char* password_hash_base64, size_t password_hash_base64_len) {
+	// hash of password hash in base64 is stored in DB
+	unsigned char password_hash_hash[crypto_generichash_BYTES];
+	crypto_generichash(
+		password_hash_hash, crypto_generichash_BYTES,
+		reinterpret_cast<const unsigned char*>(password_hash_base64), password_hash_base64_len,
+					   NULL, 0
+	);
+	sodium_bin2base64(
+		password_hash_hash_base64, password_hash_hash_base64_len,
+		password_hash_hash, sizeof password_hash_hash,
+		sodium_base64_VARIANT_URLSAFE
+	);
+}
+
 std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 	// path_name excludes URL parameters (stuff after '?')
 	// removes trailing / but leaves first /
@@ -44,14 +59,43 @@ std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 	return path_name;
 }
 
-FuzeHttp::Client FuzeHttp::State::createClient(int account_id) {
+FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
+		: fuze_dbi(fuze_dbi) {
+	// Load sessions from the database
+	for (auto session_tuple :fuze_dbi->queryRows<std::tuple<int, std::string, int>>("SELECT client_id, key, created_at FROM session")) {
+		int seconds_since_epoch = std::get<2>(session_tuple); // TODO use long instead of int
+		std::chrono::seconds sec(seconds_since_epoch);
+		std::chrono::time_point<std::chrono::system_clock> created_at(sec);
+		FuzeHttp::Session session{
+			.client_id = std::get<0>(session_tuple),
+			.created_at = created_at
+		};
+		this->sessions.emplace(std::get<1>(session_tuple), std::move(session));
+	}
+	// TODO clear clients which have expired or dont have an account
+	for (auto client_tuple :fuze_dbi->queryRows<std::tuple<int, int>>("SELECT id, account_id FROM client")) {
+		std::optional<int> account_id;
+		if (std::get<1>(client_tuple) != -1)
+			account_id = std::get<1>(client_tuple);
+		else
+			account_id = {};
+		FuzeHttp::Client client{
+			.id = std::get<0>(client_tuple),
+			.account_id = account_id
+		};
+		this->clients.emplace(std::get<0>(client_tuple), std::move(client));
+	}
+}
+
+FuzeHttp::Client FuzeHttp::State::createClient(std::optional<int> account_id) {
 	int new_client_id = fuze_dbi->query<int>("SELECT client_id FROM _sequences");
 	fuze_dbi->query<void>("UPDATE _sequences SET client_id = $1", new_client_id+1);
 	std::cout << "[FuzeHttp] Creating new client with ID " << new_client_id << std::endl;
-	fuze_dbi->query<void>("INSERT INTO client(id, account_id) VALUES ($1, $2)", new_client_id, account_id);
-	Client client{.id = new_client_id};
-	if (account_id > -1)
-		client.account_id = account_id;
+	if (account_id)
+		fuze_dbi->query<void>("INSERT INTO client(id, account_id) VALUES ($1, $2)", new_client_id, account_id.value());
+	else
+		fuze_dbi->query<void>("INSERT INTO client(id) VALUES ($1)", new_client_id);
+	Client client{.id = new_client_id, .account_id = account_id};
 	this->clients.emplace(new_client_id, client);
 	return client;
 }
@@ -60,18 +104,17 @@ std::optional<FuzeHttp::Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Req
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
 		return {};
-	std::string session_id_base64 = cookie_header->value();
+	std::string cookie = cookie_header->value();
+	std::string session_id_base64 = cookie.substr(cookie.find("=")+1);
+	// TODO trim if multiple cookies found
+	std::cout << "[FuzeHttp] Received session ID: '" <<session_id_base64 << "'" << std::endl;
 	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator it = this->sessions.find(session_id_base64); it != this->sessions.end()) {
 		return this->clients.at(it->second.client_id);
-		// return Client{
-		// 	.account_id = session->second.account_id,
-		// 	.session_id = session_id_base64
-		// };
 	}
 	else
 		return {};
 }
-
+/*
 std::variant<FuzeHttp::Client, FuzeHttp::Response> FuzeHttp::State::getRequiredClient(FuzeHttp::Request req) const {
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
@@ -87,18 +130,41 @@ std::variant<FuzeHttp::Client, FuzeHttp::Response> FuzeHttp::State::getRequiredC
 	else
 		return FuzeHttp::Response{.status = http::status::unauthorized, .error_message = "Session ID is invalid. It may have expired, or it may never had existed to begin with."};
 }
+*/
 
-void FuzeHttp::generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t password_hash_hash_base64_len, const char* password_hash_base64, size_t password_hash_base64_len) {
-	// hash of password hash in base64 is stored in DB
-	unsigned char password_hash_hash[crypto_generichash_BYTES];
-	crypto_generichash(
-		password_hash_hash, crypto_generichash_BYTES,
-		reinterpret_cast<const unsigned char*>(password_hash_base64), password_hash_base64_len,
-		NULL, 0
-	);
-	sodium_bin2base64(
-		password_hash_hash_base64, password_hash_hash_base64_len,
-		password_hash_hash, sizeof password_hash_hash,
-		sodium_base64_VARIANT_URLSAFE
-	);
+std::string FuzeHttp::State::createSession(int client_id) {
+	FuzeHttp::Session session{
+		.client_id = client_id,
+		.created_at = std::chrono::system_clock::now()
+	};
+	std::string key_base64 = generateKeyBase64(this->sessions);
+	fuze_dbi->query<void>("INSERT INTO session(client_id, key, created_at) VALUES ($1, $2, $3)", client_id, key_base64, (int)std::chrono::duration_cast<std::chrono::seconds>(session.created_at.time_since_epoch()).count());
+	// db->createSession(
+	// 	key_base64,
+	// 	session.client_id,
+	// 	std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
+	// );
+	this->sessions.emplace(key_base64, std::move(session));
+	return key_base64;
+}
+
+void FuzeHttp::State::clearExpiredSessions() {
+	int initial_number_of_sessions = this->sessions.size();
+	std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
+	std::erase_if(this->sessions, [this, &current_time](const std::pair<std::string, FuzeHttp::Session>& session_pair){
+		if (session_pair.second.created_at + this->authorization_token_lifespan < current_time) {
+			// db->deleteSession(session_pair.first);
+			return true;
+		}
+		else
+			return false;
+	});
+	std::cout << "[shared_state] Cleared " << initial_number_of_sessions - this->sessions.size() << " expired sessions." << std::endl;
+}
+
+const std::optional<FuzeHttp::Client> FuzeHttp::State::getClientFromSession(const std::string& session_id_base64) const {
+	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator session = this->sessions.find(session_id_base64); session != this->sessions.end())
+		return this->clients.at(session->second.client_id);
+	else
+		return {};
 }

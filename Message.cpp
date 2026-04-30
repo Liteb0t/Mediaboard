@@ -1,4 +1,4 @@
-#include "post.hpp"
+#include "Message.hpp"
 #include <boost/json/serialize.hpp>
 #include <chrono>
 #include <string>
@@ -38,13 +38,17 @@ Post::Post(struct db_post_struct* post_struct) {
 }
 */
 // Save post when JSON is received
-Post::Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi) {
+Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi) {
+	if (!(post_json.contains("files") && post_json.contains("name") && post_json.contains("content"))) {
+		throw std::runtime_error("Message JSON is missing one or more of the following entries: files, name, content");
+	}
+	// if ((message_content.length() == 0 && post_json["files"].size() == 0) || message_content.length() > static_cast<size_t>(MESSAGE_FIELDS::MAX_CONTENT))
+	//	return api_response(http::status::bad_request, std::string("The post does not meet the constraints set by the server.\nThis could mean that the message content was empty and no files were uploaded, or the message content is too long."));
 	this->post_as_json = post_json;
 	this->post_as_json["type"] = "post";
 
 	this->id_in_thread = post_json["id_in_thread"].as_int64();
 	this->thread_id = post_json["thread_id"].as_int64();
-
 	// User input checking is done on front-end, so it's not high priority to return an http error when username or content is empty/too long.
 	this->name = post_json["name"].as_string();
 	if (this->name == "") {
@@ -56,13 +60,8 @@ Post::Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connect
 		this->post_as_json["name"] = this->name;
 	}
 	this->content = post_json["content"].as_string();
-	// if (this->content == "") {
-	// 	this->content = "I'm speechless."; // Post looks ugly with empty content.
-	// 	this->post_as_json["content"] = this->content;
-	// }
 	if (this->content.length() > static_cast<size_t>(MESSAGE_FIELDS::MAX_CONTENT)) {
-		this->content = "I have much to say.";
-		this->post_as_json["content"] = this->content;
+		throw std::runtime_error(std::format("Message content length {} exceeds the limit of {}", this->content.length(), static_cast<size_t>(MESSAGE_FIELDS::MAX_CONTENT)));
 	}
 	this->created_at = std::chrono::system_clock::now();
 	this->post_as_json["created_at"] = std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count();
@@ -70,10 +69,13 @@ Post::Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connect
 	// this->id = fuze_dbi->query<int>("SELECT message_id FROM _sequences");
 	// fuze_dbi->query<void>("UPDATE _sequences SET message_id = $1", this->id + 1);
 	// fuze_dbi->query<void>("INSERT INTO message(id, thread, id_in_thread, author_client_id, name, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->name, std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count(), this->content);
-	boost::json::array file_vector = post_json["files"].as_array();
-	boost::json::array::const_iterator it = file_vector.begin();
+	boost::json::array files_json = post_json["files"].as_array();
+	if (this->content.length() == 0 && files_json.size() == 0) {
+		throw std::runtime_error("Message Cannot be empty");
+	}
+	boost::json::array::const_iterator it = files_json.begin();
 	this->files_i = 0;
-	while (it != file_vector.end() && files_i < 4) {
+	while (it != files_json.end() && files_i < 4) {
 		const boost::json::string filename = it->as_string();
 		if (filename.size() <= static_cast<size_t>(MESSAGE_FIELDS::MAX_FILE_NAME_WITH_UUID)) {
 			this->files.push_back(filename.c_str());
@@ -91,11 +93,11 @@ Post::Post(boost::json::object post_json, int author_client_id, FuzeDBI::Connect
 	// this->post_as_json["deleted"] = false;
 }
 
-std::string Post::dumpPost() const {
+std::string Message::dump() const {
 	return boost::json::serialize(this->post_as_json);
 }
 
-void Post::markAsDeleted() {
+void Message::markAsDeleted() {
 	this->deleted = true;
 	// db_mark_post_as_deleted(this->id);
 }

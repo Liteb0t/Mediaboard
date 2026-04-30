@@ -112,6 +112,13 @@ public:
 	ReturnType getValue(PGresult* result, int row = 0, int column = 0) {
 		return getValueImpl(std::type_identity<ReturnType>{}, result, row, column);
 	}
+	template<typename T>
+	std::optional<T> getValueImpl(std::type_identity<std::optional<T>>, PGresult* result, int row, int column) {
+		if (PQgetisnull(result, row, column) == 1) // 1 means null
+			return {};
+		else
+			return this->getValueImpl(std::type_identity<T>{}, result, row, column);
+	}
 	std::string getValueImpl(std::type_identity<std::string>, PGresult* result, int row, int column) {
 		return std::string(PQgetvalue(result, row, column));
 	}

@@ -1,29 +1,29 @@
-#include "board.hpp"
+#include "Board.hpp"
 // #include "db_interface.h"
 #include <boost/json/serialize.hpp>
 #include <sstream>
 #include <iostream>
 
 Board::Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi)
-		: PermissionManagedObject(permission_parent, fuze_dbi),
+		: PermissionManagedObject(permission_parent, 1, fuze_dbi),
 		fuze_dbi(fuze_dbi) {
 }
 
 int Board::createThread(boost::json::object thread_json, int author_client_id) {
 	Thread thread(this, thread_json, author_client_id, fuze_dbi);
 	this->threads.emplace(thread.getId(), thread);
-	this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread.getLastPostTime().time_since_epoch()).count(), thread.getId()));
+	this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread.getLastMessageTime().time_since_epoch()).count(), thread.getId()));
 	return thread.getId();
 }
 
-int Board::createPost(boost::json::object post_json, int author_client_id) {
-	int thread_id = post_json["thread_id"].as_int64();
+int Board::createMessage(boost::json::object message_json, int author_client_id) {
+	int thread_id = message_json["thread_id"].as_int64();
 	Thread* thread = &this->threads.at(thread_id);
-	std::time_t old_post_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastPostTime().time_since_epoch()).count();
-	int new_post_id = thread->createPostFromJson(post_json, author_client_id);
-	std::time_t new_post_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastPostTime().time_since_epoch()).count();
-	this->ordered_threads.erase(std::make_pair(old_post_time, thread_id));
-	this->ordered_threads.insert(std::make_pair(new_post_time, thread_id));
+	std::time_t old_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
+	int new_post_id = thread->createMessageFromJson(message_json, author_client_id);
+	std::time_t new_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
+	this->ordered_threads.erase(std::make_pair(old_message_time, thread_id));
+	this->ordered_threads.insert(std::make_pair(new_message_time, thread_id));
 	return new_post_id;
 }
 
@@ -121,7 +121,7 @@ void Board::removeListenerFromThread(websocket_session* listener, int thread_id)
 		std::cout << "[Board] Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
-std::string Board::dumpPost(int thread_id, int post_id, std::string key) const {
-	return this->threads.at(thread_id).dumpPost(post_id, key);
+std::string Board::dumpMessage(int thread_id, int message_id) const {
+	return this->threads.at(thread_id).dumpMessage(message_id);
 }
 

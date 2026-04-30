@@ -63,6 +63,22 @@ using Headers = std::unordered_map<std::string, std::string>;
 
 void generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t password_hash_hash_base64_len, const char* password_hash_base64, size_t password_hash_base64_len);
 
+template<class Map>
+std::string generateKeyBase64(const Map& map) {
+	// _NO_PADDING variant is used because the key is not expected to be converted back into binary
+	char key_base64[sodium_base64_ENCODED_LEN(128/8, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
+	do {
+		unsigned char key_bytes[128/8];
+		randombytes_buf(key_bytes, 128/8);
+		sodium_bin2base64(
+			key_base64, sizeof key_base64,
+			key_bytes, 128/8,
+			sodium_base64_VARIANT_URLSAFE_NO_PADDING
+		);
+	} while (map.contains(key_base64)); // It's not impossible for it to clash...
+	return key_base64;
+}
+
 template<typename StateType>
 void getSaltBase64(StateType state, const std::string& username, char* salt_base64) {
 	unsigned char salt[crypto_pwhash_SALTBYTES];
@@ -344,14 +360,20 @@ private:
 
 class State {
 public: // TODO change to protected if possible
-	State(FuzeDBI::Connection* fuze_dbi) : fuze_dbi(fuze_dbi) {}
+	State(FuzeDBI::Connection* fuze_dbi);
 	std::optional<Client> getClientIfExists(FuzeHttp::Request req) const;
-	Client createClient(int account_id = -1);
-	std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
+	Client createClient(std::optional<int> account_id = {});
+
+	std::string createSession(int client_id);
+	const std::optional<FuzeHttp::Client> getClientFromSession(const std::string& session_id_base64) const;
+	void clearExpiredSessions();
+
+	// std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;
 private:
 	FuzeDBI::Connection* fuze_dbi;
+	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);
 }; // class State
 } // namespace FuzeHttp
