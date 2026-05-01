@@ -60,6 +60,25 @@ std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 	return path_name;
 }
 
+/*
+std::variant<http::file_body::value_type, FuzeHttp::Response> FuzeHttp::State::openFile(boost::filesystem::path path) const {
+	if (!boost::filesystem::exists(path))
+		return FuzeHttp::Response{.status = http::status::not_found};
+	if (!boost::filesystem::is_regular_file(path))
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Is a directory"};
+	// Attempt to open the file
+	beast::error_code ec;
+	http::file_body::value_type body;
+	body.open(path.c_str(), beast::file_mode::scan, ec);
+
+	// Handle the case where the file doesn't exist
+	if (ec == boost::system::errc::no_such_file_or_directory)
+		return FuzeHttp::Response{.status = http::status::not_found};
+	else if (ec) // Handle an unknown error
+		return FuzeHttp::Response{.status = http::status::internal_server_error};
+}
+*/
+
 FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
 		: fuze_dbi(fuze_dbi) {
 	// Load sessions from the database

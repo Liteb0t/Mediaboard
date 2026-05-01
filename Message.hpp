@@ -7,6 +7,7 @@ enum class MESSAGE_FIELDS : size_t { MAX_NAME = 32, MAX_CONTENT = 5000, MAX_FILE
 
 class Message {
 public:
+	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::string content, std::vector<std::string> files, bool deleted = false);
 	Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
 	std::string dump() const;
 	boost::json::object asJson() const { return this->post_as_json; };
@@ -24,7 +25,8 @@ private:
 	// char upload_timestamp[20];
 	std::vector<std::string> files;
 	short files_i;
-	std::string name;
+	int author_client_id;
+	std::string author_username;
 	std::string content;
 	boost::json::object post_as_json;
 	std::chrono::time_point<std::chrono::system_clock> created_at;

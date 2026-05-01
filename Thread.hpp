@@ -9,26 +9,28 @@ class websocket_session;
 
 class Thread : public PermissionManagedObject {
 public:
-	// Thread();
+	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi, int id, int permission_object_id);
 	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi);
-	std::string dumpThread() const;
-	boost::json::object asJson() const { return this->thread_as_json; }
+	// std::string dumpThread() const;
+	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const;
+	boost::json::object asJsonWithMessages(const std::optional<FuzeHttp::Client>& client) const;
 	// int getNumberOfPosts() const { return this->posts.size(); };
 	// void addInitialPost(json post_json, bool save_to_database);
 	// void createPostFromStruct(struct db_post_struct* post_struct);
+	void cacheMessage(Message&& message);
 	int createMessageFromJson(boost::json::object message_json, int author_client_id);
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
 	void deleteMessage(int message_id);
 	// bool keyMatchesMessage(std::string key, int message_id) const;
-	bool messageExists(int message_id) const { std::map<int, Message>::const_iterator it = messages.find(message_id); return it != messages.end(); };
+	bool messageExists(int message_id_in_thread) const { return this->messages.contains(message_id_in_thread); }
 	int getId() const { return this->id; };
 	void addListener(websocket_session* listener);
 	void removeListener(websocket_session* listener);
 	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
-	boost::json::array getMessagesAsJson(std::string key) const;
-	std::string dumpMessage(int message_id) const;
+	boost::json::array getMessagesAsJson() const;
+	// std::string dumpMessage(int message_id) const;
 	// std::string dumpPermissions(int client_id) const;
 	void markAsDeleted();
 	std::chrono::time_point<std::chrono::system_clock> getLastMessageTime() const { return this->last_message_created_at; }

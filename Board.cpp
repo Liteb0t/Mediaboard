@@ -38,39 +38,47 @@ void Board::deleteMessageFromThread(int message_id, int thread_id) {
 	}
 }
 
-/*
 void Board::cacheAllThreads() {
 	std::cout << "[Board] Retrieving threads from database..." << std::endl;
-	struct db_thread_array* thread_list = db_retrieve_threads();
-	for (int i = 0; i < thread_list->used; i++) {
-		// json thread_json;
-		// thread_json["id"] = thread_list->array[i].id;
-		// thread_json["number_of_posts"] = thread_list->array[i].number_of_posts;
-		// Thread thread(thread_json, false);
-		Thread thread(this, &thread_list->array[i], db, fuze_dbi);
+	for (auto thread_tuple : fuze_dbi->queryRows<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = 'FALSE'")) {
+		Thread thread(this, fuze_dbi, std::get<0>(thread_tuple), std::get<1>(thread_tuple));
 		std::cout << thread.getId() << ", ";
 		this->threads.insert(std::make_pair(thread.getId(), thread));
 	}
-	freeThreadArray(thread_list);
 	std::cout << "done." << std::endl;
 
-	std::cout << "[Board] Retrieving posts from database..." << std::endl;
-	struct db_post_array* post_history = db_retrieve_history();
-	for (int i = 0; i < post_history->used; i++) {
-		std::cout << "#" << post_history->array[i].thread_id << '/' << post_history->array[i].id_in_thread << ", ";
-		this->threads.at(post_history->array[i].thread_id).createPostFromStruct(&post_history->array[i]);
+	std::cout << "[Board] Retrieving messages from database..." << std::endl;
+	for (auto message_tuple : fuze_dbi->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE deleted = 'FALSE'")) {
+		int message_id = std::get<0>(message_tuple);
+		int thread_id = std::get<1>(message_tuple);
+		int id_in_thread = std::get<2>(message_tuple);
+		int seconds_since_epoch = std::get<3>(message_tuple); // TODO use long instead of int
+		std::chrono::seconds sec(seconds_since_epoch);
+		std::chrono::time_point<std::chrono::system_clock> created_at(sec);
+		std::vector<std::string> message_files;
+		for (auto file_name :fuze_dbi->queryRows<std::string>("SELECT file_name FROM message_file WHERE message_id = $1", message_id)) {
+			message_files.push_back(file_name);
+		}
+		Message message(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), message_files);
+		this->threads.at(thread_id).cacheMessage(std::move(message));
+		std::cout << "#" << thread_id << '/' << id_in_thread << ", ";
 	}
-	freePostArray(post_history);
 	std::cout << "done." << std::endl;
+
+	// Mark invalid threads as deleted. Sometimes when an error occurs whilst creating a thread, it saves the thread to the DB but not its corresponding message.
+	for (auto& thread_pair : this->threads) {
+		if (!thread_pair.second.messageExists(0))
+			thread_pair.second.markAsDeleted();
+	}
 	
-	// Sort threads by most recent post date
+	// Sort threads by most recent message date
 	for (std::unordered_map<int, Thread>::const_iterator it = this->threads.begin(); it != this->threads.end(); ++it) {
-		this->ordered_threads.insert(std::make_pair(it->second.getLastPostTime(), it->first));
+		this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(it->second.getLastMessageTime().time_since_epoch()).count(), it->first));
 	}
 
 	std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 }
-
+/*
 std::string Board::dumpThread(int thread_id, int client_id, std::string key) const {
 	nlohmann::json thread_json;
 	thread_json["messages"] = this->threads.at(thread_id).getMessagesAsJson(key);
@@ -82,14 +90,16 @@ std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {
 	return this->threads.at(thread_id).dumpPermissions(client_id);
 }
 */
+boost::json::object Board::getThreadPermissionsAsJson(int thread_id, const std::optional<FuzeHttp::Client>& client) const {
+	return this->threads.at(thread_id).getPermissionsAsJson(client);
+}
 
 std::string Board::dumpAllThreads(const std::optional<FuzeHttp::Client>& client) const {
 	boost::json::array threads_json = boost::json::array();
 	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
 		// boost::shared_ptr<Thread> thread = this->getThread(it->second);
 		if (!this->threads.at(it->second).isDeleted() && this->threads.at(it->second).clientHasPermission(client, PERMISSION::VIEW_THREAD)) {
-			boost::json::object thread_json = this->threads.at(it->second).asJson();
-			thread_json["client_permissions"] = this->threads.at(it->second).getPermissionsAsJson(client);
+			boost::json::object thread_json = this->threads.at(it->second).asJson(client);
 			threads_json.emplace_back(thread_json);
 		}
 	}
@@ -117,7 +127,6 @@ void Board::removeListenerFromThread(websocket_session* listener, int thread_id)
 		std::cout << "[Board] Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
-std::string Board::dumpMessage(int thread_id, int message_id) const {
-	return this->threads.at(thread_id).dumpMessage(message_id);
-}
-
+// std::string Board::dumpMessage(int thread_id, int message_id) const {
+// 	return this->threads.at(thread_id).dumpMessage(message_id);
+// }

@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/json.hpp>
 #include <iostream>
 #include <variant>
@@ -186,7 +187,7 @@ public:
 	}
 	Response executeView(StateType state, Request& req) override {
 		std::optional<int> set_session_for_client_id;
-		if (this->all_args[0].index() == 3) { // There is a Client{} parameter in the view
+		if (std::tuple_size<ArgTuple>{} > 0 && this->all_args[0].index() == 3) { // There is a Client{} parameter in the view
 			std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
 			if (!client) {
 				client = state->createClient(); // Create anonymous client, because accounts are assigned a client on login
@@ -378,6 +379,8 @@ public: // TODO change to protected if possible
 	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
 	std::string createInvite(int granted_group_id);
 	int getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const; // returns PUBLIC if none found
+
+	// std::variant<http::file_body::value_type, FuzeHttp::Response> openFile(boost::filesystem::path path) const;
 
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;

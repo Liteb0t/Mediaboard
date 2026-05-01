@@ -5,6 +5,13 @@
 #include <boost/beast/http/status.hpp>
 #include <iostream>
 
+FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
+	return FuzeHttp::Response{
+		.status = http::status::ok,
+		.body = "This is a test"
+	};
+}
+
 FuzeHttp::Response createThread(shared_state* state, FuzeHttp::Request req, FuzeHttp::Client client) {
 	boost::json::object thread_json;
 	try {
@@ -35,11 +42,35 @@ FuzeHttp::Response createThread(shared_state* state, FuzeHttp::Request req, Fuze
 	};
 }
 
-FuzeHttp::Response threads(shared_state* state, FuzeHttp::Request req) {
+FuzeHttp::Response showThreads(shared_state* state, FuzeHttp::Request req) {
 	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
 	return FuzeHttp::Response{
 		.status = http::status::ok,
 		.body = state->main_board()->dumpAllThreads(client)
+	};
+}
+
+FuzeHttp::Response showThread(shared_state* state, FuzeHttp::Request req, int thread_id) {
+	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!state->main_board()->threadExists(thread_id))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
+	else if (!state->main_board()->getThread(thread_id)->clientHasPermission(client, PERMISSION::VIEW_THREAD))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to view this thread."};
+	return FuzeHttp::Response{
+		.status = http::status::ok,
+		.json = state->main_board()->getThread(thread_id)->asJsonWithMessages(client)
+	};
+}
+
+FuzeHttp::Response getThreadPermissions(shared_state* state, FuzeHttp::Request req, int thread_id) {
+	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!state->main_board()->threadExists(thread_id))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
+	else if (!state->main_board()->getThread(thread_id)->clientHasPermission(client, PERMISSION::VIEW_THREAD))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to view this thread."};
+	return FuzeHttp::Response{
+		.status = http::status::ok,
+		.json = state->main_board()->getThreadPermissionsAsJson(thread_id, client)
 	};
 }
 

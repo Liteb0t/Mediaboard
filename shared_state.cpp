@@ -44,7 +44,7 @@ shared_state::~shared_state() {
 void shared_state::start() {
 	Board main_board(this, fuze_dbi);
 	this->boards.emplace(0, main_board);
-	// this->boards.at(0).cacheAllThreads();
+	this->boards.at(0).cacheAllThreads();
 }
 
 void shared_state::join(websocket_session* session) {

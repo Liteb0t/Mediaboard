@@ -4,6 +4,17 @@
 #include <iostream>
 #include <cstring>
 
+Thread::Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi, int id, int permission_object_id)
+		: PermissionManagedObject(permission_parent, permission_object_id, fuze_dbi),
+		id(id),
+		fuze_dbi(fuze_dbi) {
+	this->cacheAllPermissions();
+	this->thread_as_json = {
+		{"id", id},
+		{"reply_count", 0}
+	};
+}
+
 // Save thread when JSON is received
 Thread::Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi)
 		: PermissionManagedObject(permission_parent, fuze_dbi),
@@ -31,10 +42,22 @@ Thread::Thread(PermissionObjectBase* permission_parent, struct db_thread_struct*
 	this->thread_as_json["deleted"] = this->deleted;
 	this->thread_as_json["reply_count"] = 0;
 }
-*/
 std::string Thread::dumpThread() const {
 	return boost::json::serialize(this->thread_as_json);
 }
+*/
+
+boost::json::object Thread::asJson(const std::optional<FuzeHttp::Client>& client) const {
+	boost::json::object thread_json = this->thread_as_json;
+	thread_json.emplace("client_permissions", this->getPermissionsAsJson(client));
+	return thread_json;
+}
+boost::json::object Thread::asJsonWithMessages(const std::optional<FuzeHttp::Client>& client) const {
+	boost::json::object thread_json = this->asJson(client);
+	thread_json.emplace("messages", this->getMessagesAsJson());
+	return thread_json;
+}
+
 /*
 void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
 	Post post(post_struct);
@@ -48,6 +71,17 @@ void Thread::createPostFromStruct(struct db_post_struct* post_struct) {
 	this->last_post_timestamp = post.getUploadTimestamp();
 }
 */
+void Thread::cacheMessage(Message&& message) {
+	if (message.getIdInThread() == 0)
+		this->thread_as_json["post_zero"] = message.asJson();
+	else if (!message.isDeleted()) {
+		this->reply_count++;
+		this->thread_as_json["reply_count"] = this->reply_count;
+	}
+	this->messages.emplace(message.getIdInThread(), message);
+	this->last_message_created_at = message.createdAt();
+}
+
 int Thread::createMessageFromJson(boost::json::object post_json, int author_client_id) {
 	post_json.emplace("id_in_thread", this->messages.size());
 	// const std::string placeholder_key(KEY_LENGTH+1, 'T');
@@ -76,7 +110,7 @@ void Thread::deleteMessage(int message_id) {
 // 	return message_id != 0 && this->messages.at(message_id).getKey() == key; // Don't match key to message 0, because threads can't be deleted by regular users (yet?)
 // }
 
-boost::json::array Thread::getMessagesAsJson(std::string key) const {
+boost::json::array Thread::getMessagesAsJson() const {
 	boost::json::array multiple_post_json = boost::json::array();
 	for (auto it = this->messages.begin(); it != this->messages.end(); ++it) {
 		if (!it->second.isDeleted()) {
@@ -89,10 +123,10 @@ boost::json::array Thread::getMessagesAsJson(std::string key) const {
 	return multiple_post_json;
 }
 
-std::string Thread::dumpMessage(int message_id) const {
-	boost::json::object message_json = this->messages.at(message_id).asJson();
-	return boost::json::serialize(message_json);
-}
+// std::string Thread::dumpMessage(int message_id) const {
+// 	boost::json::object message_json = this->messages.at(message_id).asJson();
+// 	return boost::json::serialize(message_json);
+// }
 
 // std::string Thread::dumpPermissions(int client_id) const {
 // 	return this->getPermissionCollectionsAsJson(client_id).dump();

@@ -8,8 +8,11 @@ using namespace http;
 void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	// C-style strings are immutable parts of the URL, and strings/ints are variables passed into the view.
 	// Client{} is used when the function needs to identify the user via a cookie.
+	controller->addPattern(verb::get, showMainPage						);
 	controller->addPattern(verb::post, createThread, Client{},			"api", "thread");
-	controller->addPattern(verb::get, threads, 							"api", "threads");
+	controller->addPattern(verb::get, showThread, 						"api", "thread", int());
+	controller->addPattern(verb::get, getThreadPermissions,				"api", "thread", int(), "permissions");
+	controller->addPattern(verb::get, showThreads, 						"api", "threads");
 	controller->addPattern(verb::get, client, 							"api", "user", "client");
 	controller->addPattern(verb::get, acceptInvite,						"invite", std::string());
 
