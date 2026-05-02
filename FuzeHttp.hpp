@@ -58,6 +58,7 @@ struct Response {
 	std::optional<std::unordered_map<std::string, std::string>> headers;
 	std::optional<std::string> error_message;
 	std::optional<boost::json::object> json;
+	std::optional<boost::filesystem::path> file;
 	std::optional<std::string> body;
 };
 using Headers = std::unordered_map<std::string, std::string>;
@@ -107,6 +108,10 @@ void getSaltBase64(StateType state, const std::string& username, char* salt_base
 		sodium_base64_VARIANT_URLSAFE
 	);
 }
+beast::string_view getMimeType(beast::string_view path);
+
+template<typename BodyType>
+http::response<BodyType> buildResponse(FuzeHttp::Response basic_response, http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req);
 
 // https://stackoverflow.com/a/79894118/18658154
 // Type Filtering Logic

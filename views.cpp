@@ -8,7 +8,7 @@
 FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.body = "This is a test"
+		.file = std::format("{}/frontend/index.html", state->getProgramLocation().string())
 	};
 }
 
@@ -42,7 +42,7 @@ FuzeHttp::Response createThread(shared_state* state, FuzeHttp::Request req, Fuze
 	};
 }
 
-FuzeHttp::Response showThreads(shared_state* state, FuzeHttp::Request req) {
+FuzeHttp::Response getThreads(shared_state* state, FuzeHttp::Request req) {
 	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
 	return FuzeHttp::Response{
 		.status = http::status::ok,
@@ -50,7 +50,7 @@ FuzeHttp::Response showThreads(shared_state* state, FuzeHttp::Request req) {
 	};
 }
 
-FuzeHttp::Response showThread(shared_state* state, FuzeHttp::Request req, int thread_id) {
+FuzeHttp::Response getThread(shared_state* state, FuzeHttp::Request req, int thread_id) {
 	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
 	if (!state->main_board()->threadExists(thread_id))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
@@ -107,5 +107,47 @@ FuzeHttp::Response acceptInvite(shared_state* state, FuzeHttp::Request req, std:
 		.headers = {{
 			{"Location", std::format("/registration.html?invite={}", invite_key_base64)}
 		}}
+	};
+}
+
+// TODO find a way to handle multiple directories under one view
+FuzeHttp::Response getMedia(shared_state* state, FuzeHttp::Request req, std::string file_path) {
+	std::cout << "Showing thru getMedia" << std::endl;
+	std::string file_name = file_path;
+	int filename_extension_index;
+	if ((filename_extension_index = file_name.rfind(".")) == -1) {
+		filename_extension_index = file_name.size();
+	}
+	if (filename_extension_index >= 36) {
+		file_name.erase(filename_extension_index - 36, 36);
+	}
+	return FuzeHttp::Response{
+		.status = http::status::ok,
+		.headers = {{
+			{"Content-Disposition", std::format("inline; filename=\"{}\"", file_name)}
+		}},
+		.file = std::format("{}/{}", state->getMediaLocation().string(), file_path)
+	};
+}
+FuzeHttp::Response getThumbnail(shared_state* state, FuzeHttp::Request req, std::string file_path) {
+	std::cout << "Showing thru getMedia" << std::endl;
+	std::string file_name = file_path;
+	int filename_extension_index;
+	if ((filename_extension_index = file_name.rfind(".")) == -1) {
+		filename_extension_index = file_name.size();
+	}
+	if (filename_extension_index >= 36) {
+		file_name.erase(filename_extension_index - 36, 36);
+	}
+	return FuzeHttp::Response{
+		.status = http::status::ok,
+		.file = std::format("{}/thumbnails/{}", state->getMediaLocation().string(), file_path)
+	};
+}
+
+FuzeHttp::Response showThread(shared_state* state, FuzeHttp::Request req, int thread_id) {
+	return FuzeHttp::Response{
+		.status = http::status::ok,
+		.file = std::format("{}/frontend/index.html", state->getProgramLocation().string())
 	};
 }

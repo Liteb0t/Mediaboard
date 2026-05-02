@@ -10,7 +10,6 @@
 #include "FuzeHttp.hpp"
 #include "field_lengths.h"
 #include "http_session.hpp"
-#include "permission_managed_object.hpp"
 #include "shared_state.hpp"
 #include "websocket_session.hpp"
 #include <boost/algorithm/string/replace.hpp>
@@ -24,7 +23,6 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <Magick++.h>
-#include <nlohmann/json.hpp>
 #include <charconv>
 #include <fstream>
 #include <iostream>
@@ -39,41 +37,6 @@ http_session::http_session(boost::asio::ip::tcp::socket&& socket, shared_state* 
 }
 
 //------------------------------------------------------------------------------
-
-// Return a reasonable mime type based on the extension of a file.
-beast::string_view
-mime_type(beast::string_view path) {
-	using beast::iequals;
-	auto const ext = [&path] 	{
-		auto const pos = path.rfind(".");
-		if(pos == beast::string_view::npos)
-			return beast::string_view{};
-		return path.substr(pos);
-	}();
-	if(iequals(ext, ".htm"))  return "text/html";
-	if(iequals(ext, ".html")) return "text/html";
-	if(iequals(ext, ".php"))  return "text/html";
-	if(iequals(ext, ".css"))  return "text/css";
-	if(iequals(ext, ".txt"))  return "text/plain";
-	if(iequals(ext, ".js"))   return "application/javascript";
-	if(iequals(ext, ".json")) return "application/json";
-	if(iequals(ext, ".xml"))  return "application/xml";
-	if(iequals(ext, ".swf"))  return "application/x-shockwave-flash";
-	if(iequals(ext, ".flv"))  return "video/x-flv";
-	if(iequals(ext, ".png"))  return "image/png";
-	if(iequals(ext, ".jpe"))  return "image/jpeg";
-	if(iequals(ext, ".jpeg")) return "image/jpeg";
-	if(iequals(ext, ".jpg"))  return "image/jpeg";
-	if(iequals(ext, ".jxl"))  return "image/jxl";
-	if(iequals(ext, ".gif"))  return "image/gif";
-	if(iequals(ext, ".bmp"))  return "image/bmp";
-	if(iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
-	if(iequals(ext, ".tiff")) return "image/tiff";
-	if(iequals(ext, ".tif"))  return "image/tiff";
-	if(iequals(ext, ".svg"))  return "image/svg+xml";
-	if(iequals(ext, ".svgz")) return "image/svg+xml";
-	return "application/text";
-}
 
 const std::string forbidden_file_name_chars = "#?";
 
@@ -203,34 +166,22 @@ http::message_generator handle_request(
 	FuzeHttp::Response basic_res;
 	try {
 		basic_res = controller->matchPathAndExecute(state, req);
+		std::cout << "[http_session] basic_res.status: " << basic_res.status << std::endl;
+		if (basic_res.status != http::status::not_found) {
+			if (basic_res.json || basic_res.body)
+				return FuzeHttp::buildResponse<http::string_body>(basic_res, req);
+			else if (basic_res.file)
+				return FuzeHttp::buildResponse<http::file_body>(basic_res, req);
+			else
+				return FuzeHttp::buildResponse<http::empty_body>(basic_res, req);
+		}
 	}
 	catch(const std::exception& e) {
 		std::string error_text = std::format("[http_session] {}", e.what());
 		std::cerr << error_text << std::endl;
 		return server_error(error_text);
 	}
-	std::cout << "[http_session] basic_res.status: " << basic_res.status << std::endl;
-	if (basic_res.status != http::status::not_found) {
-		http::response<http::string_body> res{basic_res.status, req.version()};
-		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-		if (basic_res.headers) {
-			for (auto& header : basic_res.headers.value())
-				res.set(header.first, header.second);
-		}
-		if (basic_res.error_message)
-			res.set("message", basic_res.error_message.value());
-		if (basic_res.json) {
-			res.set(http::field::content_type, "application/json");
-			res.body() = boost::json::serialize(basic_res.json.value());
-		}
-		else if (basic_res.error_message)
-			res.body() = basic_res.error_message.value();
-		else if (basic_res.body)
-			res.body() = basic_res.body.value();
-		res.keep_alive(req.keep_alive());
-		res.prepare_payload();
-		return res;
-	}
+
 
 	auto const getNumberFromPath = [&path_name](int start_index) {
 		std::size_t found = path_name.find_first_not_of("0123456789", start_index+1);
@@ -297,186 +248,7 @@ http::message_generator handle_request(
 		return std::make_pair(-1, key);
 	};
 	*/
-
-		// Make sure we can handle the method
-	if 		(req.method() == http::verb::get) {
-		bool is_media;
-		if (path_name.substr(0, 5) == "/api/") {
-			http::response<http::string_body> res;
-			/*
-			std::pair<int, std::string> client;
-			try {
-				client = getUserFromToken();
-			}
-			catch(std::string error_text) {
-				return api_response(http::status::bad_request, error_text);
-			}
-			res.set(http::field::content_type, "application/json");
-			if (path_name.substr(5) == "threads/") {
-				res.result(http::status::ok);
-				res.body() = state->main_board()->dumpAllThreads(client.first);
-			}
-			else if (path_name.substr(5, 7) == "server/") {
-				if (path_name.substr(12, 12) == "permissions/") {
-					res.body() = state->dumpPermissions(client.first);
-					res.result(http::status::ok);
-				}
-				else
-					return api_response(http::status::bad_request, std::string("Bad URL. Do better next time."));
-			}
-			else if (path_name.substr(5, 7) == "thread/") {
-				std::pair<int, int> thread_in_path;
-				try {
-					 thread_in_path = getNumberFromPath(12);
-				}
-				catch(std::string error_text) {
-					return api_response(http::status::bad_request, error_text);
-				}
-				if (state->main_board()->threadExists(thread_in_path.first)) {
-					if (path_name.substr(thread_in_path.second) == "/permissions/") {
-						res.body() = state->main_board()->dumpPermissionsInThread(thread_in_path.first, client.first);
-					}
-					else {
-						boost::shared_ptr<Thread> thread = state->main_board()->getThread(thread_in_path.first);
-						if (thread->userHasPermission(client.first, PERMISSION::VIEW_THREAD)) {
-							res.body() = state->main_board()->dumpThread(thread_in_path.first, client.first, client.second);
-						}
-						else {
-							return api_response(http::status::forbidden, std::string("You do not have permission to view this thread."));
-						}
-					}
-					res.result(http::status::ok);
-				}
-				else {
-					std::cout << "Error: thread '" << thread_in_path.first << "' does not exist" << std::endl;
-					res.result(404);
-				}
-			}
-			else */
-			if (path_name.substr(5, 6) == "group/") { // TODO add /members/ to end of URL check
-				std::size_t found = path_name.find_first_not_of("0123456789", 11);
-				if (path_name[found] != '/') {
-					return api_response(http::status::bad_request, std::string("Invalid group ID; trailing '/' not found."));
-				}
-				else if (found == 11) {
-					return api_response(http::status::bad_request, std::string("Invalid group ID; cannot be empty."));
-				}
-				else {
-					int group_in_url;
-					// Get group ID from URL substring
-					std::from_chars(path_name.substr(11, found).data(), path_name.substr(11, found).data() + path_name.substr(11, found).size(), group_in_url);
-					std::cout << "group_id_url: " << group_in_url << std::endl;
-					if (state->groupExists(group_in_url)) {
-						// res.body() = state->dumpMembersInGroup(group_in_url);
-						res.body() = state->dumpMembersInGroupAsArray(group_in_url);
-						res.result(http::status::ok);
-					}
-					else
-						return api_response(http::status::bad_request, std::string("Group '") + std::to_string(group_in_url) + "' not found.");
-				}
-			}
-			/*
-			else if (path_name.substr(5) == "groups/") {
-				res.body() = state->dumpAllGroups(client.first);
-				res.result(http::status::ok);
-			}
-			// Currently only used for checking if the client has MANAGE_PERMISSIONS on the server level, so the frontend can determine whether to show the "manage server" tab
-			else if (path_name.substr(5, 5) == "user/") {
-				int user_id;
-				if (path_name.substr(10) == "client/")
-					user_id = client.first;
-				else {
-					return api_response(http::status::not_implemented, std::string("only /user/client/ is implemented"));
-				}
-				nlohmann::json response_json;
-				response_json["server_permissions"]["manage_permissions"] = state->userHasPermission(user_id, PERMISSION::MANAGE_PERMISSIONS);
-				response_json["server_permissions"]["create_thread"] = state->userHasPermission(user_id, PERMISSION::CREATE_THREAD);
-				// response_json["server_permissions"]["delete_post"] = state->userHasPermission(user_id, PERMISSION::DELETE_POST);
-				return api_response_json(http::status::ok, response_json);
-			}
-			else if (path_name.substr(5) == "users/") {
-				res.body() = state->dumpAllUsers(client.first);
-				int user_rank = state->getUserRank(client.first);
-				res.set("Client-Rank", std::to_string(user_rank));
-				res.result(http::status::ok);
-			}
-			*/
-			else {
-				return api_response(http::status::bad_request, "That API endpoint does not exist");
-			}
-			res.prepare_payload();
-			return res;
-		}
-		// Build the path to the requested file
-		if (path_name.substr(0, 7) == "/media/")
-			is_media = true;
-		else
-			is_media = false;
-		// Check if path leads to a directory
-		boost::filesystem::path filesystem_path;
-		if (is_media)
-			filesystem_path = std::format("{}/{}", state->getMediaLocation().string(), path_name.substr(7));
-		else {
-			if (path_name.empty() || path_name.ends_with("/")) // So /thread/1/ and such will redirect to index.html
-				filesystem_path = std::format("{}/frontend/index.html", state->getProgramLocation().string());
-			else
-				filesystem_path = std::format("{}/frontend{}", state->getProgramLocation().string(), path_name);
-		}
-		std::cout << "Attempting to open " << filesystem_path << std::endl;
-		if (!boost::filesystem::exists(filesystem_path))
-			return not_found(path_name);
-		if (!boost::filesystem::is_regular_file(filesystem_path))
-			return bad_request("Is a directory.");
-
-		// Attempt to open the file
-		beast::error_code ec;
-		http::file_body::value_type body;
-		body.open(filesystem_path.c_str(), beast::file_mode::scan, ec);
-
-		// Handle the case where the file doesn't exist
-		if (ec == boost::system::errc::no_such_file_or_directory)
-			return not_found(path_name);
-		else if (ec) // Handle an unknown error
-			return server_error(ec.message());
-
-		std::string filename;
-		if (is_media) {
-			int filename_start_index = path_name.rfind("/") + 1;
-			filename = path_name.substr(filename_start_index, path_name.length() - filename_start_index);
-			int filename_extension_index;
-			if ((filename_extension_index = filename.rfind(".")) == -1) {
-				filename_extension_index = filename.size();
-			}
-			if (filename_extension_index >= 36) {
-				filename.erase(filename_extension_index - 36, 36);
-			}
-			// We know it's not a user-submitted file when the filename is too short to include a UUID.
-			else
-				is_media = false;
-			std::cout << "Is media. Filename: " << filename << std::endl;
-		}
-
-		// Cache the size since we need it after the move
-		auto const size = body.size();
-
-		// Respond to GET request
-		http::response<http::file_body> res{
-			std::piecewise_construct,
-			std::make_tuple(std::move(body)),
-			std::make_tuple(http::status::ok, req.version())
-		};
-		if (is_media) {
-			// Only set when the filename is long enough to include the UUID.
-			// In other words, we know it's a user-uploaded file.
-			res.set("Content-Disposition", "inline; filename=\"" + filename + "\"");
-		}
-		res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
-		res.set(http::field::content_type, mime_type(filesystem_path.string()));
-		res.content_length(size);
-		res.keep_alive(req.keep_alive());
-		return res;
-	}
-	else if (req.method() == http::verb::post) {
+	if (req.method() == http::verb::post) {
 		if (req.target() == "/api/upload/") {
 			// request_parser<empty_body> req_parser;
 			// std::string content_dispo =  req.get()[http::field::content_disposition] << std::endl;
