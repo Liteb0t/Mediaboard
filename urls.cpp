@@ -16,7 +16,7 @@ void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	controller->addPattern(verb::get, client, 							"api", "user", "client");
 	controller->addPattern(verb::get, acceptInvite,						"invite", std::string());
 	controller->addPattern(verb::get, getMedia,							"media", std::string());
-	controller->addPattern(verb::get, getThumbnail,							"media", "thumbnails", std::string());
+	controller->addPattern(verb::get, getThumbnail,						"media", "thumbnails", std::string());
 	controller->addPattern(verb::get, showThread,						"thread", int());
 
 	controller->addPattern(verb::post, requestNewAccountParameters, 	"registration", "request_new_account_parameters");

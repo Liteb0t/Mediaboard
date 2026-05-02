@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
 		("postgresql_host,h", boost::program_options::value<std::string>(&postgresql_host)->default_value("localhost"),  "Host for the PostgreSQL database.")
 		("postgresql_port,p", boost::program_options::value<unsigned short>(&postgresql_port)->default_value(5432), "The port at which the database is available.")
 		("postgresql_database_name,n", boost::program_options::value<std::string>(&postgresql_database_name)->default_value("fuze_mediaboard"), "Name of the PostgreSQL database.")
-		("sqlite_database_path,s", boost::program_options::value<std::string>(&postgresql_uri)->default_value("database/sqlite_data.db"),  "File where SQLite data is stored.")
+		("sqlite_database_path,s", boost::program_options::value<std::string>(&sqlite_database_path)->default_value("database/sqlite_data.db"),  "File where SQLite data is stored.")
 		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.")
 		("thumbnail_file_format", boost::program_options::value<std::string>(&thumbnail_file_format)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.");
 
@@ -131,11 +131,23 @@ int main(int argc, char* argv[]) {
 		return EXIT_FAILURE;
 	}
 	*/
-	FuzeDBI::Connection* fuze_database_interface = new FuzeDBI::Connection(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name, current_version);
 
-	std::cout << "Set port: " << server_port << std::endl;
 	boost::filesystem::path media_location;
+	FuzeDBI::Connection* fuze_database_interface;
 	try {
+#ifdef FUZEDBI_POSTGRES
+		fuze_database_interface = new FuzeDBI::Connection(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name);
+#elifdef FUZEDBI_SQLITE
+		boost::filesystem::path sqlite_file_location;
+		sqlite_file_location = boost::filesystem::canonical(sqlite_database_path, location);
+		fuze_database_interface = new FuzeDBI::Connection(sqlite_file_location.string());
+#endif
+		auto version_string = fuze_database_interface->query<std::optional<std::string>>("SELECT version FROM _info");
+		if (version_string)
+			std::cout << "Version " <<	version_string.value() << std::endl;
+		else
+			std::cerr << "Version string not found in database" << std::endl;
+		std::cout << "Set port: " << server_port << std::endl;
 		media_location = boost::filesystem::canonical(media_location_relative_str, location);
 	}
 	catch (const std::exception& exception) {

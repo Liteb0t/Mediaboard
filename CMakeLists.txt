@@ -7,7 +7,7 @@ project(Mediaboard
   HOMEPAGE_URL "https://fuze.page/software/mediaboard"
 )
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Required on FreeBSD
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd to use
@@ -33,6 +33,7 @@ if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
 endif()
 
 add_executable(MediaboardServer)
+target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_SQLITE)
 target_link_libraries(MediaboardServer
   PRIVATE
     Boost::filesystem

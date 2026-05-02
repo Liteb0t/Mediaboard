@@ -1,6 +1,5 @@
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
-#include <boost/beast/http/empty_body.hpp>
 
 char FuzeHttp::fromHex(char ch) {
 	return std::isdigit(ch) ? ch - '0' : std::tolower(ch) - 'a' + 10;
