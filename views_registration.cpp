@@ -1,3 +1,5 @@
+// FUZE.page 2026
+// The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views_registration.hpp"
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
@@ -117,7 +119,6 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 	int account_id;
 	try {
 		account_id = state->createAccount(username, std::move(password_hash_hash_base64), intermediate_salt_base64.c_str());
-		std::cout << "add user to group " << invite_granted_group_id.value() << std::endl;
 		if (invite_granted_group_id) {
 			std::cout << "add user to group " << invite_granted_group_id.value() << std::endl;
 			state->addAccountToGroup(account_id, invite_granted_group_id.value());
@@ -146,7 +147,7 @@ FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request
 		username_j = req_json.at("username").as_string();
 	}
 	catch(const std::exception& e) {
-		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = std::format("[registerAccount] {}", e.what())};
+		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = std::format("[requestLoginParameters] {}", e.what())};
 	}
 	std::string username = std::string(username_j);
 	if (username.length() >  Account::MAX_USERNAME)
@@ -169,7 +170,7 @@ FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request
 FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 	boost::json::value req_json;
 	boost::json::string username_j, password_hash_base64;
-	std::cout << "createNewAccount called" << std::endl;
+	std::cout << "login called" << std::endl;
 	try {
 		req_json = boost::json::parse(req.body());
 		username_j = req_json.at("username").as_string();
@@ -194,7 +195,7 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 	if (account_id && state->accountMatchesPassword(account_id.value(), password_hash_hash_base64)) {
 		std::string session_id_base64;
 		try {
-			session_id_base64 = state->createSession(account_id.value()); // Add session so client can authenticate via browser cookie
+			session_id_base64 = state->createSession(state->getClientFromAccountId(account_id.value()).id); // Add session so client can authenticate via browser cookie
 		}
 		catch(const std::exception& e) {
 			std::string error_text = std::format("[login] {}", e.what());
@@ -212,4 +213,20 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 			.error_message = std::string("Password is incorrect or the user doesn't exist.")
 		};
 	}
+}
+
+FuzeHttp::Response logout(shared_state* state, FuzeHttp::Request req) {
+	auto cookie_header = req.find("Cookie");
+	if (cookie_header == req.end())
+		return {};
+	std::string cookie = cookie_header->value();
+	std::string session_id_base64 = cookie.substr(cookie.find("=")+1);
+
+	return FuzeHttp::Response{
+		.status = http::status::created,
+		.headers = {{{"Set-Cookie", FuzeHttp::formatCookie(session_id_base64, 0)}}}
+	};
+	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!client)
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = ""};
 }

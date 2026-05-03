@@ -11,17 +11,27 @@
 #include "shared_state.hpp"
 #include "websocket_session.hpp"
 #include <boost/json/serialize.hpp>
-#include <chrono>
 #include <iostream>
 
-shared_state::shared_state(boost::filesystem::path parent_directory, boost::filesystem::path media_location, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
+shared_state::shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
 		: PermissionManager(0, fuze_database_interface),
 		State(fuze_database_interface),
 		fuze_dbi(fuze_database_interface),
-		program_location(std::move(parent_directory)),
+		// document_root(std::move(document_root)),
 		media_location(std::move(media_location)),
 		thumbnail_file_format(thumbnail_file_format) {
 	// db->getSecret(this->secret_base64);
+	this->document_root = document_root;
+	for (const auto& client_pair : this->clients) {
+		if (client_pair.second.account_id) {
+			int account_id = client_pair.second.account_id.value();
+			auto it = this->accounts.find(account_id);
+			if (it == this->accounts.end())
+				throw std::runtime_error(std::format("Client {} refers to account {} which does not exist", client_pair.first, account_id));
+			it->second.client_id = client_pair.first;
+			std::cout << "Account " <<account_id << " = Client " <<client_pair.first << std::endl;
+		}
+	}
 	/* FuzeDBI demo
 	fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
 	auto version = fuze_dbi->query<std::string>("SELECT (version) FROM _info");
@@ -32,10 +42,6 @@ shared_state::shared_state(boost::filesystem::path parent_directory, boost::file
 		std::cout << std::get<0>(row) << '_' << std::get<1>(row) << std::endl;
 	}
 	*/
-}
-
-shared_state::~shared_state() {
-	this->clearExpiredSessions(); // TODO Ideally this would be called on an interval instead of on shutdown.
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
@@ -49,12 +55,12 @@ void shared_state::start() {
 
 void shared_state::join(websocket_session* session) {
 	std::lock_guard<std::mutex> lock(mutex_);
-	sessions_.insert(session);
+	websocket_sessions.insert(session);
 }
 
 void shared_state::leave(websocket_session* session) {
 	std::lock_guard<std::mutex> lock(mutex_);
-	sessions_.erase(session);
+	websocket_sessions.erase(session);
 }
 
 // Broadcast a message to all websocket client sessions
@@ -68,7 +74,7 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	std::vector<boost::weak_ptr<websocket_session>> v;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-		v.reserve(sessions_.size());
+		v.reserve(websocket_sessions.size());
 		for(auto p : this->main_board()->getListenersFromThread(thread_id))
 			v.emplace_back(p->weak_from_this());
 	}
@@ -81,7 +87,21 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	}
 }
 
-std::string shared_state::dumpAllGroups(const FuzeHttp::Client& client) const {
+std::string shared_state::getIntermediateSaltFromAccount(int account_id) {
+	return fuze_dbi->query<std::string>("SELECT intermediate_salt_base64 FROM account WHERE id = $1", account_id);
+}
+
+const FuzeHttp::Client& shared_state::getClientFromAccountId(int account_id) const { // We assume the account with the ID is already checked
+	if (!this->accounts.at(account_id).client_id)
+		throw std::runtime_error(std::format("[getClientFromAccountId] No client ID assigned to account {}", account_id));
+	int client_id = this->accounts.at(account_id).client_id.value();
+	auto it = this->clients.find(client_id);
+	if (it == this->clients.end())
+		throw std::runtime_error(std::format("Account {} refers to Client {} which does not exist", account_id, client_id));
+	return it->second;
+}
+
+std::string shared_state::dumpAllGroups(const std::optional<FuzeHttp::Client>& client) const {
 	std::cout << "Dumping from ordered_groups_vec: ";
 
 	boost::json::object groups_json;
@@ -111,7 +131,7 @@ std::string shared_state::dumpAllGroups(const FuzeHttp::Client& client) const {
 		{"group_heirarchy", group_heirarchy_json}
 	});
 }
-
+/*
 std::string shared_state::dumpMembersInGroup(int group_id) const {
 	const std::unordered_set<int> members = this->getGroup(group_id)->getMembers();
 	boost::json::object members_json;
@@ -164,7 +184,7 @@ BasicResponse shared_state::setGroupHeirarchy(const FuzeHttp::Client& client, st
 		int existing_group_at_this_rank = (*(this->getOrderedGroups()))[group_rank];
 		std::cout << existing_group_at_this_rank << std::endl;
 		if (group_rank <= user_rank && group_id != existing_group_at_this_rank)
-			return BasicResponse(http::status::bad_request, std::string("Permission denied; attempted to change order of groups greater than or equal to your rank.") /*" group_rank: " + std::to_string(group_rank) + ", user_rank: " + std::to_string(user_rank)*/);
+			return BasicResponse(http::status::bad_request, std::string("Permission denied; attempted to change order of groups greater than or equal to your rank.") );
 	}
 	if (ordered_groups[0] != static_cast<int>(BUILTIN_GROUPS::OWNER) ||
 			ordered_groups[ordered_groups.size()-2] != static_cast<int>(BUILTIN_GROUPS::USERS) ||
@@ -177,8 +197,9 @@ BasicResponse shared_state::setGroupHeirarchy(const FuzeHttp::Client& client, st
 
 	return BasicResponse(http::status::ok, std::string("Updated group heirarchy")); // Success
 }
+*/
 
-std::string shared_state::dumpAllUsers(const FuzeHttp::Client& client) const {
+std::string shared_state::dumpAllUsers(const std::optional<FuzeHttp::Client>& client) const {
 	boost::json::object users_json;
 	int client_rank = this->getClientRank(client);
 	bool client_has_manage_permissions_permission = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
@@ -209,7 +230,7 @@ std::string shared_state::dumpAllUsers(const FuzeHttp::Client& client) const {
 		{"users", users_json}
 	});
 }
-
+/*
 BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int account_id, std::vector<int> groups_by_id) {
 	int client_rank;
 	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
@@ -234,7 +255,7 @@ BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int 
 	}
 	return BasicResponse(http::status::ok, std::string("Added user to groups")); // Success
 }
-
+*/
 /* I was unable to generate a key here that would work with the frontend WASM module.
 void shared_state::createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password) {
 	unsigned char intermediate_salt[crypto_pwhash_SALTBYTES];

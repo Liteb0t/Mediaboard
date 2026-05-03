@@ -1,7 +1,10 @@
+// FUZE.page 2026
+// The following code is not to be used for AI training. For humans, the MIT license applies.
 #pragma once
 #include "FuzeDBI.hpp"
 #include "beast.hpp"
 // #include "permission_managed_object.hpp"
+#include <boost/beast/http/status.hpp>
 #include <sodium.h>
 #include <charconv>
 #include <string>
@@ -26,6 +29,11 @@ std::string getDecodedURL(boost::string_view raw_URL);
 
 std::string_view getPathName(const std::string& source_URL);
 
+inline std::string formatCookie(const std::string& session_id, int max_age) {
+	return std::format("Session={}; Path=/; HttpOnly; Max-Age={}", session_id, max_age);
+}
+
+// Cookie without Max-Age expires on session end. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/Cookies#removal_defining_the_lifetime_of_a_cookie
 inline std::string formatCookie(const std::string& session_id) {
 	return std::format("Session={}; Path=/; HttpOnly", session_id);
 }
@@ -57,7 +65,7 @@ struct Response {
 	beast::http::status status;
 	std::optional<std::unordered_map<std::string, std::string>> headers;
 	std::optional<std::string> error_message;
-	std::optional<boost::json::object> json;
+	std::optional<boost::json::value> json;
 	std::optional<boost::filesystem::path> file;
 	std::optional<std::string> body;
 };
@@ -86,8 +94,8 @@ void getSaltBase64(StateType state, const std::string& username, char* salt_base
 	unsigned char salt[crypto_pwhash_SALTBYTES];
 	std::optional<int> user_id = state->getIdFromUsername(username);
 	if (user_id) {
-		// std::string intermediate_salt_base64 = state->db->getIntermediateSaltFromAccount(user_id.value());
-		std::string intermediate_salt_base64 = "";
+		std::string intermediate_salt_base64 = state->getIntermediateSaltFromAccount(user_id.value());
+		// std::string intermediate_salt_base64 = "";
 		crypto_generichash(
 			salt, sizeof salt,
 			reinterpret_cast<const unsigned char*>(username.c_str()), username.length(),
@@ -356,11 +364,12 @@ public:
 			std::cout << "Matching finished: number of matches: " << matched_views.size() << std::endl;
 			return views.at(*matched_views.begin())->executeView(state, req);
 		}
+		else if (req.method() == http::verb::get) {
+			return FuzeHttp::Response{.status = http::status::ok, .file = boost::filesystem::canonical(path_name.substr(1), state->document_root)};
+		}
 		else {
-			Response res;
-			res.status = http::status::not_found;
 			std::cout << "No patterns were matched to path_name " << path_name << std::endl;
-			return res;
+			return FuzeHttp::Response{.status = http::status::not_found};
 		}
 	}
 private:
@@ -387,9 +396,11 @@ public: // TODO change to protected if possible
 
 	// std::variant<http::file_body::value_type, FuzeHttp::Response> openFile(boost::filesystem::path path) const;
 
+	const boost::filesystem::path& getDocumentRoot() const { return document_root; }
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;
+	boost::filesystem::path document_root;
 private:
 	FuzeDBI::Connection* fuze_dbi;
 	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);

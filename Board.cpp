@@ -10,7 +10,7 @@ Board::Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_
 }
 
 int Board::createThread(boost::json::object thread_json, int author_client_id) {
-	Thread thread(this, thread_json.at("thread").as_object(), author_client_id, fuze_dbi);
+	Thread thread(this, thread_json, author_client_id, fuze_dbi);
 	this->threads.emplace(thread.getId(), thread);
 	this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread.getLastMessageTime().time_since_epoch()).count(), thread.getId()));
 	return thread.getId();
@@ -40,7 +40,7 @@ void Board::deleteMessageFromThread(int message_id, int thread_id) {
 
 void Board::cacheAllThreads() {
 	std::cout << "[Board] Retrieving threads from database..." << std::endl;
-	for (auto thread_tuple : fuze_dbi->queryRows<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = 'FALSE'")) {
+	for (auto thread_tuple : fuze_dbi->queryRows<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = FALSE")) {
 		Thread thread(this, fuze_dbi, std::get<0>(thread_tuple), std::get<1>(thread_tuple));
 		std::cout << thread.getId() << ", ";
 		this->threads.insert(std::make_pair(thread.getId(), thread));
@@ -48,7 +48,7 @@ void Board::cacheAllThreads() {
 	std::cout << "done." << std::endl;
 
 	std::cout << "[Board] Retrieving messages from database..." << std::endl;
-	for (auto message_tuple : fuze_dbi->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE deleted = 'FALSE'")) {
+	for (auto message_tuple : fuze_dbi->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE deleted = FALSE")) {
 		int message_id = std::get<0>(message_tuple);
 		int thread_id = std::get<1>(message_tuple);
 		int id_in_thread = std::get<2>(message_tuple);
@@ -127,6 +127,6 @@ void Board::removeListenerFromThread(websocket_session* listener, int thread_id)
 		std::cout << "[Board] Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
-// std::string Board::dumpMessage(int thread_id, int message_id) const {
-// 	return this->threads.at(thread_id).dumpMessage(message_id);
-// }
+std::string Board::dumpMessage(int thread_id, int message_id) const {
+	return this->threads.at(thread_id).dumpMessage(message_id);
+}

@@ -1,3 +1,5 @@
+// FUZE.page 2026
+// The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
 
@@ -75,6 +77,7 @@ beast::string_view FuzeHttp::getMimeType(beast::string_view path) {
 	if(iequals(ext, ".midi"))   return "audio/midi";
 	if(iequals(ext, ".mp3"))   return "audio/mpeg";
 	if(iequals(ext, ".oga"))   return "audio/ogg";
+	if(iequals(ext, ".ogx"))   return "audio/ogg";
 	if(iequals(ext, ".opus"))   return "audio/ogg";
 	if(iequals(ext, ".js"))   return "application/javascript";
 	if(iequals(ext, ".json")) return "application/json";
@@ -245,7 +248,13 @@ std::optional<FuzeHttp::Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Req
 	std::cout << "[FuzeHttp] Received session ID: '" <<session_id_base64 << "'" << std::endl;
 	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator it = this->sessions.find(session_id_base64); it != this->sessions.end()) {
 		std::cout << "found session";
-		return this->clients.at(it->second.client_id);
+		auto client_it = this->clients.find(it->second.client_id);
+		if (client_it == this->clients.end()) {
+			std::print(std::cerr, "[FuzeHttp] Session ID linked to client with id {} which does not exist", it->second.client_id);
+			return {};
+		}
+		else
+			return client_it->second;
 	}
 	else
 		return {};

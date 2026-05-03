@@ -33,7 +33,7 @@ if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
 endif()
 
 add_executable(MediaboardServer)
-target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_SQLITE)
+target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_POSTGRES)
 target_link_libraries(MediaboardServer
   PRIVATE
     Boost::filesystem

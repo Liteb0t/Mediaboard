@@ -324,7 +324,6 @@ let state = {
 let websocket;
 let websocket_connected = false;
 let reconnect_websocket_interval;
-let is_administrator = false;
 const content_field_text_encoder = new TextEncoder();
 console.log(websocket);
 
@@ -372,8 +371,8 @@ class Format {
 	static IMAGE = 0;
 	static AUDIO = 1;
 	static OTHER = -1;
-	static image_formats = ["bmp", "gif", "ico", "jpg", "jpeg", "jxl", "png", "svg", "webp"];
-	static audio_formats = ["flac", "m4a", "mp3", "ogg", "ogx", "opus", "wav"];
+	static image_formats = ["avif", "bmp", "gif", "ico", "jpg", "jpeg", "jxl", "png", "svg", "webp"];
+	static audio_formats = ["aac", "flac", "m4a", "mp3", "oga", "ogg", "ogx", "opus", "wav"];
 	static fromFileName(file_name) {
 		let dot_index = file_name.lastIndexOf('.');
 		if (dot_index !== -1) {
@@ -394,43 +393,36 @@ class Format {
 	}
 }
 
-// Used to verify the author on deleting a message.
-let local_key = localStorage.getItem("local_key");
-let account_key = localStorage.getItem("account_key");
-if (local_key === null || local_key.length !== 8) {
-	local_key = '';
-	for (let i = 0; i < 8; i++) {
-		local_key += valid_uri_chars.charAt(Math.floor(Math.random() * valid_uri_chars.length));
-	}
-	localStorage.setItem("local_key", local_key);
-}
 // The value in the name field is set to the name used in the most recent post, if any.
 name_field.value = localStorage.getItem("name");
-if (account_key === null) {
-	registration_link.style["display"] = "inherit";
-}
-else {
+if (localStorage.getItem("logged_in") === "true") {
 	let account_username = localStorage.getItem("account_username");
 	logged_in_as_username.textContent = account_username;
-	if (account_username === "Administrator")
-		is_administrator = true;
 	logout_button.style["display"] = "inherit";
 	logged_in_indicator.style["display"] = "inherit";
 	change_password_link.style["display"] = "inherit";
 }
+else {
+	registration_link.style["display"] = "inherit";
+}
 
-function logoutAction() {
+async function logoutAction() {
 	logout_button.style["display"] = "none";
 	logged_in_indicator.style["display"] = "none";
 	registration_link.style["display"] = "inherit";
 	change_password_link.style["display"] = "none";
 	// manage_server_button.style["display"] = "none";
-	localStorage.removeItem("account_key");
+	localStorage.removeItem("account_username");
+	localStorage.setItem("logged_in", "false");
 	// localStorage.removeItem("server_permissions");
-	account_key = null;
-	is_administrator = false;
-	refresh_send();
-	getClientInfo();
+	const fetch_response = await fetch("_ROOT_URL" + "registration/logout", {method: "POST"});
+	if (fetch_response && fetch_response.ok) {
+		refresh_send();
+		getClientInfo();
+	}
+	else {
+		console.error("Couldn't log out for one reason or another");
+	}
 }
 
 async function postAction() {
@@ -1109,9 +1101,8 @@ async function postMessage() {
 async function deleteMessage(thread_id, message_id) {
 	console.log("deleting message...");
 	const data = {
-		key: account_key || local_key
-		,thread_id: thread_id
-		,id_in_thread: message_id
+		thread_id: thread_id,
+		id_in_thread: message_id
 	};
 	const fetch_response = await API.sendRequest("DELETE", `post/${thread_id}/${message_id}`)
 	/*

@@ -63,7 +63,7 @@ Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::C
 
 	this->id = fuze_dbi->query<int>("SELECT message_id FROM _sequences");
 	fuze_dbi->query<void>("UPDATE _sequences SET message_id = $1", this->id + 1);
-	fuze_dbi->query<void>("INSERT INTO message(id, thread_id, id_in_thread, author_client_id, name, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->author_username, (int)std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count(), this->content);
+	fuze_dbi->query<void>("INSERT INTO message(id, thread_id, id_in_thread, author_client_id, author_username, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->author_username, (int)std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count(), this->content);
 	boost::json::array files_json = post_json["files"].as_array();
 	if (this->content.length() == 0 && files_json.size() == 0) {
 		throw std::runtime_error("Message Cannot be empty");

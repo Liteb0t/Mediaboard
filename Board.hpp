@@ -25,7 +25,7 @@ public:
 	void addListenerToThread(websocket_session* listener, int thread_id);
 	void removeListenerFromThread(websocket_session* listener, int thread_id);
 	std::unordered_set<websocket_session*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id).getListeners(); };
-	// std::string dumpMessage(int thread_id, int message_id) const;
+	std::string dumpMessage(int thread_id, int message_id) const;
 	struct thread_order_comparator {
 		bool operator() (std::pair<std::time_t, int> left, std::pair<std::time_t, int> right) const {
 			if (left.first > right.first)

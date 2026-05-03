@@ -2,6 +2,7 @@
 #include "Message.hpp"
 #include <ctime>
 #include <string>
+#include <map>
 #include <unordered_set>
 #include <boost/json.hpp>
 
@@ -30,7 +31,7 @@ public:
 	void removeListener(websocket_session* listener);
 	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
 	boost::json::array getMessagesAsJson() const;
-	// std::string dumpMessage(int message_id) const;
+	std::string dumpMessage(int message_id) const;
 	// std::string dumpPermissions(int client_id) const;
 	void markAsDeleted();
 	std::chrono::time_point<std::chrono::system_clock> getLastMessageTime() const { return this->last_message_created_at; }

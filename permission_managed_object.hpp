@@ -6,8 +6,8 @@
 #include "Group.hpp"
 #include "permission_collection.hpp"
 #include <algorithm>
+#include <boost/json/object.hpp>
 #include <iostream>
-#include <nlohmann/json.hpp>
 #include <vector>
 
 enum class BUILTIN_GROUPS {
@@ -21,6 +21,7 @@ struct Account {
 	inline static const size_t MAX_USERNAME = 32;
 	inline static const size_t MIN_PASSWORD = 3;
 	const int id;
+	std::optional<int> client_id;
 	std::string username;
 };
 
@@ -84,9 +85,10 @@ public:
 	virtual std::vector<int> getOrderedGroupsContainingMember(int user_id) const = 0;
 	virtual bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const = 0;
 	virtual bool passInheritedPermissionForAccount(bool inherited_permission, PERMISSION permission, int account_id) const = 0;
-	virtual int getClientRank(const FuzeHttp::Client& client) const = 0;
+	virtual int getClientRank(const std::optional<FuzeHttp::Client>& client) const = 0;
 	virtual int getGroupRank(int group_id) const = 0;
-	// virtual const boost::shared_ptr<std::unordered_map<int, Account>> getAccounts() const = 0;
+	virtual int getAccountRank(int account_id) const = 0;
+	virtual const std::unordered_map<int, Account>& getAccounts() const = 0;
 	bool clientHasPermission(const std::optional<FuzeHttp::Client>& client, PERMISSION permission) const {
 		bool inherited_permission = false;
 		// PUBLIC and USERS are built-in, that is, they are never placed in an account's group list. This is because every account is implicitly a part of these two groups
@@ -102,20 +104,20 @@ public:
 		}
 		return inherited_permission;
 	}
-	bool clientHasPermissionForGroup(const FuzeHttp::Client& client, PERMISSION permission, int group_id) const {
+	bool clientHasPermissionForGroup(const std::optional<FuzeHttp::Client>& client, PERMISSION permission, int group_id) const {
 		if (!this->clientHasPermission(client, permission))
 			return false;
 		return this->getClientRank(client) < this->getGroupRank(group_id);
 	}
-	bool clientHasPermissionForClient(const FuzeHttp::Client& client, PERMISSION permission, const FuzeHttp::Client& _client) const {
+	bool clientHasPermissionForAccount(const std::optional<FuzeHttp::Client>& client, PERMISSION permission, int account_id) const {
 		if (!this->clientHasPermission(client, permission))
 			return false;
-		return this->getClientRank(client) < this->getClientRank(_client);
+		return this->getClientRank(client) < this->getAccountRank(account_id);
 	}
 	bool permissionCollectionExistsForGroup(int group_id) const { return this->group_permissions.contains(group_id); }
 	bool permissionCollectionExistsForAccount(int account_id) const { return this->account_permissions.contains(account_id); }
+	boost::json::object getPermissionCollectionsAsJson() const;
 protected:
-	nlohmann::json getPermissionCollectionsAsJson(int client_id) const;
 	int getPermissionObjectId() const { return this->id; }
 private:
 	int id;
@@ -143,13 +145,13 @@ public:
 		std::unordered_map<int, Group>::const_iterator it = this->groups.find(group_id); 
 		return it != this->groups.end();
 	}
-	int getClientRank(const FuzeHttp::Client& client) const override {
-		if (!client.account_id)
+	int getClientRank(const std::optional<FuzeHttp::Client>& client) const override {
+		if (!client || !client.value().account_id)
 			return this->ordered_groups.size(); // This is the least privileged rank
 		else
-			return this->getAccountRank(client.account_id.value());
+			return this->getAccountRank(client.value().account_id.value());
 	}
-	int getAccountRank(int account_id) const {
+	int getAccountRank(int account_id) const override {
 		if (this->owner_id && account_id == this->owner_id.value())
 			return 0; // This is the most privileged rank
 		int i;
@@ -180,9 +182,9 @@ public:
 	// bool checkUserKey(int user_id, std::string key) const {
 	// 	return this->users.at(user_id).keyMatches(key);
 	// }
-	// const boost::shared_ptr<std::unordered_map<int, Account>> getAccounts() const override {
-	// 	return boost::make_shared<std::unordered_map<int, Account>>(this->accounts);
-	// }
+	const std::unordered_map<int, Account>& getAccounts() const override {
+		return this->accounts;
+	}
 	int getGroupRank(int group_id) const override {
 		int rank;
 		for (rank = 0; this->ordered_groups[rank] != group_id; rank++)
@@ -199,6 +201,12 @@ public:
 		this->groups.erase(group_id);
 		this->saveGroupHeirarchy();
 		// db_delete_group(group_id);
+	}
+	boost::json::array getGroupMembersAsJson(int group_id) const {
+		boost::json::array members;
+		for (int member_id : this->groups.at(group_id).getMembers())
+			members.emplace_back(member_id);
+		return members;
 	}
 	void removeUserFromGroup(int user_id, int group_id) {
 		this->groups.at(group_id).removeMember(user_id);
@@ -274,15 +282,18 @@ public:
 	std::vector<int> getOrderedGroupsContainingMember(int user_id) const override {
 		return this->parent_object->getOrderedGroupsContainingMember(user_id);
 	}
-	int getClientRank(const FuzeHttp::Client& client) const override {
+	int getClientRank(const std::optional<FuzeHttp::Client>& client) const override {
 		return this->parent_object->getClientRank(client);
+	}
+	int getAccountRank(int account_id) const override {
+		return this->parent_object->getAccountRank(account_id);
 	}
 	int getGroupRank(int group_id) const override {
 		return this->parent_object->getGroupRank(group_id);
 	}
-	// const boost::shared_ptr<std::unordered_map<int, Account>> getAccounts() const override {
-	// 	return this->parent_object->getAccounts();
-	// }
+	const std::unordered_map<int, Account>& getAccounts() const override {
+		return this->parent_object->getAccounts();
+	}
 	bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const override {
 		return this->parent_object->passPermissionForGroup(inherited_permission, permission, group_id);
 	}

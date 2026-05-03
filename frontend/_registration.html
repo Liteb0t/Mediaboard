@@ -132,6 +132,7 @@ async function registerAction() {
 		registration_success_dialog.showModal();
 		// localStorage.setItem("authorisation_token", authorisation_token);
 		localStorage.setItem("account_username", new_account_username);
+		localStorage.setItem("logged_in", "true");
 		localStorage.setItem("name", new_account_username);
 	}
 	catch (error) {
@@ -197,6 +198,7 @@ async function loginAction() {
 		logged_in_as.textContent = username_input;
 		login_success_dialog.showModal();
 		localStorage.setItem("account_username", username_input);
+		localStorage.setItem("logged_in", "true");
 		localStorage.setItem("name", username_input);
 	}
 	catch (error) {

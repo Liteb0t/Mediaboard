@@ -123,10 +123,10 @@ boost::json::array Thread::getMessagesAsJson() const {
 	return multiple_post_json;
 }
 
-// std::string Thread::dumpMessage(int message_id) const {
-// 	boost::json::object message_json = this->messages.at(message_id).asJson();
-// 	return boost::json::serialize(message_json);
-// }
+std::string Thread::dumpMessage(int message_id) const {
+	boost::json::object message_json = this->messages.at(message_id).asJson();
+	return boost::json::serialize(message_json);
+}
 
 // std::string Thread::dumpPermissions(int client_id) const {
 // 	return this->getPermissionCollectionsAsJson(client_id).dump();

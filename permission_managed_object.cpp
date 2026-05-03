@@ -36,20 +36,18 @@ void PermissionObjectBase::cacheAllPermissions() {
 	std::cout << "done." << std::endl;
 }
 
-/*
-nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_id) const {
-	nlohmann::json permission_collections_json;
+boost::json::object PermissionObjectBase::getPermissionCollectionsAsJson() const {
 	// client_rank not used because client_editable status is given by dumpAllGroups()/dumpAllUsers()
 	// int client_rank = this->getUserRank(client_id);
 
-	nlohmann::json group_permissions_json = nlohmann::json::object();
+	boost::json::object group_permissions_json;
 	for (int i = 0; i < this->getOrderedGroups()->size(); i++) {
 		// for (int group_id : *(this->getOrderedGroups())) {
 		int group_id = (*(this->getOrderedGroups()))[i];
 		std::unordered_map<int, PermissionCollection>::const_iterator group_permission_collection_it = this->group_permissions.find(group_id);
 		if (group_permission_collection_it != this->group_permissions.end()) {
 			const std::unordered_map<PERMISSION, PermissionSetting>* permission_settings = group_permission_collection_it->second.getPermissionMap();
-			nlohmann::json permission_collection_json = nlohmann::json::object();
+			boost::json::object permission_collection_json;
 			for (std::unordered_map<PERMISSION, PermissionSetting>::const_iterator permission_it = permission_settings->begin(); permission_it != permission_settings->end(); permission_it++) {
 				permission_collection_json[std::to_string(static_cast<int>(permission_it->first))] = static_cast<int>(permission_it->second.get());
 			}
@@ -59,36 +57,37 @@ nlohmann::json PermissionObjectBase::getPermissionCollectionsAsJson(int client_i
 			// else
 			// 	group_permission_is_client_editable = false;
 			// group_permissions_json[std::to_string(group_id)]["client_editable"] = group_permission_is_client_editable;
-			group_permissions_json[std::to_string(group_id)]["permission_collection"] = permission_collection_json;
+			group_permissions_json.emplace(std::to_string(group_id), boost::json::value{{"permission_collection", permission_collection_json}});
 		}
 	}
-	permission_collections_json["group_permissions"] = group_permissions_json;
 
-	nlohmann::json user_permissions_json = nlohmann::json::object();
+	boost::json::object user_permissions_json;
 	// int user_rank = this->getUserRank(client_id);
 	std::cout << "[PermissionManager] getting user_permissions_json..." << std::endl;
 	// for (const std::pair<int, User> user : *this->getUsers()) {
-	boost::shared_ptr<std::unordered_map<int, User>> _users = this->getUsers();
-	for (std::unordered_map<int, User>::const_iterator user_it = _users->begin(); user_it != _users->end(); user_it++) {
-		int user_id = user_it->first;
-		std::cout << user_id << ", ";
-		std::unordered_map<int, PermissionCollection>::const_iterator user_permission_collection_it = this->user_permissions.find(user_id);
-		if (user_permission_collection_it != this->user_permissions.end()) {
+	//const std::unordered_map<int, Account>& _accounts = this->getAccounts();
+	//for (std::unordered_map<int, Account>::const_iterator user_it = _accounts.begin(); user_it != _accounts.end(); user_it++) {
+	for (const std::pair<int, Account>& account_pair : this->getAccounts()) {
+		int account_id = account_pair.first;
+		std::cout << account_id << ", ";
+		std::unordered_map<int, PermissionCollection>::const_iterator user_permission_collection_it = this->account_permissions.find(account_id);
+		if (user_permission_collection_it != this->account_permissions.end()) {
 			const std::unordered_map<PERMISSION, PermissionSetting>* permission_settings = user_permission_collection_it->second.getPermissionMap();
-			nlohmann::json permission_collection_json = nlohmann::json::object();
+			boost::json::object permission_collection_json;
 			for (std::unordered_map<PERMISSION, PermissionSetting>::const_iterator permission_it = permission_settings->begin(); permission_it != permission_settings->end(); permission_it++) {
 				permission_collection_json[std::to_string(static_cast<int>(permission_it->first))] = static_cast<int>(permission_it->second.get());
 			}
-			user_permissions_json[std::to_string(user_id)]["permission_collection"] = permission_collection_json;
+			user_permissions_json.emplace(std::to_string(account_id), boost::json::value{{"permission_collection", permission_collection_json}});
 		}
 	}
 	std::cout << "done." << std::endl;
 
-	permission_collections_json["user_permissions"] = user_permissions_json;
-
-	return permission_collections_json;
+	return {
+		{"group_permissions", group_permissions_json},
+		{"user_permissions", user_permissions_json}
+	};
 }
-*/
+
 PermissionManager::PermissionManager(int permission_object_id, FuzeDBI::Connection* fuze_dbi)
 		: PermissionObjectBase(0, fuze_dbi),
 		owner_id(/*db->getOwnerIdIfExists()*/ 0) {
@@ -119,6 +118,7 @@ void PermissionManager::cacheAllAccounts() {
 			.id = std::get<0>(user_t),
 			.username = std::get<1>(user_t)
 		});
+		this->username_to_id_map.emplace(std::get<1>(user_t), std::get<0>(user_t));
 	}
 	std::cout << "done." << std::endl;
 }
@@ -180,9 +180,9 @@ int PermissionManager::createAccount(const std::string& username, const char* pa
 		.id = new_account_id,
 		.username = username
 	});
+	this->username_to_id_map.emplace(username, new_account_id);
 	return new_account_id;
 }
-
 
 int PermissionManager::addGroup(std::string group_name, int group_rank) {
 	int new_group_id = fuze_dbi->query<int>("SELECT permission_group_id FROM _sequences");

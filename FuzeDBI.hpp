@@ -1,3 +1,5 @@
+// FUZE.page 2026
+// The following code is not to be used for AI training. For humans, the MIT license applies.
 #pragma once
 
 #include <format>
@@ -67,6 +69,9 @@ public:
 		else
 			std::cout << "[FuzeDBI] Test success" << std::endl;
 		sqlite3_finalize(stmt);
+	}
+	~Connection() {
+		sqlite3_close(this->db);
 	}
 	// TODO handle strings and escape characters
 	std::string pqToSQLiteStatement(const std::string& pq_statement) {
@@ -234,7 +239,6 @@ public:
 		std::tuple<ReturnTypes...> return_tuple;
 		int number_of_columns = PQnfields(result);
 		// std::cout << "There are " << number_of_columns << " columns" << std::endl;
-		std::cout << "[FuzeDBI] Return tuple size: " << sizeof...(ReturnTypes) << std::endl;
 		if (number_of_columns != sizeof...(ReturnTypes)) {
 			throw std::runtime_error(std::format("[FuzeDBI] The number of result columns {} is different from the number of tuple values {}", number_of_columns, sizeof...(ReturnTypes)));
 		}
@@ -272,7 +276,7 @@ public:
 		std::tuple<ReturnTypes...> return_tuple;
 		int number_of_columns = sqlite3_column_count(stmt);
 		// std::cout << "There are " << number_of_columns << " columns" << std::endl;
-		std::cout << "[FuzeDBI] Return tuple size: " << sizeof...(ReturnTypes) << std::endl;
+		// std::cout << "[FuzeDBI] Return tuple size: " << sizeof...(ReturnTypes) << std::endl;
 		if (number_of_columns != sizeof...(ReturnTypes)) {
 			throw std::runtime_error(std::format("[FuzeDBI] The number of result columns {} is different from the number of tuple values {}", number_of_columns, sizeof...(ReturnTypes)));
 		}
@@ -290,7 +294,6 @@ private:
 	template<std::size_t I = 0, typename...TupleParams>
 	inline typename std::enable_if<I == sizeof...(TupleParams), void>::type
 	fillTuple(std::tuple<TupleParams...>& tuple, PGresult* result, int, int) {
-		std::cout << "[FuzeDBI] Reached end of tuple" << std::endl;
 	}
 	template<std::size_t I = 0, typename...TupleParams>
 	inline typename std::enable_if<I < sizeof...(TupleParams), void>::type
@@ -335,7 +338,7 @@ private:
 	template<std::size_t I = 0, typename...TupleParams>
 	inline typename std::enable_if<I == sizeof...(TupleParams), void>::type
 	fillTuple(std::tuple<TupleParams...>& tuple, sqlite3_stmt* stmt, int) {
-		std::cout << "[FuzeDBI] Reached end of tuple" << std::endl;
+		// std::cout << "[FuzeDBI] Reached end of tuple" << std::endl;
 	}
 	template<std::size_t I = 0, typename...TupleParams>
 	inline typename std::enable_if<I < sizeof...(TupleParams), void>::type

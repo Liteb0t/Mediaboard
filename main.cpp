@@ -116,22 +116,6 @@ int main(int argc, char* argv[]) {
 		boost::filesystem::create_directory(database_location.string());
 	}
 
-	/*
-	DatabaseConnection* database_connection;
-	if (database_engine.starts_with("postgres")) {
-		if (postgresql_use_uri)
-			database_connection = new DatabaseConnectionPostgreSQL(postgresql_uri, current_version);
-		else
-			database_connection = new DatabaseConnectionPostgreSQL(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name, current_version);
-	}
-	else if (database_engine.starts_with("sqlite"))
-		database_connection = new DatabaseConnectionSQLite(database_location, "sqlite_data.db", current_version);
-	else {
-		std::cerr << "Error: unknown database engine \"" << database_engine << "\". Must be \"postgres\" or \"sqlite\"." << std::endl;
-		return EXIT_FAILURE;
-	}
-	*/
-
 	boost::filesystem::path media_location;
 	FuzeDBI::Connection* fuze_database_interface;
 	try {
@@ -176,7 +160,9 @@ int main(int argc, char* argv[]) {
 	// boost::shared_ptr<shared_state> state(new shared_state(location, media_location, database_connection, thumbnail_file_format));
 	shared_state* state;
 	try {
-		state = new shared_state(location, media_location, thumbnail_file_format, fuze_database_interface);
+		boost::filesystem::path document_root = location;
+		document_root += "/frontend/";
+		state = new shared_state(document_root, media_location, thumbnail_file_format, fuze_database_interface);
 		state->start();
 	}
 	catch (const std::exception& exception) {
@@ -218,6 +204,7 @@ int main(int argc, char* argv[]) {
 		}
 	);
 
+	try {
 	// Run the I/O service on the requested number of threads
 	std::cout << "Running the I/O service..." << std::endl;
 	std::vector<std::thread> v;
@@ -234,16 +221,22 @@ int main(int argc, char* argv[]) {
 
 	// (If we get here, it means we got a SIGINT or SIGTERM)
 
-	// Block until all the threads exit
-	for(auto& t : v)
-		t.join();
-
+		// Block until all the threads exit
+		for(auto& t : v)
+			t.join();
 	if (threads == 1)
 		std::cout << "Thread closed." << std::endl;
 	else
 		std::cout << "All " << threads << " threads closed." << std::endl;
-	delete state;
+	state->clearExpiredSessions();
+	// delete state;
 	// delete database_connection;
 
+	}
+	catch(const std::system_error& e) {
+		std::cout << "Caught system_error with code "
+		"[" << e.code() << "] meaning "
+		"[" << e.what() << "]\n";
+	}
 	return EXIT_SUCCESS;
 }
