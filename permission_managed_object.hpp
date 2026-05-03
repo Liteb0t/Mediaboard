@@ -33,6 +33,8 @@ public:
 	PermissionObjectBase(FuzeDBI::Connection* fuze_dbi); // save new object to database
 	void cacheAllPermissions();
 	void addGroupPermissionCollection(int group_id) {
+		if (this->permissionCollectionExistsForGroup(group_id))
+			throw std::runtime_error(std::format("Attempted to create duplicate permission collection for group {}", group_id));
 		int new_permission_collection_id = fuze_dbi->query<int>("SELECT permission_collection_id FROM _sequences");
 		fuze_dbi->query<void>("UPDATE _sequences SET permission_collection_id = $1", new_permission_collection_id+1);
 		fuze_dbi->query<void>("INSERT INTO permission_collection(id, permission_object_id, permission_group_id) VALUES ($1, $2, $3)", new_permission_collection_id, this->id, group_id);
@@ -41,6 +43,8 @@ public:
 		this->group_permissions.emplace(group_id, permission_collection);
 	}
 	void addAccountPermissionCollection(int account_id) {
+		if (this->permissionCollectionExistsForAccount(account_id))
+			throw std::runtime_error(std::format("Attempted to create duplicate permission collection for account {}", account_id));
 		int new_permission_collection_id = fuze_dbi->query<int>("SELECT permission_collection_id FROM _sequences");
 		fuze_dbi->query<void>("UPDATE _sequences SET permission_collection_id = $1", new_permission_collection_id+1);
 		fuze_dbi->query<void>("INSERT INTO permission_collection(id, permission_object_id, account_id) VALUES ($1, $2, $3)", new_permission_collection_id, this->id, account_id);
@@ -152,14 +156,14 @@ public:
 			return this->getAccountRank(client.value().account_id.value());
 	}
 	int getAccountRank(int account_id) const override {
-		if (this->owner_id && account_id == this->owner_id.value())
-			return 0; // This is the most privileged rank
+		// if (this->owner_id && account_id == this->owner_id.value())
+		// 	return 0; // This is the most privileged rank
 		int i;
 		for (i = 0; i < this->ordered_groups.size() - 2; i++) { // 2 is subtracted because USERS and PUBLIC are hard-coded groups
 			if (this->groups.at(ordered_groups[i]).containsMember(account_id))
 				break;
 		}
-		return i + 1; // 1 is added because the ADMINISTRATORS group is one rank below OWNER
+		return i;
 	}
 	std::optional<int> getIdFromUsername(const std::string& username) const {
 		if (auto it = this->username_to_id_map.find(username); it != this->username_to_id_map.end())
@@ -213,15 +217,14 @@ public:
 		// db_remove_member_from_group(user_id, group_id);
 	}
 	int addGroup(std::string group_name, int group_rank);
-	void addAccountToGroup(int account_id, int group_id) {
-		if (!this->groups.at(group_id).containsMember(account_id)) {
-			this->groups.at(group_id).addMember(account_id);
-			fuze_dbi->query<void>("INSERT INTO permission_group_account(permission_group_id, account_id) VALUES ($1, $2)", group_id, account_id);
-		}
-		// db_add_member_to_group(user_id, group_id);
+	void addAccountToGroup(int account_id, int group_id);
+	void setOrderedGroups(std::vector<int> ordered_groups) {
+		this->ordered_groups = ordered_groups;
+		this->saveGroupHeirarchy(); // Apply changes to the database
 	}
 	int createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64);
 	bool accountExists(const std::string username) const { return this->username_to_id_map.contains(username); }
+	bool accountExists(int account_id) const { return this->accounts.contains(account_id); }
 
 	// PermissionManager is the highest level, so there is no parent to inherit from
 	bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const override { return inherited_permission; }
@@ -231,7 +234,6 @@ protected:
 	const Group* getGroup(int group_id) const {
 		return &(this->groups.at(group_id));
 	}
-	bool accountExists(int account_id) const { return this->accounts.contains(account_id); }
 	// const Account* getAccount(std::string username) const {
 	// 	return &(this->accounts.at(this->username_to_id_map.at(username)));
 	// }
@@ -252,10 +254,6 @@ protected:
 	void cacheAllGroups();
 	void cacheAllAccounts();
 
-	void setOrderedGroups(std::vector<int> ordered_groups) {
-		this->ordered_groups = ordered_groups;
-		this->saveGroupHeirarchy(); // Apply changes to the database
-	}
 	std::unordered_map<int, Account> accounts;
 private:
 	void grantOwnerPrivileges();

@@ -30,7 +30,7 @@ class UserListFactory {
 				return null;
 			}
 			this.users_json = response_json["users"];
-			console.log(this.users_json);
+			// console.log(this.users_json);
 			this.client_rank = Number(response.headers.get("Client-Rank"));
 			for (let user_list of this.user_lists) {
 				user_list.refresh(this.users_json);
@@ -162,7 +162,7 @@ class HeirarchyEditableGroup extends Group {
 		// let group_to_move = this.element.previousElementSibling;
 
 		let response = await this.group_list.sendGroupHeirarchyToServer(heirarchy);
-		console.log(response);
+		// console.log(response);
 		// console.log(response.ok);
 		// TODO don't call refresh unnecessarily
 		group_list_factory.refreshGroups();
@@ -203,7 +203,7 @@ class ManageGroupsGroupList extends GroupList {
 		const fragment = new DocumentFragment();
 		let previous_group_not_editable;
 		this.groups_json = groups_json;
-		console.log(groups_json);
+		// console.log(groups_json);
 		for (let rank = 1; rank <= groups_json["group_heirarchy"].length; rank++) {
 			let group_id = groups_json["group_heirarchy"][rank-1];
 			let group_json = groups_json["groups"][group_id];
@@ -286,7 +286,7 @@ class ManageGroupsGroupList extends GroupList {
 
 class User {
 	constructor(user_list, user_json, clickable = false) {
-		console.log(user_json);
+		// console.log(user_json);
 		this.user_list = user_list;
 		this.id = user_json["id"];
 		this.rank = user_json["rank"];
@@ -316,7 +316,7 @@ class UserList {
 		this.selected_user = null;
 	}
 	createUser(user_json) {
-		console.log(user_json);
+		// console.log(user_json);
 		let new_user = new User(this, user_json);
 		return new_user;
 	}
@@ -431,7 +431,7 @@ class ManageGroupsMemberList extends UserList {
 					error_dialog.showModal();
 					return null;
 				}
-				console.log(response_json);
+				// console.log(response_json);
 				const fragment = new DocumentFragment();
 				/*
 				for (let member_json of Object.values(response_json["members"])) {
@@ -509,11 +509,11 @@ class PermissionSettingsGroupList extends GroupList {
 		for (let rank = 1; rank <= groups_json["group_heirarchy"].length; rank++) {
 			let group_id = groups_json["group_heirarchy"][rank-1];
 			let group_json = groups_json["groups"][group_id];
-			console.log(group_id);
-			console.log(group_json);
+			// console.log(group_id);
+			// console.log(group_json);
 			if (this.permission_settings_object.permissions_json["group_permissions"][group_id] != null) {
 				let new_group = this.createGroup(group_json);
-				console.log(new_group);
+				// console.log(new_group);
 				fragment.appendChild(new_group.element);
 			}
 		}
@@ -573,10 +573,10 @@ class PermissionSettingsUserList extends UserList {
 		let previous_user_not_editable;
 		this.users_json = users_json;
 		for (const user_json of Object.values(users_json)) {
-			console.log(user_json);
+			// console.log(user_json);
 			if (this.permission_settings_object.permissions_json["user_permissions"][user_json.id] !== undefined) {
 				let new_user = this.createUser(user_json);
-				console.log(new_user);
+				// console.log(new_user);
 				fragment.appendChild(new_user.element);
 			}
 		}
@@ -604,12 +604,12 @@ class PermissionSettingsAddGroupGroupList extends GroupList {
 		for (let rank = 1; rank <= groups_json["group_heirarchy"].length; rank++) {
 			let group_id = groups_json["group_heirarchy"][rank-1];
 			let group_json = groups_json["groups"][group_id];
-			console.log(group_id);
-			console.log(group_json);
+			// console.log(group_id);
+			// console.log(group_json);
 			if (this.permission_settings_object.permissions_json["group_permissions"][group_id] === undefined && group_list_factory.groups_json.groups[group_id]["permission_editable"]) {
 				let new_group = this.createGroup(group_json);
 				// new_group.client_editable = group_list_factory.groups_json.groups[new_group.id]["permission_editable"];
-				console.log(new_group);
+				// console.log(new_group);
 				fragment.appendChild(new_group.element);
 			}
 		}
@@ -620,12 +620,12 @@ class PermissionSettingsAddGroupGroupList extends GroupList {
 		if (response.ok) {
 			this.group_list_container.removeChild(group.element);
 			await this.permission_settings_object.refreshPermissions();
-			console.log("group below");
-			console.log(group);
-			console.log(this.permission_settings_object.permissions_json["group_permissions"]);
+			// console.log("group below");
+			// console.log(group);
+			// console.log(this.permission_settings_object.permissions_json["group_permissions"]);
 			this.permission_settings_object.add_group_group_list.refresh(group_list_factory.groups_json);
 			this.permission_settings_object.group_list.refresh(group_list_factory.groups_json);
-			console.log(this.permission_settings_object.permissions_json);
+			// console.log(this.permission_settings_object.permissions_json);
 			this.permission_settings_object.group_list.groupClickEvent(group);
 		}
 		this.add_group_dialog.close();
@@ -645,12 +645,12 @@ class PermissionSettingsAddUserUserList extends UserList {
 	refresh(users_json) {
 		const fragment = new DocumentFragment();
 		// this.users_json = users_json;
-		console.log(users_json);
+		// console.log(users_json);
 		for (const user_json of Object.values(users_json)) {
-			console.log(user_json);
+			// console.log(user_json);
 			if (this.permission_settings_object.permissions_json["user_permissions"][user_json.id] === undefined && user_list_factory.client_rank < user_list_factory.users_json[user_json.id]["rank"]) {
 				let new_user = this.createUser(user_json);
-				console.log(new_user);
+				// console.log(new_user);
 				new_user.permission_editable = true;
 				fragment.appendChild(new_user.element);
 			}
@@ -662,9 +662,9 @@ class PermissionSettingsAddUserUserList extends UserList {
 		if (response.ok) {
 			this.user_list_container.removeChild(user.element);
 			await this.permission_settings_object.refreshPermissions();
-			console.log("user below");
-			console.log(user);
-			console.log(this.permission_settings_object.permissions_json["user_permissions"]);
+			// console.log("user below");
+			// console.log(user);
+			// console.log(this.permission_settings_object.permissions_json["user_permissions"]);
 			this.permission_settings_object.add_user_user_list.refresh(user_list_factory.users_json);
 			this.permission_settings_object.user_list.refresh(user_list_factory.users_json);
 			this.permission_settings_object.user_list.userClickEvent(user);
@@ -828,8 +828,8 @@ class PermissionSettings {
 				error_dialog.showModal();
 				return null;
 			}
-			console.log(response);
-			console.log(response_json);
+			// console.log(response);
+			// console.log(response_json);
 			this.permissions_json["user_permissions"] = response_json["user_permissions"];
 			this.permissions_json["group_permissions"] = response_json["group_permissions"];
 			// this.client_rank = Number(response.headers.get("Client-Rank"));
@@ -870,7 +870,7 @@ class addUserToGroupsGroupList {
 					groups_to_add.push(Number(input_element.id.substring("add_user_to_group_dialog_group_".length)));
 				}
 			});
-		console.log(groups_to_add);
+		// console.log(groups_to_add);
 		if (groups_to_add.length > 0) {
 			let response = await API.sendRequest("POST", `user/${the_user_list.selected_user.id}/add_groups`, {}, {"groups_by_id":groups_to_add});
 			if (response.ok === true) {
@@ -884,7 +884,7 @@ class addUserToGroupsGroupList {
 		for (let rank = 0; rank < groups_json["group_heirarchy"].length; rank++) {
 			let group_id = groups_json["group_heirarchy"][rank];
 			let group_json = groups_json["groups"][group_id];
-			console.log(group_json);
+			// console.log(group_json);
 			if (group_json.id !== PRESET_GROUPS.USERS &&
 					group_json.id !== PRESET_GROUPS.PUBLIC &&
 					rank > user_list_factory.client_rank &&

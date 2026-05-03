@@ -118,7 +118,7 @@ std::string shared_state::dumpAllGroups(const std::optional<FuzeHttp::Client>& c
 		boost::json::object group_json{
 			{"id", group_id},
 			{"name", this->getGroup(group_id)->getName()},
-			{"heirarchy_editable", i >= group_editable_threshold && (group_id == static_cast<int>(BUILTIN_GROUPS::USERS) || group_id == static_cast<int>(BUILTIN_GROUPS::PUBLIC))},
+			{"heirarchy_editable", i >= group_editable_threshold && (group_id != static_cast<int>(BUILTIN_GROUPS::USERS) && group_id != static_cast<int>(BUILTIN_GROUPS::PUBLIC))},
 			{"permission_editable", i >= group_editable_threshold}
 		};
 		groups_json.emplace(std::to_string(group_id), group_json);
@@ -210,7 +210,7 @@ std::string shared_state::dumpAllUsers(const std::optional<FuzeHttp::Client>& cl
 		boost::json::object account_json {
 			{"id", account_id},
 			{"username", this->getUsernameFromAccount(account_id)},
-			{"rank", client_rank}
+			{"rank", account_rank}
 		};
 		boost::json::array user_groups_json;
 		for (const int group_id : this->getOrderedGroupsContainingMember(account_id)) {

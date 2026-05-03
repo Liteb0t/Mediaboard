@@ -169,7 +169,7 @@ void PermissionManager::cacheAllGroups() {
 	if (consistency_test_passed)
 		std::cout << "[PermissionManager] No issues were found." << std::endl;
 	else
-		throw std::runtime_error("[PermissionManager] Test failed.");
+		throw std::runtime_error("[PermissionManager] Test failed. Check the permission_group and permission_group_heirarchy tables in the database.");
 }
 
 int PermissionManager::createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64) {
@@ -186,7 +186,7 @@ int PermissionManager::createAccount(const std::string& username, const char* pa
 
 int PermissionManager::addGroup(std::string group_name, int group_rank) {
 	int new_group_id = fuze_dbi->query<int>("SELECT permission_group_id FROM _sequences");
-	fuze_dbi->query<void>("UPDATE _sequences SET account_id = $1", new_group_id+1);
+	fuze_dbi->query<void>("UPDATE _sequences SET permission_group_id = $1", new_group_id+1);
 	fuze_dbi->query<void>("INSERT INTO permission_group(id, name) VALUES ($1, $2)", new_group_id, group_name.c_str());
 	Group new_group(new_group_id, group_name);
 	this->groups.emplace(new_group_id, new_group);
@@ -197,10 +197,24 @@ int PermissionManager::addGroup(std::string group_name, int group_rank) {
 	return new_group_id;
 }
 
+void PermissionManager::addAccountToGroup(int account_id, int group_id) {
+	if (!this->groupExists(group_id))
+		throw std::runtime_error(std::format("[addAccountToGroup] Group {} does not exist", group_id));
+	if (!this->accountExists(account_id))
+		throw std::runtime_error(std::format("[addAccountToGroup] Account {} does not exist", account_id));
+	if (static_cast<BUILTIN_GROUPS>(group_id) == BUILTIN_GROUPS::USERS || static_cast<BUILTIN_GROUPS>(group_id) == BUILTIN_GROUPS::PUBLIC)
+		throw std::runtime_error("[addAccountToGroup] Attempted to add user to one or more groups to which no user can be added, namely, the \"USERS\" and \"PUBLIC\" groups.");
+	if (!this->groups.at(group_id).containsMember(account_id)) {
+		this->groups.at(group_id).addMember(account_id);
+		fuze_dbi->query<void>("INSERT INTO permission_group_account(permission_group_id, account_id) VALUES ($1, $2)", group_id, account_id);
+	}
+}
+
 void PermissionManager::saveGroupHeirarchy() const {
 	std::cout << "[PermissionManager] Saving new group heirarchy: ";
+	fuze_dbi->query<void>("DELETE FROM permission_group_heirarchy");
 	for (int rank = 0; rank < this->ordered_groups.size(); rank++) {
-		fuze_dbi->query<void>("INSERT INTO permission_group_heirarchy(rank, permission_group) VALUES ($1, $2)", rank, this->ordered_groups[rank]);
+		fuze_dbi->query<void>("INSERT INTO permission_group_heirarchy(rank, permission_group_id) VALUES ($1, $2)", rank, this->ordered_groups[rank]);
 		std::cout << rank << ": " << this->ordered_groups[rank] << ", ";
 	}
 	std::cout << "done." << std::endl;

@@ -14,15 +14,22 @@ void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	controller->addPattern(verb::post, createGroup,						"api", "create_group"); // TODO move to server/permissions
 	controller->addPattern(verb::get, getGroupMembers,					"api", "group", int(), "members");
 	controller->addPattern(verb::get, getGroups,						"api", "groups");
+	controller->addPattern(verb::put, setGroupHeirarchy,				"api", "group_heirarchy");
 	controller->addPattern(verb::post, createMessage, Client{},			"api", "message");
 	controller->addPattern(verb::post, createThread, Client{},			"api", "thread");
 	controller->addPattern(verb::get, getThread, 						"api", "thread", int());
 	controller->addPattern(verb::get, getThreadPermissions,				"api", "thread", int(), "permissions");
-	controller->addPattern(verb::post, setThreadGroupPermissions,		"api", "thread", int(), "permissions", "group", int());
-	controller->addPattern(verb::post, setThreadUserPermissions,		"api", "thread", int(), "permissions", "user", int());
+	controller->addPattern(verb::post, addThreadGroupPermission,		"api", "thread", int(), "permissions", "group", int());
+	controller->addPattern(verb::put, updateThreadGroupPermissions,		"api", "thread", int(), "permissions", "group", int());
+	controller->addPattern(verb::post, addThreadUserPermission,			"api", "thread", int(), "permissions", "user", int());
+	controller->addPattern(verb::put, updateThreadUserPermissions,		"api", "thread", int(), "permissions", "user", int());
 	controller->addPattern(verb::get, getThreads, 						"api", "threads");
 	controller->addPattern(verb::get, getServerPermissions,				"api", "server", "permissions");
-// 	controller->addPattern(verb::post, addGroupsToUser,					"api", "user", "add_groups"); // TODO move to server/permissions
+	controller->addPattern(verb::post, addServerGroupPermission,		"api", "server", "permissions", "group", int());
+	controller->addPattern(verb::put, updateServerGroupPermissions,		"api", "server", "permissions", "group", int());
+	controller->addPattern(verb::post, addServerUserPermission,			"api", "server", "permissions", "user", int());
+	controller->addPattern(verb::put, updateServerUserPermissions,		"api", "server", "permissions", "user", int());
+	controller->addPattern(verb::post, addGroupsToUser,					"api", "user", int(), "add_groups"); // TODO move to server/permissions
 	controller->addPattern(verb::get, client, 							"api", "user", "client");
 	controller->addPattern(verb::get, getUsers,							"api", "users");
 	controller->addPattern(verb::get, acceptInvite,						"invite", std::string());
