@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <cstring>
 #include <variant>
 
 #ifndef FUZEDBI_INTERFACE
@@ -163,6 +164,7 @@ public:
 		}
 		sqlite3_finalize(stmt);
 #endif
+		throw std::runtime_error("[FuzeDBI] Reached end of query function without a return value");
 	}
 	template<class ReturnType, class... Args>
 	QueryIterator<ReturnType> queryRows(const std::string& statement, Args... args) {

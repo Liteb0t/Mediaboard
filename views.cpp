@@ -6,6 +6,7 @@
 #include "shared_state.hpp"
 #include <boost/beast/http/status.hpp>
 #include <iostream>
+#include <print>
 
 FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
 	return FuzeHttp::Response{
@@ -36,6 +37,34 @@ FuzeHttp::Response createGroup(shared_state* state, FuzeHttp::Request req) {
 	/*int new_group_id = */state->addGroup(new_group_name, new_group_rank);
 	return FuzeHttp::Response{
 		.status = http::status::created
+	};
+}
+
+FuzeHttp::Response deleteGroup(shared_state* state, FuzeHttp::Request req, int group_id) {
+	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!state->groupExists(group_id))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "Group does not exist."};
+	if (!state->clientHasPermissionForGroup(client, PERMISSION::MANAGE_PERMISSIONS, group_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this group."};
+	state->eraseGroup(group_id);
+	return FuzeHttp::Response{
+		.status = http::status::ok
+	};
+}
+
+FuzeHttp::Response removeMemberFromGroup(shared_state* state, FuzeHttp::Request req, int group_id, int account_id) {
+	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!state->groupExists(group_id))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "Group does not exist."};
+	if (!state->clientHasPermissionForGroup(client, PERMISSION::MANAGE_PERMISSIONS, group_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this group."};
+	if (!state->accountExists(account_id))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = std::format("Account {} not found.", account_id)};
+	if (!state->clientHasPermissionForAccount(client, PERMISSION::MANAGE_PERMISSIONS, account_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to remove this account from a group."};
+	state->removeUserFromGroup(account_id, group_id);
+	return FuzeHttp::Response{
+		.status = http::status::ok
 	};
 }
 
@@ -377,6 +406,30 @@ FuzeHttp::Response updateServerUserPermissions(shared_state* state, FuzeHttp::Re
 	state->setAccountPermission(account_id, static_cast<PERMISSION>(permission_number), static_cast<THREE_STATE_SETTING>(permission_setting));
 	return FuzeHttp::Response{
 		.status = http::status::created
+	};
+}
+
+FuzeHttp::Response deleteServerGroupPermission(shared_state* state, FuzeHttp::Request req, int group_id) {
+	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!state->permissionCollectionExistsForGroup(group_id))
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "This group does not exist."};
+	if (!state->clientHasPermissionForGroup(client, PERMISSION::MANAGE_PERMISSIONS, group_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this group."};
+	state->removeGroupPermissionCollection(group_id);
+	return FuzeHttp::Response{
+		.status = http::status::ok
+	};
+}
+
+FuzeHttp::Response deleteServerUserPermission(shared_state* state, FuzeHttp::Request req, int account_id) {
+	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!state->permissionCollectionExistsForAccount(account_id))
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "This account does not exist."};
+	if (!state->clientHasPermissionForAccount(client, PERMISSION::MANAGE_PERMISSIONS, account_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this account."};
+	state->removeAccountPermissionCollection(account_id);
+	return FuzeHttp::Response{
+		.status = http::status::ok
 	};
 }
 

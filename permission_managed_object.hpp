@@ -53,11 +53,16 @@ public:
 		this->account_permissions.emplace(account_id, permission_collection);
 	}
 	void removeGroupPermissionCollection(int group_id) {
-		// this->group_permissions.at(group_id).removeFromDatabase();
-		this->group_permissions.erase(group_id);
+		auto it = this->group_permissions.find(group_id);
+		if (it == this->group_permissions.end())
+			throw std::runtime_error(std::format("Attempted to delete group {} which doesn't exist", group_id));
+		fuze_dbi->query<void>("DELETE FROM permission_collection WHERE permission_group_id = $1", group_id);
+		this->group_permissions.erase(it);
 	}
 	void removeAccountPermissionCollection(int account_id) {
-		// this->account_permissions.at(account_id).removeFromDatabase();
+		if (!this->account_permissions.contains(account_id))
+			throw std::runtime_error(std::format("Attempted to delete account {} which doesn't exist", account_id));
+		fuze_dbi->query<void>("DELETE FROM permission_collection WHERE account_id = $1", account_id);
 		this->account_permissions.erase(account_id);
 	}
 	void setGroupPermission(int group_id, PERMISSION permission_type, THREE_STATE_SETTING setting) {
@@ -212,9 +217,9 @@ public:
 			members.emplace_back(member_id);
 		return members;
 	}
-	void removeUserFromGroup(int user_id, int group_id) {
-		this->groups.at(group_id).removeMember(user_id);
-		// db_remove_member_from_group(user_id, group_id);
+	void removeUserFromGroup(int account_id, int group_id) {
+		this->groups.at(group_id).removeMember(account_id);
+		fuze_dbi->query<void>("DELETE FROM permission_group_account WHERE permission_group_id = $1 AND account_id = $2", group_id, account_id);
 	}
 	int addGroup(std::string group_name, int group_rank);
 	void addAccountToGroup(int account_id, int group_id);

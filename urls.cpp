@@ -12,6 +12,8 @@ void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	// Client{} is used when the function needs to identify the user via a cookie.
 	controller->addPattern(verb::get, showMainPage						);
 	controller->addPattern(verb::post, createGroup,						"api", "create_group"); // TODO move to server/permissions
+	controller->addPattern(verb::delete_, deleteGroup,					"api", "group", int());
+	controller->addPattern(verb::delete_, removeMemberFromGroup,		"api", "group", int(), "member", int());
 	controller->addPattern(verb::get, getGroupMembers,					"api", "group", int(), "members");
 	controller->addPattern(verb::get, getGroups,						"api", "groups");
 	controller->addPattern(verb::put, setGroupHeirarchy,				"api", "group_heirarchy");
@@ -21,14 +23,18 @@ void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	controller->addPattern(verb::get, getThreadPermissions,				"api", "thread", int(), "permissions");
 	controller->addPattern(verb::post, addThreadGroupPermission,		"api", "thread", int(), "permissions", "group", int());
 	controller->addPattern(verb::put, updateThreadGroupPermissions,		"api", "thread", int(), "permissions", "group", int());
+	// controller->addPattern(verb::delete_, deleteThreadGroupPermission,	"api", "thread", int(), "permissions", "group", int());
 	controller->addPattern(verb::post, addThreadUserPermission,			"api", "thread", int(), "permissions", "user", int());
 	controller->addPattern(verb::put, updateThreadUserPermissions,		"api", "thread", int(), "permissions", "user", int());
+	// controller->addPattern(verb::delete_, deleteThreadUserPermission,	"api", "thread", int(), "permissions", "user", int());
 	controller->addPattern(verb::get, getThreads, 						"api", "threads");
 	controller->addPattern(verb::get, getServerPermissions,				"api", "server", "permissions");
 	controller->addPattern(verb::post, addServerGroupPermission,		"api", "server", "permissions", "group", int());
 	controller->addPattern(verb::put, updateServerGroupPermissions,		"api", "server", "permissions", "group", int());
+	controller->addPattern(verb::delete_, deleteServerGroupPermission,		"api", "server", "permissions", "group", int());
 	controller->addPattern(verb::post, addServerUserPermission,			"api", "server", "permissions", "user", int());
 	controller->addPattern(verb::put, updateServerUserPermissions,		"api", "server", "permissions", "user", int());
+	controller->addPattern(verb::delete_, deleteServerUserPermission,		"api", "server", "permissions", "user", int());
 	controller->addPattern(verb::post, addGroupsToUser,					"api", "user", int(), "add_groups"); // TODO move to server/permissions
 	controller->addPattern(verb::get, client, 							"api", "user", "client");
 	controller->addPattern(verb::get, getUsers,							"api", "users");
