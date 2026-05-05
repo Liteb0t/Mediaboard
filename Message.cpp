@@ -94,5 +94,4 @@ std::string Message::dump() const {
 
 void Message::markAsDeleted() {
 	this->deleted = true;
-	// db_mark_post_as_deleted(this->id);
 }

@@ -98,11 +98,12 @@ int Thread::createMessageFromJson(boost::json::object post_json, int author_clie
 	return message.getIdInThread();
 }
 
-void Thread::deleteMessage(int message_id) {
-	this->messages.at(message_id).markAsDeleted();
+void Thread::deleteMessage(int id_in_thread) {
+	this->messages.at(id_in_thread).markAsDeleted();
+	fuze_dbi->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $1", this->id, id_in_thread);
 	this->reply_count--;
 	this->thread_as_json["reply_count"] = this->reply_count;
-	std::cout << "Erased message " << message_id << " from thread " << this->id << std::endl;
+	std::cout << "Erased message " << id_in_thread << " from thread " << this->id << std::endl;
 }
 
 // bool Thread::keyMatchesMessage(std::string key, int message_id) const {
@@ -135,7 +136,8 @@ std::string Thread::dumpMessage(int message_id) const {
 
 void Thread::markAsDeleted() {
 	this->deleted = true;
-	// db_mark_thread_as_deleted(this->id);
+	fuze_dbi->query<void>("UPDATE thread SET deleted = TRUE WHERE id = $1", this->id);
+	fuze_dbi->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1", this->id);
 }
 
 void Thread::addListener(websocket_session* listener) {

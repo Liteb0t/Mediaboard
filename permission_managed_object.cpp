@@ -185,6 +185,8 @@ int PermissionManager::createAccount(const std::string& username, const char* pa
 }
 
 int PermissionManager::addGroup(std::string group_name, int group_rank) {
+	if (group_name.length() > Group::MAX_NAME)
+		throw std::runtime_error(std::format("Group name length {} is over the limit of {}", group_name.length(), Group::MAX_NAME));
 	int new_group_id = fuze_dbi->query<int>("SELECT permission_group_id FROM _sequences");
 	fuze_dbi->query<void>("UPDATE _sequences SET permission_group_id = $1", new_group_id+1);
 	fuze_dbi->query<void>("INSERT INTO permission_group(id, name) VALUES ($1, $2)", new_group_id, group_name.c_str());

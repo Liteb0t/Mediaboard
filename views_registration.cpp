@@ -226,7 +226,4 @@ FuzeHttp::Response logout(shared_state* state, FuzeHttp::Request req) {
 		.status = http::status::created,
 		.headers = {{{"Set-Cookie", FuzeHttp::formatCookie(session_id_base64, 0)}}}
 	};
-	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
-	if (!client)
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = ""};
 }

@@ -37,6 +37,7 @@ public:
 	std::chrono::time_point<std::chrono::system_clock> getLastMessageTime() const { return this->last_message_created_at; }
 	bool isDeleted() const { return this->deleted; }
 	boost::json::object getPermissionsAsJson(const std::optional<FuzeHttp::Client>& client) const;
+	const Message* getMessage(int message_id_in_thread) const { return &this->messages.at(message_id_in_thread); }
 private:
 	FuzeDBI::Connection* fuze_dbi;
 	int id;
@@ -46,11 +47,6 @@ private:
 	int reply_count = 0;
 	std::unordered_set<websocket_session*> listeners;
 	// char subject[256];
-	// char upload_timestamp[20];
-	// char files[4][256]; // Max files is 4, maximum URL length is 255
-	// short files_i;
-	// std::string name;
-	// std::string content;
 	boost::json::object thread_as_json;
-	bool deleted;
+	bool deleted = false; // It is assumed new Thread object are not marked as deleted, because deleted threads are not retrieved from the database, nor can they be created through the API.
 };

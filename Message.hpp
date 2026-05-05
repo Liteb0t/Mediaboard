@@ -2,6 +2,7 @@
 #include <ctime>
 #include <boost/json.hpp>
 #include "FuzeDBI.hpp"
+#include "FuzeHttp.hpp"
 
 enum class MESSAGE_FIELDS : size_t { MAX_NAME = 32, MAX_CONTENT = 5000, MAX_FILE_NAME = 205, MAX_FILE_NAME_WITH_UUID = 205+36 };
 
@@ -18,6 +19,7 @@ public:
 	void createFromJSON(boost::json::object post_json);
 	void markAsDeleted();
 	bool isDeleted() const { return this->deleted; }
+	bool clientIsAuthor(const FuzeHttp::Client& client) const { return client.id == this->author_client_id; }
 private:
 	int id;
 	int thread_id;

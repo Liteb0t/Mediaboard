@@ -50,10 +50,10 @@ class API {
 			if (!fetch_response.ok) {
 				let header_error_message = fetch_response.headers.get("message");
 				if (header_error_message == null) {
-					throw new Error(`ERROR ${fetch_response.status}\n${fetch_response.statusText}`);
+					throw new Error(`${fetch_response.status} ${fetch_response.statusText}`);
 				}
 				else {
-					throw new Error(`ERROR ${fetch_response.status}\n${fetch_response.statusText}\n${header_error_message}`);
+					throw new Error(`${fetch_response.status} ${fetch_response.statusText}\n${header_error_message}`);
 				}
 			}
 		}

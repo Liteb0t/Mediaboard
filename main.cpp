@@ -11,8 +11,6 @@
 */
 //------------------------------------------------------------------------------
 
-// #include "DatabaseConnectionPostgreSQL.hpp"
-// #include "DatabaseConnectionSQLite.hpp"
 #include "listener.hpp"
 #include "migrations.hpp"
 #include "permission_managed_object.hpp"
@@ -170,17 +168,6 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	if (variable_map.count("create_owner")) {
-		// try {
-		// 	state->createOwnerAccount(database_connection, "Administrator", admin_password);
-		// }
-		// catch (const std::exception& exception) {
-		// 	std::cout << exception.what() << std::endl;
-		// 	delete database_connection;
-		// 	return 1;
-		// }
-		// std::cout << "Created 'Administrator' account successfully. Restart the server, click on \"Log-in or Register\", and log in as 'Administrator' using the same password you entered here." << std::endl;
-		// delete database_connection;
-		// return 0;
 		std::string invite_key = state->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
 		std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << server_port << "/invite/" << invite_key << std::endl;
 	}

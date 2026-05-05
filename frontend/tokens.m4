@@ -21,7 +21,6 @@ define(`_THUMBNAIL_FILE_FORMAT', `jpg')
 # Also edit the parser_->body_limit in http_session.cpp
 define(`_FILE_SIZE_LIMIT_MB', `100')
 
-# Defined in field_lengths.h
 define(`_POST_MAX_NAME', `32')
 define(`_POST_MAX_FILE_NAME', `205')
 define(`_POST_MAX_CONTENT', `5000')

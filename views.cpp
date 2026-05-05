@@ -187,11 +187,31 @@ FuzeHttp::Response createMessage(shared_state* state, FuzeHttp::Request req, Fuz
 	};
 }
 
+FuzeHttp::Response deletePost(shared_state* state, FuzeHttp::Request req, FuzeHttp::Client client, int thread_id, int message_id_in_thread) {
+	if (!state->main_board()->threadExists(thread_id))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
+	const Thread* thread = state->getThread(0, thread_id);
+	if (!thread->messageExists(message_id_in_thread))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "No such message found in this thread."};
+	if (!thread->clientHasPermission(client, PERMISSION::DELETE_POST) && !thread->getMessage(message_id_in_thread)->clientIsAuthor(client))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this message."};
+	if (message_id_in_thread == 0)
+		state->main_board()->deleteThread(thread_id);
+	else
+		state->main_board()->deleteMessageFromThread(message_id_in_thread, thread_id);
+	return FuzeHttp::Response{
+		.status = http::status::ok
+	};
+}
+
 FuzeHttp::Response getThread(shared_state* state, FuzeHttp::Request req, int thread_id) {
 	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
 	if (!state->main_board()->threadExists(thread_id))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
-	else if (!state->main_board()->getThread(thread_id)->clientHasPermission(client, PERMISSION::VIEW_THREAD))
+	const Thread* thread = state->main_board()->getThread(thread_id);
+	if (thread->isDeleted())
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "This thread has been deleted"};
+	if (!thread->clientHasPermission(client, PERMISSION::VIEW_THREAD))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to view this thread."};
 	return FuzeHttp::Response{
 		.status = http::status::ok,
@@ -284,6 +304,34 @@ FuzeHttp::Response updateThreadUserPermissions(shared_state* state, FuzeHttp::Re
 	if (!thread->clientHasPermissionForAccount(client, PERMISSION::MANAGE_PERMISSIONS, account_id))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to update permissions for this account."};
 	state->main_board()->setAccountPermissionForThread(account_id, static_cast<PERMISSION>(permission_number), static_cast<THREE_STATE_SETTING>(permission_setting), thread_id);
+	return FuzeHttp::Response{
+		.status = http::status::ok
+	};
+}
+
+FuzeHttp::Response deleteThreadGroupPermission(shared_state* state, FuzeHttp::Request req, int thread_id, int group_id) {		std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!state->main_board()->threadExists(thread_id))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
+	const Thread* thread = state->getThread(0, thread_id);
+	if (!state->permissionCollectionExistsForGroup(group_id))
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "No permissions set for this group."};
+	if (!thread->clientHasPermissionForGroup(client, PERMISSION::MANAGE_PERMISSIONS, group_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this group."};
+	state->main_board()->removeGroupPermissionCollectionFromThread(group_id, thread_id);
+	return FuzeHttp::Response{
+		.status = http::status::ok
+	};
+}
+
+FuzeHttp::Response deleteThreadUserPermission(shared_state* state, FuzeHttp::Request req, int thread_id, int account_id) {		std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+	if (!state->main_board()->threadExists(thread_id))
+		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
+	const Thread* thread = state->getThread(0, thread_id);
+	if (!state->permissionCollectionExistsForAccount(account_id))
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "No permissions set for this account."};
+	if (!thread->clientHasPermissionForAccount(client, PERMISSION::MANAGE_PERMISSIONS, account_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this account."};
+	state->main_board()->removeAccountPermissionCollectionFromThread(account_id, thread_id);
 	return FuzeHttp::Response{
 		.status = http::status::ok
 	};
@@ -477,42 +525,6 @@ FuzeHttp::Response acceptInvite(shared_state* state, FuzeHttp::Request req, std:
 		.headers = {{
 			{"Location", std::format("/registration.html?invite={}", invite_key_base64)}
 		}}
-	};
-}
-
-// TODO find a way to handle multiple directories under one view
-FuzeHttp::Response getMedia(shared_state* state, FuzeHttp::Request req, std::string file_path) {
-	std::cout << "Showing thru getMedia" << std::endl;
-	std::string file_name = file_path;
-	int filename_extension_index;
-	if ((filename_extension_index = file_name.rfind(".")) == -1) {
-		filename_extension_index = file_name.size();
-	}
-	if (filename_extension_index >= 36) {
-		file_name.erase(filename_extension_index - 36, 36);
-	}
-	return FuzeHttp::Response{
-		.status = http::status::ok,
-		.headers = {{
-			{"Content-Disposition", std::format("inline; filename=\"{}\"", file_name)}
-		}},
-		.file = std::format("{}/{}", state->getMediaLocation().string(), file_path)
-	};
-}
-
-FuzeHttp::Response getThumbnail(shared_state* state, FuzeHttp::Request req, std::string file_path) {
-	std::cout << "Showing thru getMedia" << std::endl;
-	std::string file_name = file_path;
-	int filename_extension_index;
-	if ((filename_extension_index = file_name.rfind(".")) == -1) {
-		filename_extension_index = file_name.size();
-	}
-	if (filename_extension_index >= 36) {
-		file_name.erase(filename_extension_index - 36, 36);
-	}
-	return FuzeHttp::Response{
-		.status = http::status::ok,
-		.file = std::format("{}/thumbnails/{}", state->getMediaLocation().string(), file_path)
 	};
 }
 

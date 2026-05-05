@@ -110,7 +110,8 @@ public:
 					PQclear(result);
 					return return_val;
 				}
-				break;
+				else
+					return void();
 			case PGRES_FATAL_ERROR:
 				error_message = PQresultErrorMessage(result);
 				PQclear(result);
@@ -118,11 +119,9 @@ public:
 					throw std::runtime_error(error_message);
 				else
 					throw std::runtime_error(PQerrorMessage(this->db));
-				break;
 			default:
 				PQclear(result);
 				throw std::runtime_error(std::format("[FuzeDBI] Unknown PWresStatus: {}", PQresStatus(status)));
-				break;
 		}
 		PQclear(result);
 #elifdef FUZEDBI_SQLITE
@@ -156,7 +155,8 @@ public:
 					// throw std::runtime_error("[FuzeDBI] SQLite interface not implemented");
 					return return_val;
 				}
-				break;
+				else
+					return void();
 			default:
 				throw std::runtime_error(std::format("[FuzeDBI] SQLite error in statement \"{}\" \n{}", formatted_statement, sqlite3_errmsg(this->db)));
 				break;

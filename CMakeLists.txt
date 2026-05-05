@@ -48,7 +48,6 @@ target_link_libraries(MediaboardServer
 target_sources(MediaboardServer
   PRIVATE
     Board.cpp
-    db_interface.c
     FuzeHttp.cpp
     Group.cpp
     http_session.cpp
@@ -60,6 +59,7 @@ target_sources(MediaboardServer
     Thread.cpp
     urls.cpp
     views.cpp
+    views_media.cpp
     views_registration.cpp
     websocket_session.cpp
 )

@@ -73,7 +73,7 @@
 						<h2>Create group</h2>
 						<form action="" method="POST">
 							<label for="create_group_form_group_name">Name</label>
-							<input type="text" id="create_group_form_group_name" name="group-name" minlength="1" maxlength="64">
+							<input type="text" id="create_group_form_group_name" name="group-name" minlength="1" maxlength="_GROUP_MAX_NAME">
 						</form>
 						<div class="ToolBar">
 							<input type="button" value="OK" onclick="group_manager.group_list.createNewGroup();create_group_dialog.close()"><button onclick="create_group_dialog.close()">Cancel</button>

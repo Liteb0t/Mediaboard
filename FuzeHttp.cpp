@@ -2,9 +2,33 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
+#include <set>
 
 char FuzeHttp::fromHex(char ch) {
 	return std::isdigit(ch) ? ch - '0' : std::tolower(ch) - 'a' + 10;
+}
+
+const std::string forbidden_file_name_chars = "#?+/&";
+void FuzeHttp::sanitiseFileName(std::string* file_name) {
+	for (int i = 0; i < file_name->length(); i++) {
+		if (forbidden_file_name_chars.find((*file_name)[i]) != -1) {
+			(*file_name)[i] = '_';
+		}
+	}
+}
+
+const std::set<std::string, std::less<>> image_formats = {"bmp", "gif", "ico", "jpg", "jpeg", "jxl", "png", "svg", "webp"};
+const bool FuzeHttp::fileIsImage(const std::string& file_name) {
+	int dot_index = file_name.rfind('.');
+	if (dot_index != std::string::npos) {
+		std::string file_extension = file_name.substr(dot_index+1);
+		if (image_formats.find(file_extension) != image_formats.end())
+			return true;
+		else
+			return false;
+	}
+	else
+		return false;
 }
 
 std::string FuzeHttp::getDecodedURL(boost::string_view raw_URL) {

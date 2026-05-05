@@ -25,6 +25,7 @@ public:
 		return this->members;
 	}
 	std::string getName() const { return this->name; }
+	inline static const size_t MAX_NAME = 32;
 private:
 	int id;
 	std::string name;
