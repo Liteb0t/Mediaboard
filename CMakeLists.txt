@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Required on FreeBSD
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd to use
 set(SODIUM_DISABLE_TESTS ON)
+set(FUZEDBI_USE_POSTGRES ON)
 
 # Find dependencies sneeded by the project
 cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
@@ -23,7 +24,6 @@ add_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
 include_directories(${ImageMagick_INCLUDE_DIRS})
 
 find_package(PostgreSQL REQUIRED)
-find_library(ECPG_LIB ecpg)
 include_directories (${PostgreSQL_INCLUDE_DIRS})
 link_directories(${PostgreSQL_LIBRARY_DIRS})
 
@@ -33,14 +33,17 @@ if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
 endif()
 
 add_executable(MediaboardServer)
-target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_POSTGRES)
+if(FUZEDBI_USE_POSTGRES EQUAL ON)
+  target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_POSTGRES)
+else()
+  target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_SQLITE)
+endif()
 target_link_libraries(MediaboardServer
   PRIVATE
     Boost::filesystem
     Boost::json
     Boost::program_options
     ${ImageMagick_LIBRARIES}
-    ${ECPG_LIB}
     PostgreSQL::PostgreSQL
     SQLite3::SQLite3
     sodium
@@ -54,6 +57,7 @@ target_sources(MediaboardServer
     listener.cpp
     main.cpp
     Message.cpp
+    migrations.cpp
     permission_managed_object.cpp
     shared_state.cpp
     Thread.cpp
@@ -65,11 +69,6 @@ target_sources(MediaboardServer
 )
 configure_file(config.ini ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
 configure_file(database_template.sql ${CMAKE_CURRENT_BINARY_DIR}/database/database_template.sql COPYONLY)
-add_custom_command(
-  OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/db_interface.c
-  COMMAND ecpg ${CMAKE_CURRENT_SOURCE_DIR}/db_interface.pgc
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/db_interface.pgc
-)
 add_dependencies(MediaboardServer
   frontend
 )

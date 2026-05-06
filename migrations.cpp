@@ -1,0 +1,66 @@
+#include "migrations.hpp"
+#include <boost/filesystem/operations.hpp>
+#include <cstdio>
+#include <fstream>
+#include <sstream>
+#include <print>
+
+void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::filesystem::path& template_path, const boost::filesystem::path& absolute_sqlite_path) {
+	int ec; char* error_message;
+	std::print("Doing first-time setup");
+	std::print("Opening database template at {}", template_path.string());
+	std::ifstream sqlite_template_file(template_path.string());
+	std::string line;
+	try {
+		while (std::getline(sqlite_template_file, line)) {
+			std::cout << "[Migrations] " << line << std::endl;
+			if (!line.empty()) {
+				fuze_dbi->query<void>(line);
+			}
+		}
+		fuze_dbi->query<void>("CREATE TABLE IF NOT EXISTS _info(version TEXT NOT NULL)");
+		fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", current_version);
+	}
+	catch (std::exception& exception) {
+		std::cout << "[DatabaseConnectionSQLite] Exception in DB init: " << exception.what() << std::endl;
+		std::cout << "Remove SQLite database file? (Y/n) ";
+		std::string do_remove;
+		std::cin >> do_remove;
+		if (do_remove.empty() || do_remove[0] == 'Y' || do_remove[0] == 'y')
+			std::remove(absolute_sqlite_path.string().c_str());
+		throw std::runtime_error("An error occured during database template import.");
+	}
+}
+
+bool Migrations::writeMigrations(std::ostream& stream, const std::string& database_version_string) {
+	if (database_version_string <= "0.0.5")	goto v0_0_5;
+	if (database_version_string <= "0.0.6")	goto v0_0_6;
+	// If code reaches here, no migrations need to be made
+	return false;
+v0_0_5:
+	stream << "UPDATE permission_collection SET account_id = NULL WHERE account_id = -1;";
+	stream << "UPDATE permission_collection SET permission_group_id = NULL WHERE permission_group_id = -1;";
+v0_0_6:
+	stream << "CREATE TABLE beder(griffin TEXT);";
+	std::cout << "Finished writing migrations" << std::endl;
+	return true; // Migrations were made
+}
+
+void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string) {
+	std::stringstream migrations;
+	bool migrations_needed = Migrations::writeMigrations(migrations, database_version_string);
+	if (migrations_needed) {
+		std::print("Database migrations need to be made. It is recommended to backup the database before proceeding.");
+		std::cout << "Press enter key to continue: ";
+		std::string res;
+		std::getline(std::cin, res);
+		std::string line;
+		while (std::getline(migrations, line, ';')) {
+			std::cout << "[Migrations] " << line << std::endl;
+			fuze_dbi->query<void>(line);
+		}
+	}
+	else
+		std::print("No migrations needed");
+	fuze_dbi->query<void>("UPDATE _info SET version = $1", current_version);
+}

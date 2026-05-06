@@ -9,11 +9,11 @@
 #include <cstring>
 #include <variant>
 
-#ifndef FUZEDBI_INTERFACE
-#define FUZEDBI_INTERFACE FUZEDBI_POSTGRES
-#else
-#define FUZEDBI_INTERFACE FUZEDBI_SQLITE
-#endif
+// #ifndef FUZEDBI_INTERFACE
+// #define FUZEDBI_INTERFACE FUZEDBI_POSTGRES
+// #else
+// #define FUZEDBI_INTERFACE FUZEDBI_SQLITE
+// #endif
 
 #ifdef FUZEDBI_POSTGRES
 #include <libpq-fe.h>
@@ -26,6 +26,7 @@
 namespace FuzeDBI {
 template<class ReturnType>
 class QueryIterator; // Forward declaration
+/*
 struct ConstructorArgs {
 	std::optional<std::string> user;
 	std::optional<std::string> host;
@@ -33,6 +34,7 @@ struct ConstructorArgs {
 	std::optional<std::string> database_name;
 	std::optional<std::string> database_filepath;
 };
+*/
 class Connection {
 	enum class PARAMETER_TYPE { CHAR_ARRAY = 0, STRING = 1, INT = 2 };
 public:
@@ -59,17 +61,9 @@ public:
 		std::cout << "[FuzeDBI] Connecting to SQLite database at " << database_filepath << std::endl;
 		int ec = sqlite3_open(database_filepath.c_str(), &db);
 		if (ec) {
-			std::cout << "[DatabaseConnectionSQLite] Can't open database: " << sqlite3_errmsg(db) << std::endl;
-			sqlite3_close(db);
+			throw std::runtime_error(std::format("[DatabaseConnectionSQLite] Can't open database: {}", sqlite3_errmsg(db)));
 			return;
 		}
-		sqlite3_stmt* stmt;
-		ec = sqlite3_prepare_v2(this->db, "SELECT version FROM _info", -1, &stmt, NULL);
-		if (ec != SQLITE_OK)
-			std::cerr << "[FuzeDBI] Test fail" << std::endl;
-		else
-			std::cout << "[FuzeDBI] Test success" << std::endl;
-		sqlite3_finalize(stmt);
 	}
 	~Connection() {
 		sqlite3_close(this->db);
@@ -80,13 +74,14 @@ public:
 		output.reserve(pq_statement.length());
 		for (size_t i = 0; i < pq_statement.length(); i++) {
 			if (pq_statement[i] == '$') {
-				std::size_t number_end = pq_statement.find_first_not_of("0123456789", i);
-				if (number_end == pq_statement.npos)
+				std::size_t number_end = pq_statement.find_first_not_of("0123456789", i+1);
+				std::cout << number_end << ':';
+				if (number_end == pq_statement.npos) {
 					number_end = pq_statement.length();
-				if (number_end != i) { // there are one or more numeric characters after the $
+				}
+				if (number_end != i+1) { // there are one or more numeric characters after the $
 					output += '?';
-					std::cout <<"number_end: " << number_end << ", i: " << i << std::endl;
-					i += number_end - i;
+					i = number_end - 1;
 					continue;
 				}
 			}
@@ -127,7 +122,7 @@ public:
 #elifdef FUZEDBI_SQLITE
 		// SQLite implementation requires the string to be reformatted. Specifically, the $1 $2 etc parameters should be replaced with question marks.
 		std::string formatted_statement = pqToSQLiteStatement(statement);
-		std::cout << "[FuzeDBI] formatted_statement: " <<formatted_statement << std::endl;
+		// std::cout << "[FuzeDBI] formatted_statement: " <<formatted_statement << std::endl;
 		sqlite3_stmt* stmt;
 		int ec = sqlite3_prepare_v2(db, formatted_statement.c_str(), -1, &stmt, NULL);
 		if (ec != SQLITE_OK) {
@@ -193,7 +188,7 @@ public:
 		}
 #elifdef FUZEDBI_SQLITE
 		std::string formatted_statement = pqToSQLiteStatement(statement);
-		std::cout << "[FuzeDBI] formatted_statement: " <<formatted_statement << std::endl;
+		// std::cout << "[FuzeDBI] formatted_statement: " <<formatted_statement << std::endl;
 		sqlite3_stmt* stmt;
 		int ec = sqlite3_prepare_v2(db, formatted_statement.c_str(), -1, &stmt, NULL);
 		if (ec != SQLITE_OK) {

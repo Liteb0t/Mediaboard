@@ -25,10 +25,9 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <print>
 #include <string>
 #include <vector>
-
-const std::string current_version = "0.0.6";
 
 int main(int argc, char* argv[]) {
 	Magick::InitializeMagick(*argv);  // Required on Windows and MacOS
@@ -120,15 +119,41 @@ int main(int argc, char* argv[]) {
 #ifdef FUZEDBI_POSTGRES
 		fuze_database_interface = new FuzeDBI::Connection(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name);
 #elifdef FUZEDBI_SQLITE
-		boost::filesystem::path sqlite_file_location;
-		sqlite_file_location = boost::filesystem::canonical(sqlite_database_path, location);
-		fuze_database_interface = new FuzeDBI::Connection(sqlite_file_location.string());
+		boost::filesystem::path sqlite_file_location = sqlite_database_path;
+		if (!sqlite_file_location.has_filename())
+			throw("A filename is required for sqlite_database_path");
+		boost::filesystem::path absolute_sqlite_path = boost::filesystem::absolute(sqlite_database_path, location);
+		boost::filesystem::path absolute_sqlite_path_parent = absolute_sqlite_path.parent_path();
+		if (!boost::filesystem::exists(absolute_sqlite_path_parent))
+			throw(std::format("sqlite_database_path invalid; directory not found: {}", absolute_sqlite_path_parent.string()));
+		if (!boost::filesystem::exists(absolute_sqlite_path)) {
+			std::print("Creating SQLite database file at {}", absolute_sqlite_path.string());
+			std::ofstream{absolute_sqlite_path};
+		}
+		else if (boost::filesystem::is_directory(absolute_sqlite_path))
+			throw std::runtime_error(std::format("sqlite_database_path invalid; is a directory but must be a file: {}", absolute_sqlite_path.string()));
+		// sqlite_file_location = boost::filesystem::canonical(sqlite_database_path, location);
+		fuze_database_interface = new FuzeDBI::Connection(absolute_sqlite_path.string());
 #endif
-		auto version_string = fuze_database_interface->query<std::optional<std::string>>("SELECT version FROM _info");
-		if (version_string)
+		std::optional<std::string> version_string;
+		bool version_string_found = false;
+		try {
+			version_string = fuze_database_interface->query<std::optional<std::string>>("SELECT version FROM _info");
+			version_string_found = true;
+		}
+		catch(const std::exception& exception) {
+			std::cout << "Version string not found in database" << std::endl;
+		}
+		if (version_string_found && version_string) {
 			std::cout << "Version " <<	version_string.value() << std::endl;
-		else
-			std::cerr << "Version string not found in database" << std::endl;
+			Migrations::makeMigrations(fuze_database_interface, version_string.value());
+		}
+		else {
+			boost::filesystem::path template_path = boost::filesystem::absolute("database_template.sql", database_location);
+			if (!boost::filesystem::exists(template_path))
+				throw std::runtime_error(std::format("Database template file {} not found.", template_path.string()));
+			Migrations::firstTimeSetup(fuze_database_interface, template_path, absolute_sqlite_path);
+		}
 		std::cout << "Set port: " << server_port << std::endl;
 		media_location = boost::filesystem::canonical(media_location_relative_str, location);
 	}
@@ -191,7 +216,6 @@ int main(int argc, char* argv[]) {
 		}
 	);
 
-	try {
 	// Run the I/O service on the requested number of threads
 	std::cout << "Running the I/O service..." << std::endl;
 	std::vector<std::thread> v;
@@ -219,11 +243,5 @@ int main(int argc, char* argv[]) {
 	// delete state;
 	// delete database_connection;
 
-	}
-	catch(const std::system_error& e) {
-		std::cout << "Caught system_error with code "
-		"[" << e.code() << "] meaning "
-		"[" << e.what() << "]\n";
-	}
 	return EXIT_SUCCESS;
 }

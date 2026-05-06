@@ -4,7 +4,6 @@ CREATE TABLE _sequences(account_id INTEGER, client_id INTEGER, message_id INTEGE
 INSERT INTO _sequences VALUES (0, 0, 0, 3, 3, 0, 0, 0);
 CREATE TABLE account(id INTEGER PRIMARY KEY, username TEXT, password_hash_hash_base64 TEXT, intermediate_salt_base64 TEXT);
 CREATE TABLE client(id INTEGER PRIMARY KEY, account_id INTEGER);
--- CREATE TABLE client_session(client_id INTEGER, session_id INTEGER);
 CREATE TABLE permission_collection(id INTEGER PRIMARY KEY, permission_object_id INTEGER, account_id INTEGER, permission_group_id INTEGER);
 CREATE TABLE permission_group(id INTEGER PRIMARY KEY, name TEXT);
 CREATE TABLE permission_group_account(permission_group_id INTEGER, account_id INTEGER);
