@@ -30,7 +30,7 @@ Then install:\
 `sqlite3`\
 `postgresql18-server`   Versions 15-17 work too\
 `postgresql18-contrib`   ^\
-Add the following line to `/etc/rc.conf`:\
+If using the PostgreSQL interface, add the following line to `/etc/rc.conf`:\
 `postgresql_enable="YES"`
 ### Developing on MacOS
 Install [Homebrew](https://brew.sh/)\
@@ -40,22 +40,24 @@ add to ~/.zshrc:\
 The pkg-config for postgresql may not work out of the box. If that is the case, follow these instructions:
 `Brew ls postgresql | grep pkgconfig`\
 `export PATH=/opt/homebrew/Cellar/postgresql@15/15.15/bin:$PATH` - Adjust the postgresql version to match the result from `brew ls` in the line above.\
-`export PKG_CONFIG_PATH=/opt/homebrew/Cellar/postgresql@15/15.15/lib/pkgconfig/`\
-Use meson instead of make to build. To configure:\
-`meson setup build`\
-`meson configure --pkg-config-path $PKG_CONFIG_PATH build -Dcpp_std=c++20 -Dcpp_args=-stdlib=libc++`
+`export PKG_CONFIG_PATH=/opt/homebrew/Cellar/postgresql@15/15.15/lib/pkgconfig/`
 ### Building
-Currently there are two options: the `Makefile` and the `meson.build`.\
-To build using the Makefile, simply run `make`. \
-Do note that libraries may not link with `make` without manual intervention.\
-To build with meson, first run:\
-`meson setup build`\
-Then to build:\
-`sh build.sh`\
-`cd build`\
-`ninja`
+First ensure that submodules are downloaded. Use this command:\
+`git submodule update --init --recursive`\
+Now, to build with the default SQLite interface:
+`cmake -B build`\
+Alternatively, you can build with the PostgreSQL interface instead:\
+`cmake -B build -D FUZEDBI_USE_POSTGRES=ON`\
+Then refer to section **PostgreSQL setup**
+### Installing (experimental)
+After building, you use this command:\
+`cmake --install build --prefix install`\
+The prefix can be changed. Simply using `install` will put it alongside the `build` directory.\
+And now you can run it:\
+`./install/bin/MediaboardServer`\
+*AppImage distribution coming soon.*
 ### PostgreSQL setup
-*SQLite integration will arrive in 0.1, allowing easier deployment*
+This is only required when built with `FUZEDBI_USE_POSTGRES=ON` - See **Building** section.\
 #### Create the cluster
 *This may be skipped on certain Linux distros such as Debian. Check if the server is already running with `systemctl status postgresql` or `service postgresql status`*
 `initdb -D /var/db/postgres/18/main/`\
@@ -71,22 +73,25 @@ fuze_mediaboard=# `GRANT ALL ON SCHEMA public TO mediaboard_server;`\
 fuze_mediaboard=# `\q`\
 To import the database template, go back to your user account and run:\
 `psql -U postgres fuze_mediaboard < database_template.sql`\
-`psql -U postgres fuze_mediaboard < default_groups.sql`\
 \
 Add the following line to [pg_hba.conf](https://www.postgresql.org/docs/15/auth-pg-hba-conf.html). Insert it at the top of the table so that it won't be overridden by other settings:\
 `local   fuze_mediaboard mediaboard_server                       password`\
 \
 `mediaboard_server` is the PostgreSQL user which interacts with the database named `fuze_mediaboard`.\
 Set the environment variable `FUZE_MEDIABOARD_PASSWORD` with the same password used in the CREATE_USER statement earlier. Open a new terminal window or reboot your system to apply the change.
-### Administrator account
-The administrator is able to delete posts from any user. To create the administrator account:\
-`./build/server --create_administrator <password>`\
-If you ever forget the password, you can simply run the create_administrator command again.
+### Configuration
+Now you must point the Mediaboard server to the database. Edit the lines of `config.ini` which contains PostgreSQL connection parameters. These options start with `postgresql_`.
+### Owner account
+The owner has the highest permission level. By default, only the owner has read and write permissions. To create the owner account:\
+`./build/MediaboardServer -o`\
+The server will start normally, but this time an invite link will appear in the command line output. Find the line which looks like the following:
+`Use this link to register the owner account: http://localhost:8300/invite/j0kXVLI0Xvocw3b1b9n9Ig`
+Enter this link in your browser (you may be able to CTRL+click it) and enter your desired credentials. *If you ever forget the password, you can simply run the above command again. Note that it will not be the same account.*
 ### Execute the program
-If you built using meson, run `./build/server` - You must run the server from the Mediaboard directory, not inside `build`.\
-If you built using make, run `./server`.\
+If you built at the default directory, run `./build/MediaboardServer`.
+If you used `--install`, execute the binary `MediaboardServer`.
 In a browser open `localhost:8300`\
-You should see an empty page with a toolbar at the top. You can login to the administrator account with username "Administrator" and the password you set earlier\
+You should see an empty page with a toolbar at the top. You can login to the owner account with the credentials you set earlier. Refer to section **Owner account** if you hadn't yet.\
 ![Login page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_login_page.png)
 ### Manage permissions
 By default, users cannot view or create threads or send messages. To enable this, click on the "Manage server" tab in the toolbar as an administrator.\
@@ -129,6 +134,3 @@ location /mediaboard/media/ {
 ```
 ### Storing user-submitted media in a different location
 User-uploaded content is stored in a subdirectory named `media/`. By default, this is in the same directory as the server executable. You can choose a different directory within the server's filesystem to store media; Open `config.ini` and set `media_path` to another location.
-### Dumping the database template
-After making changes to the database schema, dump it to the repository using this command:\
-`pg_dump --schema-only fuze_mediaboard >database_template.sql`

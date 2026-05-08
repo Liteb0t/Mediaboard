@@ -483,11 +483,11 @@ FuzeHttp::Response deleteServerUserPermission(shared_state* state, FuzeHttp::Req
 
 FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req) {
 	std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
-	if (client) {
-		std::cout << "CLIENT FOUND ";
-		if (client.value().account_id)
-			std::cout << "ACCOUNT_ID FOUND ";
-	}
+	// if (client) {
+	// 	std::cout << "CLIENT FOUND ";
+	// 	if (client.value().account_id)
+	// 		std::cout << "ACCOUNT_ID FOUND ";
+	// }
 	return FuzeHttp::Response{
 		.status = http::status::ok,
 		.json = {{

@@ -36,6 +36,27 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
+	// Get the path to this program, so files can be read/written relative to the executable
+	std::error_code ec;
+	boost::filesystem::path location = boost::dll::program_location(ec).parent_path();
+	if (ec)
+		throw("An error occured when attempting to get the current program's location.");
+	else
+		std::cout << "Server is located at " << location << std::endl;
+	boost::filesystem::path data_dir;
+	// TODO be able to override with environment variable
+	if (location.filename() == "bin")
+		data_dir = boost::filesystem::absolute(location / ".." / "share"); // To match Unix directory structure
+	else
+		data_dir = boost::filesystem::absolute(location);
+	std::cout << "data_dir: " << data_dir << std::endl;
+	// boost::filesystem::path database_location = location / "database";
+	// if (!boost::filesystem::exists(database_location.string())) {
+	// 	std::cout << database_location.string() << " doesn't exist. Creating..." << std::endl;
+	// 	boost::filesystem::create_directory(database_location.string());
+	// }
+	const std::string default_sqlite_filename = "sqlite_data.db";
+	const std::string default_media_directory = "media";
 	// Check command line arguments.
 	std::string config_file;
 	unsigned short server_port, postgresql_port;
@@ -53,7 +74,7 @@ int main(int argc, char* argv[]) {
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
-		("media_path,m", boost::program_options::value<std::string>(&media_location_relative_str)->default_value("."),  "File path where user-submitted media is stored.")
+		("media_path,m", boost::program_options::value<std::string>(&media_location_relative_str)->default_value(default_media_directory),  "File path where user-submitted media is stored.")
 		("server_port,p", boost::program_options::value<unsigned short>(&server_port)->default_value(8300), "The port which the server will serve. Make sure it isn't already in use by another service.")
 		("database_engine,d", boost::program_options::value<std::string>(&database_engine)->default_value("postgres"), "Choices are \"postgres\" and \"sqlite\" (experimental). The latter is recommended for beginners.")
 		("postgresql_use_uri", boost::program_options::value<bool>(&postgresql_use_uri)->default_value(false), "If true, use postgresql_uri to connect.")
@@ -62,7 +83,7 @@ int main(int argc, char* argv[]) {
 		("postgresql_host,h", boost::program_options::value<std::string>(&postgresql_host)->default_value("localhost"),  "Host for the PostgreSQL database.")
 		("postgresql_port,p", boost::program_options::value<unsigned short>(&postgresql_port)->default_value(5432), "The port at which the database is available.")
 		("postgresql_database_name,n", boost::program_options::value<std::string>(&postgresql_database_name)->default_value("fuze_mediaboard"), "Name of the PostgreSQL database.")
-		("sqlite_database_path,s", boost::program_options::value<std::string>(&sqlite_database_path)->default_value("database/sqlite_data.db"),  "File where SQLite data is stored.")
+		("sqlite_database_path,s", boost::program_options::value<std::string>(&sqlite_database_path)->default_value(default_sqlite_filename),  "File where SQLite data is stored.")
 		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.")
 		("thumbnail_file_format", boost::program_options::value<std::string>(&thumbnail_file_format)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.");
 
@@ -98,42 +119,56 @@ int main(int argc, char* argv[]) {
 	else {
 		std::cout << "Could not open config file: " << config_file << ". Default options will be used." << std::endl;
 	}
+	boost::filesystem::path media_location;
 
 	bool make_migrations;
-	// Get the path to this program, so files can be read/written relative to the executable
-	std::error_code ec;
-	boost::filesystem::path location = boost::dll::program_location(ec).parent_path();
-	boost::filesystem::path database_location = location; database_location += "/database";
-	if (ec)
-		throw("An error occured when attempting to get the current program's location.");
-	else
-		std::cout << "Server is located at " << location << std::endl;
-	if (!boost::filesystem::exists(database_location.string())) {
-		std::cout << database_location.string() << " doesn't exist. Creating..." << std::endl;
-		boost::filesystem::create_directory(database_location.string());
-	}
-
-	boost::filesystem::path media_location;
 	FuzeDBI::Connection* fuze_database_interface;
 	try {
+		if (media_location_relative_str == default_media_directory)
+			media_location = data_dir / default_media_directory;
+		else
+			media_location = boost::filesystem::absolute(media_location_relative_str);
+		if (!boost::filesystem::exists(media_location.parent_path())) {
+			throw std::runtime_error(std::format("Error: media location parent path not found at {}", media_location.parent_path().string()));
+			// std::cout << media_location << " doesn't exist. Creating..." << std::endl;
+			// boost::filesystem::create_directory(media_location.string() + "/media");
+		}
+		else
+			boost::filesystem::create_directory(media_location);
+		if (!boost::filesystem::exists(media_location / "thumbnails")) {
+			std::cout << media_location / "thumbnails" << " doesn't exist. Creating..." << std::endl;
+			boost::filesystem::create_directory(media_location / "thumbnails");
+		}
+		std::cout << "Set media_location: " << media_location << std::endl;
 #ifdef FUZEDBI_POSTGRES
 		fuze_database_interface = new FuzeDBI::Connection(postgresql_user, postgresql_host, postgresql_port, postgresql_database_name);
 #elifdef FUZEDBI_SQLITE
-		boost::filesystem::path sqlite_file_location = sqlite_database_path;
-		if (!sqlite_file_location.has_filename())
-			throw("A filename is required for sqlite_database_path");
-		boost::filesystem::path absolute_sqlite_path = boost::filesystem::absolute(sqlite_database_path, location);
-		boost::filesystem::path absolute_sqlite_path_parent = absolute_sqlite_path.parent_path();
-		if (!boost::filesystem::exists(absolute_sqlite_path_parent))
-			throw(std::format("sqlite_database_path invalid; directory not found: {}", absolute_sqlite_path_parent.string()));
-		if (!boost::filesystem::exists(absolute_sqlite_path)) {
-			std::print("Creating SQLite database file at {}", absolute_sqlite_path.string());
-			std::ofstream{absolute_sqlite_path};
+		boost::filesystem::path sqlite_database_path_p;
+		if (sqlite_database_path == default_sqlite_filename) { // Use default database location
+			sqlite_database_path_p = data_dir / default_sqlite_filename;
 		}
-		else if (boost::filesystem::is_directory(absolute_sqlite_path))
-			throw std::runtime_error(std::format("sqlite_database_path invalid; is a directory but must be a file: {}", absolute_sqlite_path.string()));
+		else {
+			sqlite_database_path_p = boost::filesystem::absolute(sqlite_database_path);
+			if (!boost::filesystem::exists(sqlite_database_path_p.parent_path()))
+				throw std::runtime_error(std::format("sqlite_database_path invalid; directory not found: {}", sqlite_database_path_p.parent_path().string()));
+		}
+		print("sqlite_database_path_p: {}", sqlite_database_path_p.string());
+		// 	throw(std::format("sqlite_database_path invalid; directory not found: {}", absolute_sqlite_path_parent.string()));
+		// boost::filesystem::path sqlite_file_location = sqlite_database_path;
+		// if (!sqlite_file_location.has_filename())
+		// 	throw("A filename is required for sqlite_database_path");
+		// boost::filesystem::path absolute_sqlite_path = boost::filesystem::absolute(sqlite_database_path, location);
+		// boost::filesystem::path absolute_sqlite_path_parent = absolute_sqlite_path.parent_path();
+		// if (!boost::filesystem::exists(absolute_sqlite_path_parent))
+		// 	throw(std::format("sqlite_database_path invalid; directory not found: {}", absolute_sqlite_path_parent.string()));
+		// if (!boost::filesystem::exists(absolute_sqlite_path)) {
+		// 	std::print("Creating SQLite database file at {}", absolute_sqlite_path.string());
+		// 	std::ofstream{absolute_sqlite_path};
+		// }
+		// else if (boost::filesystem::is_directory(absolute_sqlite_path))
+		// 	throw std::runtime_error(std::format("sqlite_database_path invalid; is a directory but must be a file: {}", absolute_sqlite_path.string()));
 		// sqlite_file_location = boost::filesystem::canonical(sqlite_database_path, location);
-		fuze_database_interface = new FuzeDBI::Connection(absolute_sqlite_path.string());
+		fuze_database_interface = new FuzeDBI::Connection(sqlite_database_path_p.string());
 #endif
 		std::optional<std::string> version_string;
 		bool version_string_found = false;
@@ -149,28 +184,18 @@ int main(int argc, char* argv[]) {
 			Migrations::makeMigrations(fuze_database_interface, version_string.value());
 		}
 		else {
-			boost::filesystem::path template_path = boost::filesystem::absolute("database_template.sql", database_location);
-			if (!boost::filesystem::exists(template_path))
-				throw std::runtime_error(std::format("Database template file {} not found.", template_path.string()));
-			Migrations::firstTimeSetup(fuze_database_interface, template_path, absolute_sqlite_path);
+			// boost::filesystem::path template_path = boost::filesystem::absolute("database_template.sql", database_location);
+			// if (!boost::filesystem::exists(template_path))
+			// 	throw std::runtime_error(std::format("Database template file {} not found.", template_path.string()));
+			Migrations::firstTimeSetup(fuze_database_interface, data_dir / "database_template.sql", sqlite_database_path_p.string());
 		}
 		std::cout << "Set port: " << server_port << std::endl;
-		media_location = boost::filesystem::canonical(media_location_relative_str, location);
+		// media_location = boost::filesystem::canonical(media_location_relative_str, location);
 	}
 	catch (const std::exception& exception) {
 		std::cerr << exception.what() << std::endl;
 		return 1;
 	}
-	if (!boost::filesystem::exists(media_location.string() + "/media")) {
-		std::cout << media_location.string() + "/media" << " doesn't exist. Creating..." << std::endl;
-		boost::filesystem::create_directory(media_location.string() + "/media");
-	}
-	media_location += "/media";
-	if (!boost::filesystem::exists(media_location.string() + "/thumbnails")) {
-		std::cout << media_location.string() + "/thumbnails" << " doesn't exist. Creating..." << std::endl;
-		boost::filesystem::create_directory(media_location.string() + "/thumbnails");
-	}
-	std::cout << "Set media_location: " << media_location << std::endl;
 	std::cout << "Set threads: " << threads << std::endl;
 	if (threads > 1)
 		std::cout << "Warning: issues may arise from multi-threading" << std::endl;
@@ -187,14 +212,14 @@ int main(int argc, char* argv[]) {
 		document_root += "/frontend/";
 		state = new shared_state(document_root, media_location, thumbnail_file_format, fuze_database_interface);
 		state->start();
+		if (variable_map.count("create_owner")) {
+			std::string invite_key = state->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
+			std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << server_port << "/invite/" << invite_key << std::endl;
+		}
 	}
 	catch (const std::exception& exception) {
 		std::cerr << "[shared_state] " << exception.what() << std::endl;
 		return 1;
-	}
-	if (variable_map.count("create_owner")) {
-		std::string invite_key = state->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
-		std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << server_port << "/invite/" << invite_key << std::endl;
 	}
 	// Create and launch a listening port
 	std::cout << "Creating a listening port..." << std::endl;

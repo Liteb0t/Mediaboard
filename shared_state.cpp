@@ -11,6 +11,10 @@
 #include "shared_state.hpp"
 #include "websocket_session.hpp"
 #include <boost/json/serialize.hpp>
+#include <boost/dll.hpp>
+#include <boost/dll/runtime_symbol_info.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/program_options.hpp>
 #include <iostream>
 
 shared_state::shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
@@ -22,6 +26,7 @@ shared_state::shared_state(boost::filesystem::path document_root, boost::filesys
 		thumbnail_file_format(thumbnail_file_format) {
 	// db->getSecret(this->secret_base64);
 	this->document_root = document_root;
+	// Link accounts to clients
 	for (const auto& client_pair : this->clients) {
 		if (client_pair.second.account_id) {
 			int account_id = client_pair.second.account_id.value();

@@ -9,6 +9,8 @@ void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::file
 	int ec; char* error_message;
 	std::print("Doing first-time setup");
 	std::print("Opening database template at {}", template_path.string());
+	if (!boost::filesystem::exists(template_path))
+		throw std::runtime_error("Error: database template not found");
 	std::ifstream sqlite_template_file(template_path.string());
 	std::string line;
 	try {
@@ -47,9 +49,8 @@ v0_0_6:
 }
 
 void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string) {
-	std::stringstream migrations;
-	bool migrations_needed = Migrations::writeMigrations(migrations, database_version_string);
-	if (migrations_needed) {
+	if (std::stringstream migrations;
+		database_version_string != current_version && Migrations::writeMigrations(migrations, database_version_string)) {
 		std::print("Database migrations need to be made. It is recommended to backup the database before proceeding.");
 		std::cout << "Press enter key to continue: ";
 		std::string res;

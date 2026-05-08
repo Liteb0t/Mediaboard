@@ -12,7 +12,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Required on FreeBSD
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd to use
 set(SODIUM_DISABLE_TESTS ON)
-set(FUZEDBI_USE_POSTGRES ON)
+set(FUZEDBI_USE_POSTGRES OFF)
+include(GNUInstallDirs)
 
 # Find dependencies sneeded by the project
 cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
@@ -68,7 +69,9 @@ target_sources(MediaboardServer
     websocket_session.cpp
 )
 configure_file(config.ini ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
-configure_file(database_template.sql ${CMAKE_CURRENT_BINARY_DIR}/database/database_template.sql COPYONLY)
+install(FILES config.ini TYPE DATA)
+configure_file(database_template.sql ${CMAKE_CURRENT_BINARY_DIR}/database_template.sql COPYONLY)
+install(FILES database_template.sql TYPE DATA)
 add_dependencies(MediaboardServer
   frontend
 )
@@ -77,5 +80,6 @@ add_subdirectory(dependencies)
 
 install(
   TARGETS MediaboardServer
-  RUNTIME DESTINATION bin
+  FILE_SET HEADERS
+  # RUNTIME DESTINATION bin
 )

@@ -34,6 +34,8 @@ foreach(frontend_file IN LISTS frontend_files)
     WORKING_DIRECTORY
       ${CMAKE_CURRENT_SOURCE_DIR}
   )
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${frontend_file}
+    DESTINATION ${CMAKE_INSTALL_DATADIR}/frontend)
 endforeach()
 add_custom_command(
   TARGET frontend POST_BUILD

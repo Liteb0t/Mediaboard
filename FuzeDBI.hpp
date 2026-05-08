@@ -75,7 +75,6 @@ public:
 		for (size_t i = 0; i < pq_statement.length(); i++) {
 			if (pq_statement[i] == '$') {
 				std::size_t number_end = pq_statement.find_first_not_of("0123456789", i+1);
-				std::cout << number_end << ':';
 				if (number_end == pq_statement.npos) {
 					number_end = pq_statement.length();
 				}

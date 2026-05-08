@@ -43,7 +43,7 @@
 		</main>
 		<div id="body_separator" class="FlexSeparator"></div>
 		<details id="reply_container" style="display: none" open="">
-			<summary><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator"></span></div></summary>
+			<summary onclick="onReplyContainerOpen()"><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator"></span></div></summary>
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
 			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Username" maxlength="_POST_MAX_NAME" />
@@ -705,6 +705,8 @@ function createPost(data, client_permissions) {
 			thumbnail_element.onclick = (event) => {
 				if (!image_opened) {
 					image_opened = true;
+					// TODO copy 4chan's behaviour of showing the image as it progressively loads...
+					// ...rather than waiting until it is fully loaded
 					img_element.onload = (event) => {
 						img_element.style["display"] = "inherit";
 						thumbnail_element.style["display"] = "none";
