@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.5
+Name=Fuze Mediaboard
+Comment=Self-hosted Chat Server
+Exec=MediaboardServer
+Icon=page.fuze.Mediaboard
+Type=Application
+Categories=Network;

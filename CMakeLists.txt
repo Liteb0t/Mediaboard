@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Required on FreeBSD
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd to use
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(SODIUM_DISABLE_TESTS ON)
 set(FUZEDBI_USE_POSTGRES OFF)
 include(GNUInstallDirs)
@@ -68,13 +69,18 @@ target_sources(MediaboardServer
     views_registration.cpp
     websocket_session.cpp
 )
-configure_file(config.ini ${CMAKE_CURRENT_BINARY_DIR} COPYONLY)
-install(FILES config.ini TYPE DATA)
-configure_file(database_template.sql ${CMAKE_CURRENT_BINARY_DIR}/database_template.sql COPYONLY)
-install(FILES database_template.sql TYPE DATA)
+configure_file(config.ini ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/config.ini COPYONLY)
+configure_file(database_template.sql ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/database_template.sql COPYONLY)
+install(
+  FILES
+    config.ini
+    database_template.sql
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard
+)
 add_dependencies(MediaboardServer
   frontend
 )
+add_subdirectory(assets)
 add_subdirectory(frontend)
 add_subdirectory(dependencies)
 

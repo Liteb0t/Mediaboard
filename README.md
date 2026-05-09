@@ -134,3 +134,8 @@ location /mediaboard/media/ {
 ```
 ### Storing user-submitted media in a different location
 User-uploaded content is stored in a subdirectory named `media/`. By default, this is in the same directory as the server executable. You can choose a different directory within the server's filesystem to store media; Open `config.ini` and set `media_path` to another location.
+### Developers' section
+To create Appdir required by AppImage, run:\
+`cmake --install build --prefix AppDir/usr`\
+Then to bundle the dependencies:\
+`./linuxdeploy-x86_64.AppImage --appdir AppDir`
