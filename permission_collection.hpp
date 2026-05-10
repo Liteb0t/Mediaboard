@@ -26,15 +26,15 @@ public:
 		permission_map.emplace(permission_type, permission_setting);
 	}
 	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting, FuzeDBI::Connection* fuze_dbi) {
-		std::unordered_map<PERMISSION, PermissionSetting>::const_iterator it = this->permission_map.find(permission_type);
-		if (!this->permission_map.contains(permission_type)) {
+		std::unordered_map<PERMISSION, PermissionSetting>::iterator it = this->permission_map.find(permission_type);
+		if (it == this->permission_map.end()) {
 			int new_permission_setting_id = fuze_dbi->query<int>("SELECT permission_setting_id FROM _sequences");
 			fuze_dbi->query<void>("UPDATE _sequences SET permission_setting_id = $1", new_permission_setting_id+1);
 			fuze_dbi->query<void>("INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES ($1, $2, $3, $4)", new_permission_setting_id, this->id, static_cast<int>(permission_type), static_cast<int>(setting));
 			this->addPermissionSetting(new_permission_setting_id, permission_type, setting);
 		}
 		else
-			permission_map.at(permission_type).set(setting);
+			it->second.set(setting);
 	}
 	// bool containsPermissionType(PERMISSION permission_type) const { return this->permission_map.contains(permission_type); }
 	/*

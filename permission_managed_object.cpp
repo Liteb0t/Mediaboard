@@ -1,5 +1,7 @@
 #include "permission_managed_object.hpp"
 #include <iostream>
+#include <ostream>
+#include <print>
 
 PermissionObjectBase::PermissionObjectBase(int permission_object_id, FuzeDBI::Connection* fuze_dbi) // On extraction from database
 		: id(permission_object_id),
@@ -18,20 +20,16 @@ void PermissionObjectBase::cacheAllPermissions() {
 	for (auto permission_collection_tuple : fuze_dbi->queryRows<std::tuple<int, std::optional<int>, std::optional<int>>>("SELECT id, account_id, permission_group_id FROM permission_collection WHERE permission_object_id = $1", this->id)) {
 		std::optional<int> account_id = std::get<1>(permission_collection_tuple);
 		std::optional<int> group_id = std::get<2>(permission_collection_tuple);
-		if (!account_id)
-			std::cout << "account ID: NULL" << std::endl;
-		if (!group_id)
-			std::cout << "group ID: NULL" << std::endl;
-		PermissionCollection new_permission_collection(std::get<0>(permission_collection_tuple), account_id, group_id);
+		PermissionCollection permission_collection(std::get<0>(permission_collection_tuple), account_id, group_id);
 
-		for (auto permission_setting_tuple : fuze_dbi->queryRows<std::tuple<int, int, int>>("SELECT id, permission_number, setting FROM permission_setting WHERE permission_collection_id = $1", new_permission_collection.getId())) {
+		for (auto permission_setting_tuple : fuze_dbi->queryRows<std::tuple<int, int, int>>("SELECT id, permission_number, setting FROM permission_setting WHERE permission_collection_id = $1", permission_collection.getId())) {
 			std::cout << std::get<0>(permission_setting_tuple) << ", ";
-			new_permission_collection.addPermissionSetting(std::get<0>(permission_setting_tuple), static_cast<PERMISSION>(std::get<1>(permission_setting_tuple)), static_cast<THREE_STATE_SETTING>(std::get<2>(permission_setting_tuple)));
+			permission_collection.addPermissionSetting(std::get<0>(permission_setting_tuple), static_cast<PERMISSION>(std::get<1>(permission_setting_tuple)), static_cast<THREE_STATE_SETTING>(std::get<2>(permission_setting_tuple)));
 		}
-		if (new_permission_collection.getAccountOrGroupEnumValue() == ACCOUNT_OR_GROUP::ACCOUNT)
-			this->account_permissions.emplace(account_id.value(), new_permission_collection);
+		if (permission_collection.getAccountOrGroupEnumValue() == ACCOUNT_OR_GROUP::ACCOUNT)
+			this->account_permissions.emplace(account_id.value(), permission_collection);
 		else
-			this->group_permissions.emplace(group_id.value(), new_permission_collection);
+			this->group_permissions.emplace(group_id.value(), permission_collection);
 	}
 	std::cout << "done." << std::endl;
 }
@@ -89,20 +87,16 @@ boost::json::object PermissionObjectBase::getPermissionCollectionsAsJson() const
 }
 
 PermissionManager::PermissionManager(int permission_object_id, FuzeDBI::Connection* fuze_dbi)
-		: PermissionObjectBase(0, fuze_dbi),
-		owner_id(/*db->getOwnerIdIfExists()*/ 0) {
+		: PermissionObjectBase(0, fuze_dbi) {
 	this->cacheAllGroups();
 	this->cacheAllAccounts();
-	if (this->owner_id)
-		this->grantOwnerPrivileges();
+	this->grantOwnerPrivileges();
 }
 
 // Grants all permissions to the Owner group
 // This will no longer be needed when the database can populate the entries on first start
 void PermissionManager::grantOwnerPrivileges() {
 	std::cout << "[PermissionManager] grantOwnerPrivileges()" << std::endl;
-	if (!this->groups.contains(static_cast<int>(BUILTIN_GROUPS::OWNER)))
-		throw std::runtime_error("Group OWNER does not exist");
 	for (int permission_number = 0; permission_number < static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS); permission_number++) {
 		if (!this->passPermissionForGroup(false, static_cast<PERMISSION>(permission_number), static_cast<int>(BUILTIN_GROUPS::OWNER)))
 			this->setGroupPermission(static_cast<int>(BUILTIN_GROUPS::OWNER), static_cast<PERMISSION>(permission_number), THREE_STATE_SETTING::ALLOW);
@@ -210,6 +204,18 @@ void PermissionManager::addAccountToGroup(int account_id, int group_id) {
 		this->groups.at(group_id).addMember(account_id);
 		fuze_dbi->query<void>("INSERT INTO permission_group_account(permission_group_id, account_id) VALUES ($1, $2)", group_id, account_id);
 	}
+}
+
+bool PermissionManager::ownerExists() const {
+	if (!this->groups.contains(static_cast<int>(BUILTIN_GROUPS::OWNER)))
+		throw std::runtime_error("[PermissionManager] Group OWNER does not exist");
+	const Group* owner_group = this->getGroup(static_cast<int>(BUILTIN_GROUPS::OWNER));
+	if (owner_group->getMembers().empty())
+		return false;
+	else if (owner_group->getMembers().size() > 1)
+		throw std::runtime_error("[PermissionManager] Multiple owners detected. Mediaboard can only have one owner.");
+	else
+		return true;
 }
 
 void PermissionManager::saveGroupHeirarchy() const {

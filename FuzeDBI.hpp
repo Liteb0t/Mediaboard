@@ -253,8 +253,8 @@ public:
 	}
 	template<typename T>
 	std::optional<T> getValueImpl(std::type_identity<std::optional<T>>, sqlite3_stmt* stmt, int column) {
-		if (sqlite3_column_type(stmt, 0) == SQLITE_NULL) {
-			sqlite3_finalize(stmt);
+		if (sqlite3_column_type(stmt, column) == SQLITE_NULL) {
+			// sqlite3_finalize(stmt);
 			return {};
 		}
 		else {

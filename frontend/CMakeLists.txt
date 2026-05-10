@@ -54,3 +54,7 @@ add_custom_command(
       ${CMAKE_CURRENT_SOURCE_DIR}/static
       ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/static
 )
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/static
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard/frontend
+)

@@ -230,7 +230,7 @@ public:
 	int createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64);
 	bool accountExists(const std::string username) const { return this->username_to_id_map.contains(username); }
 	bool accountExists(int account_id) const { return this->accounts.contains(account_id); }
-
+	bool ownerExists() const;
 	// PermissionManager is the highest level, so there is no parent to inherit from
 	bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const override { return inherited_permission; }
 	bool passInheritedPermissionForAccount( bool inherited_permission, PERMISSION permission, int account_id ) const override { return inherited_permission; }

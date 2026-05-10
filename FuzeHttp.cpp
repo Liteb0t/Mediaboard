@@ -339,11 +339,6 @@ std::string FuzeHttp::State::createInvite(int granted_group_id) {
 	};
 	std::string key_base64 = FuzeHttp::generateKeyBase64(this->sessions);
 	// TODO save invite to database
-	// db->createSession(
-	// 	key_base64,
-	// 	session.account_id,
-	// 	std::chrono::duration_cast<std::chrono::minutes>(session.created_at.time_since_epoch()).count()
-	// );
 	std::cout << "[shared_state] Created invite with key " << key_base64 << std::endl;
 	this->invites.emplace(key_base64, std::move(invite));
 	return key_base64;

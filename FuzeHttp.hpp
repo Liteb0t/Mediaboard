@@ -363,14 +363,14 @@ public:
 			return this->views.at(view_id)->getPathSize() > section_index;
 		});
 		if (matched_views.size() >= 1) {
-			std::cout << "Matching finished: number of matches: " << matched_views.size() << std::endl;
+			// std::cout << "Matching finished: number of matches: " << matched_views.size() << std::endl;
 			return views.at(*matched_views.begin())->executeView(state, req);
 		}
 		else if (req.method() == http::verb::get) {
 			return FuzeHttp::Response{.status = http::status::ok, .file = boost::filesystem::canonical(path_name.substr(1), state->document_root)};
 		}
 		else {
-			std::cout << "No patterns were matched to path_name " << path_name << std::endl;
+			// std::cout << "No patterns were matched to path_name " << path_name << std::endl;
 			return FuzeHttp::Response{.status = http::status::not_found};
 		}
 	}

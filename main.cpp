@@ -26,7 +26,7 @@ struct ProgramDirectories {
 	boost::filesystem::path sqlite_file;
 };
 
-ProgramDirectories getProgramDirectories(std::optional<std::string> data_directory_config, std::optional<std::string> media_directory_config, std::optional<std::string> sqlite_database_file_config) {
+std::optional<ProgramDirectories> getProgramDirectories(std::optional<std::string> data_directory_config, std::optional<std::string> media_directory_config, std::optional<std::string> sqlite_database_file_config) {
 	boost::filesystem::path data_directory; // Typically in ~/.local/share/FuzeMediaboard, except for AppImage
 	boost::filesystem::path writeable_directory; // Different from data_directory in AppImage
 	boost::filesystem::path config_file; // Different from data_directory in AppImage
@@ -50,16 +50,26 @@ ProgramDirectories getProgramDirectories(std::optional<std::string> data_directo
 	else
 		writeable_directory = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // For development
 
-	if (std::getenv("APPDIR")) {
+	if (data_directory_config)
+		config_file = writeable_directory / "config.ini";
+	else if (std::getenv("APPDIR")) {
 		if (const char* xdg_config_home = std::getenv("XDG_CONFIG_HOME"))
 			config_file = boost::filesystem::path(xdg_config_home) / "FuzeMediaboard" / "config.ini";
 		else if (const char* unix_home = std::getenv("HOME"))
 			config_file = boost::filesystem::path(unix_home) / ".config" / "FuzeMediaboard" / "config.ini";
 		else
 			throw std::runtime_error("Running from AppImage requires XDG_CONFIG_HOME or HOME environment variables.");
+		std::cout << "It appears you are running the AppImage for the first time. By default, the directories ~/.local/share and ~/.config will be populated. \nIf you want it self-contained, run with --data-directory <directory> \nProceed? (Y/n) ";
+		std::string response;
+		std::getline(std::cin, response);
+		if (!(response.empty() || response[0] == 'Y' || response[0] == 'y'))
+			return {};
 	}
 	else
 		config_file = writeable_directory / "config.ini";
+
+	boost::filesystem::create_directories(writeable_directory);
+	boost::filesystem::create_directories(config_file.parent_path());
 
 	if (std::getenv("APPDIR")) {
 		data_directory = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // To match Unix
@@ -105,8 +115,8 @@ int main(int argc, char* argv[]) {
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
 		("data_directory", boost::program_options::value<std::string>(&data_directory_str))
-		("media_directory,m", boost::program_options::value<std::string>(&media_directory_str),  "File path where user-submitted media is stored.")
-		("sqlite_database_file,s", boost::program_options::value<std::string>(&sqlite_database_file_str),  "File where SQLite data is stored.")
+		("media_directory,m", boost::program_options::value<std::string>(&media_directory_str),  "File path where user-submitted media is stored. data_directory is used if none is specified.")
+		("sqlite_database_file,s", boost::program_options::value<std::string>(&sqlite_database_file_str),  "File where SQLite data is stored. data_directory is used if none is specified.")
 		("server_port,p", boost::program_options::value<unsigned short>(&server_port)->default_value(8300), "The port which the server will serve. Make sure it isn't already in use by another service.")
 		("postgresql_use_uri", boost::program_options::value<bool>(&postgresql_use_uri)->default_value(false), "If true, use postgresql_uri to connect.")
 		("postgresql_uri,u", boost::program_options::value<std::string>(&postgresql_uri)->default_value("fuze_mediaboard@localhost:5432"),  "Connection string for the PostgreSQL database.")
@@ -144,7 +154,14 @@ int main(int argc, char* argv[]) {
 		media_directory_config = media_directory_str;
 	if (variable_map.count("sqlite_database_file"))
 		sqlite_database_file_config = sqlite_database_file_str;
-	ProgramDirectories program_directories = getProgramDirectories(data_directory_config, media_directory_config, sqlite_database_file_config);
+	ProgramDirectories program_directories;
+	std::optional<ProgramDirectories> program_directories_opt = getProgramDirectories(data_directory_config, media_directory_config, sqlite_database_file_config);
+	if (!program_directories_opt) {
+		std::cerr << "Mediaboard setup was cancelled by the user." << std::endl;
+		return 1;
+	}
+	else
+		program_directories = program_directories_opt.value();
 	std::cout << "Config:\t" << program_directories.config << std::endl
 		<< "Data:\t" << program_directories.data << std::endl
 		<< "Media:\t" << program_directories.media << std::endl
@@ -210,10 +227,6 @@ int main(int argc, char* argv[]) {
 		boost::filesystem::path document_root = program_directories.data / "frontend";
 		state = new shared_state(document_root, program_directories.media, thumbnail_file_format, fuze_database_interface);
 		state->start();
-		if (variable_map.count("create_owner")) {
-			std::string invite_key = state->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
-			std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << server_port << "/invite/" << invite_key << std::endl;
-		}
 	}
 	catch (const std::exception& exception) {
 		std::cerr << "[shared_state] " << exception.what() << std::endl;
@@ -239,8 +252,18 @@ int main(int argc, char* argv[]) {
 		}
 	);
 
+	if (variable_map.count("create_owner")) {
+		std::string invite_key = state->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
+		std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << server_port << "/invite/" << invite_key << std::endl;
+	}
+	else if (!state->ownerExists())
+		std::println("\nERROR: No owner found. Restart the application with --create_owner");
+	else
+		std::cout << "The server can now be accessed from http://localhost:" << server_port << std::endl;
+	std::cout << std::flush;
+
 	// Run the I/O service on the requested number of threads
-	std::cout << "Running the I/O service..." << std::endl;
+	// std::cout << "Running the I/O service..." << std::endl;
 	std::vector<std::thread> v;
 	v.reserve(threads - 1);
 	for(auto i = threads - 1; i > 0; --i) {
@@ -250,18 +273,17 @@ int main(int argc, char* argv[]) {
 			}
 		);
 	}
-	std::cout << "The server can now be accessed from http://localhost:" << server_port << std::endl;
 	io_context.run();
 
 	// (If we get here, it means we got a SIGINT or SIGTERM)
 
-		// Block until all the threads exit
-		for(auto& t : v)
-			t.join();
-	if (threads == 1)
-		std::cout << "Thread closed." << std::endl;
-	else
-		std::cout << "All " << threads << " threads closed." << std::endl;
+	// Block until all the threads exit
+	for(auto& t : v)
+		t.join();
+	// if (threads == 1)
+	// 	std::cout << "Thread closed." << std::endl;
+	// else
+	// 	std::cout << "All " << threads << " threads closed." << std::endl;
 	state->clearExpiredSessions();
 	// delete state;
 	// delete database_connection;
