@@ -59,11 +59,13 @@ std::optional<ProgramDirectories> getProgramDirectories(std::optional<std::strin
 			config_file = boost::filesystem::path(unix_home) / ".config" / "FuzeMediaboard" / "config.ini";
 		else
 			throw std::runtime_error("Running from AppImage requires XDG_CONFIG_HOME or HOME environment variables.");
-		std::cout << "It appears you are running the AppImage for the first time. By default, the directories ~/.local/share and ~/.config will be populated. \nIf you want it self-contained, run with --data-directory <directory> \nProceed? (Y/n) ";
-		std::string response;
-		std::getline(std::cin, response);
-		if (!(response.empty() || response[0] == 'Y' || response[0] == 'y'))
-			return {};
+		if (!boost::filesystem::exists(config_file)) {
+			std::cout << "It appears you are running the AppImage for the first time. By default, the directories ~/.local/share and ~/.config will be populated. \nIf you want it self-contained, run with --data-directory <directory> \nProceed? (Y/n) ";
+			std::string response;
+			std::getline(std::cin, response);
+			if (!(response.empty() || response[0] == 'Y' || response[0] == 'y'))
+				return {};
+		}
 	}
 	else
 		config_file = writeable_directory / "config.ini";
@@ -81,13 +83,21 @@ std::optional<ProgramDirectories> getProgramDirectories(std::optional<std::strin
 	else {
 		data_directory = writeable_directory;
 	}
+	boost::filesystem::path sqlite_file;
+	if (sqlite_database_file_config) {
+		sqlite_file = sqlite_database_file_config.value();
+		if (boost::filesystem::is_directory(sqlite_file))
+			sqlite_file += "mediaboard_sqlite_data.db";
+	}
+	else
+		sqlite_file = writeable_directory / "sqlite_data.db";
 	boost::filesystem::path media_directory = media_directory_config ? media_directory_config.value() : writeable_directory / "media";
 	boost::filesystem::create_directories(media_directory / "thumbnails");
 	return ProgramDirectories{
 		.config = config_file,
 		.data = data_directory,
 		.media = media_directory,
-		.sqlite_file = sqlite_database_file_config ? sqlite_database_file_config.value() : writeable_directory / "sqlite_data.db"
+		.sqlite_file = sqlite_file
 	};
 }
 
