@@ -174,8 +174,8 @@ int main(int argc, char* argv[]) {
 		program_directories = program_directories_opt.value();
 	std::cout << "Config:\t" << program_directories.config << std::endl
 		<< "Data:\t" << program_directories.data << std::endl
-		<< "Media:\t" << program_directories.media << std::endl
-		<< "SQLite\t" << program_directories.sqlite_file << std::endl;
+		<< "SQLite\t" << program_directories.sqlite_file << std::endl
+		<< "Media:\t" << program_directories.media << std::endl;
 
 	// Load config.ini
 	std::ifstream config_file_ifstream(program_directories.config);
@@ -187,7 +187,7 @@ int main(int argc, char* argv[]) {
 	else {
 		std::cout << "Could not open config file: " << program_directories.config << ". Default options will be used." << std::endl;
 	}
-
+	std::println("FuzeDBI interface: {}", FUZEDBI_DB);
 	bool make_migrations;
 	FuzeDBI::Connection* fuze_database_interface;
 	try {

@@ -13,7 +13,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread") # Required on FreeBSD
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd to use
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(SODIUM_DISABLE_TESTS ON)
-set(FUZEDBI_USE_POSTGRES OFF)
+option(FUZEDBI_USE_POSTGRES "Use PostgreSQL interface instead of SQLite" OFF)
 include(GNUInstallDirs)
 
 # Find dependencies sneeded by the project
@@ -21,8 +21,8 @@ cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoos
 find_package(Boost 1.88 COMPONENTS filesystem json program_options REQUIRED)
 
 find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
-add_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
-add_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
+add_compile_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
+add_compile_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
 include_directories(${ImageMagick_INCLUDE_DIRS})
 
 find_package(PostgreSQL REQUIRED)
@@ -35,10 +35,14 @@ if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
 endif()
 
 add_executable(MediaboardServer)
-if(FUZEDBI_USE_POSTGRES EQUAL ON)
+if(FUZEDBI_USE_POSTGRES)
+  message("FuzeDBI will use PostgreSQL interface")
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_POSTGRES)
+  target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="postgresql")
 else()
+  message("FuzeDBI will use SQLite interface")
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_SQLITE)
+  target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="sqlite")
 endif()
 target_link_libraries(MediaboardServer
   PRIVATE
@@ -89,3 +93,4 @@ install(
   FILE_SET HEADERS
   # RUNTIME DESTINATION bin
 )
+unset(FUZEDBI_USE_POSTGRES CACHE)

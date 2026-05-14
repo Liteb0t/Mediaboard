@@ -7,10 +7,18 @@
 
 void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::filesystem::path& template_path, const boost::filesystem::path& absolute_sqlite_path) {
 	int ec; char* error_message;
-	std::print("Doing first-time setup");
-	std::print("Opening database template at {}", template_path.string());
+	std::println("Doing first-time setup");
+	std::println("Opening database template at {}", template_path.string());
 	if (!boost::filesystem::exists(template_path))
 		throw std::runtime_error("Error: database template not found");
+#ifdef FUZEDBI_POSTGRES
+	std::println("It appears you are setting up the PostgreSQL database for the first time. Please ensure that the database is empty and the user has full read/write permissions.");
+	std::print("Proceed? (Y/n): ");
+	std::string response;
+	std::getline(std::cin, response);
+	if (!(response.empty() || response[0] == 'Y' || response[0] == 'y'))
+		throw std::runtime_error("Database setup cancelled by user");
+#endif
 	std::ifstream sqlite_template_file(template_path.string());
 	std::string line;
 	try {
@@ -24,12 +32,14 @@ void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::file
 		fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", current_version);
 	}
 	catch (std::exception& exception) {
-		std::cout << "[DatabaseConnectionSQLite] Exception in DB init: " << exception.what() << std::endl;
+		std::cout << "[Migrations] Exception in DB init: " << exception.what() << std::endl;
+#ifdef FUZEDBI_SQLITE
 		std::cout << "Remove SQLite database file? (Y/n) ";
 		std::string do_remove;
 		std::cin >> do_remove;
 		if (do_remove.empty() || do_remove[0] == 'Y' || do_remove[0] == 'y')
 			std::remove(absolute_sqlite_path.string().c_str());
+#endif
 		throw std::runtime_error("An error occured during database template import.");
 	}
 }
