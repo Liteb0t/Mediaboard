@@ -16,10 +16,10 @@ public:
 	void deleteMessageFromThread(int message_id, int thread_id);
 	// std::string dumpLastThread() const;
 	// bool keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const;
-	std::string dumpAllThreads(const std::optional<FuzeHttp::Client>& client) const;
+	std::string dumpAllThreads(const std::optional<Client>& client) const;
 	// std::string dumpThread(int thread_id, int client_id, std::string key) const;
 	// std::string dumpPermissionsInThread(int thread_id, int client_id) const;
-	boost::json::object getThreadPermissionsAsJson(int thread_id, const std::optional<FuzeHttp::Client>& client) const;
+	boost::json::object getThreadPermissionsAsJson(int thread_id, const std::optional<Client>& client) const;
 	bool threadExists(int thread_id) const { std::unordered_map<int, Thread>::const_iterator it = threads.find(thread_id); return it != threads.end(); };
 	bool messageExistsInThread(int message_id, int thread_id) const { return this->threads.at(thread_id).messageExists(message_id); }
 	void addListenerToThread(websocket_session* listener, int thread_id);

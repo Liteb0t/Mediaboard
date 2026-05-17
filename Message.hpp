@@ -19,7 +19,7 @@ public:
 	void createFromJSON(boost::json::object post_json);
 	void markAsDeleted();
 	bool isDeleted() const { return this->deleted; }
-	bool clientIsAuthor(const FuzeHttp::Client& client) const { return client.id == this->author_client_id; }
+	bool clientIsAuthor(const Client& client) const { return client.id == this->author_client_id; }
 private:
 	int id;
 	int thread_id;

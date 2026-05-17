@@ -25,7 +25,7 @@
 class websocket_session;
 
 // Represents the shared server state
-class shared_state : public PermissionManager, public FuzeHttp::State {
+class shared_state : public FuzeHttp::State {
 public:
 	shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location_relative, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface);
 	void start();
@@ -38,18 +38,18 @@ public:
 	// Board main_board;
 	Board* main_board() { return &(this->boards.at(0)); }
 
-	std::string dumpAllGroups(const std::optional<FuzeHttp::Client>& client) const;
-	// BasicResponse setGroupHeirarchy(const FuzeHttp::Client& client, std::vector<int> ordered_groups);
+	std::string dumpAllGroups(const std::optional<Client>& client) const;
+	// BasicResponse setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups);
 	// BasicResponse createAccount(nlohmann::json user_json);
 	// std::string dumpMembersInGroup(int group_id) const;
 	// std::string dumpMembersInGroupAsArray(int group_id) const;
-	std::string dumpAllUsers(const std::optional<FuzeHttp::Client>& client) const;
+	std::string dumpAllUsers(const std::optional<Client>& client) const;
 	// std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
 	const Thread* getThread(int board_id, int thread_id) const { return this->boards.at(board_id).getThread(thread_id); }
 	std::string getIntermediateSaltFromAccount(int account_id);
-	const FuzeHttp::Client& getClientFromAccountId(int account_id) const;
+	const Client& getClientFromAccountId(int account_id) const;
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
-	// BasicResponse addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id);
+	// BasicResponse addUserToGroups(const Client& client, int user_id, std::vector<int> groups_by_id);
 
 	void join  (websocket_session* session);
 	void leave (websocket_session* session);

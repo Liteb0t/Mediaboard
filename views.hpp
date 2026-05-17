@@ -11,9 +11,9 @@ FuzeHttp::Response removeMemberFromGroup(shared_state* state, FuzeHttp::Request 
 FuzeHttp::Response getGroupMembers(shared_state* state, FuzeHttp::Request req, int group_id);
 FuzeHttp::Response getGroups(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response setGroupHeirarchy(shared_state* state, FuzeHttp::Request req);
-FuzeHttp::Response createMessage(shared_state* state, FuzeHttp::Request req, FuzeHttp::Client client);
-FuzeHttp::Response createThread(shared_state* state, FuzeHttp::Request req, FuzeHttp::Client client);
-FuzeHttp::Response deletePost(shared_state* state, FuzeHttp::Request req, FuzeHttp::Client client, int thread_id, int message_id_in_thread);
+FuzeHttp::Response createMessage(shared_state* state, FuzeHttp::Request req, Client client);
+FuzeHttp::Response createThread(shared_state* state, FuzeHttp::Request req, Client client);
+FuzeHttp::Response deletePost(shared_state* state, FuzeHttp::Request req, Client client, int thread_id, int message_id_in_thread);
 FuzeHttp::Response getThread(shared_state* state, FuzeHttp::Request req, int thread_id);
 FuzeHttp::Response getThreadPermissions(shared_state* state, FuzeHttp::Request req, int thread_id);
 FuzeHttp::Response addThreadGroupPermission(shared_state* state, FuzeHttp::Request req, int thread_id, int group_id);

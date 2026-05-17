@@ -18,8 +18,7 @@
 #include <iostream>
 
 shared_state::shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
-		: PermissionManager(0, fuze_database_interface),
-		State(fuze_database_interface),
+		: State(fuze_database_interface),
 		fuze_dbi(fuze_database_interface),
 		// document_root(std::move(document_root)),
 		media_location(std::move(media_location)),
@@ -96,7 +95,7 @@ std::string shared_state::getIntermediateSaltFromAccount(int account_id) {
 	return fuze_dbi->query<std::string>("SELECT intermediate_salt_base64 FROM account WHERE id = $1", account_id);
 }
 
-const FuzeHttp::Client& shared_state::getClientFromAccountId(int account_id) const { // We assume the account with the ID is already checked
+const Client& shared_state::getClientFromAccountId(int account_id) const { // We assume the account with the ID is already checked
 	if (!this->accounts.at(account_id).client_id)
 		throw std::runtime_error(std::format("[getClientFromAccountId] No client ID assigned to account {}", account_id));
 	int client_id = this->accounts.at(account_id).client_id.value();
@@ -106,7 +105,7 @@ const FuzeHttp::Client& shared_state::getClientFromAccountId(int account_id) con
 	return it->second;
 }
 
-std::string shared_state::dumpAllGroups(const std::optional<FuzeHttp::Client>& client) const {
+std::string shared_state::dumpAllGroups(const std::optional<Client>& client) const {
 	std::cout << "Dumping from ordered_groups_vec: ";
 
 	boost::json::object groups_json;
@@ -158,7 +157,7 @@ std::string shared_state::dumpMembersInGroupAsArray(int group_id) const {
 }
 
 // Return non-zero when action is rejected. An error is returned to the user from http_session
-BasicResponse shared_state::setGroupHeirarchy(const FuzeHttp::Client& client, std::vector<int> ordered_groups) {
+BasicResponse shared_state::setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups) {
 	int user_rank;
 	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::bad_request, std::string("Cannot change group heirarchy; permission denied."));
@@ -204,7 +203,7 @@ BasicResponse shared_state::setGroupHeirarchy(const FuzeHttp::Client& client, st
 }
 */
 
-std::string shared_state::dumpAllUsers(const std::optional<FuzeHttp::Client>& client) const {
+std::string shared_state::dumpAllUsers(const std::optional<Client>& client) const {
 	boost::json::object users_json;
 	int client_rank = this->getClientRank(client);
 	bool client_has_manage_permissions_permission = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
@@ -236,7 +235,7 @@ std::string shared_state::dumpAllUsers(const std::optional<FuzeHttp::Client>& cl
 	});
 }
 /*
-BasicResponse shared_state::addUserToGroups(const FuzeHttp::Client& client, int account_id, std::vector<int> groups_by_id) {
+BasicResponse shared_state::addUserToGroups(const Client& client, int account_id, std::vector<int> groups_by_id) {
 	int client_rank;
 	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
 		return BasicResponse(http::status::forbidden, std::string("Cannot change group heirarchy; permission denied."));

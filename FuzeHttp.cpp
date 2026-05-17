@@ -222,7 +222,7 @@ std::variant<http::file_body::value_type, FuzeHttp::Response> FuzeHttp::State::o
 */
 
 FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
-		: fuze_dbi(fuze_dbi) {
+		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi) {
 	// Load sessions from the database
 	for (auto session_tuple :fuze_dbi->queryRows<std::tuple<int, std::string, int>>("SELECT client_id, key, created_at FROM session")) {
 		int seconds_since_epoch = std::get<2>(session_tuple); // TODO use long instead of int
@@ -241,7 +241,7 @@ FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
 			account_id = std::get<1>(client_tuple);
 		else
 			account_id = {};
-		FuzeHttp::Client client{
+		Client client{
 			.id = std::get<0>(client_tuple),
 			.account_id = account_id
 		};
@@ -249,12 +249,14 @@ FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
 	}
 }
 
-FuzeHttp::Client FuzeHttp::State::createClient(std::optional<int> account_id) {
+Client FuzeHttp::State::createClient(std::optional<int> account_id) {
 	int new_client_id = fuze_dbi->query<int>("SELECT client_id FROM _sequences");
 	fuze_dbi->query<void>("UPDATE _sequences SET client_id = $1", new_client_id+1);
 	std::cout << "[FuzeHttp] Creating new client with ID " << new_client_id << std::endl;
-	if (account_id)
+	if (account_id) {
 		fuze_dbi->query<void>("INSERT INTO client(id, account_id) VALUES ($1, $2)", new_client_id, account_id.value());
+		this->accounts.at(account_id.value()).client_id = new_client_id;
+	}
 	else
 		fuze_dbi->query<void>("INSERT INTO client(id) VALUES ($1)", new_client_id);
 	Client client{.id = new_client_id, .account_id = account_id};
@@ -262,7 +264,7 @@ FuzeHttp::Client FuzeHttp::State::createClient(std::optional<int> account_id) {
 	return client;
 }
 
-std::optional<FuzeHttp::Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Request req) const {
+std::optional<Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Request req) const {
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
 		return {};
@@ -284,7 +286,7 @@ std::optional<FuzeHttp::Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Req
 		return {};
 }
 /*
-std::variant<FuzeHttp::Client, FuzeHttp::Response> FuzeHttp::State::getRequiredClient(FuzeHttp::Request req) const {
+std::variant<Client, FuzeHttp::Response> FuzeHttp::State::getRequiredClient(FuzeHttp::Request req) const {
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Cookie required but none was found."};
@@ -351,7 +353,7 @@ int FuzeHttp::State::getGrantedGroupIdFromInvite(const std::string& invite_key_b
 		return static_cast<int>(BUILTIN_GROUPS::PUBLIC);
 }
 
-const std::optional<FuzeHttp::Client> FuzeHttp::State::getClientFromSession(const std::string& session_id_base64) const {
+const std::optional<Client> FuzeHttp::State::getClientFromSession(const std::string& session_id_base64) const {
 	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator session = this->sessions.find(session_id_base64); session != this->sessions.end())
 		return this->clients.at(session->second.client_id);
 	else

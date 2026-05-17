@@ -59,12 +59,16 @@ v0_0_6:
 }
 
 void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string) {
+	println("Database version: \t{}", database_version_string);
+	println("Server version:   \t{}", current_version);
 	if (std::stringstream migrations;
 		database_version_string != current_version && Migrations::writeMigrations(migrations, database_version_string)) {
-		std::print("Database migrations need to be made. It is recommended to backup the database before proceeding.");
-		std::cout << "Press enter key to continue: ";
-		std::string res;
-		std::getline(std::cin, res);
+		std::println("Database migrations need to be made. It is recommended to backup the database before proceeding.");
+		std::print("Proceed? (Y/n): ");
+		std::string response;
+		std::getline(std::cin, response);
+		if (!(response.empty() || response[0] == 'Y' || response[0] == 'y'))
+			throw std::runtime_error("Database migration cancelled by user");
 		std::string line;
 		while (std::getline(migrations, line, ';')) {
 			std::cout << "[Migrations] " << line << std::endl;
@@ -72,6 +76,6 @@ void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string
 		}
 	}
 	else
-		std::print("No migrations needed");
+		std::println("No migrations needed");
 	fuze_dbi->query<void>("UPDATE _info SET version = $1", current_version);
 }

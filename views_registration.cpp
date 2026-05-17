@@ -130,7 +130,7 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 		std::cout << "createAccount error" << std::endl;
 		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = std::format("[createNewAccount] {}", e.what())};
 	}
-	FuzeHttp::Client client = state->createClient(account_id);
+	Client client = state->createClient(account_id);
 	std::cout << "Created account " << username << std::endl;
 	std::string session_id_base64 = state->createSession(client.id);
 	return FuzeHttp::Response{

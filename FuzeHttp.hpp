@@ -3,7 +3,7 @@
 #pragma once
 #include "FuzeDBI.hpp"
 #include "beast.hpp"
-// #include "permission_managed_object.hpp"
+#include "permission_managed_object.hpp"
 #include <boost/beast/http/status.hpp>
 #include <sodium.h>
 #include <charconv>
@@ -52,12 +52,6 @@ struct Session {
 struct Invite {
 	const int granted_group_id;
 	const std::chrono::time_point<std::chrono::system_clock> created_at;
-};
-
-struct Client {
-	int id;
-	std::optional<int> account_id;
-	// const std::string session_id;
 };
 
 template<typename... Option>
@@ -203,7 +197,7 @@ public:
 	Response executeView(StateType state, Request& req) override {
 		std::optional<int> set_session_for_client_id;
 		if (std::tuple_size<ArgTuple>{} > 0 && this->all_args[0].index() == 3) { // There is a Client{} parameter in the view
-			std::optional<FuzeHttp::Client> client = state->getClientIfExists(req);
+			std::optional<Client> client = state->getClientIfExists(req);
 			if (!client) {
 				client = state->createClient(); // Create anonymous client, because accounts are assigned a client on login
 				set_session_for_client_id = client.value().id;
@@ -381,7 +375,7 @@ private:
 	int id_counter = 0;
 }; // class Controller
 
-class State {
+class State : public PermissionManager {
 public: // TODO change to protected if possible
 	State(FuzeDBI::Connection* fuze_dbi);
 	std::optional<Client> getClientIfExists(FuzeHttp::Request req) const;
@@ -389,7 +383,7 @@ public: // TODO change to protected if possible
 	// std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
 
 	std::string createSession(int client_id);
-	const std::optional<FuzeHttp::Client> getClientFromSession(const std::string& session_id_base64) const;
+	const std::optional<Client> getClientFromSession(const std::string& session_id_base64) const;
 	void clearExpiredSessions();
 
 	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);

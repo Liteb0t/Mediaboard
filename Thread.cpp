@@ -47,12 +47,12 @@ std::string Thread::dumpThread() const {
 }
 */
 
-boost::json::object Thread::asJson(const std::optional<FuzeHttp::Client>& client) const {
+boost::json::object Thread::asJson(const std::optional<Client>& client) const {
 	boost::json::object thread_json = this->thread_as_json;
 	thread_json.emplace("client_permissions", this->getPermissionsAsJson(client));
 	return thread_json;
 }
-boost::json::object Thread::asJsonWithMessages(const std::optional<FuzeHttp::Client>& client) const {
+boost::json::object Thread::asJsonWithMessages(const std::optional<Client>& client) const {
 	boost::json::object thread_json = this->asJson(client);
 	thread_json.emplace("messages", this->getMessagesAsJson());
 	return thread_json;
@@ -148,7 +148,7 @@ void Thread::removeListener(websocket_session* listener) {
 	listeners.erase(listener);
 }
 
-boost::json::object Thread::getPermissionsAsJson(const std::optional<FuzeHttp::Client>& client) const {
+boost::json::object Thread::getPermissionsAsJson(const std::optional<Client>& client) const {
 	// json permissions_as_json;
 	// permissions_as_json["manage_permissions"] = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
 	// permissions_as_json["send_message"] = this->clientHasPermission(client, PERMISSION::SEND_MESSAGE);

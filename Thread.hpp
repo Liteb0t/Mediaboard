@@ -14,8 +14,8 @@ public:
 	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi);
 	// std::string dumpThread() const;
-	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const;
-	boost::json::object asJsonWithMessages(const std::optional<FuzeHttp::Client>& client) const;
+	boost::json::object asJson(const std::optional<Client>& client) const;
+	boost::json::object asJsonWithMessages(const std::optional<Client>& client) const;
 	// int getNumberOfPosts() const { return this->posts.size(); };
 	// void addInitialPost(json post_json, bool save_to_database);
 	// void createPostFromStruct(struct db_post_struct* post_struct);
@@ -36,7 +36,7 @@ public:
 	void markAsDeleted();
 	std::chrono::time_point<std::chrono::system_clock> getLastMessageTime() const { return this->last_message_created_at; }
 	bool isDeleted() const { return this->deleted; }
-	boost::json::object getPermissionsAsJson(const std::optional<FuzeHttp::Client>& client) const;
+	boost::json::object getPermissionsAsJson(const std::optional<Client>& client) const;
 	const Message* getMessage(int message_id_in_thread) const { return &this->messages.at(message_id_in_thread); }
 private:
 	FuzeDBI::Connection* fuze_dbi;

@@ -1,7 +1,6 @@
 #ifndef PERMISSION_MANAGED_OBJECT
 #define PERMISSION_MANAGED_OBJECT
 
-#include "FuzeHttp.hpp"
 #include "FuzeDBI.hpp"
 #include "Group.hpp"
 #include "permission_collection.hpp"
@@ -23,6 +22,12 @@ struct Account {
 	const int id;
 	std::optional<int> client_id;
 	std::string username;
+};
+
+struct Client {
+	int id;
+	std::optional<int> account_id;
+	// const std::string session_id;
 };
 
 class PermissionObjectBase {
@@ -94,11 +99,11 @@ public:
 	virtual std::vector<int> getOrderedGroupsContainingMember(int user_id) const = 0;
 	virtual bool passInheritedPermissionForGroup(bool inherited_permission, PERMISSION permission, int group_id) const = 0;
 	virtual bool passInheritedPermissionForAccount(bool inherited_permission, PERMISSION permission, int account_id) const = 0;
-	virtual int getClientRank(const std::optional<FuzeHttp::Client>& client) const = 0;
+	virtual int getClientRank(const std::optional<Client>& client) const = 0;
 	virtual int getGroupRank(int group_id) const = 0;
 	virtual int getAccountRank(int account_id) const = 0;
 	virtual const std::unordered_map<int, Account>& getAccounts() const = 0;
-	bool clientHasPermission(const std::optional<FuzeHttp::Client>& client, PERMISSION permission) const {
+	bool clientHasPermission(const std::optional<Client>& client, PERMISSION permission) const {
 		bool inherited_permission = false;
 		// PUBLIC and USERS are built-in, that is, they are never placed in an account's group list. This is because every account is implicitly a part of these two groups
 		inherited_permission = this->passPermissionForGroup(inherited_permission, permission, static_cast<int>(BUILTIN_GROUPS::PUBLIC));
@@ -113,12 +118,12 @@ public:
 		}
 		return inherited_permission;
 	}
-	bool clientHasPermissionForGroup(const std::optional<FuzeHttp::Client>& client, PERMISSION permission, int group_id) const {
+	bool clientHasPermissionForGroup(const std::optional<Client>& client, PERMISSION permission, int group_id) const {
 		if (!this->clientHasPermission(client, permission))
 			return false;
 		return this->getClientRank(client) < this->getGroupRank(group_id);
 	}
-	bool clientHasPermissionForAccount(const std::optional<FuzeHttp::Client>& client, PERMISSION permission, int account_id) const {
+	bool clientHasPermissionForAccount(const std::optional<Client>& client, PERMISSION permission, int account_id) const {
 		if (!this->clientHasPermission(client, permission))
 			return false;
 		return this->getClientRank(client) < this->getAccountRank(account_id);
@@ -154,7 +159,7 @@ public:
 		std::unordered_map<int, Group>::const_iterator it = this->groups.find(group_id); 
 		return it != this->groups.end();
 	}
-	int getClientRank(const std::optional<FuzeHttp::Client>& client) const override {
+	int getClientRank(const std::optional<Client>& client) const override {
 		if (!client || !client.value().account_id)
 			return this->ordered_groups.size(); // This is the least privileged rank
 		else
@@ -278,14 +283,14 @@ public:
 	PermissionManagedObject(PermissionObjectBase* parent_object, FuzeDBI::Connection* fuze_dbi)
 			: PermissionObjectBase(fuze_dbi), parent_object(parent_object) {
 	}
-	bool isOwnedBy(const FuzeHttp::Client& client) const;
+	bool isOwnedBy(const Client& client) const;
 	const std::vector<int>* getOrderedGroups() const override {
 		return this->parent_object->getOrderedGroups();
 	}
 	std::vector<int> getOrderedGroupsContainingMember(int user_id) const override {
 		return this->parent_object->getOrderedGroupsContainingMember(user_id);
 	}
-	int getClientRank(const std::optional<FuzeHttp::Client>& client) const override {
+	int getClientRank(const std::optional<Client>& client) const override {
 		return this->parent_object->getClientRank(client);
 	}
 	int getAccountRank(int account_id) const override {

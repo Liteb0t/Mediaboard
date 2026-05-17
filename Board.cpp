@@ -2,6 +2,7 @@
 // #include "db_interface.h"
 #include <boost/json/serialize.hpp>
 #include <sstream>
+#include <print>
 #include <iostream>
 
 Board::Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi)
@@ -52,6 +53,7 @@ void Board::cacheAllThreads() {
 		int message_id = std::get<0>(message_tuple);
 		int thread_id = std::get<1>(message_tuple);
 		int id_in_thread = std::get<2>(message_tuple);
+		std::print("#{}/{}", thread_id, id_in_thread);
 		int seconds_since_epoch = std::get<3>(message_tuple); // TODO use long instead of int
 		std::chrono::seconds sec(seconds_since_epoch);
 		std::chrono::time_point<std::chrono::system_clock> created_at(sec);
@@ -61,7 +63,7 @@ void Board::cacheAllThreads() {
 		}
 		Message message(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), message_files);
 		this->threads.at(thread_id).cacheMessage(std::move(message));
-		std::cout << "#" << thread_id << '/' << id_in_thread << ", ";
+		std::print(", ");
 	}
 	std::cout << "done." << std::endl;
 
@@ -90,11 +92,11 @@ std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {
 	return this->threads.at(thread_id).dumpPermissions(client_id);
 }
 */
-boost::json::object Board::getThreadPermissionsAsJson(int thread_id, const std::optional<FuzeHttp::Client>& client) const {
+boost::json::object Board::getThreadPermissionsAsJson(int thread_id, const std::optional<Client>& client) const {
 	return this->threads.at(thread_id).getPermissionsAsJson(client);
 }
 
-std::string Board::dumpAllThreads(const std::optional<FuzeHttp::Client>& client) const {
+std::string Board::dumpAllThreads(const std::optional<Client>& client) const {
 	boost::json::array threads_json = boost::json::array();
 	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
 		// boost::shared_ptr<Thread> thread = this->getThread(it->second);
