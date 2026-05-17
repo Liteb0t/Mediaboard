@@ -20,23 +20,46 @@
 #include <vector>
 
 struct ProgramDirectories {
-	boost::filesystem::path config;
 	boost::filesystem::path data;
 	boost::filesystem::path media;
 	boost::filesystem::path sqlite_file;
 };
 
-std::optional<ProgramDirectories> getProgramDirectories(std::optional<std::string> data_directory_config, std::optional<std::string> media_directory_config, std::optional<std::string> sqlite_database_file_config) {
+boost::filesystem::path getConfigDirectory(boost::filesystem::path program_location, std::optional<std::string> config_file) {
+	boost::filesystem::path config_path;
+	if (config_file) { // Line set in cmdline options
+		config_path = config_file.value();
+	}
+	// XDG_DATA_HOME directories are only used in the AppImage distribution. Maybe change in the future.
+	else if (std::getenv("APPDIR")) {
+		if (const char* xdg_data_home = std::getenv("XDG_DATA_HOME"))
+			config_path = boost::filesystem::path(xdg_data_home) / "FuzeMediaboard" / "config.ini";
+		else if (const char* unix_home = std::getenv("HOME"))
+			config_path = boost::filesystem::path(unix_home) / ".local" / "share" / "FuzeMediaboard" / "config.ini";
+
+		if (!boost::filesystem::exists(config_path)) {
+			boost::filesystem::path data_directory = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // To match Unix
+
+			std::println("Copying config.ini from AppImage to {}", config_path.string());
+			if (!boost::filesystem::exists(data_directory / "config.ini"))
+				throw std::runtime_error("config.ini not found in AppImage data directory.");
+			else {
+				boost::filesystem::create_directories(config_path.parent_path());
+				boost::filesystem::copy(data_directory / "config.ini", config_path);
+			}
+		}
+	}
+	else {
+		config_path = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard" / "config.ini");
+	}
+	return config_path;
+}
+
+std::optional<ProgramDirectories> getProgramDirectories(boost::filesystem::path program_location, std::optional<std::string> data_directory_config, std::optional<std::string> media_directory_config, std::optional<std::string> sqlite_database_file_config) {
 	boost::filesystem::path data_directory; // Typically in ~/.local/share/FuzeMediaboard, except for AppImage
 	boost::filesystem::path writeable_directory; // Different from data_directory in AppImage
-	boost::filesystem::path config_file; // Different from data_directory in AppImage
+	// boost::filesystem::path config_file; // Different from data_directory in AppImage
 	// Get the path to this program, so files can be read/written relative to the executable
-	std::error_code ec;
-	boost::filesystem::path program_location = boost::dll::program_location(ec).parent_path();
-	if (ec)
-		throw std::runtime_error("An error occured when attempting to get the current program's location.");
-	else
-		std::cout << "Server is located at " << program_location << std::endl;
 	if (data_directory_config)
 		writeable_directory = data_directory_config.value();
 	else if (std::getenv("APPDIR")) {
@@ -46,39 +69,21 @@ std::optional<ProgramDirectories> getProgramDirectories(std::optional<std::strin
 			writeable_directory = boost::filesystem::path(unix_home) / ".local" / "share" / "FuzeMediaboard";
 		else
 			throw std::runtime_error("Running from AppImage requires XDG_DATA_HOME or HOME environment variables.");
+
 	}
 	else
 		writeable_directory = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // For development
 
-	if (data_directory_config)
-		config_file = writeable_directory / "config.ini";
-	else if (std::getenv("APPDIR")) {
-		if (const char* xdg_config_home = std::getenv("XDG_CONFIG_HOME"))
-			config_file = boost::filesystem::path(xdg_config_home) / "FuzeMediaboard" / "config.ini";
-		else if (const char* unix_home = std::getenv("HOME"))
-			config_file = boost::filesystem::path(unix_home) / ".config" / "FuzeMediaboard" / "config.ini";
-		else
-			throw std::runtime_error("Running from AppImage requires XDG_CONFIG_HOME or HOME environment variables.");
-		if (!boost::filesystem::exists(config_file)) {
-			std::cout << "It appears you are running the AppImage for the first time. By default, the directories ~/.local/share and ~/.config will be populated. \nIf you want it self-contained, run with --data-directory <directory> \nProceed? (Y/n) ";
-			std::string response;
-			std::getline(std::cin, response);
-			if (!(response.empty() || response[0] == 'Y' || response[0] == 'y'))
-				return {};
-		}
-	}
-	else
-		config_file = writeable_directory / "config.ini";
 
 	boost::filesystem::create_directories(writeable_directory);
-	boost::filesystem::create_directories(config_file.parent_path());
+	// boost::filesystem::create_directories(config_file.parent_path());
 
 	if (std::getenv("APPDIR")) {
 		data_directory = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // To match Unix
-		if (!boost::filesystem::exists(config_file)) {
-			std::print("Copying config.ini from AppImage");
-			boost::filesystem::copy(data_directory / "config.ini", config_file);
-		}
+		// if (!boost::filesystem::exists(config_file)) {
+		// 	std::print("Copying config.ini from AppImage");
+		// 	boost::filesystem::copy(data_directory / "config.ini", config_file);
+		// }
 	}
 	else {
 		data_directory = writeable_directory;
@@ -94,7 +99,6 @@ std::optional<ProgramDirectories> getProgramDirectories(std::optional<std::strin
 	boost::filesystem::path media_directory = media_directory_config ? media_directory_config.value() : writeable_directory / "media";
 	boost::filesystem::create_directories(media_directory / "thumbnails");
 	return ProgramDirectories{
-		.config = config_file,
 		.data = data_directory,
 		.media = media_directory,
 		.sqlite_file = sqlite_file
@@ -108,7 +112,14 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	std::optional<std::string> data_directory_config, media_directory_config, sqlite_database_file_config;
+	std::error_code ec;
+	boost::filesystem::path program_location = boost::dll::program_location().parent_path();
+	if (ec)
+		throw std::runtime_error("An error occured when attempting to get the current program's location.");
+	else
+		std::cout << "Server is located at " << program_location << std::endl;
+
+	std::optional<std::string> config_file, data_directory_config, media_directory_config, sqlite_database_file_config;
 	// Check command line arguments.
 	unsigned short server_port, postgresql_port;
 	std::string config_file_str, data_directory_str, media_directory_str, database_engine, sqlite_database_file_str, postgresql_uri, postgresql_user, postgresql_host, thumbnail_file_format, postgresql_database_name;
@@ -117,7 +128,7 @@ int main(int argc, char* argv[]) {
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
 		("create_owner,o", "Generates a link to create the server owner's account.")
-		("config,c", boost::program_options::value<std::string>(&config_file_str)->default_value("config.ini"), "location of configuration file.")
+		("config,c", boost::program_options::value<std::string>(&config_file_str), "location of configuration file.")
 		("version,v", "Show version string.")
 		("help,h", "Show list of options.");
 
@@ -143,12 +154,27 @@ int main(int argc, char* argv[]) {
 	boost::program_options::variables_map variable_map;
 	try {
 		store(boost::program_options::parse_command_line(argc, argv, command_line_options), variable_map);
+		boost::program_options::notify(variable_map);
+
+		if (variable_map.count("config"))
+			config_file = config_file_str;
+		boost::filesystem::path config_file_path = getConfigDirectory(program_location, config_file);
+		// Load config.ini
+		std::ifstream config_file_ifstream(config_file_path);
+		if (config_file_ifstream) {
+			std::cout << "Loaded config file " << config_file_path << std::endl;
+			store(parse_config_file(config_file_ifstream, universal_options), variable_map);
+			boost::program_options::notify(variable_map);
+		}
+		else {
+			std::cout << "Could not find config.ini file. Default options will be used." << std::endl;
+		}
 	}
 	catch (const std::exception& exception) {
 		std::cout << exception.what() << std::endl;
 		return 1;
 	}
-	boost::program_options::notify(variable_map);
+
 
 	if (variable_map.count("help")) {
 		std::cout << command_line_options << std::endl;
@@ -160,33 +186,28 @@ int main(int argc, char* argv[]) {
 	}
 	if (variable_map.count("data_directory"))
 		data_directory_config = data_directory_str;
-	if (variable_map.count("media_directory"))
+	if (variable_map.count("media_directory")) {
+		std::println("media_directory config option found");
 		media_directory_config = media_directory_str;
+	}
+	else
+		std::println("media_directory config option not found");
 	if (variable_map.count("sqlite_database_file"))
 		sqlite_database_file_config = sqlite_database_file_str;
 	ProgramDirectories program_directories;
-	std::optional<ProgramDirectories> program_directories_opt = getProgramDirectories(data_directory_config, media_directory_config, sqlite_database_file_config);
+	std::optional<ProgramDirectories> program_directories_opt = getProgramDirectories(program_location, data_directory_config, media_directory_config, sqlite_database_file_config);
 	if (!program_directories_opt) {
 		std::cerr << "Mediaboard setup was cancelled by the user." << std::endl;
 		return 1;
 	}
 	else
 		program_directories = program_directories_opt.value();
-	std::cout << "Config:\t" << program_directories.config << std::endl
-		<< "Data:\t" << program_directories.data << std::endl
-		<< "SQLite\t" << program_directories.sqlite_file << std::endl
+	std::cout << "Data:\t" << program_directories.data << std::endl
+#ifdef FUZEDBI_SQLITE
+		<< "SQLite:\t" << program_directories.sqlite_file << std::endl
+#endif
 		<< "Media:\t" << program_directories.media << std::endl;
 
-	// Load config.ini
-	std::ifstream config_file_ifstream(program_directories.config);
-	if (config_file_ifstream) {
-		std::cout << "Loaded config file " << program_directories.config << std::endl;
-		store(parse_config_file(config_file_ifstream, universal_options), variable_map);
-		notify(variable_map);
-	}
-	else {
-		std::cout << "Could not open config file: " << program_directories.config << ". Default options will be used." << std::endl;
-	}
 	std::println("FuzeDBI interface: {}", FUZEDBI_DB);
 	bool make_migrations;
 	FuzeDBI::Connection* fuze_database_interface;
