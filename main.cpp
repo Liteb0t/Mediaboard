@@ -25,14 +25,16 @@ struct ProgramDirectories {
 	boost::filesystem::path sqlite_file;
 };
 
-boost::filesystem::path getConfigDirectory(boost::filesystem::path program_location, std::optional<std::string> config_file) {
+boost::filesystem::path getConfigDirectory(boost::filesystem::path program_location, std::optional<std::string> config_file, std::optional<std::string> data_directory_config) {
 	boost::filesystem::path config_path;
 	if (config_file) { // Line set in cmdline options
 		config_path = config_file.value();
 	}
 	// XDG_DATA_HOME directories are only used in the AppImage distribution. Maybe change in the future.
 	else if (std::getenv("APPDIR")) {
-		if (const char* xdg_data_home = std::getenv("XDG_DATA_HOME"))
+		if (data_directory_config)
+			config_path = boost::filesystem::path(data_directory_config.value()) / "config.ini";
+		else if (const char* xdg_data_home = std::getenv("XDG_DATA_HOME"))
 			config_path = boost::filesystem::path(xdg_data_home) / "FuzeMediaboard" / "config.ini";
 		else if (const char* unix_home = std::getenv("HOME"))
 			config_path = boost::filesystem::path(unix_home) / ".local" / "share" / "FuzeMediaboard" / "config.ini";
@@ -48,6 +50,9 @@ boost::filesystem::path getConfigDirectory(boost::filesystem::path program_locat
 				boost::filesystem::copy(data_directory / "config.ini", config_path);
 			}
 		}
+	}
+	else if (data_directory_config) {
+		config_path = boost::filesystem::path(data_directory_config.value()) / "config.ini";
 	}
 	else {
 		config_path = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard" / "config.ini");
@@ -123,7 +128,8 @@ int main(int argc, char* argv[]) {
 	// Check command line arguments.
 	unsigned short server_port, postgresql_port;
 	std::string config_file_str, data_directory_str, media_directory_str, database_engine, sqlite_database_file_str, postgresql_uri, postgresql_user, postgresql_host, thumbnail_file_format, postgresql_database_name;
-	int threads;
+	unsigned int threads, thumbnail_size;
+	StateConfig state_config;
 	bool postgresql_use_uri;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
@@ -145,8 +151,9 @@ int main(int argc, char* argv[]) {
 		("postgresql_host,h", boost::program_options::value<std::string>(&postgresql_host)->default_value("localhost"),  "Host for the PostgreSQL database.")
 		("postgresql_port,p", boost::program_options::value<unsigned short>(&postgresql_port)->default_value(5432), "The port at which the database is available.")
 		("postgresql_database_name,n", boost::program_options::value<std::string>(&postgresql_database_name)->default_value("fuze_mediaboard"), "Name of the PostgreSQL database.")
-		("threads,t", boost::program_options::value<int>(&threads)->default_value(1), "Number of async threads.")
-		("thumbnail_file_format", boost::program_options::value<std::string>(&thumbnail_file_format)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.");
+		("threads,t", boost::program_options::value<unsigned int>(&threads)->default_value(1), "Number of async threads. For now, only use 1 in production.")
+		("thumbnail_file_format", boost::program_options::value<std::string>(&state_config.thumbnail_file_format)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.")
+		("thumbnail_size", boost::program_options::value<unsigned int>(&state_config.thumbnail_size)->default_value(150), "Maximum width and height of image thumbnails, in pixels.");
 
 	boost::program_options::options_description command_line_options;
 	command_line_options.add(command_line_specific_options).add(universal_options);
@@ -158,7 +165,7 @@ int main(int argc, char* argv[]) {
 
 		if (variable_map.count("config"))
 			config_file = config_file_str;
-		boost::filesystem::path config_file_path = getConfigDirectory(program_location, config_file);
+		boost::filesystem::path config_file_path = getConfigDirectory(program_location, config_file, data_directory_config);
 		// Load config.ini
 		std::ifstream config_file_ifstream(config_file_path);
 		if (config_file_ifstream) {
@@ -256,7 +263,7 @@ int main(int argc, char* argv[]) {
 	shared_state* state;
 	try {
 		boost::filesystem::path document_root = program_directories.data / "frontend";
-		state = new shared_state(document_root, program_directories.media, thumbnail_file_format, fuze_database_interface);
+		state = new shared_state(document_root, program_directories.media, state_config, fuze_database_interface);
 		state->start();
 	}
 	catch (const std::exception& exception) {

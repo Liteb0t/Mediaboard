@@ -305,8 +305,8 @@ main {
 loading_dialog.showModal();
 const media_url = "media/";
 const thumbnail_url = "media/thumbnails/";
+const thumbnail_size = _THUMBNAIL_SIZE;
 const file_size_limit = _FILE_SIZE_LIMIT_MB*1024*1024;
-file_size_limit_exceeded_dialog_file_limit_bytes.textContent = file_size_limit;
 // 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
 const valid_uri_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 const media_uuid_len = 36;
@@ -406,6 +406,27 @@ else {
 	registration_link.style["display"] = "inherit";
 }
 
+document.body.onclick = (event) => {
+	let target = event.target;
+	console.log(target);
+	if (target.classList.contains("EmbedThumbnail"))
+		expandEmbedFigure(target.parentNode);
+	else if (target.classList.contains("EmbedImage"))
+		contractEmbedFigure(target.parentNode);
+}
+
+const FIGURE_IMAGE = 0; // Main <img> is child 0 of <figure>, thumbnail is child 1.
+const FIGURE_THUMBNAIL = 1;
+function expandEmbedFigure(figure_element) {
+	figure_element.children[FIGURE_IMAGE].setAttribute("src", "_ROOT_URL" + media_url + figure_element.getAttribute("filename"));
+	figure_element.children[FIGURE_IMAGE].style["display"] = "inherit";
+	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "none";
+}
+function contractEmbedFigure(figure_element) {
+	figure_element.children[FIGURE_IMAGE].style["display"] = "none";
+	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "inherit";
+}
+
 async function logoutAction() {
 	logout_button.style["display"] = "none";
 	logged_in_indicator.style["display"] = "none";
@@ -464,11 +485,6 @@ async function postAction() {
 		}
 		localStorage.setItem("name", name_field.value);
 	}
-}
-
-function removeFileFromList(file_container) {
-	file_post_list.removeChild(file_container);
-	file_upload.disabled = false;
 }
 
 function openThreadList() {
@@ -689,62 +705,62 @@ function createPost(data, client_permissions) {
 
 	let post_files_element = document.createElement("div");
 	post_files_element.classList.add("Files");
-	for (const filename of data.files) {
+	for (const file of data.files) {
 		let figure_element = document.createElement("figure");
 		figure_element.classList.add("EmbedFigure");
-		let filename_extension_i = filename.lastIndexOf(".");
-		let file_format = Format.fromFileName(filename); // Format enum
+		figure_element.setAttribute("filename", file["filename"].replace(" ", "%20"));
+		let filename_extension_i = file["filename"].lastIndexOf(".");
+		let file_format = Format.fromFileName(file["filename"]); // Format enum
 		if (file_format === Format.IMAGE) {
-			let thumbnail_element = document.createElement("img");
-			thumbnail_element.classList.add("EmbedThumbnail");
-			let thumbnail_filename = "THUMBNAIL_" + filename + "._THUMBNAIL_FILE_FORMAT";
-			thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
-			let image_opened = false;
 			let img_element = document.createElement("img");
 			img_element.classList.add("EmbedImage");
-			thumbnail_element.onclick = (event) => {
-				if (!image_opened) {
-					image_opened = true;
-					// TODO copy 4chan's behaviour of showing the image as it progressively loads...
-					// ...rather than waiting until it is fully loaded
-					img_element.onload = (event) => {
-						img_element.style["display"] = "inherit";
-						thumbnail_element.style["display"] = "none";
-					}
-					img_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
-				}
-				else {
-					thumbnail_element.style["display"] = "none";
-					img_element.style["display"] = "inherit";
-				}
+			if (file["width"] && file["height"]) {
+				img_element.width = file["width"];
+				img_element.height = file["height"];
 			}
 			img_element.style["display"] = "none";
-			img_element.onclick = (event) => {
-				thumbnail_element.style["display"] = "inherit";
-				img_element.style["display"] = "none";
+
+			// Thumbnail
+			let thumbnail_element = document.createElement("img");
+			thumbnail_element.classList.add("EmbedThumbnail");
+			let thumbnail_filename = "THUMBNAIL_" + file["filename"] + "._THUMBNAIL_FILE_FORMAT";
+			thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+			if (file["width"] && file["height"]) {
+				if (file["width"] < file["height"]) {
+					thumbnail_element.width = file["width"] < file["height"]>>1 ? Math.ceil(thumbnail_size / 2) : Math.ceil(thumbnail_size * (file["width"]/file["height"]));
+					thumbnail_element.height = thumbnail_size;
+				}
+				else if (file["height"] < file["width"]) {
+					thumbnail_element.width = thumbnail_size;
+					thumbnail_element.height = file["height"] < file["width"]>>1 ? Math.ceil(thumbnail_size / 2) : Math.ceil(thumbnail_size * (file["height"]/file["width"]));
+				}
+				else {
+					thumbnail_element.width = thumbnail_size;
+					thumbnail_element.height = thumbnail_size;
+				}
 			}
-			figure_element.appendChild(img_element);
+			else { // Legacy: images uploaded before 0.1.1 don't have width and height saved
+				thumbnail_element.width = thumbnail_element.height = thumbnail_size;
+			}
 			thumbnail_element.setAttribute("loading", "lazy");
-			thumbnail_element.setAttribute("width", "150px");
-			thumbnail_element.setAttribute("height", "150px");
-			figure_element.appendChild(thumbnail_element);
+			figure_element.append(img_element, thumbnail_element);
 		}
 		else if (file_format === Format.AUDIO) {
 			let audio_element = document.createElement("audio");
 			audio_element.controls = true;
 			audio_element.setAttribute("controlslist", "nofullscreen nodownload");
-			audio_element.setAttribute("src", "_ROOT_URL" + media_url + filename.replace(" ", "%20"));
+			audio_element.setAttribute("src", "_ROOT_URL" + media_url + file["filename"].replace(" ", "%20"));
 			figure_element.appendChild(audio_element);
 		}
 		let pretty_filename;
 		if (filename_extension_i == -1) {
-			pretty_filename = filename.slice(0, filename.length - media_uuid_len);
+			pretty_filename = file["filename"].slice(0, file["filename"].length - media_uuid_len);
 		}
 		else {
-			pretty_filename = filename.slice(0, filename_extension_i - media_uuid_len) + filename.slice(filename_extension_i, filename.length);
+			pretty_filename = file["filename"].slice(0, filename_extension_i - media_uuid_len) + file["filename"].slice(filename_extension_i, file["filename"].length);
 		}
 		let figcaption_element = document.createElement("figcaption");
-		let media_src = "_ROOT_URL" + media_url + filename.replace(" ", "%20");
+		let media_src = "_ROOT_URL" + media_url + file["filename"].replace(" ", "%20");
 		let figcaption_element_a = document.createElement("a");
 		figcaption_element_a.setAttribute("href", media_src);
 		figcaption_element_a.setAttribute("target", "_blank");
@@ -850,6 +866,7 @@ const callback = (entries, observer) => {
 }
 const scrolled_to_bottom_observer = new IntersectionObserver(callback, options);
 
+/*
 function sanitiseFileName(file_name) {
 	let sanitised_file_name = "";
 	for (let i = 0; i < file_name.length; i++) {
@@ -862,91 +879,11 @@ function sanitiseFileName(file_name) {
 	}
 	return sanitised_file_name;
 }
+*/
 function decode_utf8(s) {
 	return decodeURIComponent(escape(s));
 }
 
-// TODO refactor upload file into a class File
-function uploadFile(file_object) {
-	let formdata = new FormData();
-	formdata.append("File_1", file_object);
-	// let file_name = sanitiseFileName(file_object.name);
-	// console.log("file_name: " + file_name);
-	let file_element = addFileToList(file_object.name);
-	let file_information_element = file_element.querySelector(".FileInformation");
-	let file_progress_element = file_element.querySelector("progress");
-	let file_img_element = file_element.querySelector("img");
-	let received_error = false;
-	let request = new XMLHttpRequest();
-	file_progress_element.max = file_object.size;
-	console.log(file_object);
-	request.upload.addEventListener("progress", (event) => {
-		file_progress_element.value = event.loaded;
-	});
-	request.responseType = "text";
-	request.open("POST", "_ROOT_URL" + "api/upload/");
-	request.timeout = 60*60*1000; // 1 hour
-	request.onreadystatechange = () => {
-		console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
-		if (!(request.status >= 200 && request.status < 300) && request.status != 0 && !received_error) {
-			file_element.classList.add("Errored");
-			received_error = true;
-			request.abort();
-				const error_message = request.getResponseHeader("message");
-				// if (error_message) {
-				// 	file_upload_error_dialog_message.innerText = error_message;
-				// }
-				file_upload_error_dialog_message.innerText =
-					`Status: ${request.status} ${request.statusText}\n` +
-					(error_message || "An unknown error occured.");
-				file_upload_error_dialog.showModal();
-				const upload_failed_indicator = document.createElement("span");
-				upload_failed_indicator.classList.add("UploadFailedIndicator");
-				upload_failed_indicator.textContent = "Upload failed";
-				file_information_element.replaceChild(upload_failed_indicator, file_progress_element);
-				file_img_element.setAttribute("src", "static/x_icon.png");
-		}
-	}
-	request.send(formdata);
-	request.onload = () => {
-		console.log("Request onLoad fired");
-		if (request.readyState === request.DONE) {
-			console.log("Received response");
-			if (request.status >= 200 && request.status < 300) {
-				const server_filename = request.getResponseHeader("File-Name");
-				console.log("server_filename: " + server_filename);
-				let decoded_filename = decode_utf8(server_filename);
-				console.log("server_filename decoded: " + decoded_filename);
-				// const utf8array = new TextEncoder().encode(server_filename);
-				// var newdecoded = new TextDecoder().decode(utf8array);
-				// console.log("server_filename dec new: " + newdecoded);
-				file_element.setAttribute("id", "file_" + decoded_filename);
-				if (Format.fromFileName(server_filename) === Format.IMAGE) {
-					file_img_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
-				}
-				const upload_complete_indicator = document.createElement("span");
-				upload_complete_indicator.classList.add("UploadCompleteIndicator");
-				upload_complete_indicator.textContent = "Upload complete";
-				file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
-			}
-			else {
-				const error_message = request.getResponseHeader("message");
-				// if (error_message) {
-				// 	file_upload_error_dialog_message.innerText = error_message;
-				// }
-				file_upload_error_dialog_message.innerText =
-					`Status: ${request.status} ${request.statusText}\n` +
-					(error_message || "An unknown error occured.");
-				file_upload_error_dialog.showModal();
-				const upload_failed_indicator = document.createElement("span");
-				upload_failed_indicator.classList.add("UploadfailedIndicator");
-				upload_failed_indicator.textContent = "Upload failed";
-				file_information_element.replaceChild(upload_complete_indicator, file_progress_element);
-				file_img_element.setAttribute("src", "static/x_icon.png");
-			}
-		}
-	}
-}
 file_upload.onchange = (event) => {
 	console.log("file changed.");
 	if (file_upload.files.length + file_post_list.childNodes.length > 4) {
@@ -956,52 +893,131 @@ file_upload.onchange = (event) => {
 	}
 	else {
 		for (let chosen_file of file_upload.files) {
-			if (chosen_file.size > file_size_limit) {
-				file_size_limit_exceeded_dialog_file_size_bytes.textContent = chosen_file.size;
-				file_size_limit_exceeded_dialog_file_name.textContent = chosen_file.name;
-				file_size_limit_exceeded_dialog.showModal();
-				file_upload.value = "";
+			try {
+				let new_file = new UploadedFile(chosen_file);
+				new_file.addFileToList(file_post_list);
+				new_file.upload();
 			}
-			else {
-				const file_name_size = (new TextEncoder().encode(chosen_file.name)).length;
-				if (file_name_size > _POST_MAX_FILE_NAME) {
-					file_name_too_long_dialog_file_name.textContent = chosen_file.name;
-					file_name_too_long_dialog_name_length.textContent = file_name_size;
-					file_name_too_long_dialog.showModal();
-				}
-				else {
-					console.log("uploading...");
-					uploadFile(chosen_file);
-				}
+			catch (error) {
+				console.error(error);
+				generic_error_dialog_message.innerHTML = error.message ? error.message : "An unknown error occured when attempting to upload file.";
+				generic_error_dialog.showModal();
 			}
 		}
 	}
 }
 
-function addFileToList(filename) {
-	let file_container = document.createElement("div");
-	let file_thumbnail = document.createElement("img");
-	file_thumbnail.setAttribute("src", "static/placeholder.png");
-	file_thumbnail.setAttribute("width", "100px");
-	file_thumbnail.setAttribute("height", "100px");
-	const file_information_container = document.createElement("div");
-	file_information_container.classList.add("FileInformation");
-	let file_title = document.createElement("span");
-	// file_title.classList.add("FileTitle");
-	file_title.textContent = filename;
-	let file_delete_button = document.createElement("button");
-	file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
-	let progress_bar = document.createElement("progress");
-	progress_bar.value = 0;
-	file_information_container.append(file_title, document.createElement("br"), progress_bar, document.createElement("br"), file_delete_button);
-	file_container.append(file_thumbnail, file_information_container);
-	file_post_list.appendChild(file_container);
-	file_delete_button.onclick = (event) => {
-		// Add delete to server later
-		// file_post_list.removeChild(document.getElementById("file_" + server_filename));
-		removeFileFromList(file_container);
+class UploadedFile {
+	constructor(file_object) {
+		this.file = file_object; // derived from file_upload.files
+		this.container_element = null;
+		this.thumbnail_element = null;
+		this.information_element = null;
+		this.progress_element = null;
+		this.filename = file_object.name;
+		if (file_object.size > file_size_limit) {
+			file_upload.value = "";
+			throw(`The file ${file_object.name} exceeds the _FILE_SIZE_LIMIT_MB megabyte limit. <br>
+				<code>${file_object.size}</code> - this file (bytes)<br>
+				<code>${file_size_limit}</code> - limit (bytes)`);
+		}
+		const file_name_size = (new TextEncoder().encode(file_object.name)).length;
+		if (file_name_size > _POST_MAX_FILE_NAME) {
+			throw(`File name "${file_object.name}" exceeds the limit of _POST_MAX_FILE_NAME bytes.<br>
+				This file name: ${file_name_size} bytes.`);
+		}
+		console.log("UploadedFile test passed...");
+		// uploadFile(chosen_file);
 	}
-	return file_container;
+	addFileToList(file_upload_list_element) {
+		this.container_element = document.createElement("div");
+		this.thumbnail_element = document.createElement("img");
+		this.thumbnail_element.setAttribute("src", "static/placeholder.png");
+		this.thumbnail_element.setAttribute("width", "100px");
+		this.thumbnail_element.setAttribute("height", "100px");
+		this.information_element = document.createElement("div");
+		this.information_element.classList.add("FileInformation");
+		let file_title = document.createElement("span");
+		// file_title.classList.add("FileTitle");
+		file_title.textContent = this.filename;
+		let file_delete_button = document.createElement("button");
+		file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
+		this.progress_element = document.createElement("progress");
+		this.progress_element.value = 0;
+		this.information_element.append(file_title, document.createElement("br"), this.progress_element, document.createElement("br"), file_delete_button);
+		this.container_element.append(this.thumbnail_element, this.information_element);
+		file_upload_list_element.appendChild(this.container_element);
+		file_delete_button.onclick = (event) => {
+			// Add delete to server later
+			// file_upload_list_element.removeChild(document.getElementById("file_" + server_filename));
+			file_upload_list_element.removeChild(this.container_element);
+			file_upload.disabled = false;
+		}
+	}
+	upload() {
+		let formdata = new FormData();
+		formdata.append("File_1", this.file);
+		// let file_name = sanitiseFileName(file_object.name);
+		// console.log("file_name: " + file_name);
+		let received_error = false;
+		let request = new XMLHttpRequest();
+		this.progress_element.max = this.file.size;
+		console.log(this.file);
+		request.upload.addEventListener("progress", (event) => {
+			this.progress_element.value = event.loaded;
+		});
+		request.responseType = "text";
+		request.open("POST", "_ROOT_URL" + "api/upload/");
+		request.timeout = 60*60*1000; // 1 hour
+		request.onreadystatechange = () => {
+			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
+			if (!(request.status >= 200 && request.status < 300) && request.status != 0 && !received_error) {
+				received_error = true;
+				request.abort();
+				this.showHttpError(request);
+			}
+		}
+		request.send(formdata);
+		request.onload = () => {
+			console.log("Request onLoad fired");
+			if (request.readyState === request.DONE) {
+				console.log("Received response");
+				if (request.status >= 200 && request.status < 300) {
+					const server_filename = request.getResponseHeader("File-Name");
+					console.log("server_filename: " + server_filename);
+					let decoded_filename = decode_utf8(server_filename);
+					console.log("server_filename decoded: " + decoded_filename);
+					// const utf8array = new TextEncoder().encode(server_filename);
+					// var newdecoded = new TextDecoder().decode(utf8array);
+					// console.log("server_filename dec new: " + newdecoded);
+					this.container_element.setAttribute("id", "file_" + decoded_filename);
+					if (Format.fromFileName(server_filename) === Format.IMAGE) {
+						this.thumbnail_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
+					}
+					const upload_complete_indicator = document.createElement("span");
+					upload_complete_indicator.classList.add("UploadCompleteIndicator");
+					upload_complete_indicator.textContent = "Upload complete";
+					this.information_element.replaceChild(upload_complete_indicator, this.progress_element);
+				}
+				else {
+					this.showHttpError(request);
+				}
+			}
+		}
+	}
+	showHttpError(request) {
+		const error_message = request.getResponseHeader("message");
+		this.container_element.classList.add("Errored");
+		file_upload_error_dialog_message.innerText =
+			`Status: ${request.status} ${request.statusText}\n` +
+			(error_message || "An unknown error occured.");
+		file_upload_error_dialog.showModal();
+		const upload_failed_indicator = document.createElement("span");
+		upload_failed_indicator.classList.add("UploadFailedIndicator");
+		upload_failed_indicator.textContent = "Upload failed";
+		this.information_element.replaceChild(upload_failed_indicator, this.progress_element);
+		this.thumbnail_element.setAttribute("src", "static/x_icon.png");
+	}
 }
 
 function connectToServer() {
@@ -1070,7 +1086,7 @@ function getFiles() {
 	let files = [];
 	for (let file of file_post_list.children) {
 		if (!file.classList.contains("Errored")) {
-			files.push(file.id.slice(5, file.id.length));
+			files.push({"filename": file.id.slice(5, file.id.length)});
 		}
 	}
 	return files;

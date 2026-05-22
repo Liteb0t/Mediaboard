@@ -1,4 +1,5 @@
 #include "Message.hpp"
+#include "Magick++/Image.h"
 #include <boost/json/serialize.hpp>
 #include <chrono>
 #include <string>
@@ -7,7 +8,7 @@
 #include <cstring>
 
 // Cache message from database
-Message::Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id, std::string author_username, std::string content, std::vector<std::string> files, bool deleted)
+Message::Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id, std::string author_username, std::string content, std::vector<File> files, bool deleted)
 		: id(id),
 		thread_id(thread_id),
 		id_in_thread(id_in_thread),
@@ -25,14 +26,10 @@ Message::Message(int id, int thread_id, int id_in_thread, std::chrono::time_poin
 		{"name", author_username},
 		{"content", content}
 	};
-	boost::json::array files_json;
-	for (std::string filename : files)
-		files_json.emplace_back(filename);
-	this->post_as_json.emplace("files", files_json);
 }
 
 // Save message when JSON is received
-Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi) {
+Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi, const std::string& media_location) {
 	if (!(post_json.contains("files") && post_json.contains("name") && post_json.contains("content"))) {
 		throw std::runtime_error("Message JSON is missing one or more of the following entries: files, name, content");
 	}
@@ -68,24 +65,64 @@ Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::C
 	if (this->content.length() == 0 && files_json.size() == 0) {
 		throw std::runtime_error("Message Cannot be empty");
 	}
-	boost::json::array::const_iterator it = files_json.begin();
+	// boost::json::array::iterator it = files_json.begin();
 	this->files_i = 0;
-	while (it != files_json.end() && files_i < 4) {
-		const boost::json::string filename = it->as_string();
+	for (boost::json::value file_val : files_json) {
+		// boost::json::object& file_obj = file_val.as_object();
+		const boost::json::string filename = file_val.at("filename").as_string();
 		if (filename.size() <= static_cast<size_t>(MESSAGE_FIELDS::MAX_FILE_NAME_WITH_UUID)) {
-			this->files.push_back(filename.c_str());
-			fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, filename.c_str());
+			File file{.filename = filename.c_str()};
+			// TODO avoid duplicate image read with views_media.cpp POST upload
+			if (FuzeHttp::fileIsImage(file.filename)) {
+				const std::string image_path = std::format("{}/{}", media_location, file.filename);
+				try {
+					Magick::Image image;
+					image.read(image_path);
+					auto size = image.size();
+					file.width = size.width();
+					// file_obj.emplace("width", file.width.value());
+					file.height = size.height();
+					// file_obj.emplace("height", file.height.value());
+				}
+				catch( Magick::Warning& magick_warning ) {
+					std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Image might not be made." << std::endl;
+				}
+				catch (Magick::Error& magick_error) {
+					std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Image will therefore not be made." << std::endl;
+				}
+			}
+			this->files.push_back(file);
+			// TODO sanitise filename. Frontend handles this but not if the API is used directly
+			if (file.width && file.height)
+				fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name, width, height) VALUES ($1, $2, $3, $4)", this->id, filename.c_str(), file.width.value(), file.height.value());
+			else
+				fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, filename.c_str());
 		}
 		else
 			std::cerr << "File name too long to save to database. Length: " << filename.size() << std::endl;
-		it++;
+		if (++files_i >= 4)
+			break;
 	}
+	post_as_json.erase("files");
 	this->post_as_json["id"] = this->id;
 
 	// New posts are not in a deleted state
 	this->deleted = false;
 	// Moderators will be able to view deleted messages
 	// this->post_as_json["deleted"] = false;
+}
+
+boost::json::object Message::asJson() const {
+	boost::json::object message_as_json = this->post_as_json;
+	boost::json::array files_json;
+	for (File file : this->files) {
+		boost::json::object file_json = {{"filename", file.filename}};
+		if (file.width) file_json.emplace("width", file.width.value());
+		if (file.height) file_json.emplace("height", file.height.value());
+		files_json.emplace_back(file_json);
+	}
+	message_as_json.emplace("files", files_json);
+	return message_as_json;
 }
 
 std::string Message::dump() const {

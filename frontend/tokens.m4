@@ -17,6 +17,8 @@ define(`_FAVICON_URL', `https://fuze.page/favicon.ico')
 
 # it is required that the thumbnail_file_format setting in config.ini matches this.
 define(`_THUMBNAIL_FILE_FORMAT', `jpg')
+# For best results, make sure the thumbnail_size setting in config.ini matches this.
+define(`_THUMBNAIL_SIZE', `150')
 
 # Also edit the parser_->body_limit in http_session.cpp
 define(`_FILE_SIZE_LIMIT_MB', `100')

@@ -142,3 +142,7 @@ To create Appdir required by AppImage, run:\
 `cmake --install build --prefix AppDir/usr`\
 Then to bundle the dependencies, use [Linuxdeploy](https://github.com/linuxdeploy/linuxdeploy):\
 `./linuxdeploy-x86_64.AppImage --appdir AppDir --output appimage`
+#### Dump PostgreSQL database
+`pg_dump fuze_mediaboard > mediaboard_dump.sql`
+#### Restore PostgreSQL database
+`psql -X --set ON_ERROR_STOP=on fuze_mediaboard < mediaboard_dump.sql`

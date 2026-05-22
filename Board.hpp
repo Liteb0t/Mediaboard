@@ -10,8 +10,8 @@ class Board : public PermissionManagedObject {
 public:
 	Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi);
 	void cacheAllThreads();
-	int createThread(boost::json::object thread_json, int author_client_id);
-	int createMessage(boost::json::object message_json, int author_client_id);
+	int createThread(boost::json::object thread_json, int author_client_id, const std::string& media_location);
+	int createMessage(boost::json::object message_json, int author_client_id, const std::string& media_location);
 	void deleteThread(int thread_id);
 	void deleteMessageFromThread(int message_id, int thread_id);
 	// std::string dumpLastThread() const;

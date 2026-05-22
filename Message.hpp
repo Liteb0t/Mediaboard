@@ -6,12 +6,17 @@
 
 enum class MESSAGE_FIELDS : size_t { MAX_NAME = 32, MAX_CONTENT = 5000, MAX_FILE_NAME = 205, MAX_FILE_NAME_WITH_UUID = 205+36 };
 
+struct File {
+	std::string filename;
+	std::optional<int> width, height;
+};
+
 class Message {
 public:
-	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::string content, std::vector<std::string> files, bool deleted = false);
-	Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
+	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::string content, std::vector<File> files, bool deleted = false);
+	Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi, const std::string& media_location);
 	std::string dump() const;
-	boost::json::object asJson() const { return this->post_as_json; };
+	boost::json::object asJson() const;
 	int getId() const { return this->id; };
 	int getIdInThread() const { return this->id_in_thread; };
 	// std::string getKey() const { return this->key; }
@@ -25,7 +30,7 @@ private:
 	int thread_id;
 	int id_in_thread;
 	// char upload_timestamp[20];
-	std::vector<std::string> files;
+	std::vector<File> files;
 	short files_i;
 	int author_client_id;
 	std::string author_username;

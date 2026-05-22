@@ -108,30 +108,60 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	}
 	std::cout << "END OF FILE" << std::endl;
 
-	// Write thumbnail
-	if (FuzeHttp::fileIsImage(out_filename)) {
-		Magick::Image thumbnail;
+	bool uploaded_file_is_image = FuzeHttp::fileIsImage(out_filename);
+	unsigned int image_width, image_height;
+	if (uploaded_file_is_image) {
+		const std::string image_path = std::format("{}/{}", state->getMediaLocation().string(), out_filename);
 		try {
-			thumbnail.read(std::format("{}/{}", state->getMediaLocation().string(), out_filename));
+			// TODO introduce option to not strip metadata
+			Magick::Image image;
+			image.read(image_path);
+			image.autoOrient();
+			image.strip();
+			image.write(image_path);
+			// Write thumbnail
+			Magick::Image thumbnail;
+			thumbnail.read(image_path);
+			thumbnail.autoOrient();
 			thumbnail.strip(); // Removes metadata
-			thumbnail.resize("150x150");
+			auto size = image.size();
+			image_width = size.width();
+			image_height = size.height();
+			unsigned int thumbnail_width, thumbnail_height;
+			if (size.width() < size.height()) {
+				thumbnail_width = size.width() < size.height()>>1 ? std::ceil(state->config.thumbnail_size / 2) : std::ceil(state->config.thumbnail_size * (size.width()/size.height()));
+				thumbnail_height = state->config.thumbnail_size;
+			}
+			else if (size.height() < size.width()) {
+				thumbnail_width = state->config.thumbnail_size;
+				thumbnail_height = size.height() < size.width()>>1 ? std::ceil(state->config.thumbnail_size / 2) : std::ceil(state->config.thumbnail_size * (size.height()/size.width()));
+			}
+			else {
+				thumbnail_width = thumbnail_height = state->config.thumbnail_size;
+			}
+			thumbnail.resize(std::format("{}x{}", thumbnail_width, thumbnail_height));
 			thumbnail.quality(50);
-			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->getThumbnailFileFormat()));
+			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->config.thumbnail_file_format));
 		}
 		catch( Magick::Warning& magick_warning ) {
-			std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Thumbnail might not be made." << std::endl;
+			std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Image might not be made." << std::endl;
 		}
 		catch (Magick::Error& magick_error) {
-			std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Thumbnail will therefore not be made." << std::endl;
+			std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Image will therefore not be made." << std::endl;
 		}
 	}
 	// std::string filename_utf_8 = boost::locale::conv::to_utf(out_filename, "UTF-8");
-	return FuzeHttp::Response{
+	FuzeHttp::Response response{
 		.status = http::status::accepted,
 		.headers = {{
 			{"File-Name", out_filename}
 		}}
 	};
+	if (uploaded_file_is_image) {
+		response.headers.value().emplace("Image-Width", std::to_string(image_width));
+		response.headers.value().emplace("Image-Height", std::to_string(image_height));
+	}
+	return response;
 }
 
 // TODO find a way to handle multiple directories under one view

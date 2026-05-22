@@ -45,15 +45,12 @@ void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::file
 }
 
 bool Migrations::writeMigrations(std::ostream& stream, const std::string& database_version_string) {
-	if (database_version_string <= "0.0.5")	goto v0_0_5;
-	if (database_version_string <= "0.0.6")	goto v0_0_6;
+	if (database_version_string <= "0.1")	goto v0_1;
 	// If code reaches here, no migrations need to be made
 	return false;
-v0_0_5:
-	stream << "UPDATE permission_collection SET account_id = NULL WHERE account_id = -1;";
-	stream << "UPDATE permission_collection SET permission_group_id = NULL WHERE permission_group_id = -1;";
-v0_0_6:
-	stream << "CREATE TABLE beder(griffin TEXT);";
+v0_1:
+	stream << "ALTER TABLE message_file ADD COLUMN width INTEGER;";
+	stream << "ALTER TABLE message_file ADD COLUMN height INTEGER;";
 	std::cout << "Finished writing migrations" << std::endl;
 	return true; // Migrations were made
 }

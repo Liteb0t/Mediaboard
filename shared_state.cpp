@@ -17,8 +17,9 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 
-shared_state::shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface)
+shared_state::shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location, StateConfig config, FuzeDBI::Connection* fuze_database_interface)
 		: State(fuze_database_interface),
+		config(config),
 		fuze_dbi(fuze_database_interface),
 		// document_root(std::move(document_root)),
 		media_location(std::move(media_location)),
@@ -89,6 +90,14 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 		if(auto sp = wp.lock())
 			sp->send(ss);
 	}
+}
+
+int shared_state::createThread(int board_id, boost::json::object thread_json, int author_client_id) {
+	return this->boards.at(board_id).createThread(thread_json, author_client_id, this->getMediaLocation().string());
+}
+
+int shared_state::createMessage(int board_id, boost::json::object message_json, int author_client_id) {
+	return this->boards.at(board_id).createMessage(message_json, author_client_id, this->getMediaLocation().string());
 }
 
 std::string shared_state::getIntermediateSaltFromAccount(int account_id) {

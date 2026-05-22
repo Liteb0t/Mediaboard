@@ -24,10 +24,16 @@
 // Forward declaration
 class websocket_session;
 
+struct StateConfig {
+	std::string thumbnail_file_format;
+	unsigned int thumbnail_size;
+};
+
 // Represents the shared server state
 class shared_state : public FuzeHttp::State {
 public:
-	shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location_relative, std::string thumbnail_file_format, FuzeDBI::Connection* fuze_database_interface);
+	shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location_relative, StateConfig config, FuzeDBI::Connection* fuze_database_interface);
+	const StateConfig config;
 	void start();
 
 	// FuzeDBI::Connection* fuze_dbi;
@@ -37,6 +43,8 @@ public:
 
 	// Board main_board;
 	Board* main_board() { return &(this->boards.at(0)); }
+	int createThread(int board_id, boost::json::object thread_json, int author_client_id);
+	int createMessage(int board_id, boost::json::object message_json, int author_client_id);
 
 	std::string dumpAllGroups(const std::optional<Client>& client) const;
 	// BasicResponse setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups);

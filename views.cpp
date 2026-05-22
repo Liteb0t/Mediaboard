@@ -156,7 +156,7 @@ FuzeHttp::Response createThread(shared_state* state, FuzeHttp::Request req, Clie
 			.error_message = std::string("Client lacks permission CREATE_THREAD.")
 		};
 	}
-	int new_thread_id = state->main_board()->createThread(thread_json, client.id);
+	int new_thread_id = state->createThread(0, thread_json, client.id);
 
 	return FuzeHttp::Response{
 		.status = http::status::created,
@@ -182,7 +182,7 @@ FuzeHttp::Response createMessage(shared_state* state, FuzeHttp::Request req, Cli
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
 	if (!state->main_board()->getThread(thread_id)->clientHasPermission(client, PERMISSION::SEND_MESSAGE))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "User lacks permission SEND_MESSAGE within this thread"};
-	int new_message_id = state->main_board()->createMessage(message_json, client.id);
+	int new_message_id = state->createMessage(0, message_json, client.id);
 	std::string new_message_dump = state->main_board()->dumpMessage(thread_id, new_message_id);
 	state->sendToThread(new_message_dump, thread_id);
 	return FuzeHttp::Response{
