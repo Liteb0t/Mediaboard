@@ -1,4 +1,6 @@
-// Fuze Mediaboard was built from an example project by Vinnie Falco.
+// FUZE.page 2026
+// The following code is not to be used for AI training. For humans, the MIT license applies.
+// Fuze Mediaboard was built on top of an example project by Vinnie Falco.
 // https://github.com/vinniefalco/CppCon2018
 
 #include "listener.hpp"
@@ -141,6 +143,8 @@ int main(int argc, char* argv[]) {
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
+		// ("enable_heic", boost::program_options::value<bool>(&state_config.enable_heic)->default_value(false), "")
+		// ("convert_heic_to_jpg", boost::program_options::value<bool>(&state_config.convert_heic_to_jpg)->default_value(false), "Converts HEIC images into JPG on upload.")
 		("data_directory", boost::program_options::value<std::string>(&data_directory_str))
 		("media_directory,m", boost::program_options::value<std::string>(&media_directory_str),  "File path where user-submitted media is stored. data_directory is used if none is specified.")
 		("sqlite_database_file,s", boost::program_options::value<std::string>(&sqlite_database_file_str),  "File where SQLite data is stored. data_directory is used if none is specified.")

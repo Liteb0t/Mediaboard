@@ -25,6 +25,8 @@
 				<input id="account_password_input" type="password" name="account_password" required>
 				<input type="button" value="Show" id="toggle_password_visibility_button" class="RightAligned" onclick="togglePasswordVisibility()">
 				</div>
+				<input id="stay_logged_in_checkbox" type="checkbox" checked>
+				<label for="stay_logged_in_checkbox">Stay logged in for 90 days</label><br><br>
 				<!--<div class="FullWidth">
 				<label for="remain_logged_in">Remain logged in</label>
 				<input id="remain_logged_in" type="checkbox" name="remain_logged_in">
@@ -185,7 +187,8 @@ async function loginAction() {
 			method: "POST",
 			body: JSON.stringify({
 				username: username_input,
-				password_hash_base64: password_hash_base64
+				password_hash_base64: password_hash_base64,
+				stay_logged_in: stay_logged_in_checkbox.checked
 			})
 		});
 		if (!(login_response && login_response.ok)) {

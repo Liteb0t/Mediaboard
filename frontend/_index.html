@@ -32,7 +32,7 @@
 				<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
 				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
 
-				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard 0.1</a>
+				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard 0.1.1</a>
 
 			</div>
 			<h3 id="location_indicator"></h3>
@@ -58,7 +58,7 @@
 			</form>
 		</details>
 		<div id="bottom_marker"></div>
-		<a id="watermark" style="display: none" href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.1</a>
+		<a id="watermark" style="display: none" href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.1.1</a>
 		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="thread_posted_dialog" closedby="any">
 			<h2>Thread posted!</h2>
@@ -95,21 +95,10 @@
 			<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attachments.</p>
 			<div class="ToolBar"><button onclick="post_file_upload_not_complete_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
-		<dialog id="file_size_limit_exceeded_dialog" closedby="any">
-			<h2>Error: could not upload file</h2>
-			<p>The file <span id="file_size_limit_exceeded_dialog_file_name"></span> exceeds the _FILE_SIZE_LIMIT_MB megabyte limit.<br>
-			<code id="file_size_limit_exceeded_dialog_file_size_bytes"></code> - this file (bytes)<br><code id="file_size_limit_exceeded_dialog_file_limit_bytes"></code> - limit (bytes)</p>
-			<div class="ToolBar"><button onclick="file_size_limit_exceeded_dialog.close()">&#x1F5D9; Close</button></div>
-		</dialog>
 		<dialog id="generic_error_dialog" closedby="any">
 			<h2>Error</h2>
 			<p id="generic_error_dialog_message">Something happened.</p>
 			<div class="ToolBar"><button onclick="generic_error_dialog.close()">&#x1F5D9; Close</button></div>
-		</dialog>
-		<dialog id="file_name_too_long_dialog" closedby="any">
-			<h2>Error: could not upload file</h2>
-			<p>File name "<span id="file_name_too_long_dialog_file_name"></span>" exceeds the limit of _POST_MAX_FILE_NAME bytes.<br>This file name: <span id="file_name_too_long_dialog_name_length"></span> bytes.</p>
-			<div class="ToolBar"><button onclick="file_name_too_long_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 		<dialog id="file_upload_error_dialog" closedby="any">
 			<h2>Error: could not upload file</h2>
@@ -396,11 +385,7 @@ class Format {
 // The value in the name field is set to the name used in the most recent post, if any.
 name_field.value = localStorage.getItem("name");
 if (localStorage.getItem("logged_in") === "true") {
-	let account_username = localStorage.getItem("account_username");
-	logged_in_as_username.textContent = account_username;
-	logout_button.style["display"] = "inherit";
-	logged_in_indicator.style["display"] = "inherit";
-	change_password_link.style["display"] = "inherit";
+	displayClientAsLoggedIn();
 }
 else {
 	registration_link.style["display"] = "inherit";
@@ -427,14 +412,26 @@ function contractEmbedFigure(figure_element) {
 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "inherit";
 }
 
-async function logoutAction() {
+function displayClientAsLoggedIn() {
+	let account_username = localStorage.getItem("account_username");
+	logged_in_as_username.textContent = account_username;
+	logout_button.style["display"] = "inherit";
+	logged_in_indicator.style["display"] = "inherit";
+	change_password_link.style["display"] = "inherit";
+}
+
+function displayClientAsLoggedOut() {
 	logout_button.style["display"] = "none";
 	logged_in_indicator.style["display"] = "none";
 	registration_link.style["display"] = "inherit";
 	change_password_link.style["display"] = "none";
-	// manage_server_button.style["display"] = "none";
 	localStorage.removeItem("account_username");
 	localStorage.setItem("logged_in", "false");
+}
+
+async function logoutAction() {
+	displayClientAsLoggedOut();
+	// manage_server_button.style["display"] = "none";
 	// localStorage.removeItem("server_permissions");
 	const fetch_response = await fetch("_ROOT_URL" + "registration/logout", {method: "POST"});
 	if (fetch_response && fetch_response.ok) {
@@ -1180,6 +1177,9 @@ async function getClientInfo() {
 	if (response.ok) {
 		await response.json().then(response_json => {
 			console.log(response_json);
+			if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
+				displayClientAsLoggedOut();
+			}
 			state.server_permissions = response_json["server_permissions"];
 			window.history.replaceState(state, null, ""); // Initial state
 			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";

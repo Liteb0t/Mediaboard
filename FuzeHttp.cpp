@@ -39,15 +39,14 @@ beast::string_view FuzeHttp::getMimeType(beast::string_view path) {
 	if(iequals(ext, ".swf"))  return "application/x-shockwave-flash";
 	if(iequals(ext, ".bmp"))  return "image/bmp";
 	if(iequals(ext, ".gif"))  return "image/gif";
-	if(iequals(ext, ".ico"))  return "image/ico";
 	if(iequals(ext, ".heic")) return "image/heic";
 	if(iequals(ext, ".heics"))return "image/heic";
+	if(iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
 	if(iequals(ext, ".jpe"))  return "image/jpeg";
 	if(iequals(ext, ".jpeg")) return "image/jpeg";
 	if(iequals(ext, ".jpg"))  return "image/jpeg";
 	if(iequals(ext, ".jxl"))  return "image/jxl";
 	if(iequals(ext, ".png"))  return "image/png";
-	if(iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
 	if(iequals(ext, ".tiff")) return "image/tiff";
 	if(iequals(ext, ".tif"))  return "image/tiff";
 	if(iequals(ext, ".svg"))  return "image/svg+xml";
@@ -190,24 +189,6 @@ http::response<http::empty_body> FuzeHttp::buildResponse(FuzeHttp::Response basi
 	res.prepare_payload();
 	return res;
 }
-/*
-std::variant<http::file_body::value_type, FuzeHttp::Response> FuzeHttp::State::openFile(boost::filesystem::path path) const {
-	if (!boost::filesystem::exists(path))
-		return FuzeHttp::Response{.status = http::status::not_found};
-	if (!boost::filesystem::is_regular_file(path))
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Is a directory"};
-	// Attempt to open the file
-	beast::error_code ec;
-	http::file_body::value_type body;
-	body.open(path.c_str(), beast::file_mode::scan, ec);
-
-	// Handle the case where the file doesn't exist
-	if (ec == boost::system::errc::no_such_file_or_directory)
-		return FuzeHttp::Response{.status = http::status::not_found};
-	else if (ec) // Handle an unknown error
-		return FuzeHttp::Response{.status = http::status::internal_server_error};
-}
-*/
 
 FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
 		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi) {
@@ -273,23 +254,6 @@ std::optional<Client> FuzeHttp::State::getClientIfExists(FuzeHttp::Request req) 
 	else
 		return {};
 }
-/*
-std::variant<Client, FuzeHttp::Response> FuzeHttp::State::getRequiredClient(FuzeHttp::Request req) const {
-	auto cookie_header = req.find("Cookie");
-	if (cookie_header == req.end())
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Cookie required but none was found."};
-	std::string session_id_base64 = cookie_header->value();
-	if (std::unordered_map<std::string, FuzeHttp::Session>::const_iterator it = this->sessions.find(session_id_base64); it != this->sessions.end()) {
-		return this->clients.at(it->second.client_id);
-		// return Client{
-		// 	.account_id = session->second.account_id,
-		// 	.session_id = session_id_base64
-		// };
-	}
-	else
-		return FuzeHttp::Response{.status = http::status::unauthorized, .error_message = "Session ID is invalid. It may have expired, or it may never had existed to begin with."};
-}
-*/
 
 std::string FuzeHttp::State::createSession(int client_id) {
 	FuzeHttp::Session session{

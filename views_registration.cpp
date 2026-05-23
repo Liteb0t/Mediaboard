@@ -170,11 +170,13 @@ FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request
 FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 	boost::json::value req_json;
 	boost::json::string username_j, password_hash_base64;
+	bool stay_logged_in;
 	std::cout << "login called" << std::endl;
 	try {
 		req_json = boost::json::parse(req.body());
 		username_j = req_json.at("username").as_string();
 		password_hash_base64 = req_json.at("password_hash_base64").as_string();
+		stay_logged_in = req_json.at("stay_logged_in").as_bool();
 	}
 	catch(const std::exception& e) {
 		std::cout << "JSON error" << std::endl;
@@ -202,9 +204,10 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 			std::cout << error_text << std::endl;
 			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_text};
 		}
+		const std::string cookie = stay_logged_in ? FuzeHttp::formatCookie(session_id_base64, (int)std::chrono::duration_cast<std::chrono::seconds>(std::chrono::days(90)).count()) : FuzeHttp::formatCookie(session_id_base64);
 		return FuzeHttp::Response{
 			.status = http::status::accepted,
-			.headers = FuzeHttp::Headers{{"Set-Cookie", FuzeHttp::formatCookie(session_id_base64)}}
+			.headers = FuzeHttp::Headers{{"Set-Cookie", cookie}}
 		};
 	}
 	else {

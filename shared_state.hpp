@@ -27,6 +27,7 @@ class websocket_session;
 struct StateConfig {
 	std::string thumbnail_file_format;
 	unsigned int thumbnail_size;
+	bool convert_heic_to_jpg;
 };
 
 // Represents the shared server state
@@ -34,6 +35,7 @@ class shared_state : public FuzeHttp::State {
 public:
 	shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location_relative, StateConfig config, FuzeDBI::Connection* fuze_database_interface);
 	const StateConfig config;
+	const std::unordered_set<std::string> image_formats = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg", "image/webp"};
 	void start();
 
 	// FuzeDBI::Connection* fuze_dbi;
