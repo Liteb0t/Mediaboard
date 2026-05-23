@@ -446,47 +446,6 @@ async function logoutAction() {
 	}
 }
 
-async function postAction() {
-	let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
-	let content_length_bytes = (content_field_text_encoder.encode(content_field.innerText)).length;
-	console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
-	if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
-		post_content_empty_dialog.showModal();
-	}
-	else if (name_length_bytes > _POST_MAX_NAME) {
-		post_name_too_long_dialog_name_length.textContent = name_length_bytes;
-		post_name_too_long_dialog.showModal();
-	}
-	else if (content_length_bytes > _POST_MAX_CONTENT) {
-		post_content_too_long_dialog_content_length.textContent = content_length_bytes;
-		post_content_too_long_dialog.showModal();
-	}
-	else if (file_post_list.querySelector("progress")) {
-		post_file_upload_not_complete_dialog.showModal();
-	}
-	else {
-		let response;
-		if (state.selected_thread.id === -1) {
-			response = await postThread();
-		}
-		else {
-			response = await postMessage();
-		}
-		if (response.ok) {
-			content_field.textContent = "";
-			file_upload.value = "";
-			file_post_list.textContent = "";
-			content_length_indicator.style["display"] = "none";
-			if (state.selected_thread.id === -1) {
-				let new_thread_id = Number(response.headers.get("new-thread-id"));
-				thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
-				thread_posted_dialog.showModal();
-			}
-		}
-		localStorage.setItem("name", name_field.value);
-	}
-}
-
 function openThreadList() {
 	state.selected_thread.id = -1;
 	history.pushState(state, "", "_ROOT_URL");
@@ -991,6 +950,12 @@ class UploadedFile {
 					// var newdecoded = new TextDecoder().decode(utf8array);
 					// console.log("server_filename dec new: " + newdecoded);
 					this.container_element.setAttribute("id", "file_" + decoded_filename);
+					const width = request.getResponseHeader("Image-Width");
+					const height = request.getResponseHeader("Image-Height");
+					if (width && height) {
+						this.container_element.setAttribute("data-image-width", width);
+						this.container_element.setAttribute("data-image-height", height);
+					}
 					if (Format.fromFileName(server_filename) === Format.IMAGE) {
 						this.thumbnail_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
 					}
@@ -1084,12 +1049,62 @@ function connectToServer() {
 
 function getFiles() {
 	let files = [];
-	for (let file of file_post_list.children) {
-		if (!file.classList.contains("Errored")) {
-			files.push({"filename": file.id.slice(5, file.id.length)});
+	for (let file_element of file_post_list.children) {
+		if (!file_element.classList.contains("Errored")) {
+			let file_data = {"filename": file_element.id.slice(5, file_element.id.length)};
+			const width = file_element.getAttribute("data-image-width");
+			if (width) {
+				const height = file_element.getAttribute("data-image-height");
+				if (height) {
+					file_data["width"] = Number(width);
+					file_data["height"] = Number(height);
+				}
+			}
+			files.push(file_data);
 		}
 	}
 	return files;
+}
+
+async function postAction() {
+	let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
+	let content_length_bytes = (content_field_text_encoder.encode(content_field.innerText)).length;
+	console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
+	if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
+		post_content_empty_dialog.showModal();
+	}
+	else if (name_length_bytes > _POST_MAX_NAME) {
+		post_name_too_long_dialog_name_length.textContent = name_length_bytes;
+		post_name_too_long_dialog.showModal();
+	}
+	else if (content_length_bytes > _POST_MAX_CONTENT) {
+		post_content_too_long_dialog_content_length.textContent = content_length_bytes;
+		post_content_too_long_dialog.showModal();
+	}
+	else if (file_post_list.querySelector("progress")) {
+		post_file_upload_not_complete_dialog.showModal();
+	}
+	else {
+		let response;
+		if (state.selected_thread.id === -1) {
+			response = await postThread();
+		}
+		else {
+			response = await postMessage();
+		}
+		if (response.ok) {
+			content_field.textContent = "";
+			file_upload.value = "";
+			file_post_list.textContent = "";
+			content_length_indicator.style["display"] = "none";
+			if (state.selected_thread.id === -1) {
+				let new_thread_id = Number(response.headers.get("new-thread-id"));
+				thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
+				thread_posted_dialog.showModal();
+			}
+		}
+		localStorage.setItem("name", name_field.value);
+	}
 }
 
 async function postMessage() {

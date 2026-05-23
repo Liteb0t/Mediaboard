@@ -65,38 +65,20 @@ Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::C
 	if (this->content.length() == 0 && files_json.size() == 0) {
 		throw std::runtime_error("Message Cannot be empty");
 	}
-	// boost::json::array::iterator it = files_json.begin();
 	this->files_i = 0;
 	for (boost::json::value file_val : files_json) {
-		// boost::json::object& file_obj = file_val.as_object();
+		boost::json::object& file_obj = file_val.as_object();
 		const boost::json::string filename = file_val.at("filename").as_string();
 		if (filename.size() <= static_cast<size_t>(MESSAGE_FIELDS::MAX_FILE_NAME_WITH_UUID)) {
-			File file{.filename = filename.c_str()};
-			// TODO avoid duplicate image read with views_media.cpp POST upload
-			if (FuzeHttp::fileIsImage(file.filename)) {
-				const std::string image_path = std::format("{}/{}", media_location, file.filename);
-				try {
-					Magick::Image image;
-					image.read(image_path);
-					auto size = image.size();
-					file.width = size.width();
-					// file_obj.emplace("width", file.width.value());
-					file.height = size.height();
-					// file_obj.emplace("height", file.height.value());
-				}
-				catch( Magick::Warning& magick_warning ) {
-					std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Image might not be made." << std::endl;
-				}
-				catch (Magick::Error& magick_error) {
-					std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Image will therefore not be made." << std::endl;
-				}
-			}
-			this->files.push_back(file);
-			// TODO sanitise filename. Frontend handles this but not if the API is used directly
-			if (file.width && file.height)
+			File file{.filename = filename.c_str()}; // TODO sanitise filename. Frontend handles this but not if the API is used directly
+			if (file_obj.contains("width") && file_obj.contains("height")) {
+				file.width = file_obj.at("width").as_int64();
+				file.height = file_obj.at("height").as_int64();
 				fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name, width, height) VALUES ($1, $2, $3, $4)", this->id, filename.c_str(), file.width.value(), file.height.value());
+			}
 			else
 				fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, filename.c_str());
+			this->files.push_back(file);
 		}
 		else
 			std::cerr << "File name too long to save to database. Length: " << filename.size() << std::endl;

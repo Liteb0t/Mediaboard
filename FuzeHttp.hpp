@@ -29,7 +29,6 @@ std::string getDecodedURL(boost::string_view raw_URL);
 std::string_view getPathName(const std::string& source_URL);
 
 void sanitiseFileName(std::string* file_name);
-const bool fileIsImage(const std::string& file_name);
 
 inline std::string formatCookie(const std::string& session_id, int max_age) {
 	return std::format("Session={}; Path=/; HttpOnly; Max-Age={}", session_id, max_age);

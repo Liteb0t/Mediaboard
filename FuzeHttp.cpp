@@ -2,7 +2,6 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
-#include <set>
 
 char FuzeHttp::fromHex(char ch) {
 	return std::isdigit(ch) ? ch - '0' : std::tolower(ch) - 'a' + 10;
@@ -17,18 +16,49 @@ void FuzeHttp::sanitiseFileName(std::string* file_name) {
 	}
 }
 
-const std::set<std::string, std::less<>> image_formats = {"bmp", "gif", "ico", "jpg", "jpeg", "jxl", "png", "svg", "webp"};
-const bool FuzeHttp::fileIsImage(const std::string& file_name) {
-	int dot_index = file_name.rfind('.');
-	if (dot_index != std::string::npos) {
-		std::string file_extension = file_name.substr(dot_index+1);
-		if (image_formats.find(file_extension) != image_formats.end())
-			return true;
-		else
-			return false;
-	}
-	else
-		return false;
+// Return a reasonable mime type based on the extension of a file.
+beast::string_view FuzeHttp::getMimeType(beast::string_view path) {
+	using beast::iequals;
+	auto const ext = [&path] {
+		auto const pos = path.rfind(".");
+		if(pos == beast::string_view::npos)
+			return beast::string_view{};
+		return path.substr(pos);
+	}();
+	if(iequals(ext, ".aac"))  return "audio/aac";
+	if(iequals(ext, ".flac")) return "audio/flac";
+	if(iequals(ext, ".mid"))  return "audio/midi";
+	if(iequals(ext, ".midi")) return "audio/midi";
+	if(iequals(ext, ".mp3"))  return "audio/mpeg";
+	if(iequals(ext, ".oga"))  return "audio/ogg";
+	if(iequals(ext, ".ogx"))  return "audio/ogg";
+	if(iequals(ext, ".opus")) return "audio/ogg";
+	if(iequals(ext, ".js"))   return "application/javascript";
+	if(iequals(ext, ".json")) return "application/json";
+	if(iequals(ext, ".xml"))  return "application/xml";
+	if(iequals(ext, ".swf"))  return "application/x-shockwave-flash";
+	if(iequals(ext, ".bmp"))  return "image/bmp";
+	if(iequals(ext, ".gif"))  return "image/gif";
+	if(iequals(ext, ".ico"))  return "image/ico";
+	if(iequals(ext, ".heic")) return "image/heic";
+	if(iequals(ext, ".heics"))return "image/heic";
+	if(iequals(ext, ".jpe"))  return "image/jpeg";
+	if(iequals(ext, ".jpeg")) return "image/jpeg";
+	if(iequals(ext, ".jpg"))  return "image/jpeg";
+	if(iequals(ext, ".jxl"))  return "image/jxl";
+	if(iequals(ext, ".png"))  return "image/png";
+	if(iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
+	if(iequals(ext, ".tiff")) return "image/tiff";
+	if(iequals(ext, ".tif"))  return "image/tiff";
+	if(iequals(ext, ".svg"))  return "image/svg+xml";
+	if(iequals(ext, ".svgz")) return "image/svg+xml";
+	if(iequals(ext, ".htm"))  return "text/html";
+	if(iequals(ext, ".html")) return "text/html";
+	if(iequals(ext, ".php"))  return "text/html";
+	if(iequals(ext, ".css"))  return "text/css";
+	if(iequals(ext, ".txt"))  return "text/plain";
+	if(iequals(ext, ".flv"))  return "video/x-flv";
+	return "application/text";
 }
 
 std::string FuzeHttp::getDecodedURL(boost::string_view raw_URL) {
@@ -84,48 +114,6 @@ std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 		path_name = path_name.substr(0, path_name.size() - 1);
 	std::cout << "path_name: " << path_name << std::endl;
 	return path_name;
-}
-
-// Return a reasonable mime type based on the extension of a file.
-beast::string_view FuzeHttp::getMimeType(beast::string_view path) {
-	using beast::iequals;
-	auto const ext = [&path] 	{
-		auto const pos = path.rfind(".");
-		if(pos == beast::string_view::npos)
-			return beast::string_view{};
-		return path.substr(pos);
-	}();
-	if(iequals(ext, ".aac"))   return "audio/aac";
-	if(iequals(ext, ".flac"))   return "audio/flac";
-	if(iequals(ext, ".mid"))   return "audio/midi";
-	if(iequals(ext, ".midi"))   return "audio/midi";
-	if(iequals(ext, ".mp3"))   return "audio/mpeg";
-	if(iequals(ext, ".oga"))   return "audio/ogg";
-	if(iequals(ext, ".ogx"))   return "audio/ogg";
-	if(iequals(ext, ".opus"))   return "audio/ogg";
-	if(iequals(ext, ".js"))   return "application/javascript";
-	if(iequals(ext, ".json")) return "application/json";
-	if(iequals(ext, ".xml"))  return "application/xml";
-	if(iequals(ext, ".swf"))  return "application/x-shockwave-flash";
-	if(iequals(ext, ".png"))  return "image/png";
-	if(iequals(ext, ".jpe"))  return "image/jpeg";
-	if(iequals(ext, ".jpeg")) return "image/jpeg";
-	if(iequals(ext, ".jpg"))  return "image/jpeg";
-	if(iequals(ext, ".jxl"))  return "image/jxl";
-	if(iequals(ext, ".gif"))  return "image/gif";
-	if(iequals(ext, ".bmp"))  return "image/bmp";
-	if(iequals(ext, ".ico"))  return "image/vnd.microsoft.icon";
-	if(iequals(ext, ".tiff")) return "image/tiff";
-	if(iequals(ext, ".tif"))  return "image/tiff";
-	if(iequals(ext, ".svg"))  return "image/svg+xml";
-	if(iequals(ext, ".svgz")) return "image/svg+xml";
-	if(iequals(ext, ".htm"))  return "text/html";
-	if(iequals(ext, ".html")) return "text/html";
-	if(iequals(ext, ".php"))  return "text/html";
-	if(iequals(ext, ".css"))  return "text/css";
-	if(iequals(ext, ".txt"))  return "text/plain";
-	if(iequals(ext, ".flv"))  return "video/x-flv";
-	return "application/text";
 }
 
 template<>

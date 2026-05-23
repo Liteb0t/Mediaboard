@@ -108,7 +108,7 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	}
 	std::cout << "END OF FILE" << std::endl;
 
-	bool uploaded_file_is_image = FuzeHttp::fileIsImage(out_filename);
+	bool uploaded_file_is_image = state->image_formats.contains(FuzeHttp::getMimeType(out_filename));
 	unsigned int image_width, image_height;
 	if (uploaded_file_is_image) {
 		const std::string image_path = std::format("{}/{}", state->getMediaLocation().string(), out_filename);

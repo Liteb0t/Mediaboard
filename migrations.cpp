@@ -49,8 +49,9 @@ bool Migrations::writeMigrations(std::ostream& stream, const std::string& databa
 	// If code reaches here, no migrations need to be made
 	return false;
 v0_1:
-	stream << "ALTER TABLE message_file ADD COLUMN width INTEGER;";
-	stream << "ALTER TABLE message_file ADD COLUMN height INTEGER;";
+	stream << "ALTER TABLE message_file ADD COLUMN width INTEGER;"
+	<< "ALTER TABLE message_file ADD COLUMN height INTEGER;"
+	<< "ALTER TABLE message_file ADD COLUMN thumbnail_format TEXT";
 	std::cout << "Finished writing migrations" << std::endl;
 	return true; // Migrations were made
 }
