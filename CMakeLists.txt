@@ -58,6 +58,7 @@ target_sources(MediaboardServer
   PRIVATE
     Board.cpp
     FuzeHttp.cpp
+    # FuzeMigrationHelper.cpp
     Group.cpp
     http_session.cpp
     listener.cpp

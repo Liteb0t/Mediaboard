@@ -51,14 +51,27 @@ bool Migrations::writeMigrations(std::ostream& stream, const std::string& databa
 v0_1:
 	stream << "ALTER TABLE message_file ADD COLUMN width INTEGER;"
 	<< "ALTER TABLE message_file ADD COLUMN height INTEGER;"
-	<< "ALTER TABLE message_file ADD COLUMN thumbnail_format TEXT";
-	std::cout << "Finished writing migrations" << std::endl;
+	;std::cout << "Finished writing migrations" << std::endl;
 	return true; // Migrations were made
 }
+
+/*
+void Migrations::writeNewMigrations(FuzeDBI::Connection* fuze_dbi, Fuze::MigrationHelper::Migrations& m) {
+	using namespace Fuze::MigrationHelper;
+	m += Version{"1.1.1"};
+	m += "ALTER TABLE message_file ADD COLUMN height INTEGER";
+	m += "ALTER TABLE message_file ADD COLUMN thumbnail_format TEXT";
+	// m += [](){std::cout << "Function migration called";};
+	m += [](){std::cout << "Function migration called";};
+}
+*/
 
 void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string) {
 	println("Database version: \t{}", database_version_string);
 	println("Server version:   \t{}", current_version);
+	// Fuze::MigrationHelper::Migrations migrater(fuze_dbi);
+	// writeNewMigrations(fuze_dbi, migrater);
+	// migrater.migrateFrom(database_version_string);
 	if (std::stringstream migrations;
 		database_version_string != current_version && Migrations::writeMigrations(migrations, database_version_string)) {
 		std::println("Database migrations need to be made. It is recommended to backup the database before proceeding.");
