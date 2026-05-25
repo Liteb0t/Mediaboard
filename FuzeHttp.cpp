@@ -8,10 +8,12 @@ char FuzeHttp::fromHex(char ch) {
 }
 
 const std::string forbidden_file_name_chars = "#?+/&";
-void FuzeHttp::sanitiseFileName(std::string* file_name) {
-	for (int i = 0; i < file_name->length(); i++) {
-		if (forbidden_file_name_chars.find((*file_name)[i]) != -1) {
-			(*file_name)[i] = '_';
+void FuzeHttp::sanitiseFileName(std::string& file_name) {
+	if (file_name[0] == ' ')
+		file_name[0] = '_';
+	for (int i = 0; i < file_name.length(); i++) {
+		if (forbidden_file_name_chars.find(file_name[i]) != -1) {
+			file_name[i] = '_';
 		}
 	}
 }

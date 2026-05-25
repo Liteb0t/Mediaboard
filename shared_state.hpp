@@ -28,6 +28,7 @@ struct StateConfig {
 	std::string thumbnail_file_format;
 	unsigned int thumbnail_size;
 	bool convert_heic_to_jpg;
+	bool strip_metadata;
 };
 
 // Represents the shared server state

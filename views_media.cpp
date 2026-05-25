@@ -53,7 +53,7 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	else if (out_filename.length() > static_cast<int>(MESSAGE_FIELDS::MAX_FILE_NAME)) {
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("File name length exceeds the server-defined limit of {}", static_cast<int>(MESSAGE_FIELDS::MAX_FILE_NAME))};
 	}
-	FuzeHttp::sanitiseFileName(&out_filename);
+	FuzeHttp::sanitiseFileName(out_filename);
 	std::cout << "Sanitised out_filename: " << out_filename << std::endl;
 
 	// Add UUID to filename
@@ -113,12 +113,13 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	if (uploaded_file_is_image) {
 		const std::string image_path = std::format("{}/{}", state->getMediaLocation().string(), out_filename);
 		try {
-			// TODO introduce option to not strip metadata
 			Magick::Image image;
 			image.read(image_path);
-			image.autoOrient();
-			image.strip();
-			image.write(image_path);
+			if (state->config.strip_metadata) {
+				image.autoOrient();
+				image.strip();
+				image.write(image_path);
+			}
 			// Write thumbnail
 			Magick::Image thumbnail;
 			thumbnail.read(image_path);

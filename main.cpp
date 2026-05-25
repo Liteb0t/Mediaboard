@@ -149,6 +149,7 @@ int main(int argc, char* argv[]) {
 		("media_directory,m", boost::program_options::value<std::string>(&media_directory_str),  "File path where user-submitted media is stored. data_directory is used if none is specified.")
 		("sqlite_database_file,s", boost::program_options::value<std::string>(&sqlite_database_file_str),  "File where SQLite data is stored. data_directory is used if none is specified.")
 		("server_port,p", boost::program_options::value<unsigned short>(&server_port)->default_value(8300), "The port which the server will serve. Make sure it isn't already in use by another service.")
+		("strip_metadata", boost::program_options::value<bool>(&state_config.strip_metadata)->default_value(true), "Remove metadata from newly-uploaded images.")
 		("postgresql_use_uri", boost::program_options::value<bool>(&postgresql_use_uri)->default_value(false), "If true, use postgresql_uri to connect.")
 		("postgresql_uri,u", boost::program_options::value<std::string>(&postgresql_uri)->default_value("fuze_mediaboard@localhost:5432"),  "Connection string for the PostgreSQL database.")
 		("postgresql_user,U", boost::program_options::value<std::string>(&postgresql_user)->default_value("mediaboard_server"),  "User which will access the PostgreSQL database.")
@@ -240,7 +241,7 @@ int main(int argc, char* argv[]) {
 			std::cout << "Version string not found in database" << std::endl;
 		}
 		if (version_string_found && version_string) {
-			std::cout << "Version " <<	version_string.value() << std::endl;
+			// std::cout << "Version " <<	version_string.value() << std::endl;
 			Migrations::makeMigrations(fuze_database_interface, version_string.value());
 		}
 		else {
