@@ -29,7 +29,7 @@ Message::Message(int id, int thread_id, int id_in_thread, std::chrono::time_poin
 }
 
 // Save message when JSON is received
-Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi, const std::string& media_location) {
+Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi) {
 	if (!(post_json.contains("files") && post_json.contains("name") && post_json.contains("content"))) {
 		throw std::runtime_error("Message JSON is missing one or more of the following entries: files, name, content");
 	}
@@ -71,10 +71,11 @@ Message::Message(boost::json::object post_json, int author_client_id, FuzeDBI::C
 		const boost::json::string filename = file_val.at("filename").as_string();
 		if (filename.size() <= static_cast<size_t>(MESSAGE_FIELDS::MAX_FILE_NAME_WITH_UUID)) {
 			File file{.filename = filename.c_str()}; // TODO sanitise filename. Frontend handles this but not if the API is used directly
-			if (file_obj.contains("width") && file_obj.contains("height")) {
+			if (file_obj.contains("width") && file_obj.contains("height") && file_obj.contains("thumbnail_file_extension")) {
 				file.width = file_obj.at("width").as_int64();
 				file.height = file_obj.at("height").as_int64();
-				fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name, width, height) VALUES ($1, $2, $3, $4)", this->id, filename.c_str(), file.width.value(), file.height.value());
+				file.thumbnail_file_extension = file_obj.at("thumbnail_file_extension").as_string();
+				fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name, width, height, thumbnail_file_extension) VALUES ($1, $2, $3, $4, $5)", this->id, filename.c_str(), file.width.value(), file.height.value(), file.thumbnail_file_extension.value());
 			}
 			else
 				fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, filename.c_str());
@@ -101,6 +102,7 @@ boost::json::object Message::asJson() const {
 		boost::json::object file_json = {{"filename", file.filename}};
 		if (file.width) file_json.emplace("width", file.width.value());
 		if (file.height) file_json.emplace("height", file.height.value());
+		if (file.thumbnail_file_extension) file_json.emplace("thumbnail_file_extension", file.thumbnail_file_extension.value());
 		files_json.emplace_back(file_json);
 	}
 	message_as_json.emplace("files", files_json);

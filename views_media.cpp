@@ -6,6 +6,7 @@
 #include "shared_state.hpp"
 #include <boost/beast/http/status.hpp>
 // #include <boost/uuid/uuid.hpp>
+#include <boost/filesystem/operations.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #include <Magick++.h>
@@ -108,41 +109,57 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	}
 	std::cout << "END OF FILE" << std::endl;
 
-	bool uploaded_file_is_image = state->image_formats.contains(FuzeHttp::getMimeType(out_filename));
+	bool uploaded_file_is_image = state->hasImageFormat((FuzeHttp::getMimeType(out_filename)));
 	unsigned int image_width, image_height;
+	bool uploaded_file_has_thumbnail = false;
 	if (uploaded_file_is_image) {
-		const std::string image_path = std::format("{}/{}", state->getMediaLocation().string(), out_filename);
+		const boost::filesystem::path image_path = state->getMediaLocation() / out_filename;
 		try {
 			Magick::Image image;
-			image.read(image_path);
-			if (state->config.strip_metadata) {
-				image.autoOrient();
-				image.strip();
-				image.write(image_path);
+			image.read(image_path.string());
+			if (state->config.strip_metadata || state->config.convert_heic_to_jpg) {
+				if (state->config.strip_metadata) {
+					image.autoOrient();
+					image.strip();
+				}
+				if (state->config.convert_heic_to_jpg) {
+					image.quality(80);
+					image.write(image_path.string().substr(0, image_path.string().rfind('.'))+".jpg");
+					std::println("out_filename was first {}", out_filename);
+					out_filename = out_filename.substr(0, out_filename.rfind('.'))+".jpg";
+					std::println("out_filename is now {}", out_filename);
+				}
+				else
+					image.write(image_path.string());
 			}
 			// Write thumbnail
 			Magick::Image thumbnail;
-			thumbnail.read(image_path);
+			thumbnail.read(image_path.string());
 			thumbnail.autoOrient();
 			thumbnail.strip(); // Removes metadata
 			auto size = image.size();
 			image_width = size.width();
 			image_height = size.height();
-			unsigned int thumbnail_width, thumbnail_height;
+			Magick::Geometry thumbnail_dimensions;
 			if (size.width() < size.height()) {
-				thumbnail_width = size.width() < size.height()>>1 ? std::ceil(state->config.thumbnail_size / 2) : std::ceil(state->config.thumbnail_size * (size.width()/size.height()));
-				thumbnail_height = state->config.thumbnail_size;
+				thumbnail_dimensions.width(size.width() < size.height()>>1 ? std::ceil(state->config.thumbnail_size / 2) : std::ceil(state->config.thumbnail_size * (size.width()/size.height())));
+				thumbnail_dimensions.height(state->config.thumbnail_size);
 			}
 			else if (size.height() < size.width()) {
-				thumbnail_width = state->config.thumbnail_size;
-				thumbnail_height = size.height() < size.width()>>1 ? std::ceil(state->config.thumbnail_size / 2) : std::ceil(state->config.thumbnail_size * (size.height()/size.width()));
+				thumbnail_dimensions.width(state->config.thumbnail_size);
+				thumbnail_dimensions.height(size.height() < size.width()>>1 ? std::ceil(state->config.thumbnail_size / 2) : std::ceil(state->config.thumbnail_size * (size.height()/size.width())));
 			}
 			else {
-				thumbnail_width = thumbnail_height = state->config.thumbnail_size;
+				thumbnail_dimensions.width(state->config.thumbnail_size);
+				thumbnail_dimensions.height(state->config.thumbnail_size);
 			}
-			thumbnail.resize(std::format("{}x{}", thumbnail_width, thumbnail_height));
-			thumbnail.quality(50);
-			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->config.thumbnail_file_format));
+			thumbnail.resize(thumbnail_dimensions);
+			thumbnail.quality(60);
+			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->config.thumbnail_file_extension));
+			uploaded_file_has_thumbnail = true;
+			if (state->config.convert_heic_to_jpg) {
+				boost::filesystem::remove(image_path);
+			}
 		}
 		catch( Magick::Warning& magick_warning ) {
 			std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Image might not be made." << std::endl;
@@ -161,6 +178,8 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	if (uploaded_file_is_image) {
 		response.headers.value().emplace("Image-Width", std::to_string(image_width));
 		response.headers.value().emplace("Image-Height", std::to_string(image_height));
+		if (uploaded_file_has_thumbnail)
+			response.headers.value().emplace("Thumbnail-File-Extension", state->config.thumbnail_file_extension);
 	}
 	return response;
 }

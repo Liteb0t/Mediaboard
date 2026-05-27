@@ -25,9 +25,11 @@
 class websocket_session;
 
 struct StateConfig {
-	std::string thumbnail_file_format;
+	std::string thumbnail_file_extension;
 	unsigned int thumbnail_size;
 	bool convert_heic_to_jpg;
+	bool enable_heic;
+	bool enable_avif;
 	bool strip_metadata;
 };
 
@@ -36,8 +38,9 @@ class shared_state : public FuzeHttp::State {
 public:
 	shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location_relative, StateConfig config, FuzeDBI::Connection* fuze_database_interface);
 	const StateConfig config;
-	const std::unordered_set<std::string> image_formats = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg", "image/webp"};
 	void start();
+	void setAdditionalImageFormatsFromConfig(const StateConfig& config);
+	bool hasImageFormat(const std::string& mime_type) const;
 
 	// FuzeDBI::Connection* fuze_dbi;
 
@@ -69,14 +72,13 @@ public:
 
 	const boost::filesystem::path& getMediaLocation() const { return media_location; }
 	// const boost::filesystem::path& getProgramLocation() const { return program_location; }
-	const std::string& getThumbnailFileFormat() const { return thumbnail_file_format; }
 	const char* getSecret() const { return this->secret_base64; }
 private:
 	const boost::filesystem::path media_location;
 	// const boost::filesystem::path program_location;
-	const std::string thumbnail_file_format;
 	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
 	FuzeDBI::Connection* fuze_dbi;
+	std::unordered_set<std::string> image_formats = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg", "image/webp"};
 
 	// This mutex synchronizes all access to sessions_
 	std::mutex mutex_;

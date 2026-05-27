@@ -44,14 +44,17 @@ void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::file
 	}
 }
 
-bool Migrations::writeMigrations(std::ostream& stream, const std::string& database_version_string) {
+bool Migrations::writeMigrations(std::ostream& stream, const std::string& database_version_string, const StateConfig& state_config) {
 	if (database_version_string <= "0.1")	goto v0_1;
+	if (database_version_string <= "0.1.1")	goto v0_1_1;
 	// If code reaches here, no migrations need to be made
 	return false;
 v0_1:
 	stream << "ALTER TABLE message_file ADD COLUMN width INTEGER;"
-	<< "ALTER TABLE message_file ADD COLUMN height INTEGER;"
-	;std::cout << "Finished writing migrations" << std::endl;
+	<< "ALTER TABLE message_file ADD COLUMN height INTEGER;";
+v0_1_1:
+	stream << "ALTER TABLE message_file ADD COLUMN thumbnail_file_extension TEXT;";
+	std::cout << "Finished writing migrations" << std::endl;
 	return true; // Migrations were made
 }
 
@@ -66,14 +69,14 @@ void Migrations::writeNewMigrations(FuzeDBI::Connection* fuze_dbi, Fuze::Migrati
 }
 */
 
-void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string) {
+void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string, const StateConfig& state_config) {
 	println("Database version: \t{}", database_version_string);
 	println("Server version:   \t{}", current_version);
 	// Fuze::MigrationHelper::Migrations migrater(fuze_dbi);
 	// writeNewMigrations(fuze_dbi, migrater);
 	// migrater.migrateFrom(database_version_string);
 	if (std::stringstream migrations;
-		database_version_string != current_version && Migrations::writeMigrations(migrations, database_version_string)) {
+		database_version_string != current_version && Migrations::writeMigrations(migrations, database_version_string, state_config)) {
 		std::println("Database migrations need to be made. It is recommended to backup the database before proceeding.");
 		std::print("Proceed? (Y/n): ");
 		std::string response;

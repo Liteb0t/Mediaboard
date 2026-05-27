@@ -1,18 +1,19 @@
 #pragma once
 #include "FuzeDBI.hpp"
+#include "shared_state.hpp"
 // #include "FuzeMigrationHelper.hpp"
 #include <boost/filesystem/path.hpp>
 #include <iostream>
 #include <string>
 
-const std::string current_version = "0.1.1";
+const std::string current_version = "0.1.2";
 
 namespace Migrations {
 // Populates database with entries in database_template.sql, and sets the version
 void firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::filesystem::path& template_path, const boost::filesystem::path& absolute_sqlite_path);
 // Returns true if any migrations need to be made by psql
-bool writeMigrations(std::ostream& stream, const std::string& database_version_string);
+bool writeMigrations(std::ostream& stream, const std::string& database_version_string, const StateConfig& state_config);
 // void writeNewMigrations(FuzeDBI::Connection* fuze_dbi, Fuze::MigrationHelper::Migrations& migrater);
 // Wrapper for writeMigrations
-void makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string);
+void makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string, const StateConfig& state_config);
 }

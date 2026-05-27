@@ -16,7 +16,7 @@ Thread::Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuz
 }
 
 // Save thread when JSON is received
-Thread::Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi, const std::string& media_location)
+Thread::Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi)
 		: PermissionManagedObject(permission_parent, fuze_dbi),
 		fuze_dbi(fuze_dbi) {
 	boost::json::object post_zero = thread_json.at("post_zero").as_object();
@@ -26,7 +26,7 @@ Thread::Thread(PermissionObjectBase* permission_parent, boost::json::object thre
 	fuze_dbi->query<void>("INSERT INTO thread(id, permission_object_id) VALUES ($1, $2)", this->id, this->getPermissionObjectId());
 	this->thread_as_json["id"] = this->id;
 	post_zero.emplace("thread_id", this->id);
-	int new_message_id = this->createMessageFromJson(std::move(post_zero), author_client_id, media_location);
+	int new_message_id = this->createMessageFromJson(std::move(post_zero), author_client_id);
 	this->thread_as_json["post_zero"] = this->messages.at(new_message_id).asJson();
 	this->thread_as_json["reply_count"] = 0;
 }
@@ -83,11 +83,11 @@ void Thread::cacheMessage(Message&& message) {
 	this->last_message_created_at = message.createdAt();
 }
 
-int Thread::createMessageFromJson(boost::json::object post_json, int author_client_id, const std::string& media_location) {
+int Thread::createMessageFromJson(boost::json::object post_json, int author_client_id) {
 	post_json.emplace("id_in_thread", this->messages.size());
 	// const std::string placeholder_key(KEY_LENGTH+1, 'T');
 	// post_json["key"] = placeholder_key;
-	Message message(post_json, author_client_id, fuze_dbi, media_location); // Key is deleted from post_json in its constructor
+	Message message(post_json, author_client_id, fuze_dbi); // Key is deleted from post_json in its constructor
 	if (this->messages.empty())
 		this->thread_as_json["post_zero"] = message.asJson();
 	else {

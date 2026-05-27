@@ -143,8 +143,9 @@ int main(int argc, char* argv[]) {
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
-		// ("enable_heic", boost::program_options::value<bool>(&state_config.enable_heic)->default_value(false), "")
-		// ("convert_heic_to_jpg", boost::program_options::value<bool>(&state_config.convert_heic_to_jpg)->default_value(false), "Converts HEIC images into JPG on upload.")
+		("enable_avif", boost::program_options::value<bool>(&state_config.enable_avif)->default_value(false))
+		("enable_heic", boost::program_options::value<bool>(&state_config.enable_heic)->default_value(false), "Prerequisite for convert_heic_to_jpg")
+		("convert_heic_to_jpg", boost::program_options::value<bool>(&state_config.convert_heic_to_jpg)->default_value(false), "Converts HEIC images into JPG on upload.")
 		("data_directory", boost::program_options::value<std::string>(&data_directory_str))
 		("media_directory,m", boost::program_options::value<std::string>(&media_directory_str),  "File path where user-submitted media is stored. data_directory is used if none is specified.")
 		("sqlite_database_file,s", boost::program_options::value<std::string>(&sqlite_database_file_str),  "File where SQLite data is stored. data_directory is used if none is specified.")
@@ -157,7 +158,7 @@ int main(int argc, char* argv[]) {
 		("postgresql_port,p", boost::program_options::value<unsigned short>(&postgresql_port)->default_value(5432), "The port at which the database is available.")
 		("postgresql_database_name,n", boost::program_options::value<std::string>(&postgresql_database_name)->default_value("fuze_mediaboard"), "Name of the PostgreSQL database.")
 		("threads,t", boost::program_options::value<unsigned int>(&threads)->default_value(1), "Number of async threads. For now, only use 1 in production.")
-		("thumbnail_file_format", boost::program_options::value<std::string>(&state_config.thumbnail_file_format)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.")
+		("thumbnail_file_extension", boost::program_options::value<std::string>(&state_config.thumbnail_file_extension)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.")
 		("thumbnail_size", boost::program_options::value<unsigned int>(&state_config.thumbnail_size)->default_value(150), "Maximum width and height of image thumbnails, in pixels.");
 
 	boost::program_options::options_description command_line_options;
@@ -172,7 +173,7 @@ int main(int argc, char* argv[]) {
 			config_file = config_file_str;
 		boost::filesystem::path config_file_path = getConfigDirectory(program_location, config_file, data_directory_config);
 		// Load config.ini
-		std::ifstream config_file_ifstream(config_file_path);
+		std::ifstream config_file_ifstream(config_file_path.string());
 		if (config_file_ifstream) {
 			std::cout << "Loaded config file " << config_file_path << std::endl;
 			store(parse_config_file(config_file_ifstream, universal_options), variable_map);
@@ -242,7 +243,7 @@ int main(int argc, char* argv[]) {
 		}
 		if (version_string_found && version_string) {
 			// std::cout << "Version " <<	version_string.value() << std::endl;
-			Migrations::makeMigrations(fuze_database_interface, version_string.value());
+			Migrations::makeMigrations(fuze_database_interface, version_string.value(), state_config);
 		}
 		else {
 			// boost::filesystem::path template_path = boost::filesystem::absolute("database_template.sql", database_location);

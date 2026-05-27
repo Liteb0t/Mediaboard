@@ -11,7 +11,7 @@ class websocket_session;
 class Thread : public PermissionManagedObject {
 public:
 	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi, int id, int permission_object_id);
-	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi, const std::string& media_location);
+	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi);
 	// std::string dumpThread() const;
 	boost::json::object asJson(const std::optional<Client>& client) const;
@@ -20,7 +20,7 @@ public:
 	// void addInitialPost(json post_json, bool save_to_database);
 	// void createPostFromStruct(struct db_post_struct* post_struct);
 	void cacheMessage(Message&& message);
-	int createMessageFromJson(boost::json::object message_json, int author_client_id, const std::string& media_location);
+	int createMessageFromJson(boost::json::object message_json, int author_client_id);
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
 	void deleteMessage(int message_id);

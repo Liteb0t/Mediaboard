@@ -9,12 +9,13 @@ enum class MESSAGE_FIELDS : size_t { MAX_NAME = 32, MAX_CONTENT = 5000, MAX_FILE
 struct File {
 	std::string filename;
 	std::optional<int> width, height;
+	std::optional<std::string> thumbnail_file_extension;
 };
 
 class Message {
 public:
 	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::string content, std::vector<File> files, bool deleted = false);
-	Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi, const std::string& media_location);
+	Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
 	std::string dump() const;
 	boost::json::object asJson() const;
 	int getId() const { return this->id; };

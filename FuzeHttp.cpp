@@ -39,6 +39,7 @@ beast::string_view FuzeHttp::getMimeType(beast::string_view path) {
 	if(iequals(ext, ".json")) return "application/json";
 	if(iequals(ext, ".xml"))  return "application/xml";
 	if(iequals(ext, ".swf"))  return "application/x-shockwave-flash";
+	if(iequals(ext, ".avif")) return "image/avif";
 	if(iequals(ext, ".bmp"))  return "image/bmp";
 	if(iequals(ext, ".gif"))  return "image/gif";
 	if(iequals(ext, ".heic")) return "image/heic";

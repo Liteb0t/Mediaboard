@@ -172,10 +172,10 @@ main {
 		.EmbedFigure {
 			display: inline-block;
 			margin: 0;
-			max-width: 100%;
 			.EmbedThumbnail, .EmbedImage {
 				cursor: pointer;
 				max-width: 100%;
+				height: auto;
 			}
 		}
 	}
@@ -360,12 +360,12 @@ class Format {
 	static IMAGE = 0;
 	static AUDIO = 1;
 	static OTHER = -1;
-	static image_formats = ["avif", "bmp", "gif", "ico", "jpg", "jpeg", "jxl", "png", "svg", "webp"];
-	static audio_formats = ["aac", "flac", "m4a", "mp3", "oga", "ogg", "ogx", "opus", "wav"];
+	static image_formats = ["bmp", "gif", "ico", "jpe", "jpeg", "jpg", "jxl", "png", "svg", "svgz", "webp"];
+	static audio_formats = ["aac", "flac", "m4a", "mid", "midi", "mp3", "oga", "ogg", "ogx", "opus", "wav"];
 	static fromFileName(file_name) {
 		let dot_index = file_name.lastIndexOf('.');
 		if (dot_index !== -1) {
-			let file_extension = file_name.substring(dot_index+1);
+			let file_extension = file_name.substring(dot_index+1).toLowerCase();
 			if (Format.image_formats.indexOf(file_extension) !== -1) {
 				return Format.IMAGE;
 			}
@@ -667,7 +667,7 @@ function createPost(data, client_permissions) {
 		figure_element.setAttribute("filename", file["filename"].replace(" ", "%20"));
 		let filename_extension_i = file["filename"].lastIndexOf(".");
 		let file_format = Format.fromFileName(file["filename"]); // Format enum
-		if (file_format === Format.IMAGE) {
+		if (file.thumbnail_file_extension || file_format === Format.IMAGE) { // the file_format check is for compatibility with images uploaded prior to 0.1.2
 			let img_element = document.createElement("img");
 			img_element.classList.add("EmbedImage");
 			if (file["width"] && file["height"]) {
@@ -679,7 +679,7 @@ function createPost(data, client_permissions) {
 			// Thumbnail
 			let thumbnail_element = document.createElement("img");
 			thumbnail_element.classList.add("EmbedThumbnail");
-			let thumbnail_filename = "THUMBNAIL_" + file["filename"] + "._THUMBNAIL_FILE_FORMAT";
+			let thumbnail_filename = file.thumbnail_file_extension ? `THUMBNAIL_${file.filename}.${file.thumbnail_file_extension}` : "THUMBNAIL_" + file["filename"] + "._THUMBNAIL_FILE_FORMAT";
 			thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
 			if (file["width"] && file["height"]) {
 				if (file["width"] < file["height"]) {
@@ -893,14 +893,16 @@ class UploadedFile {
 		this.thumbnail_element.setAttribute("height", "100px");
 		this.information_element = document.createElement("div");
 		this.information_element.classList.add("FileInformation");
-		let file_title = document.createElement("span");
+		this.file_title_element = document.createElement("span");
+		this.status_element = document.createElement("span");
+		this.status_element.textContent = "Uploading...";
 		// file_title.classList.add("FileTitle");
-		file_title.textContent = this.filename;
+		this.file_title_element.textContent = this.filename;
 		let file_delete_button = document.createElement("button");
 		file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
 		this.progress_element = document.createElement("progress");
 		this.progress_element.value = 0;
-		this.information_element.append(file_title, document.createElement("br"), this.progress_element, document.createElement("br"), file_delete_button);
+		this.information_element.append(this.file_title_element, document.createElement("br"), this.status_element, this.progress_element, document.createElement("br"), file_delete_button);
 		this.container_element.append(this.thumbnail_element, this.information_element);
 		file_upload_list_element.appendChild(this.container_element);
 		file_delete_button.onclick = (event) => {
@@ -921,6 +923,9 @@ class UploadedFile {
 		console.log(this.file);
 		request.upload.addEventListener("progress", (event) => {
 			this.progress_element.value = event.loaded;
+			if (event.loaded === event.total) {
+				this.status_element.textContent = "Processing...";
+			}
 		});
 		request.responseType = "text";
 		request.open("POST", "_ROOT_URL" + "api/upload/");
@@ -947,19 +952,23 @@ class UploadedFile {
 					// var newdecoded = new TextDecoder().decode(utf8array);
 					// console.log("server_filename dec new: " + newdecoded);
 					this.container_element.setAttribute("id", "file_" + decoded_filename);
+					// this.file_title_element.textContent = decoded_filename;
 					const width = request.getResponseHeader("Image-Width");
 					const height = request.getResponseHeader("Image-Height");
 					if (width && height) {
 						this.container_element.setAttribute("data-image-width", width);
 						this.container_element.setAttribute("data-image-height", height);
 					}
+					const thumbnail_file_extension = request.getResponseHeader("Thumbnail-File-Extension");
+					if (thumbnail_file_extension) {
+						this.container_element.setAttribute("data-thumbnail-file-extension", thumbnail_file_extension);
+					}
 					if (Format.fromFileName(server_filename) === Format.IMAGE) {
 						this.thumbnail_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
 					}
-					const upload_complete_indicator = document.createElement("span");
-					upload_complete_indicator.classList.add("UploadCompleteIndicator");
-					upload_complete_indicator.textContent = "Upload complete";
-					this.information_element.replaceChild(upload_complete_indicator, this.progress_element);
+					this.status_element.textContent = "Upload complete";
+					this.status_element.classList.add("UploadCompleteIndicator");
+					this.information_element.removeChild(this.progress_element);
 				}
 				else {
 					this.showHttpError(request);
@@ -1057,6 +1066,9 @@ function getFiles() {
 					file_data["height"] = Number(height);
 				}
 			}
+			const thumbnail_file_extension = file_element.getAttribute("data-thumbnail-file-extension");
+			if (thumbnail_file_extension)
+				file_data["thumbnail_file_extension"] = thumbnail_file_extension;
 			files.push(file_data);
 		}
 	}

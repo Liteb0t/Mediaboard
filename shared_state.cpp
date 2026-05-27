@@ -21,10 +21,7 @@ shared_state::shared_state(boost::filesystem::path document_root, boost::filesys
 		: State(fuze_database_interface),
 		config(config),
 		fuze_dbi(fuze_database_interface),
-		// document_root(std::move(document_root)),
-		media_location(std::move(media_location)),
-		thumbnail_file_format(thumbnail_file_format) {
-	// db->getSecret(this->secret_base64);
+		media_location(std::move(media_location)) {
 	this->document_root = document_root;
 	// Link accounts to clients
 	for (const auto& client_pair : this->clients) {
@@ -37,6 +34,7 @@ shared_state::shared_state(boost::filesystem::path document_root, boost::filesys
 			std::cout << "Account " <<account_id << " = Client " <<client_pair.first << std::endl;
 		}
 	}
+	this->setAdditionalImageFormatsFromConfig(config);
 	/* FuzeDBI demo
 	fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
 	auto version = fuze_dbi->query<std::string>("SELECT (version) FROM _info");
@@ -47,6 +45,17 @@ shared_state::shared_state(boost::filesystem::path document_root, boost::filesys
 		std::cout << std::get<0>(row) << '_' << std::get<1>(row) << std::endl;
 	}
 	*/
+}
+
+void shared_state::setAdditionalImageFormatsFromConfig(const StateConfig& config) {
+	if (config.enable_heic)
+		this->image_formats.emplace("image/heic");
+	if (config.enable_avif)
+		this->image_formats.emplace("image/avif");
+}
+
+bool shared_state::hasImageFormat(const std::string& mime_type) const {
+	return this->image_formats.contains(mime_type);
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error
@@ -93,11 +102,11 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 }
 
 int shared_state::createThread(int board_id, boost::json::object thread_json, int author_client_id) {
-	return this->boards.at(board_id).createThread(thread_json, author_client_id, this->getMediaLocation().string());
+	return this->boards.at(board_id).createThread(thread_json, author_client_id);
 }
 
 int shared_state::createMessage(int board_id, boost::json::object message_json, int author_client_id) {
-	return this->boards.at(board_id).createMessage(message_json, author_client_id, this->getMediaLocation().string());
+	return this->boards.at(board_id).createMessage(message_json, author_client_id);
 }
 
 std::string shared_state::getIntermediateSaltFromAccount(int account_id) {
