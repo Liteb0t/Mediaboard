@@ -21,30 +21,12 @@ class API {
 		API.error_dialog.append(dialog_header, API.error_message, dialog_toolbar);
 		document.body.appendChild(API.error_dialog);
 	}
-	static getAccountToken() {
-		let account_key = localStorage.getItem("account_key");
-		let account_username = localStorage.getItem("account_username");
-		if (account_key !== null && account_username !== null) {
-			return `${account_key}.${account_username}`;
-		}
-		else {
-			let local_key = localStorage.getItem("local_key");
-			if (local_key !== null) {
-				return `${local_key}.Public`;
-			}
-			else {
-				throw new Error("account_key and/or account_username are null");
-			}
-		}
-	}
 	static async sendRequest(method, endpoint, headers = null, body = null) {
 		let fetch_response;
 		try {
 			fetch_response = await fetch("_ROOT_URL" + API.api_url + endpoint + "/", {
 				method: method,
-				headers: {"token": API.getAccountToken(),
-					...headers
-				},
+				headers: {...headers},
 				body: body && JSON.stringify(body)
 			});
 			if (!fetch_response.ok) {
