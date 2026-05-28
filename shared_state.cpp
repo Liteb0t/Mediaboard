@@ -52,6 +52,8 @@ void shared_state::setAdditionalImageFormatsFromConfig(const StateConfig& config
 		this->image_formats.emplace("image/heic");
 	if (config.enable_avif)
 		this->image_formats.emplace("image/avif");
+	if (config.enable_webp)
+		this->image_formats.emplace("image/webp");
 }
 
 bool shared_state::hasImageFormat(const std::string& mime_type) const {
