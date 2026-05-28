@@ -122,7 +122,7 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 					image.autoOrient();
 					image.strip();
 				}
-				if (state->config.convert_heic_to_jpg) {
+				if (state->config.convert_heic_to_jpg && FuzeHttp::getMimeType(out_filename) == "image/heic") {
 					image.quality(80);
 					image.write(image_path.string().substr(0, image_path.string().rfind('.'))+".jpg");
 					std::println("out_filename was first {}", out_filename);

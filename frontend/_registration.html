@@ -39,6 +39,7 @@
 			</form>
 			<div id="error_messages"></div>
 		</main>
+		<dialog id="status_dialog"><p id="status_dialog_body">Loading...</p></dialog>
 		<dialog id="login_success_dialog" closedby="any">
 			<h2>Success</h2>
 			<p>Logged in as <i id="logged_in_as">some dude idk</i></p>
@@ -77,6 +78,8 @@ async function registerAction() {
 		if (url_params_invite) {
 			request_account_parameters_data["invite"] = url_params_invite;
 		}
+		status_dialog_body.textContent = "Requesting account parameters...";
+		status_dialog.showModal();
 		const request_new_account_parameters_response = await fetch("_ROOT_URL" + "registration/request_new_account_parameters", {
 			method: "POST",
 			body: JSON.stringify(request_account_parameters_data)
@@ -96,10 +99,12 @@ async function registerAction() {
 		const pwhash_memlimit = new_account_parameters_response_json["pwhash_memlimit"];
 		// const salt = atob(salt_base64);
 
-		console.log("Password: " + account_password_input.value +
-		"\nintermediate_salt_base64: " + intermediate_salt_base64 +
-		"\nsalt_base64: " + salt_base64 +
-		"\nlimits: " + pwhash_opslimit + ", " + (pwhash_memlimit >> 10));
+		// console.log("Password: " + account_password_input.value +
+		// "\nintermediate_salt_base64: " + intermediate_salt_base64 +
+		// "\nsalt_base64: " + salt_base64 +
+		// "\nlimits: " + pwhash_opslimit + ", " + (pwhash_memlimit >> 10));
+
+		status_dialog_body.textContent = "Calculating secure hash...";
 		const hashed_password = await hashwasm.argon2id({
 			password: account_password_input.value,
 			salt: salt_base64,
@@ -109,11 +114,12 @@ async function registerAction() {
 			hashLength: password_hash_length,
 			outputType: "binary"
 		});
-		console.log(`[newRegisterAction] hashed_password: ${hashed_password}`);
+		// console.log(`[newRegisterAction] hashed_password: ${hashed_password}`);
 		const password_hash_base64 = hashed_password.toBase64({alphabet: "base64url"});
-		console.log(`[newRegisterAction] password_hash_base64: ${password_hash_base64}`);
+		// console.log(`[newRegisterAction] password_hash_base64: ${password_hash_base64}`);
 		// Send the new hash to the server
 
+		status_dialog_body.textContent = "Sending account details to server...";
 		let create_new_account_data = {
 			intermediate_salt_base64: intermediate_salt_base64,
 			username: new_account_username,
@@ -122,10 +128,12 @@ async function registerAction() {
 		if (url_params_invite) {
 			create_new_account_data["invite"] = url_params_invite;
 		}
+
 		const create_new_account_response = await fetch("_ROOT_URL" + "registration/create_new_account", {
 			method: "POST",
 			body: JSON.stringify(create_new_account_data)
 		});
+		status_dialog.close();
 		if (!(create_new_account_response && create_new_account_response.ok)) {
 			const res_message = create_new_account_response.headers.get("message");
 			throw new Error("Could not create new account: " + res_message ? res_message : create_new_account_response.statusText);
@@ -153,6 +161,8 @@ async function loginAction() {
 				username: username_input
 			})
 		});
+		status_dialog_body.textContent = "Requesting login parameters...";
+		status_dialog.showModal();
 		if (!(fetch_login_parameters_response && fetch_login_parameters_response.ok)) {
 			let header_error_message = fetch_login_parameters_response.headers.get("message");
 			if (header_error_message == null)
@@ -166,10 +176,11 @@ async function loginAction() {
 		const pwhash_opslimit = login_parameters_response_json["pwhash_opslimit"];
 		const pwhash_memlimit = login_parameters_response_json["pwhash_memlimit"];
 		// const Uint8Array
-		console.log("Password: " + account_password_input.value +
+		// console.log("Password: " + account_password_input.value +
 		// "\nintermediate_salt_base64: " + intermediate_salt_base64 +
-		"\nsalt_base64: " + salt_base64 +
-		"\nlimits: " + pwhash_opslimit + ", " + (pwhash_memlimit >> 10));
+		// "\nsalt_base64: " + salt_base64 +
+		// "\nlimits: " + pwhash_opslimit + ", " + (pwhash_memlimit >> 10));
+		status_dialog_body.textContent = "Calculating secure hash...";
 		const hashed_password = await hashwasm.argon2id({
 			password: account_password_input.value,
 			salt: salt_base64,
@@ -179,10 +190,11 @@ async function loginAction() {
 			hashLength: password_hash_length,
 			outputType: "binary"
 		});
-		console.log(`[newLoginAction] hashed_password: ${hashed_password}`);
+		// console.log(`[newLoginAction] hashed_password: ${hashed_password}`);
 		const password_hash_base64 = hashed_password.toBase64({alphabet: "base64url"});
-		console.log(`[newRegisterAction] password_hash_base64: ${password_hash_base64}`);
+		// console.log(`[newRegisterAction] password_hash_base64: ${password_hash_base64}`);
 
+		status_dialog_body.textContent = "Sending credentials to server...";
 		const login_response = await fetch("_ROOT_URL" + "registration/login", {
 			method: "POST",
 			body: JSON.stringify({
@@ -191,6 +203,7 @@ async function loginAction() {
 				stay_logged_in: stay_logged_in_checkbox.checked
 			})
 		});
+		status_dialog.close();
 		if (!(login_response && login_response.ok)) {
 			let header_error_message = login_response.headers.get("message");
 			if (header_error_message == null)

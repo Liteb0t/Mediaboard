@@ -1195,7 +1195,7 @@ async function getClientInfo() {
 			state.server_permissions = response_json["server_permissions"];
 			window.history.replaceState(state, null, ""); // Initial state
 			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
-			updateReplyContainer(state.selected_thread.id, state.server_permissions);
+			// updateReplyContainer(state.selected_thread.id, state.server_permissions);
 			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
 		});
 	}
