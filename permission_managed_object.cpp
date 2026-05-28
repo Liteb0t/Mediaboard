@@ -167,6 +167,8 @@ void PermissionManager::cacheAllGroups() {
 }
 
 int PermissionManager::createAccount(const std::string& username, const char* password_hash_hash, const char* intermediate_salt_base64) {
+	if (this->accountExists(username))
+		throw std::runtime_error("An account with this username already exists");
 	int new_account_id = fuze_dbi->query<int>("SELECT account_id FROM _sequences");
 	fuze_dbi->query<void>("UPDATE _sequences SET account_id = $1", new_account_id+1);
 	fuze_dbi->query<void>("INSERT INTO account(id, username, password_hash_hash_base64, intermediate_salt_base64) VALUES ($1, $2, $3, $4)", new_account_id, username.c_str(), password_hash_hash, intermediate_salt_base64);
@@ -176,6 +178,21 @@ int PermissionManager::createAccount(const std::string& username, const char* pa
 	});
 	this->username_to_id_map.emplace(username, new_account_id);
 	return new_account_id;
+}
+
+void PermissionManager::eraseGroup(int group_id) {
+	std::vector<int>::const_iterator it = std::find(this->ordered_groups.begin(), this->ordered_groups.end(), group_id);
+	std::cout << *it << " should match " << group_id << std::endl;
+	for (int member_id : this->groups.at(group_id).getMembers()) {
+		this->removeUserFromGroup(member_id, group_id);
+	}
+	for (int permission_collection_id : fuze_dbi->queryRows<int>("SELECT id FROM permission_collection WHERE permission_group_id = $1", group_id))
+		fuze_dbi->query<void>("DELETE FROM permission_setting WHERE permission_collection_id = $1", permission_collection_id);
+	fuze_dbi->query<void>("DELETE FROM permission_collection WHERE permission_group_id = $1", group_id);
+	fuze_dbi->query<void>("DELETE FROM permission_group WHERE id = $1", group_id);
+	this->ordered_groups.erase(it);
+	this->groups.erase(group_id);
+	this->saveGroupHeirarchy();
 }
 
 int PermissionManager::addGroup(std::string group_name, int group_rank) {

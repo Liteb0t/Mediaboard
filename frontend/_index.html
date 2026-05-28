@@ -33,7 +33,6 @@
 				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
 
 				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard 0.1.2</a>
-
 			</div>
 			<h3 id="location_indicator"></h3>
 			<noscript>
@@ -288,7 +287,6 @@ main {
 	text-decoration: none;
 }
 </style>
-<script src="api.js"></script>
 <script>
 "use strict";
 loading_dialog.showModal();
@@ -464,7 +462,7 @@ async function refresh_send() {
 }
 
 async function getAllThreads() {
-	let response = await API.sendRequest("GET", "threads");
+	let response = await fetch("_ROOT_URL" + "api/threads");
 	console.log(response);
 	if (response.ok) {
 		await response.json().then(response_obj => {
@@ -535,7 +533,7 @@ function openThread(thread_id) {
 }
 
 async function getThread() {
-	let response = await API.sendRequest("GET", `thread/${state.selected_thread.id}`);
+	let response = await fetch("_ROOT_URL" + `api/thread/${state.selected_thread.id}`);
 	if (response.ok) {
 		await response.json().then(response_obj => {
 			console.log(response_obj);
@@ -1128,7 +1126,7 @@ async function postMessage() {
 		}
 	};
 	console.log(data);
-	const fetch_response = await API.sendRequest("POST", "message", {}, data);
+	const fetch_response = await fetch("api/message", {method: "POST", body: JSON.stringify(data)});
 
 	/*
 	const fetch_response = await fetch("_ROOT_URL" + "api/" + "create_message/", {
@@ -1146,7 +1144,7 @@ async function deleteMessage(thread_id, message_id) {
 		thread_id: thread_id,
 		id_in_thread: message_id
 	};
-	const fetch_response = await API.sendRequest("DELETE", `post/${thread_id}/${message_id}`)
+	const fetch_response = await fetch(`api/post/${thread_id}/${message_id}`, {method: "DELETE"});
 	/*
 	fetch("_ROOT_URL" + api_url + "delete_message/" + `${thread_id}/${message_id}/`, {
 		method: "DELETE",
@@ -1174,7 +1172,7 @@ async function postThread() {
 		}
 	};
 	console.log(data)
-	const fetch_response = await API.sendRequest("POST", "thread", null, data);
+	const fetch_response = await fetch("api/thread", {method: "POST", body: JSON.stringify(data)});
 	//await fetch("_ROOT_URL" + api_url + "create_thread/", {
 	//	method: "POST",
 	//	body: JSON.stringify(data)
@@ -1184,7 +1182,7 @@ async function postThread() {
 
 // websocket = connectToServer();
 async function getClientInfo() {
-	const response = await API.sendRequest("GET", `user/client`);
+	const response = await fetch("api/user/client");
 	console.log(response);
 	if (response.ok) {
 		await response.json().then(response_json => {

@@ -230,3 +230,54 @@ FuzeHttp::Response logout(shared_state* state, FuzeHttp::Request req) {
 		.headers = {{{"Set-Cookie", FuzeHttp::formatCookie(session_id_base64, 0)}}}
 	};
 }
+
+FuzeHttp::Response changePassword(shared_state* state, FuzeHttp::Request req) {
+	boost::json::object req_json;
+	boost::json::string username_j, new_password_hash_base64, intermediate_salt_base64, old_password_hash_base64;
+	std::optional<std::string> invite_key;
+	std::optional<int> invite_granted_group_id;
+	std::cout << "changePassword called" << std::endl;
+	try {
+		req_json = boost::json::parse(req.body()).as_object();
+		username_j = req_json.at("username").as_string();
+		intermediate_salt_base64 = req_json.at("intermediate_salt_base64").as_string();
+		new_password_hash_base64 = req_json.at("new_password_hash_base64").as_string();
+		old_password_hash_base64 = req_json.at("old_password_hash_base64").as_string();
+	}
+	catch(const std::exception& e) {
+		std::cerr << "JSON error" << std::endl;
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[registerAccount] {}", e.what())};
+	}
+	std::string username = std::string(username_j);
+	if (username.length() > Account::MAX_USERNAME)
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("Username length {} is over the limit of {}", username.length(),  Account::MAX_USERNAME)};
+	else if (new_password_hash_base64.size() > 500)
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("new_password_hash_base64 length {} is over the limit of 500", new_password_hash_base64.size())};
+	else if (username.empty())
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::string("Username cannot be empty")};
+
+	char new_password_hash_hash_base64[sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE)];
+	FuzeHttp::generatePasswordHashHashBase64(
+		new_password_hash_hash_base64, sizeof new_password_hash_hash_base64,
+		new_password_hash_base64.c_str(), new_password_hash_base64.size()
+	);
+	char old_password_hash_hash_base64[sodium_base64_ENCODED_LEN(crypto_generichash_BYTES, sodium_base64_VARIANT_URLSAFE)];
+	FuzeHttp::generatePasswordHashHashBase64(
+		old_password_hash_hash_base64, sizeof old_password_hash_hash_base64,
+		old_password_hash_base64.c_str(), old_password_hash_base64.size()
+	);
+
+	std::optional<int> account_id = state->getIdFromUsername(username);
+	if (account_id && state->accountMatchesPassword(account_id.value(), old_password_hash_hash_base64)) {
+		state->changeAccountPassword(account_id.value(), new_password_hash_hash_base64, intermediate_salt_base64.c_str());
+		return FuzeHttp::Response{
+			.status = http::status::ok
+		};
+	}
+	else {
+		return FuzeHttp::Response{
+			.status = http::status::unauthorized,
+			.error_message = std::string("Password is incorrect or the user doesn't exist.")
+		};
+	}
+}

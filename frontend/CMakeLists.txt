@@ -7,7 +7,7 @@ set(frontend_files
   manage_permissions.html
   manage_server.html
   registration.html
-  api.js
+  UserAuthentication.js
   permissions.js
 )
 set(frontend_files_out
@@ -16,7 +16,7 @@ set(frontend_files_out
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/manage_permissions.html
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/manage_server.html
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/registration.html
-  ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/api.js
+  ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/UserAuthentication.js
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/permissions.js
 )
 add_custom_target(frontend

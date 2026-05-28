@@ -9,3 +9,4 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response logout(shared_state* state, FuzeHttp::Request req);
+FuzeHttp::Response changePassword(shared_state* state, FuzeHttp::Request req);

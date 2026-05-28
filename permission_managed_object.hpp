@@ -193,6 +193,9 @@ public:
 			return true;
 		return false;
 	}
+	void changeAccountPassword(int account_id, const char* password_hash_hash_base64, const char* intermediate_salt_base64) {
+		fuze_dbi->query<void>("UPDATE account SET password_hash_hash_base64 = $1, intermediate_salt_base64 = $2 WHERE id = $3", password_hash_hash_base64, intermediate_salt_base64, account_id);
+	}
 	// bool checkUserKey(int user_id, std::string key) const {
 	// 	return this->users.at(user_id).keyMatches(key);
 	// }
@@ -205,17 +208,7 @@ public:
 			;
 		return rank + 1; // 1 is added because the ADMINISTRATORS group is one rank below OWNER
 	}
-	void eraseGroup(int group_id) {
-		std::vector<int>::const_iterator it = std::find(this->ordered_groups.begin(), this->ordered_groups.end(), group_id);
-		std::cout << *it << " should match " << group_id << std::endl;
-		for (int member_id : this->groups.at(group_id).getMembers()) {
-			this->removeUserFromGroup(member_id, group_id);
-		}
-		this->ordered_groups.erase(it);
-		this->groups.erase(group_id);
-		this->saveGroupHeirarchy();
-		// db_delete_group(group_id);
-	}
+	void eraseGroup(int group_id);
 	boost::json::array getGroupMembersAsJson(int group_id) const {
 		boost::json::array members;
 		for (int member_id : this->groups.at(group_id).getMembers())

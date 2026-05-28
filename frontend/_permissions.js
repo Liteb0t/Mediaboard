@@ -18,7 +18,7 @@ class UserListFactory {
 		this.user_lists.push(user_list);
 	}
 	async refreshUsers() {
-		let response = await API.sendRequest("GET", "users");
+		let response = await fetch("_ROOT_URL" + "api/users");
 		if (response.ok) {
 			let response_json;
 			try {
@@ -49,7 +49,7 @@ class GroupListFactory {
 		this.group_lists.push(group_list);
 	}
 	async refreshGroups() {
-		let response = await API.sendRequest("GET", "groups");
+		let response = await fetch("_ROOT_URL" + "api/groups");
 		if (response.ok) {
 			let response_json;
 			try {
@@ -179,7 +179,7 @@ class ManageGroupsGroupList extends GroupList {
 		this.rename_button = rename_button;
 		this.delete_button.onclick = async() => {
 			this.delete_button.disabled = true;
-			let response = await API.sendRequest("DELETE", `group/${this.selected_group.id}`);
+			let response = await fetch("_ROOT_URL" + `api/group/${this.selected_group.id}`, {method: "DELETE"});
 			if (response.ok) {
 				group_list_factory.refreshGroups();
 				this.selected_group_indicator.textContent = "None selected";
@@ -262,7 +262,7 @@ class ManageGroupsGroupList extends GroupList {
 		// 	let group_id = Number(element.id.substring("group-".length));
 		// 	data_to_send.new_group_heirarchy.push(group_id);
 		// }
-		let response = await API.sendRequest("PUT", "group_heirarchy", {}, data_to_send);
+		let response = await fetch("_ROOT_URL" + "api/group_heirarchy", {method: "PUT", body: JSON.stringify(data_to_send)});
 		return response;
 	}
 	async createNewGroup() {
@@ -271,7 +271,7 @@ class ManageGroupsGroupList extends GroupList {
 				name: create_group_form_group_name.value
 			}
 		};
-		let response = await API.sendRequest("POST", "create_group", {}, new_group_data);
+		let response = await fetch("_ROOT_URL" + "api/create_group", {method: "POST", body: JSON.stringify(new_group_data)});
 		if (response.ok) {
 			group_list_factory.refreshGroups();
 			// const new_group_id = response.headers.get("New-Group-ID");
@@ -395,7 +395,7 @@ class ManageGroupsUser extends User {
 		}
 		this.remove_button.onclick = async() => {
 			// this.member_list.removeClickEvent();
-			let response = await API.sendRequest("DELETE", `group/${this.user_list.group_manager.group_list.selected_group.id}/member/${this.id}`);
+			let response = await fetch("_ROOT_URL" + `api/group/${this.user_list.group_manager.group_list.selected_group.id}/member/${this.id}`, {method: "DELETE"});
 			if (response.ok) {
 				this.user_list.user_list_container.removeChild(this.element);
 				user_list_factory.refreshUsers();
@@ -420,7 +420,7 @@ class ManageGroupsMemberList extends UserList {
 	}
 	async refresh() {
 		if (this.group_manager.group_list.selected_group != null) {
-			let response = await API.sendRequest("GET", `group/${this.group_manager.group_list.selected_group.id}/members`);
+			let response = await fetch("_ROOT_URL" + `api/group/${this.group_manager.group_list.selected_group.id}/members`);
 			if (response.ok) {
 				let response_json;
 				try {
@@ -491,7 +491,7 @@ class PermissionSettingsGroupList extends GroupList {
 		return new_group;
 	}
 	async removeGroup(group) {
-		let response = await API.sendRequest("DELETE", this.permission_settings_object.api_location + `permissions/group/${group.id}`);
+		let response = await fetch("_ROOT_URL" + "api/" + this.permission_settings_object.api_location + `permissions/group/${group.id}`, {method: "DELETE"});
 		if (response.ok) {
 			this.group_list_container.removeChild(group.element);
 			// TODO stop showing permissions if deleted group was selected
@@ -557,7 +557,7 @@ class PermissionSettingsUserList extends UserList {
 		return new_user;
 	}
 	async removeUser(user) {
-		let response = await API.sendRequest("DELETE", this.permission_settings_object.api_location + `permissions/user/${user.id}`);
+		let response = await fetch("_ROOT_URL" + "api/" + this.permission_settings_object.api_location + `permissions/user/${user.id}`, {method: "DELETE"});
 		if (response.ok) {
 			this.user_list_container.removeChild(user.element);
 			// TODO stop showing permissions if deleted user was selected
@@ -616,7 +616,7 @@ class PermissionSettingsAddGroupGroupList extends GroupList {
 		this.group_list_container.replaceChildren(fragment);
 	}
 	async groupClickEvent(group) {
-		let response = await API.sendRequest("POST", this.permission_settings_object.api_location + `permissions/group/${group.id}`);
+		let response = await fetch("_ROOT_URL" + "api/" + this.permission_settings_object.api_location + `permissions/group/${group.id}`, {method: "POST"});
 		if (response.ok) {
 			this.group_list_container.removeChild(group.element);
 			await this.permission_settings_object.refreshPermissions();
@@ -658,7 +658,7 @@ class PermissionSettingsAddUserUserList extends UserList {
 		this.user_list_container.replaceChildren(fragment);
 	}
 	async userClickEvent(user) {
-		let response = await API.sendRequest("POST", this.permission_settings_object.api_location + `permissions/user/${user.id}`);
+		let response = await fetch("_ROOT_URL" + "api/" + this.permission_settings_object.api_location + `permissions/user/${user.id}`, {method: "POST"});
 		if (response.ok) {
 			this.user_list_container.removeChild(user.element);
 			await this.permission_settings_object.refreshPermissions();
@@ -805,11 +805,11 @@ class PermissionSettings {
 		};
 		if (this.group_is_selected === true) {
 			this.permissions_json["group_permissions"][this.group_list.selected_group.id]["permission_collection"][request_json.permission] = request_json.setting;
-			response = await API.sendRequest("PUT", this.api_location + `permissions/group/${this.group_list.selected_group.id}`, {}, request_json);
+			response = await fetch("_ROOT_URL" + "api/" + this.api_location + `permissions/group/${this.group_list.selected_group.id}`, {method: "PUT", body: JSON.stringify(request_json)});
 		}
 		else if (this.user_is_selected === true) {
 			this.permissions_json["user_permissions"][this.user_list.selected_user.id]["permission_collection"][request_json.permission] = request_json.setting;
-			response = await API.sendRequest("PUT", this.api_location + `permissions/user/${this.user_list.selected_user.id}`, {}, request_json);
+			response = await fetch("_ROOT_URL" + "api/" + this.api_location + `permissions/user/${this.user_list.selected_user.id}`, {method: "PUT", body: JSON.stringify(request_json)});
 		}
 		else {
 			error_message.textContent = "No group or user is selected";
@@ -817,7 +817,7 @@ class PermissionSettings {
 		}
 	}
 	async refreshPermissions() {
-		let response = await API.sendRequest("GET", this.api_location + "permissions");
+		let response = await fetch("_ROOT_URL" + "api/" + this.api_location + "permissions");
 		if (response.ok) {
 			let response_json;
 			try {
@@ -872,7 +872,7 @@ class addUserToGroupsGroupList {
 			});
 		// console.log(groups_to_add);
 		if (groups_to_add.length > 0) {
-			let response = await API.sendRequest("POST", `user/${the_user_list.selected_user.id}/add_groups`, {}, {"groups_by_id":groups_to_add});
+			let response = await fetch("_ROOT_URL" + `api/user/${the_user_list.selected_user.id}/add_groups`, {method: "POST", body: JSON.stringify({"groups_by_id":groups_to_add})});
 			if (response.ok === true) {
 				await user_list_factory.refreshUsers(); // TODO only refresh the user the groups were added to
 				this.refresh(group_list_factory.groups_json);

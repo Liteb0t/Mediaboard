@@ -51,4 +51,5 @@ void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	controller->addPattern(verb::post, requestLoginParameters,  		"registration", "request_login_parameters");
 	controller->addPattern(verb::post, login, 							"registration", "login");
 	controller->addPattern(verb::post, logout,							"registration", "logout");
+	controller->addPattern(verb::post, changePassword,  				"registration", "change_password");
 }
