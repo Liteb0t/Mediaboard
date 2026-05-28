@@ -54,6 +54,7 @@ beast::string_view FuzeHttp::getMimeType(beast::string_view path) {
 	if(iequals(ext, ".tif"))  return "image/tiff";
 	if(iequals(ext, ".svg"))  return "image/svg+xml";
 	if(iequals(ext, ".svgz")) return "image/svg+xml";
+	if(iequals(ext, ".webp")) return "image/webp";
 	if(iequals(ext, ".htm"))  return "text/html";
 	if(iequals(ext, ".html")) return "text/html";
 	if(iequals(ext, ".php"))  return "text/html";

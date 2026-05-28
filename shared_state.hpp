@@ -30,6 +30,7 @@ struct StateConfig {
 	bool convert_heic_to_jpg;
 	bool enable_heic;
 	bool enable_avif;
+	bool enable_webp;
 	bool strip_metadata;
 };
 
