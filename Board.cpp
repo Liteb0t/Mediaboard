@@ -37,6 +37,8 @@ void Board::deleteMessageFromThread(int message_id, int thread_id) {
 		std::cout << "[Board] Deleting message " << message_id << " in thread " << thread_id << std::endl;
 		this->threads.at(thread_id).deleteMessage(message_id);
 	}
+	else
+		throw std::runtime_error("Can't delete message 0 from thread");
 }
 
 void Board::cacheAllThreads() {

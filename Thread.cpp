@@ -103,7 +103,7 @@ int Thread::createMessageFromJson(boost::json::object post_json, int author_clie
 
 void Thread::deleteMessage(int id_in_thread) {
 	this->messages.at(id_in_thread).markAsDeleted();
-	fuze_dbi->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $1", this->id, id_in_thread);
+	fuze_dbi->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $2", this->id, id_in_thread);
 	this->reply_count--;
 	this->thread_as_json["reply_count"] = this->reply_count;
 	std::cout << "Erased message " << id_in_thread << " from thread " << this->id << std::endl;
