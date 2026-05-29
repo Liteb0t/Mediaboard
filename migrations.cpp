@@ -53,7 +53,9 @@ v0_1:
 	stream << "ALTER TABLE message_file ADD COLUMN width INTEGER;"
 	<< "ALTER TABLE message_file ADD COLUMN height INTEGER;";
 v0_1_1:
-	stream << "ALTER TABLE message_file ADD COLUMN thumbnail_file_extension TEXT;";
+	stream << "ALTER TABLE message_file ADD COLUMN thumbnail_file_extension TEXT;"
+	<< "ALTER TABLE thread ADD COLUMN message_id_seq INTEGER DEFAULT 0;"
+	<< "UPDATE thread SET message_id_seq = 1000";
 	std::cout << "Finished writing migrations" << std::endl;
 	return true; // Migrations were made
 }

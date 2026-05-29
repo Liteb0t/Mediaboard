@@ -84,7 +84,9 @@ void Thread::cacheMessage(Message&& message) {
 }
 
 int Thread::createMessageFromJson(boost::json::object post_json, int author_client_id) {
-	post_json.emplace("id_in_thread", this->messages.size());
+	int new_message_id_in_thread = fuze_dbi->query<int>("SELECT message_id_seq FROM thread WHERE id = $1", this->id);
+	fuze_dbi->query<void>("UPDATE thread SET message_id_seq = $1 WHERE id = $2", new_message_id_in_thread+1, this->id);
+	post_json.emplace("id_in_thread", (size_t)new_message_id_in_thread);
 	// const std::string placeholder_key(KEY_LENGTH+1, 'T');
 	// post_json["key"] = placeholder_key;
 	Message message(post_json, author_client_id, fuze_dbi); // Key is deleted from post_json in its constructor
