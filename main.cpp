@@ -144,6 +144,7 @@ int main(int argc, char* argv[]) {
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
 		("enable_avif", boost::program_options::value<bool>(&state_config.enable_avif)->default_value(false))
+		("enable_webp", boost::program_options::value<bool>(&state_config.enable_webp)->default_value(false))
 		("enable_heic", boost::program_options::value<bool>(&state_config.enable_heic)->default_value(false), "Prerequisite for convert_heic_to_jpg")
 		("convert_heic_to_jpg", boost::program_options::value<bool>(&state_config.convert_heic_to_jpg)->default_value(false), "Converts HEIC images into JPG on upload.")
 		("data_directory", boost::program_options::value<std::string>(&data_directory_str))

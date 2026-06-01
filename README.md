@@ -22,6 +22,12 @@ Ensure the configure output ends with all the delegates listed:\
 Then install:\
 `make`\
 `sudo make install`
+__ImageMagick may use significant amounts of memory, which can crash the program if system memory runs out. To set memory limits add these environment variables:__
+```
+MAGICK_MEMORY_LIMIT=512MiB
+MAGICK_MAP_LIMIT=1GiB
+MAGICK_DISK_LIMIT=2GiB
+```
 ### Required packages (FreeBSD 15.0)
 `ImageMagick7-nox11`\
 `boost-libs`\
@@ -117,7 +123,8 @@ location /mediaboard/ {
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   client_max_body_size 100M;
   proxy_pass_request_headers on;
-  proxy_redirect / https://example.com/mediaboard/; # Change "example.com" to your domain
+  # Uncomment the following line if the Mediaboard is not served from the root URL.
+  # proxy_redirect / /mediaboard/;
 
   # WebSocket support
   proxy_http_version 1.1;

@@ -15,7 +15,7 @@ define(`_ROOT_URL', `/')
 # define(`_ROOT_URL', `/mediaboard/')
 define(`_FAVICON_URL', `https://fuze.page/favicon.ico')
 
-# it is required that the thumbnail_file_format setting in config.ini matches this.
+# Legacy option. Required to show thumbnails on images uploaded before 0.1.1
 define(`_THUMBNAIL_FILE_FORMAT', `jpg')
 # For best results, make sure the thumbnail_size setting in config.ini matches this.
 define(`_THUMBNAIL_SIZE', `150')

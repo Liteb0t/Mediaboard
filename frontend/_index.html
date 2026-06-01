@@ -871,13 +871,13 @@ class UploadedFile {
 		this.filename = file_object.name;
 		if (file_object.size > file_size_limit) {
 			file_upload.value = "";
-			throw(`The file ${file_object.name} exceeds the _FILE_SIZE_LIMIT_MB megabyte limit. <br>
+			throw new Error(`The file ${file_object.name} exceeds the _FILE_SIZE_LIMIT_MB megabyte limit. <br>
 				<code>${file_object.size}</code> - this file (bytes)<br>
 				<code>${file_size_limit}</code> - limit (bytes)`);
 		}
 		const file_name_size = (new TextEncoder().encode(file_object.name)).length;
 		if (file_name_size > _POST_MAX_FILE_NAME) {
-			throw(`File name "${file_object.name}" exceeds the limit of _POST_MAX_FILE_NAME bytes.<br>
+			throw new Error(`File name "${file_object.name}" exceeds the limit of _POST_MAX_FILE_NAME bytes.<br>
 				This file name: ${file_name_size} bytes.`);
 		}
 		console.log("UploadedFile test passed...");
@@ -960,8 +960,9 @@ class UploadedFile {
 					const thumbnail_file_extension = request.getResponseHeader("Thumbnail-File-Extension");
 					if (thumbnail_file_extension) {
 						this.container_element.setAttribute("data-thumbnail-file-extension", thumbnail_file_extension);
+						this.thumbnail_element.setAttribute("src", "_ROOT_URL" + media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
 					}
-					if (Format.fromFileName(server_filename) === Format.IMAGE) {
+					else if (Format.fromFileName(server_filename) === Format.IMAGE) {
 						this.thumbnail_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
 					}
 					this.status_element.textContent = "Upload complete";
