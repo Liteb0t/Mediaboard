@@ -114,7 +114,7 @@ void getSaltBase64(StateType state, const std::string& username, char* salt_base
 beast::string_view getMimeType(beast::string_view path);
 
 template<typename BodyType>
-http::response<BodyType> buildResponse(FuzeHttp::Response basic_response, http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req);
+http::response<BodyType> buildResponse(FuzeHttp::Response basic_response, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req);
 
 // https://stackoverflow.com/a/79894118/18658154
 // Type Filtering Logic

@@ -87,18 +87,7 @@ void Board::cacheAllThreads() {
 
 	std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 }
-/*
-std::string Board::dumpThread(int thread_id, int client_id, std::string key) const {
-	nlohmann::json thread_json;
-	thread_json["messages"] = this->threads.at(thread_id).getMessagesAsJson(key);
-	thread_json["client_permissions"] = this->threads.at(thread_id).getPermissionsAsJson(client_id);
-	return thread_json.dump();
-}
 
-std::string Board::dumpPermissionsInThread(int thread_id, int client_id) const {
-	return this->threads.at(thread_id).dumpPermissions(client_id);
-}
-*/
 boost::json::object Board::getThreadPermissionsAsJson(int thread_id, const std::optional<Client>& client) const {
 	return this->threads.at(thread_id).getPermissionsAsJson(client);
 }

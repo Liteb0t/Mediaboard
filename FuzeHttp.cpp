@@ -120,7 +120,7 @@ std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
 }
 
 template<>
-http::response<http::string_body> FuzeHttp::buildResponse(FuzeHttp::Response basic_response, http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
+http::response<http::string_body> FuzeHttp::buildResponse(FuzeHttp::Response basic_response, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
 
 	http::response<http::string_body> res{basic_response.status, req.version()};
 	res.set(http::field::server, BOOST_BEAST_VERSION_STRING);
@@ -144,7 +144,7 @@ http::response<http::string_body> FuzeHttp::buildResponse(FuzeHttp::Response bas
 }
 
 template<>
-http::response<http::file_body> FuzeHttp::buildResponse(FuzeHttp::Response basic_response, http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
+http::response<http::file_body> FuzeHttp::buildResponse(FuzeHttp::Response basic_response, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
 	std::cout << "Attempting to open " << basic_response.file.value() << std::endl;
 	if (!boost::filesystem::exists(basic_response.file.value()))
 		throw std::runtime_error("File not found");
@@ -179,7 +179,7 @@ http::response<http::file_body> FuzeHttp::buildResponse(FuzeHttp::Response basic
 }
 
 template<>
-http::response<http::empty_body> FuzeHttp::buildResponse(FuzeHttp::Response basic_response, http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
+http::response<http::empty_body> FuzeHttp::buildResponse(FuzeHttp::Response basic_response, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
 
 	http::response<http::empty_body> res{basic_response.status, req.version()};
 	res.set(http::field::server, BOOST_BEAST_VERSION_STRING);

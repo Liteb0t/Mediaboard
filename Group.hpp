@@ -13,14 +13,6 @@ public:
 	void addMember(const int user_id) { this->members.insert(user_id); }
 	void removeMember(int user_id) { this->members.erase(user_id); }
 	bool containsMember(int user_id) const { return this->members.contains(user_id); }
-	/*
-	std::string dumpMembers() const {
-		nlohmann::json members_json;
-		members_json["members"] = nlohmann::json::array();
-		for (int member_id : this->members) {
-			members_json.push_back(member_id);
-		return members_json.dump();
-	}*/
 	const std::unordered_set<int> getMembers() const {
 		return this->members;
 	}

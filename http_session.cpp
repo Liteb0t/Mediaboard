@@ -111,28 +111,48 @@ void http_session::on_read(beast::error_code ec, std::size_t) {
 
 	// See if it is a WebSocket Upgrade
 	if(websocket::is_upgrade(parser_->get())) {
-		// Create a websocket session, transferring ownership
-		// of both the socket and the HTTP request.
-		boost::make_shared<websocket_session>(stream_.release_socket(), state_)->run(parser_->release());
-		return;
-	}
-
-	// Handle request
-	http::message_generator msg = handle_request(state_, controller, parser_->release());
-	// http::message_generator msg = handle_request(state_->doc_root(), parser_->release());
-
-	// Determine if we should close the connection
-	bool keep_alive = msg.keep_alive();
-
-	auto self = shared_from_this();
-
-	// Send the response
-	beast::async_write(
-		stream_, std::move(msg),
-		[self, keep_alive](beast::error_code ec, std::size_t bytes) {
-			self->on_write(ec, bytes, keep_alive);
+		const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req = parser_->release();
+		std::optional<Client> client = state_->getClientIfExists(req);
+		if (!client) {
+			auto basic_res = FuzeHttp::Response{
+				.status = http::status::unauthorized,
+				.error_message = "Websocket connection requires an HTTP session."
+			};
+			http::message_generator msg = FuzeHttp::buildResponse<http::empty_body>(basic_res, req);
+			bool keep_alive = msg.keep_alive();
+			auto self = shared_from_this();
+			beast::async_write(
+				stream_, std::move(msg),
+				[self, keep_alive](beast::error_code ec, std::size_t bytes) {
+					self->on_write(ec, bytes, keep_alive);
+				}
+			);
 		}
-	);
+		else {
+			// Create a websocket session, transferring ownership
+			// of both the socket and the HTTP request.
+			boost::make_shared<websocket_session>(stream_.release_socket(), state_)->run(req);
+			return;
+		}
+	}
+	else {
+		// Handle request
+		http::message_generator msg = handle_request(state_, controller, parser_->release());
+		// http::message_generator msg = handle_request(state_->doc_root(), parser_->release());
+
+		// Determine if we should close the connection
+		bool keep_alive = msg.keep_alive();
+
+		auto self = shared_from_this();
+
+		// Send the response
+		beast::async_write(
+			stream_, std::move(msg),
+			[self, keep_alive](beast::error_code ec, std::size_t bytes) {
+				self->on_write(ec, bytes, keep_alive);
+			}
+		);
+	}
 }
 
 void http_session::on_write(beast::error_code ec, std::size_t, bool keep_alive) {

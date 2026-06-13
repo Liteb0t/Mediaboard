@@ -103,6 +103,32 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	}
 }
 
+
+void shared_state::sendToWebRTC(std::string message) {
+	// Put the message in a shared pointer so we can re-use it for each client
+	auto const ss = boost::make_shared<std::string const>(std::move(message));
+
+	// Make a local list of all the weak pointers representing
+	// the sessions, so we can do the actual sending without
+	// holding the mutex:
+	std::vector<boost::weak_ptr<websocket_session>> v;
+	{
+		std::lock_guard<std::mutex> lock(mutex_);
+		v.reserve(websocket_sessions.size());
+		for(auto p : this->websocket_sessions) {
+			if (p->is_webrtc)
+				v.emplace_back(p->weak_from_this());
+		}
+	}
+
+	// For each session in our local list, try to acquire a strong
+	// pointer. If successful, then send the message on that session.
+	for(auto const&wp : v) {
+		if(auto sp = wp.lock())
+			sp->send(ss);
+	}
+}
+
 int shared_state::createThread(int board_id, boost::json::object thread_json, int author_client_id) {
 	return this->boards.at(board_id).createThread(thread_json, author_client_id);
 }
@@ -169,11 +195,6 @@ std::string shared_state::dumpMembersInGroup(int group_id) const {
 	return boost::json::serialize(boost::json::object{
 		{"members", members_json},
 	});
-}
-
-std::string shared_state::dumpMembersInGroupAsArray(int group_id) const {
-	nlohmann::json members_json = this->getGroup(group_id)->getMembers();
-	return members_json.dump();
 }
 
 // Return non-zero when action is rejected. An error is returned to the user from http_session

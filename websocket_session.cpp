@@ -11,8 +11,8 @@
 // #include "db_interface.h"
 // #include "post.hpp"
 #include <iostream>
-#include <nlohmann/json.hpp>
-using json = nlohmann::json;
+#include <boost/json.hpp>
+#include <print>
 
 websocket_session::websocket_session(boost::asio::ip::tcp::socket&& socket, shared_state* state)
 		: ws_(std::move(socket)) , state_(state) {
@@ -58,28 +58,43 @@ void websocket_session::on_read(beast::error_code ec, std::size_t) {
 	if(ec)
 		return fail(ec, "read");
 
-	std::string buffer_data = beast::buffers_to_string(buffer_.data());
-	std::cout << buffer_data << std::endl;
-	json buffer_as_json = json::parse(buffer_data);
+	try {
+		std::string buffer_data = beast::buffers_to_string(buffer_.data());
+		std::cout << buffer_data << std::endl;
+		boost::json::object buffer_as_json = boost::json::parse(buffer_data).as_object();
 
-	std::string request_type = buffer_as_json["type"].template get<std::string>();
-	if (request_type == "listen_to_thread") {
-		if (buffer_as_json["thread_id"].is_number_integer()) {
-			int thread_id = buffer_as_json["thread_id"].template get<int>();
-			if (state_->main_board()->threadExists(thread_id)) {
-				this->tracking_thread = thread_id;
-				state_->main_board()->addListenerToThread(this, thread_id);
+		if (!buffer_as_json.contains("type"))
+			throw std::runtime_error("'type' field is missing");
+		std::string request_type = buffer_as_json["type"].as_string().c_str();
+		if (request_type == "listen_to_thread") {
+			if (buffer_as_json["thread_id"].is_int64()) {
+				int thread_id = buffer_as_json["thread_id"].as_int64();
+				if (state_->main_board()->threadExists(thread_id)) {
+					this->tracking_thread = thread_id;
+					state_->main_board()->addListenerToThread(this, thread_id);
+				}
+				else
+					std::cout << "Warning: thread " << thread_id << " does not exist" << std::endl;
 			}
-			else
-				std::cout << "Warning: thread " << thread_id << " does not exist" << std::endl;
+			else {
+				std::cout << "Warning: thread is not an integer" << std::endl;
+			}
+		}
+		else if (request_type == "connect_to_channel") {
+			std::println("DUMMY added ws to channel");
+			is_webrtc = true;
+		}
+		else if (request_type == "webrtc_signal") {
+			std::println("received webrtc_signal WS message");
+			state_->sendToWebRTC(buffer_data);
 		}
 		else {
-			std::cout << "Warning: thread is not an integer" << std::endl;
+			// TODO send error message back to requester
+			throw std::runtime_error("request_type " + request_type + " not recognised");
 		}
 	}
-	else {
-		// TODO send error message back to requester
-		std::cerr << "request_type " + request_type + " not recognised" << std::endl;
+	catch (const std::exception& e) {
+		std::println(std::cerr, "[websocket_session] {}", e.what());
 	}
 
 	// Clear the buffer

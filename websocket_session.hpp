@@ -36,8 +36,8 @@ public:
 	// Send a message
 	void send(boost::shared_ptr<std::string const> const& ss);
 
+	bool is_webrtc = false; // TODO: replace with abstract classes
 private:
-	// std::unordered_set<int> tracking_threads;
 	int tracking_thread;
 	beast::flat_buffer buffer_;
 	websocket::stream<beast::tcp_stream> ws_;
@@ -48,7 +48,7 @@ private:
 	void on_accept(beast::error_code ec);
 	void on_read(beast::error_code ec, std::size_t bytes_transferred);
 	void on_write(beast::error_code ec, std::size_t bytes_transferred);
-	void	on_send(boost::shared_ptr<std::string const> const& ss);
+	void on_send(boost::shared_ptr<std::string const> const& ss);
 };
 
 template<class Body, class Allocator>

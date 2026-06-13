@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<!--
+		include(`tokens.m4')
+	-->
+	<title>WebRTC - _SITE_NAME</title>
+	<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<meta charset="utf-8">
+	<base href="_ROOT_URL">
+	<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
+	<link rel="stylesheet" href="static/styles.css">
+</head>
+<body>
+	<!--Navbar can go here-->
+	<main>
+		<h1>WebRTC - _SITE_NAME</h1>
+		<button onclick="startVideoShare(false)">Share video</button>
+		<button id="share_window_button" styles="display: none;" onclick="startVideoShare(true)">Share window</button>
+		<button onclick="startAudioShare()">Share audio</button><br>
+		<button onclick="makeCall()">Ring telephone</button>
+		<fieldset>
+		<legend>Controller</legend>
+		<label for="channel_number">Channel: </label><input id="channel_number" type="number" min="0"><br>
+		<button onclick="connectToChannel()">Connect</button>
+		<span id="connection_status_text">Not connected</span>
+		</fieldset>
+		<br>
+		<video id="stream_playback" width="300"></video>
+	</main>
+</body>
+<script>
+"use strict";
+let stream_sock;
+let peerConnection;
+const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]}
+
+if (navigator.mediaDevices.getDisplayMedia) {
+	share_window_button.style["display"] = "initial";
+}
+
+async function startVideoShare(capture_window = false) {
+	try {
+		let stream;
+		if (capture_window) {
+			// https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getDisplayMedia
+			stream = await navigator.mediaDevices.getDisplayMedia();
+		}
+		else {
+			stream = await navigator.mediaDevices.getUserMedia({'video': true});
+		}
+		console.log('Got MediaStream:', stream);
+		stream_playback.srcObject = stream;
+	}
+	catch(error) {
+		console.error('Error accessing media devices.', error);
+	}
+}
+async function startAudioShare() {
+	try {
+		const stream = await navigator.mediaDevices.getUserMedia({'audio': true});
+		console.log('Got MediaStream:', stream);
+	}
+	catch(error) {
+		console.error('Error accessing media devices.', error);
+	}
+}
+function connectToChannel() {
+	if (typeof stream_sock !== "undefined") {
+		stream_sock.close();
+	}
+	stream_sock = new WebSocket("_WEBSOCKET_URL");
+	stream_sock.onopen = () => {
+		connection_status_text.textContent = "Connected";
+		stream_sock.send(JSON.stringify({
+			"type": "connect_to_channel",
+			"channel_id": Number(channel_number.value)
+		}));
+	}
+	stream_sock.onclose = () => {
+		connection_status_text.textContent = "Not connected";
+	}
+	peerConnection = new RTCPeerConnection(configuration);
+	stream_sock.addEventListener('message', async message => {
+		console.log("Received websocket message");
+		console.log(message);
+		const message_json = JSON.parse(message.data);
+		if (message_json.offer) {
+			peerConnection.setRemoteDescription(new RTCSessionDescription(message_json.offer));
+			const answer = await peerConnection.createAnswer();
+			await peerConnection.setLocalDescription(answer);
+			stream_sock.send(JSON.stringify({
+				"type": "webrtc_signal",
+				'answer': answer
+			}));
+		}
+	});
+}
+async function makeCall() {
+    const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]}
+    const peerConnection = new RTCPeerConnection(configuration);
+    stream_sock.addEventListener('message', async message => {
+		const message_json = JSON.parse(message.data);
+        if (message_json.answer) {
+            const remoteDesc = new RTCSessionDescription(message_json.answer);
+            await peerConnection.setRemoteDescription(remoteDesc);
+			console.log("received answer");
+        }
+    });
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+	console.log(peerConnection);
+	console.log(offer);
+    stream_sock.send(JSON.stringify({
+		"type": "webrtc_signal",
+		'offer': offer
+	}));
+}
+
+</script>
+</html>

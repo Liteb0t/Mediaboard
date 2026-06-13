@@ -69,6 +69,7 @@ public:
 	void join  (websocket_session* session);
 	void leave (websocket_session* session);
 	void sendToThread (std::string message, int thread_id);
+	void sendToWebRTC(std::string message);
 	void clearWebsockets();
 
 	const boost::filesystem::path& getMediaLocation() const { return media_location; }

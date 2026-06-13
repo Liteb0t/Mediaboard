@@ -7,6 +7,7 @@ set(frontend_files
   manage_permissions.html
   manage_server.html
   registration.html
+  webrtc.html
   UserAuthentication.js
   permissions.js
 )
@@ -16,6 +17,7 @@ set(frontend_files_out
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/manage_permissions.html
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/manage_server.html
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/registration.html
+  ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/webrtc.html
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/UserAuthentication.js
   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/permissions.js
 )
