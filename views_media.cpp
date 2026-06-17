@@ -15,6 +15,10 @@
 #include <print>
 
 FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
+	std::optional<Client> client = state->getClientIfExists(req);
+	// TODO have UPLOAD_FILE permission modifiable for threads and boards.
+	if (!state->clientHasPermission(client, PERMISSION::UPLOAD_FILE))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files."};
 	std::istringstream req_stream(req.body());
 	std::string req_line;
 	std::getline(req_stream, req_line);

@@ -685,7 +685,8 @@ class PermissionCollection {
 		1: "View thread",
 		2: "Create thread",
 		3: "Send message",
-		4: "Delete post"
+		4: "Delete post",
+		5: "Upload file"
 	};
 	static three_state_settings = {
 		0: "Deny",
@@ -747,8 +748,9 @@ class PermissionSettings {
 		this.user_list = new PermissionSettingsUserList(this, _user_list_element);
 		user_list_factory.addUserList(this.user_list);
 		let enabled_permissions;
+		// TODO add board-level permissions
 		if (api_location.substring(0, api_location.indexOf("/")) === "server") {
-			enabled_permissions = [0, 1, 2, 3, 4];
+			enabled_permissions = [0, 1, 2, 3, 4, 5];
 		}
 		else { // This is a thread
 			enabled_permissions = [1, 3, 4];

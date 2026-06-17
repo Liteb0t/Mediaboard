@@ -49,7 +49,7 @@
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned Button" onclick="postAction()">
 			</div>
 			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content"></div>
-			<fieldset>
+			<fieldset id="file_upload_fieldset" style="display: none;">
 				<legend>Upload up to four files</legend>
 				<input type="file" id="file_upload" tabindex="1" autocomplete="off" multiple>
 				<div id="file_post_list"></div>
@@ -229,7 +229,7 @@ main {
 
 		&#content_field {
 			min-height: 4em;
-			padding: 4px;
+			margin-bottom: 4px;
 			white-space: -moz-pre-space;
 			&:empty:before {
 				content: attr(placeholder);
@@ -240,7 +240,7 @@ main {
 		}
 	}
 	>* {
-		margin: 2px;
+		margin: 2px 2px 4px;
 		margin-inline: 2px;
 	}
 	>fieldset {
@@ -1193,6 +1193,7 @@ async function getClientInfo() {
 			state.server_permissions = response_json["server_permissions"];
 			window.history.replaceState(state, null, ""); // Initial state
 			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
+			file_upload_fieldset.style["display"] = response_json["server_permissions"]["upload_file"] === true ? "inherit" : "none";
 			// updateReplyContainer(state.selected_thread.id, state.server_permissions);
 			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
 		});

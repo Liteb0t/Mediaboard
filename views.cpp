@@ -496,7 +496,8 @@ FuzeHttp::Response client(shared_state* state, FuzeHttp::Request req) {
 		.json = {{
 			{"server_permissions", {
 				{"manage_permissions", state->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS)},
-				{"create_thread", state->clientHasPermission(client, PERMISSION::CREATE_THREAD)}
+				{"create_thread", state->clientHasPermission(client, PERMISSION::CREATE_THREAD)},
+				{"upload_file", state->clientHasPermission(client, PERMISSION::UPLOAD_FILE)}
 			}},
 			{"has_cookie", req.find("Cookie") != req.end()}
 		}}
