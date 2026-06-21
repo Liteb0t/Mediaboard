@@ -41,7 +41,7 @@ public:
 	const StateConfig config;
 	void start();
 	void setAdditionalImageFormatsFromConfig(const StateConfig& config);
-	bool hasImageFormat(const std::string& mime_type) const;
+	bool hasImageFormat(const std::string_view mime_type) const;
 
 	// FuzeDBI::Connection* fuze_dbi;
 
@@ -80,7 +80,7 @@ private:
 	// const boost::filesystem::path program_location;
 	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
 	FuzeDBI::Connection* fuze_dbi;
-	std::unordered_set<std::string> image_formats = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg", "image/webp"};
+	std::unordered_set<std::string> image_formats = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg"};
 
 	// This mutex synchronizes all access to sessions_
 	std::mutex mutex_;

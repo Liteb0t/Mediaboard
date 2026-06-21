@@ -19,13 +19,13 @@ void FuzeHttp::sanitiseFileName(std::string& file_name) {
 }
 
 // Return a reasonable mime type based on the extension of a file.
-beast::string_view FuzeHttp::getMimeType(beast::string_view path) {
+const std::string_view FuzeHttp::getMimeType(const std::string& path) {
 	using beast::iequals;
-	auto const ext = [&path] {
+	std::string_view ext = [&path] {
 		auto const pos = path.rfind(".");
-		if(pos == beast::string_view::npos)
-			return beast::string_view{};
-		return path.substr(pos);
+		if(pos == std::string_view::npos)
+			return std::string_view{};
+		return std::string_view(path).substr(pos);
 	}();
 	if(iequals(ext, ".aac"))  return "audio/aac";
 	if(iequals(ext, ".flac")) return "audio/flac";

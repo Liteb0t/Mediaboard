@@ -1199,7 +1199,9 @@ async function getClientInfo() {
 			window.history.replaceState(state, null, ""); // Initial state
 			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
 			file_upload_fieldset.style["display"] = response_json["server_permissions"]["upload_file"] === true ? "inherit" : "none";
-			// updateReplyContainer(state.selected_thread.id, state.server_permissions);
+			if (state.selected_thread.id === -1) {
+				updateReplyContainer(state.selected_thread.id, state.server_permissions);
+			}
 			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
 		});
 	}

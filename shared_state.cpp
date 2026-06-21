@@ -56,8 +56,8 @@ void shared_state::setAdditionalImageFormatsFromConfig(const StateConfig& config
 		this->image_formats.emplace("image/webp");
 }
 
-bool shared_state::hasImageFormat(const std::string& mime_type) const {
-	return this->image_formats.contains(mime_type);
+bool shared_state::hasImageFormat(const std::string_view mime_type) const {
+	return this->image_formats.contains(std::string(mime_type));
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error

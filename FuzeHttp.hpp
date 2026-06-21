@@ -111,7 +111,7 @@ void getSaltBase64(StateType state, const std::string& username, char* salt_base
 		sodium_base64_VARIANT_URLSAFE
 	);
 }
-beast::string_view getMimeType(beast::string_view path);
+const std::string_view getMimeType(const std::string& path);
 
 template<typename BodyType>
 http::response<BodyType> buildResponse(FuzeHttp::Response basic_response, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req);

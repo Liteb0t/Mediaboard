@@ -70,8 +70,9 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	}
 	out_filename.insert(filename_uuid_index, uuid_str);
 
+	const boost::filesystem::path out_file_path = state->getMediaLocation() / out_filename;
 	// Write to the file
-	std::ofstream outfile(std::format("{}/{}", state->getMediaLocation().string(), out_filename), std::ios::binary);
+	std::ofstream outfile(out_file_path.string(), std::ios::binary);
 	bool is_initial_line = true;
 	bool previous_line_ends_with_carriage_return = false;
 	while (std::getline(req_stream, req_line)) {
@@ -113,32 +114,34 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	}
 	std::cout << "END OF FILE" << std::endl;
 
-	bool uploaded_file_is_image = state->hasImageFormat((FuzeHttp::getMimeType(out_filename)));
+	const std::string_view file_mime_type = FuzeHttp::getMimeType(out_filename);
+	std::print("MIME type: {}", file_mime_type);
+	bool uploaded_file_is_image = state->hasImageFormat(file_mime_type);
+	std::println(" - is image? {}", uploaded_file_is_image);
 	unsigned int image_width, image_height;
 	bool uploaded_file_has_thumbnail = false;
 	if (uploaded_file_is_image) {
-		const boost::filesystem::path image_path = state->getMediaLocation() / out_filename;
 		try {
 			Magick::Image image;
-			image.read(image_path.string());
+			image.read(out_file_path.string());
 			if (state->config.strip_metadata || state->config.convert_heic_to_jpg) {
 				if (state->config.strip_metadata) {
 					image.autoOrient();
 					image.strip();
 				}
-				if (state->config.convert_heic_to_jpg && FuzeHttp::getMimeType(out_filename) == "image/heic") {
+				if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
 					image.quality(80);
-					image.write(image_path.string().substr(0, image_path.string().rfind('.'))+".jpg");
+					image.write(out_file_path.string().substr(0, out_file_path.string().rfind('.'))+".jpg");
 					std::println("out_filename was first {}", out_filename);
 					out_filename = out_filename.substr(0, out_filename.rfind('.'))+".jpg";
 					std::println("out_filename is now {}", out_filename);
 				}
 				else
-					image.write(image_path.string());
+					image.write(out_file_path.string());
 			}
 			// Write thumbnail
 			Magick::Image thumbnail;
-			thumbnail.read(image_path.string());
+			thumbnail.read(out_file_path.string());
 			thumbnail.autoOrient();
 			thumbnail.strip(); // Removes metadata
 			auto size = image.size();
@@ -161,8 +164,8 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 			thumbnail.quality(60);
 			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->config.thumbnail_file_extension));
 			uploaded_file_has_thumbnail = true;
-			if (state->config.convert_heic_to_jpg) {
-				boost::filesystem::remove(image_path);
+			if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
+				boost::filesystem::remove(out_file_path);
 			}
 		}
 		catch( Magick::Warning& magick_warning ) {
