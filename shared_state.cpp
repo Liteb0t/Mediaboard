@@ -91,6 +91,7 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
 		v.reserve(websocket_sessions.size());
+		this->main_board()->removeUnauthorizedListenersFromThread(thread_id);
 		for(auto p : this->main_board()->getListenersFromThread(thread_id))
 			v.emplace_back(p->weak_from_this());
 	}

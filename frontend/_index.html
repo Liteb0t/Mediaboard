@@ -540,6 +540,11 @@ async function getThread() {
 		});
 		websocket = connectToServer();
 	}
+	else {
+		const error_message = response.headers.get("message");
+		generic_error_dialog_message.innerText = error_message ? error_message : "An unknown error occured when attempting to load thread.";
+		generic_error_dialog.showModal();
+	}
 }
 
 function showThread(thread_json) {

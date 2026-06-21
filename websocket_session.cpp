@@ -70,6 +70,8 @@ void websocket_session::on_read(beast::error_code ec, std::size_t) {
 			if (buffer_as_json["thread_id"].is_int64()) {
 				int thread_id = buffer_as_json["thread_id"].as_int64();
 				if (state_->main_board()->threadExists(thread_id)) {
+					if (!state_->main_board()->getThread(thread_id)->clientHasPermission(this->client, PERMISSION::VIEW_THREAD))
+						throw std::runtime_error("Client does not have VIEW_THREAD permission");
 					this->tracking_thread = thread_id;
 					state_->main_board()->addListenerToThread(this, thread_id);
 				}

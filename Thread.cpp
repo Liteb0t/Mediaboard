@@ -1,5 +1,7 @@
 #include "Thread.hpp"
+#include "permission_managed_object.hpp"
 #include <boost/json/serialize.hpp>
+#include "websocket_session.hpp"
 #include <string>
 #include <iostream>
 #include <cstring>
@@ -161,4 +163,14 @@ boost::json::object Thread::getPermissionsAsJson(const std::optional<Client>& cl
 		{"send_message", this->clientHasPermission(client, PERMISSION::SEND_MESSAGE)},
 		{"delete_post", this->clientHasPermission(client, PERMISSION::DELETE_POST)},
 	};
+}
+
+std::unordered_set<websocket_session*> Thread::getListeners() const {
+	return this->listeners;
+};
+
+void Thread::removeUnauthorizedListeners() {
+	std::erase_if(this->listeners, [this](const websocket_session* ws)->bool{
+		return !this->clientHasPermission(ws->getClient(), PERMISSION::VIEW_THREAD);
+	});
 }

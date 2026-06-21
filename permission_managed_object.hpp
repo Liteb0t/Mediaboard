@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <boost/json/object.hpp>
 #include <iostream>
+#include <print>
 #include <vector>
 
 enum class BUILTIN_GROUPS {
@@ -71,8 +72,7 @@ public:
 		this->account_permissions.erase(account_id);
 	}
 	void setGroupPermission(int group_id, PERMISSION permission_type, THREE_STATE_SETTING setting) {
-		std::unordered_map<int, PermissionCollection>::const_iterator group_iterator = this->group_permissions.find(group_id);
-		if (group_iterator == this->group_permissions.end())
+		if (!this->group_permissions.contains(group_id))
 			this->addGroupPermissionCollection(group_id);
 		this->group_permissions.at(group_id).setPermission(permission_type, setting, fuze_dbi);
 	}

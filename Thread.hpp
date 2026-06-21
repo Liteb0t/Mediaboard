@@ -1,3 +1,4 @@
+#pragma once
 #include "permission_managed_object.hpp"
 #include "Message.hpp"
 #include <ctime>
@@ -29,7 +30,8 @@ public:
 	int getId() const { return this->id; };
 	void addListener(websocket_session* listener);
 	void removeListener(websocket_session* listener);
-	std::unordered_set<websocket_session*> getListeners() const { return this->listeners; };
+	std::unordered_set<websocket_session*> getListeners() const;
+	void removeUnauthorizedListeners();
 	boost::json::array getMessagesAsJson() const;
 	std::string dumpMessage(int message_id) const;
 	// std::string dumpPermissions(int client_id) const;

@@ -1,3 +1,4 @@
+#pragma once
 #include "Thread.hpp"
 #include <ctime>
 #include <boost/json.hpp>
@@ -24,6 +25,9 @@ public:
 	bool messageExistsInThread(int message_id, int thread_id) const { return this->threads.at(thread_id).messageExists(message_id); }
 	void addListenerToThread(websocket_session* listener, int thread_id);
 	void removeListenerFromThread(websocket_session* listener, int thread_id);
+	void removeUnauthorizedListenersFromThread(int thread_id) {
+		this->threads.at(thread_id).removeUnauthorizedListeners();
+	}
 	std::unordered_set<websocket_session*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id).getListeners(); };
 	std::string dumpMessage(int thread_id, int message_id) const;
 	struct thread_order_comparator {

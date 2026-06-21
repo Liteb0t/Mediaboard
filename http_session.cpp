@@ -111,6 +111,7 @@ void http_session::on_read(beast::error_code ec, std::size_t) {
 
 	// See if it is a WebSocket Upgrade
 	if(websocket::is_upgrade(parser_->get())) {
+		/*
 		const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req = parser_->release();
 		std::optional<Client> client = state_->getClientIfExists(req);
 		if (!client) {
@@ -129,11 +130,12 @@ void http_session::on_read(beast::error_code ec, std::size_t) {
 			);
 		}
 		else {
+			*/
 			// Create a websocket session, transferring ownership
 			// of both the socket and the HTTP request.
-			boost::make_shared<websocket_session>(stream_.release_socket(), state_)->run(req);
+			boost::make_shared<websocket_session>(stream_.release_socket(), state_)->run(parser_->release());
 			return;
-		}
+		// }
 	}
 	else {
 		// Handle request

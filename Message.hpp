@@ -1,3 +1,4 @@
+#pragma once
 #include <string>
 #include <ctime>
 #include <boost/json.hpp>

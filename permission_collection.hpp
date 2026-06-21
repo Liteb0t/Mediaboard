@@ -1,3 +1,4 @@
+#pragma once
 #include "FuzeDBI.hpp"
 #include "permission_setting.hpp"
 #include <unordered_map>
@@ -23,18 +24,26 @@ public:
 	}
 	void addPermissionSetting(int permission_setting_id, PERMISSION permission_type, THREE_STATE_SETTING setting) {
 		PermissionSetting permission_setting(permission_setting_id, setting);
-		permission_map.emplace(permission_type, permission_setting);
+		this->permission_map.emplace(permission_type, std::move(permission_setting));
 	}
 	void setPermission(PERMISSION permission_type, THREE_STATE_SETTING setting, FuzeDBI::Connection* fuze_dbi) {
 		std::unordered_map<PERMISSION, PermissionSetting>::iterator it = this->permission_map.find(permission_type);
-		if (it == this->permission_map.end()) {
+		if (setting == THREE_STATE_SETTING::INHERIT) {
+			if (it != this->permission_map.end()) {
+				fuze_dbi->query<void>("DELETE FROM permission_setting WHERE id = $1", it->second.getId());
+				this->permission_map.erase(it);
+			}
+		}
+		else if (it == this->permission_map.end()) {
 			int new_permission_setting_id = fuze_dbi->query<int>("SELECT permission_setting_id FROM _sequences");
 			fuze_dbi->query<void>("UPDATE _sequences SET permission_setting_id = $1", new_permission_setting_id+1);
 			fuze_dbi->query<void>("INSERT INTO permission_setting(id, permission_collection_id, permission_number, setting) VALUES ($1, $2, $3, $4)", new_permission_setting_id, this->id, static_cast<int>(permission_type), static_cast<int>(setting));
 			this->addPermissionSetting(new_permission_setting_id, permission_type, setting);
 		}
-		else
+		else {
+			fuze_dbi->query<void>("UPDATE permission_setting SET setting = $1 WHERE id = $2", static_cast<int>(setting), it->second.getId());
 			it->second.set(setting);
+		}
 	}
 	// bool containsPermissionType(PERMISSION permission_type) const { return this->permission_map.contains(permission_type); }
 	/*

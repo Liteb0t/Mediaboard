@@ -1,3 +1,4 @@
+#pragma once
 #include <iostream>
 
 // Caution: only insert values just before NUMBER_OF_PERMISSIONS; otherwise existing database entries will be messed up
@@ -36,6 +37,7 @@ public:
 	}
 	THREE_STATE_SETTING get() const { return this->setting; }
 	void set(THREE_STATE_SETTING setting) { this->setting = setting; }
+	int getId() const { return this->id; }
 private:
 	int id;
 	// int permission_collection_id;
