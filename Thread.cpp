@@ -162,6 +162,7 @@ boost::json::object Thread::getPermissionsAsJson(const std::optional<Client>& cl
 		{"manage_permissions", this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS)},
 		{"send_message", this->clientHasPermission(client, PERMISSION::SEND_MESSAGE)},
 		{"delete_post", this->clientHasPermission(client, PERMISSION::DELETE_POST)},
+		{"upload_file", this->clientHasPermission(client, PERMISSION::UPLOAD_FILE)},
 	};
 }
 

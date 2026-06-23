@@ -753,7 +753,7 @@ class PermissionSettings {
 			enabled_permissions = [0, 1, 2, 3, 4, 5];
 		}
 		else { // This is a thread
-			enabled_permissions = [1, 3, 4];
+			enabled_permissions = [1, 3, 4, 5];
 		}
 		this.permission_collection = new PermissionCollection(this, _permission_list_element, enabled_permissions); // PermissionCollection
 		this.permission_list_element = _permission_list_element;

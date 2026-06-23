@@ -438,6 +438,7 @@ async function logoutAction() {
 	displayClientAsLoggedOut();
 	// manage_server_button.style["display"] = "none";
 	// localStorage.removeItem("server_permissions");
+	state.server_permissions = undefined;
 	const fetch_response = await fetch("_ROOT_URL" + "registration/logout", {method: "POST"});
 	if (fetch_response && fetch_response.ok) {
 		refresh_send();
@@ -769,24 +770,25 @@ function updateReplyContainer(selected_thread_id, permissions) {
 		reply_container.style["display"] = "none";
 		return;
 	}
-	if (selected_thread_id === -1) {
-		if (permissions["create_thread"]) {
-			reply_heading_text.textContent = "Create a thread";
-			reply_container.style["display"] = "initial";
+	if (selected_thread_id >= 0) {
+		if (permissions["send_message"] ) {
+			reply_heading_text.textContent = "Leave a reply";
+			reply_container.style["display"] = "inherit";
 		}
 		else {
 			reply_container.style["display"] = "none";
 		}
 	}
 	else {
-		if (permissions["send_message"] ) {
-			reply_heading_text.textContent = "Leave a reply";
-			reply_container.style["display"] = "initial";
+		if (permissions["create_thread"]) {
+			reply_heading_text.textContent = "Create a thread";
+			reply_container.style["display"] = "inherit";
 		}
 		else {
 			reply_container.style["display"] = "none";
 		}
 	}
+	file_upload_fieldset.style["display"] = permissions["upload_file"] === true ? "inherit" : "none";
 }
 
 content_field.oninput = () => {
@@ -1218,8 +1220,8 @@ async function getClientInfo() {
 			state.server_permissions = response_json["server_permissions"];
 			window.history.replaceState(state, null, ""); // Initial state
 			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
-			file_upload_fieldset.style["display"] = response_json["server_permissions"]["upload_file"] === true ? "inherit" : "none";
-			if (state.selected_thread.id === -1) {
+			console.log(state);
+			if (!(state.selected_thread.id >= 0)) {
 				updateReplyContainer(state.selected_thread.id, state.server_permissions);
 			}
 			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
