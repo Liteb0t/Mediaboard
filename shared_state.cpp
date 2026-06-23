@@ -48,16 +48,24 @@ shared_state::shared_state(boost::filesystem::path document_root, boost::filesys
 }
 
 void shared_state::setAdditionalImageFormatsFromConfig(const StateConfig& config) {
-	if (config.enable_heic)
-		this->image_formats.emplace("image/heic");
-	if (config.enable_avif)
-		this->image_formats.emplace("image/avif");
-	if (config.enable_webp)
-		this->image_formats.emplace("image/webp");
+	if (config.heic_thumbnails)
+		this->image_formats_to_create_thumbnails_for.emplace("image/heic");
+	if (config.avif_thumbnails)
+		this->image_formats_to_create_thumbnails_for.emplace("image/avif");
+	if (config.webp_thumbnails)
+		this->image_formats_to_create_thumbnails_for.emplace("image/webp");
+	if (config.mp4_thumbnails)
+		this->video_formats_to_create_thumbnails_for.emplace("video/mp4");
+	if (config.webm_thumbnails)
+		this->video_formats_to_create_thumbnails_for.emplace("video/webm");
 }
 
-bool shared_state::hasImageFormat(const std::string_view mime_type) const {
-	return this->image_formats.contains(std::string(mime_type));
+bool shared_state::canCreateThumbnailForImageFormat(const std::string_view mime_type) const {
+	return this->image_formats_to_create_thumbnails_for.contains(std::string(mime_type));
+}
+
+bool shared_state::canCreateThumbnailForVideoFormat(const std::string_view mime_type) const {
+	return this->video_formats_to_create_thumbnails_for.contains(std::string(mime_type));
 }
 
 // shared_from_this cannot be used in a constructor; see https://stackoverflow.com/questions/5558734/c-bad-weak-ptr-error

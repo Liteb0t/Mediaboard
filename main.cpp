@@ -143,9 +143,11 @@ int main(int argc, char* argv[]) {
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
-		("enable_avif", boost::program_options::value<bool>(&state_config.enable_avif)->default_value(false))
-		("enable_webp", boost::program_options::value<bool>(&state_config.enable_webp)->default_value(false))
-		("enable_heic", boost::program_options::value<bool>(&state_config.enable_heic)->default_value(false), "Prerequisite for convert_heic_to_jpg")
+		("avif_thumbnails", boost::program_options::value<bool>(&state_config.avif_thumbnails)->default_value(false))
+		("webp_thumbnails", boost::program_options::value<bool>(&state_config.webp_thumbnails)->default_value(false))
+		("heic_thumbnails", boost::program_options::value<bool>(&state_config.heic_thumbnails)->default_value(false), "Prerequisite for convert_heic_to_jpg")
+		("mp4_thumbnails", boost::program_options::value<bool>(&state_config.mp4_thumbnails)->default_value(false))
+		("webm_thumbnails", boost::program_options::value<bool>(&state_config.webm_thumbnails)->default_value(false))
 		("convert_heic_to_jpg", boost::program_options::value<bool>(&state_config.convert_heic_to_jpg)->default_value(false), "Converts HEIC images into JPG on upload.")
 		("data_directory", boost::program_options::value<std::string>(&data_directory_str))
 		("media_directory,m", boost::program_options::value<std::string>(&media_directory_str),  "File path where user-submitted media is stored. data_directory is used if none is specified.")

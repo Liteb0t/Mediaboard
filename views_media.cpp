@@ -116,18 +116,22 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 
 	const std::string_view file_mime_type = FuzeHttp::getMimeType(out_filename);
 	std::print("MIME type: {}", file_mime_type);
-	bool uploaded_file_is_image = state->hasImageFormat(file_mime_type);
-	std::println(" - is image? {}", uploaded_file_is_image);
-	unsigned int image_width, image_height;
+	bool create_thumbnail_for_image = state->canCreateThumbnailForImageFormat(file_mime_type);
+	bool create_thumbnail_for_video = state->canCreateThumbnailForVideoFormat(file_mime_type);
+	std::println(" - create thumbnail? {}", create_thumbnail_for_image || create_thumbnail_for_video);
+	unsigned int image_width = 0, image_height = 0;
 	bool uploaded_file_has_thumbnail = false;
-	if (uploaded_file_is_image) {
+	if (create_thumbnail_for_image || create_thumbnail_for_video) {
 		try {
-			Magick::Image image;
-			image.read(out_file_path.string());
-			if (state->config.strip_metadata || state->config.convert_heic_to_jpg) {
+			Magick::Image thumbnail;
+			Magick::Geometry size;
+			if (create_thumbnail_for_image) {
+				thumbnail.read(out_file_path.string());
+				Magick::Image image;
+				image.read(out_file_path.string());
 				if (state->config.strip_metadata) {
 					image.autoOrient();
-					image.strip();
+					image.strip(); // Removes metadata
 				}
 				if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
 					image.quality(80);
@@ -136,18 +140,16 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 					out_filename = out_filename.substr(0, out_filename.rfind('.'))+".jpg";
 					std::println("out_filename is now {}", out_filename);
 				}
-				else
+				else if (state->config.strip_metadata)
 					image.write(out_file_path.string());
 			}
-			// Write thumbnail
-			Magick::Image thumbnail;
-			thumbnail.read(out_file_path.string());
-			thumbnail.autoOrient();
-			thumbnail.strip(); // Removes metadata
-			auto size = image.size();
+			else {
+				thumbnail.read(std::format("{}[0]", out_file_path.string())); // read the first frame into ImageMagick ffmpeg delegate
+				size = thumbnail.size();
+			}
+			Magick::Geometry thumbnail_dimensions = thumbnail.size();
 			image_width = size.width();
 			image_height = size.height();
-			Magick::Geometry thumbnail_dimensions;
 			if (size.width() < size.height()) {
 				thumbnail_dimensions.width(size.width() < size.height()>>1 ? std::ceil(state->config.thumbnail_size / 2) : std::ceil(state->config.thumbnail_size * (size.width()/size.height())));
 				thumbnail_dimensions.height(state->config.thumbnail_size);
@@ -182,9 +184,11 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 			{"File-Name", out_filename}
 		}}
 	};
-	if (uploaded_file_is_image) {
-		response.headers.value().emplace("Image-Width", std::to_string(image_width));
-		response.headers.value().emplace("Image-Height", std::to_string(image_height));
+	if (create_thumbnail_for_image || create_thumbnail_for_video) {
+		if (create_thumbnail_for_image || (create_thumbnail_for_video && uploaded_file_has_thumbnail)) {
+			response.headers.value().emplace("Image-Width", std::to_string(image_width));
+			response.headers.value().emplace("Image-Height", std::to_string(image_height));
+		}
 		if (uploaded_file_has_thumbnail)
 			response.headers.value().emplace("Thumbnail-File-Extension", state->config.thumbnail_file_extension);
 	}

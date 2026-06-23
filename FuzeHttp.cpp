@@ -61,6 +61,8 @@ const std::string_view FuzeHttp::getMimeType(const std::string& path) {
 	if(iequals(ext, ".css"))  return "text/css";
 	if(iequals(ext, ".txt"))  return "text/plain";
 	if(iequals(ext, ".flv"))  return "video/x-flv";
+	if(iequals(ext, ".mp4"))  return "video/mp4";
+	if(iequals(ext, ".webm"))  return "video/webm";
 	return "application/text";
 }
 

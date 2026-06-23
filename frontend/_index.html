@@ -171,10 +171,13 @@ main {
 		.EmbedFigure {
 			display: inline-block;
 			margin: 0;
+			.EmbedThumbnail, .EmbedImage, .EmbedVideo {
+				max-width: 100%;
+				max-height: 90vh;
+				height: auto;
+			}
 			.EmbedThumbnail, .EmbedImage {
 				cursor: pointer;
-				max-width: 100%;
-				height: auto;
 			}
 		}
 	}
@@ -356,9 +359,11 @@ window.onpopstate = function(event) {
 class Format {
 	static IMAGE = 0;
 	static AUDIO = 1;
+	static VIDEO = 2;
 	static OTHER = -1;
 	static image_formats = ["bmp", "gif", "ico", "jpe", "jpeg", "jpg", "jxl", "png", "svg", "svgz"];
 	static audio_formats = ["aac", "flac", "m4a", "mid", "midi", "mp3", "oga", "ogg", "ogx", "opus", "wav"];
+	static video_formats = ["mp4", "webm"];
 	static fromFileName(file_name) {
 		let dot_index = file_name.lastIndexOf('.');
 		if (dot_index !== -1) {
@@ -368,6 +373,9 @@ class Format {
 			}
 			else if (Format.audio_formats.indexOf(file_extension) !== -1) {
 				return Format.AUDIO;
+			}
+			else if (Format.video_formats.indexOf(file_extension) !== -1) {
+				return Format.VIDEO;
 			}
 			else {
 				return Format.OTHER;
@@ -397,15 +405,15 @@ document.body.onclick = (event) => {
 		contractEmbedFigure(target.parentNode);
 }
 
-const FIGURE_IMAGE = 0; // Main <img> is child 0 of <figure>, thumbnail is child 1.
+const FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
 const FIGURE_THUMBNAIL = 1;
 function expandEmbedFigure(figure_element) {
-	figure_element.children[FIGURE_IMAGE].setAttribute("src", "_ROOT_URL" + media_url + figure_element.getAttribute("filename"));
-	figure_element.children[FIGURE_IMAGE].style["display"] = "inherit";
+	figure_element.children[FIGURE_EMBED].setAttribute("src", "_ROOT_URL" + media_url + figure_element.getAttribute("filename"));
+	figure_element.children[FIGURE_EMBED].style["display"] = "inherit";
 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "none";
 }
 function contractEmbedFigure(figure_element) {
-	figure_element.children[FIGURE_IMAGE].style["display"] = "none";
+	figure_element.children[FIGURE_EMBED].style["display"] = "none";
 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "inherit";
 }
 
@@ -670,13 +678,25 @@ function createPost(data, client_permissions) {
 		let filename_extension_i = file["filename"].lastIndexOf(".");
 		let file_format = Format.fromFileName(file["filename"]); // Format enum
 		if (file.thumbnail_file_extension || file_format === Format.IMAGE) { // the file_format check is for compatibility with images uploaded prior to 0.1.2
-			let img_element = document.createElement("img");
-			img_element.classList.add("EmbedImage");
-			if (file["width"] && file["height"]) {
-				img_element.width = file["width"];
-				img_element.height = file["height"];
+			if (file_format === Format.IMAGE) {
+				let img_element = document.createElement("img");
+				img_element.classList.add("EmbedImage");
+				if (file["width"] && file["height"]) {
+					img_element.width = file["width"];
+					img_element.height = file["height"];
+				}
+				img_element.style["display"] = "none";
+				figure_element.appendChild(img_element);
 			}
-			img_element.style["display"] = "none";
+			else if (file_format === Format.VIDEO) {
+				let video_element = document.createElement("video");
+				video_element.classList.add("EmbedVideo");
+				video_element.controls = true;
+				video_element.disablePictureInPicture = true;
+				video_element.setAttribute("controlslist", "nofullscreen nodownload");
+				video_element.style["display"] = "none";
+				figure_element.appendChild(video_element);
+			}
 
 			// Thumbnail
 			let thumbnail_element = document.createElement("img");
@@ -701,7 +721,7 @@ function createPost(data, client_permissions) {
 				thumbnail_element.width = thumbnail_element.height = thumbnail_size;
 			}
 			thumbnail_element.setAttribute("loading", "lazy");
-			figure_element.append(img_element, thumbnail_element);
+			figure_element.append(thumbnail_element);
 		}
 		else if (file_format === Format.AUDIO) {
 			let audio_element = document.createElement("audio");

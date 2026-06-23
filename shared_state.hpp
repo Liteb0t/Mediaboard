@@ -28,9 +28,11 @@ struct StateConfig {
 	std::string thumbnail_file_extension;
 	unsigned int thumbnail_size;
 	bool convert_heic_to_jpg;
-	bool enable_heic;
-	bool enable_avif;
-	bool enable_webp;
+	bool heic_thumbnails;
+	bool avif_thumbnails;
+	bool webp_thumbnails;
+	bool mp4_thumbnails;
+	bool webm_thumbnails;
 	bool strip_metadata;
 };
 
@@ -41,7 +43,8 @@ public:
 	const StateConfig config;
 	void start();
 	void setAdditionalImageFormatsFromConfig(const StateConfig& config);
-	bool hasImageFormat(const std::string_view mime_type) const;
+	bool canCreateThumbnailForImageFormat(const std::string_view mime_type) const;
+	bool canCreateThumbnailForVideoFormat(const std::string_view mime_type) const;
 
 	// FuzeDBI::Connection* fuze_dbi;
 
@@ -80,7 +83,8 @@ private:
 	// const boost::filesystem::path program_location;
 	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
 	FuzeDBI::Connection* fuze_dbi;
-	std::unordered_set<std::string> image_formats = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg"};
+	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg"};
+	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;
 
 	// This mutex synchronizes all access to sessions_
 	std::mutex mutex_;
