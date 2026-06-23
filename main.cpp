@@ -191,7 +191,6 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-
 	if (variable_map.count("help")) {
 		std::cout << command_line_options << std::endl;
 		return 0;
