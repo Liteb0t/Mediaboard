@@ -119,12 +119,11 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	bool create_thumbnail_for_image = state->canCreateThumbnailForImageFormat(file_mime_type);
 	bool create_thumbnail_for_video = state->canCreateThumbnailForVideoFormat(file_mime_type);
 	std::println(" - create thumbnail? {}", create_thumbnail_for_image || create_thumbnail_for_video);
-	unsigned int image_width = 0, image_height = 0;
+	unsigned int image_width = 100, image_height = 100;
 	bool uploaded_file_has_thumbnail = false;
 	if (create_thumbnail_for_image || create_thumbnail_for_video) {
 		try {
 			Magick::Image thumbnail;
-			Magick::Geometry size;
 			if (create_thumbnail_for_image) {
 				thumbnail.read(out_file_path.string());
 				Magick::Image image;
@@ -145,11 +144,11 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 			}
 			else {
 				thumbnail.read(std::format("{}[0]", out_file_path.string())); // read the first frame into ImageMagick ffmpeg delegate
-				size = thumbnail.size();
 			}
-			Magick::Geometry thumbnail_dimensions = thumbnail.size();
+			const Magick::Geometry size = thumbnail.size();
 			image_width = size.width();
 			image_height = size.height();
+			Magick::Geometry thumbnail_dimensions;
 			if (size.width() < size.height()) {
 				thumbnail_dimensions.width(size.width() < size.height()>>1 ? std::ceil(state->config.thumbnail_size / 2) : std::ceil(state->config.thumbnail_size * (size.width()/size.height())));
 				thumbnail_dimensions.height(state->config.thumbnail_size);
