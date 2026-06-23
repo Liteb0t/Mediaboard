@@ -6,7 +6,7 @@
 #include <iostream>
 #include <string>
 
-const std::string current_version = "0.1.2";
+const std::string current_version = "0.1.3";
 
 namespace Migrations {
 // Populates database with entries in database_template.sql, and sets the version

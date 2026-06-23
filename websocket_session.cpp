@@ -82,6 +82,7 @@ void websocket_session::on_read(beast::error_code ec, std::size_t) {
 				std::cout << "Warning: thread is not an integer" << std::endl;
 			}
 		}
+		/*
 		else if (request_type == "connect_to_channel") {
 			std::println("DUMMY added ws to channel");
 			is_webrtc = true;
@@ -90,6 +91,7 @@ void websocket_session::on_read(beast::error_code ec, std::size_t) {
 			std::println("received webrtc_signal WS message");
 			state_->sendToWebRTC(buffer_data);
 		}
+		*/
 		else {
 			// TODO send error message back to requester
 			throw std::runtime_error("request_type " + request_type + " not recognised");
