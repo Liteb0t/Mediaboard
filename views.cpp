@@ -316,7 +316,7 @@ FuzeHttp::Response deleteThreadGroupPermission(shared_state* state, FuzeHttp::Re
 	if (!state->main_board()->threadExists(thread_id))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
 	const Thread* thread = state->getThread(0, thread_id);
-	if (!state->permissionCollectionExistsForGroup(group_id))
+	if (!thread->permissionCollectionExistsForGroup(group_id))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "No permissions set for this group."};
 	if (!thread->clientHasPermissionForGroup(client, PERMISSION::MANAGE_PERMISSIONS, group_id))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this group."};
@@ -330,7 +330,7 @@ FuzeHttp::Response deleteThreadUserPermission(shared_state* state, FuzeHttp::Req
 	if (!state->main_board()->threadExists(thread_id))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
 	const Thread* thread = state->getThread(0, thread_id);
-	if (!state->permissionCollectionExistsForAccount(account_id))
+	if (!thread->permissionCollectionExistsForAccount(account_id))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "No permissions set for this account."};
 	if (!thread->clientHasPermissionForAccount(client, PERMISSION::MANAGE_PERMISSIONS, account_id))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this account."};

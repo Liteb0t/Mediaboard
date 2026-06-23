@@ -8,7 +8,6 @@
 		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
-		<base href="_ROOT_URL">
 		<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
 		<link rel="stylesheet" href="static/styles.css">
 	</head>
@@ -35,7 +34,7 @@
 				<input type="submit">-->
 				<input id="login_button" type="button" value="Log in"  onclick="loginAction()">
 				<input type="button" value="Register" onclick="registerAction()">
-				<!--<a class="Button RightAligned" href="_ROOT_URL">Return</a>-->
+				<!--<a class="Button RightAligned" href=window.location.pathname>Return</a>-->
 			</form>
 			<div id="error_messages"></div>
 		</main>
@@ -43,12 +42,12 @@
 		<dialog id="login_success_dialog" closedby="any">
 			<h2>Success</h2>
 			<p>Logged in as <i id="logged_in_as">some dude idk</i></p>
-			<div class="ToolBar"><a class="Button" href="_ROOT_URL">Proceed</a><button onclick="login_success_dialog.close()">Close</button></div>
+			<div class="ToolBar"><a class="Button" href="../">Proceed</a><button onclick="login_success_dialog.close()">Close</button></div>
 		</dialog>
 		<dialog id="registration_success_dialog" closedby="any">
 			<h2>Success</h2>
 			<p>Registered as <i id="registered_as">some dude idk</i>. You are now logged in.</p>
-			<div class="ToolBar"><a class="Button" href="_ROOT_URL">Proceed</a><button onclick="registration_success_dialog.close()">Close</button></div>
+			<div class="ToolBar"><a class="Button" href="../">Proceed</a><button onclick="registration_success_dialog.close()">Close</button></div>
 		</dialog>
 	</body>
 <style>
@@ -94,7 +93,7 @@ async function registerAction() {
 			create_new_account_data["invite"] = url_params_invite;
 		}
 
-		const create_new_account_response = await fetch("_ROOT_URL" + "registration/create_new_account", {
+		const create_new_account_response = await fetch("../registration/create_new_account", {
 			method: "POST",
 			body: JSON.stringify(create_new_account_data)
 		});
@@ -121,50 +120,13 @@ async function loginAction() {
 	try {
 		const username_input = account_username_input.value;
 		let auth_user = new UserAuthentication(username_input, account_password_input.value);
-		// first get the salt from the server
-		// const fetch_login_parameters_response = await fetch("_ROOT_URL" + "registration/request_login_parameters", {
-		// 	method: "POST",
-		// 	body: JSON.stringify({
-		// 		username: username_input
-		// 	})
-		// });
 		status_dialog_body.textContent = "Requesting login parameters...";
 		status_dialog.showModal();
 		await auth_user.requestAccountParameters();
-		// if (!(fetch_login_parameters_response && fetch_login_parameters_response.ok)) {
-		// 	let header_error_message = fetch_login_parameters_response.headers.get("message");
-		// 	if (header_error_message == null)
-		// 		throw new Error(`ERROR ${fetch_login_parameters_response.status}\n${fetch_login_parameters_response.statusText}`);
-		// 	else
-		// 		throw new Error(header_error_message);
-		// }
-		// const login_parameters_response_json = await fetch_login_parameters_response.json();
-		// const salt_base64 = login_parameters_response_json["salt_base64"];
-		// const password_hash_length = login_parameters_response_json["password_hash_length"];
-		// const pwhash_opslimit = login_parameters_response_json["pwhash_opslimit"];
-		// const pwhash_memlimit = login_parameters_response_json["pwhash_memlimit"];
-		// const Uint8Array
-		// console.log("Password: " + account_password_input.value +
-		// "\nintermediate_salt_base64: " + intermediate_salt_base64 +
-		// "\nsalt_base64: " + salt_base64 +
-		// "\nlimits: " + pwhash_opslimit + ", " + (pwhash_memlimit >> 10));
 		status_dialog_body.textContent = "Calculating secure hash...";
 		const password_hash_base64 = await auth_user.calculateHash();
-		// const hashed_password = await hashwasm.argon2id({
-		// 	password: account_password_input.value,
-		// 	salt: salt_base64,
-		// 	iterations: pwhash_opslimit,
-		// 	parallelism: 1,
-		// 	memorySize: pwhash_memlimit >> 10,
-		// 	hashLength: password_hash_length,
-		// 	outputType: "binary"
-		// });
-		// console.log(`[newLoginAction] hashed_password: ${hashed_password}`);
-		// const password_hash_base64 = hashed_password.toBase64({alphabet: "base64url"});
-		// console.log(`[newRegisterAction] password_hash_base64: ${password_hash_base64}`);
-
 		status_dialog_body.textContent = "Sending credentials to server...";
-		const login_response = await fetch("_ROOT_URL" + "registration/login", {
+		const login_response = await fetch("../registration/login", {
 			method: "POST",
 			body: JSON.stringify({
 				username: username_input,

@@ -102,17 +102,7 @@ You should see an empty page with a toolbar at the top. You can login to the own
 By default, users cannot view or create threads or send messages. To enable this, click on the "Manage server" tab in the toolbar as an administrator.\
 ![Permissions in the Manage Server page](https://cdn.fuze.page/Mediaboard/Tutorial/Mediaboard_manage_permissions.png)
 In the Manage permissions tab, click "Add group" and select "Public". Now set the desired permissions to "Allow".
-### Deployment
-Let's say, for example, the Mediaboard will be accessible under `/mediaboard/`.\
-Open `tokens.m4` and locate the following line:
-```
-define(`_WEBSOCKET_URL', `ws://localhost:8300')
-```
-Set the value to the publicly accessible URL Mediaboard is proxied to.\
-In this example, if our domain is *fuze.page*, the value should be `wss://fuze.page/mediaboard/`. **Do not forget: if using HTTPS, set the scheme to `wss://`.**\
-Also change the definition of `_ROOT_URL` from `/` to `/mediaboard/`\
-Run `make` to apply the changes, or `sh build.sh` if using Meson.
-#### HTTPS support
+### HTTPS support
 Fuze Mediaboard does not provide HTTPS. For that, you should use a reverse proxy like [NGINX](https://nginx.org/).\
 Example NGINX reverse proxy settings:
 ```

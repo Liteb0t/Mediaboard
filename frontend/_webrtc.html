@@ -8,7 +8,6 @@
 	<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta charset="utf-8">
-	<base href="_ROOT_URL">
 	<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
 	<link rel="stylesheet" href="static/styles.css">
 </head>
@@ -34,6 +33,7 @@
 "use strict";
 let stream_sock;
 let peerConnection;
+const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
 const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]}
 
 if (navigator.mediaDevices.getDisplayMedia) {
@@ -70,7 +70,7 @@ function connectToChannel() {
 	if (typeof stream_sock !== "undefined") {
 		stream_sock.close();
 	}
-	stream_sock = new WebSocket("_WEBSOCKET_URL");
+	stream_sock = new WebSocket("websocket_url");
 	stream_sock.onopen = () => {
 		connection_status_text.textContent = "Connected";
 		stream_sock.send(JSON.stringify({

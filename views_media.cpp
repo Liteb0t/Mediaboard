@@ -195,9 +195,9 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 }
 
 // TODO find a way to handle multiple directories under one view
-FuzeHttp::Response getMedia(shared_state* state, FuzeHttp::Request req, std::string file_path) {
+FuzeHttp::Response getMedia(shared_state* state, FuzeHttp::Request req, std::string location) {
 	std::cout << "Showing thru getMedia" << std::endl;
-	std::string file_name = file_path;
+	std::string file_name = location;
 	int filename_extension_index;
 	if ((filename_extension_index = file_name.rfind(".")) == -1) {
 		filename_extension_index = file_name.size();
@@ -205,12 +205,17 @@ FuzeHttp::Response getMedia(shared_state* state, FuzeHttp::Request req, std::str
 	if (filename_extension_index >= 36) {
 		file_name.erase(filename_extension_index - 36, 36);
 	}
+	boost::filesystem::path file_path = state->getMediaLocation() / location;
+	if (!boost::filesystem::exists(file_path))
+		return FuzeHttp::Response{http::status::not_found};
+	if (!boost::filesystem::is_regular_file(file_path))
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Is a directory"};
 	return FuzeHttp::Response{
 		.status = http::status::ok,
 		.headers = {{
 			{"Content-Disposition", std::format("inline; filename=\"{}\"", file_name)}
 		}},
-		.file = std::format("{}/{}", state->getMediaLocation().string(), file_path)
+		.file = file_path.string()
 	};
 }
 

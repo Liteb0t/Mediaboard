@@ -8,7 +8,6 @@
 		<meta name="description" content="Fuze Mediaboard is an imageboard engine with advanced permissions.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
-		<base href="_ROOT_URL">
 		<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
 		<link rel="stylesheet" href="static/styles.css">
 	</head>
@@ -295,6 +294,7 @@ main {
 loading_dialog.showModal();
 const media_url = "media/";
 const thumbnail_url = "media/thumbnails/";
+const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
 const thumbnail_size = _THUMBNAIL_SIZE;
 const file_size_limit = _FILE_SIZE_LIMIT_MB*1024*1024;
 // 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
@@ -329,25 +329,9 @@ if (url_params.get("display") === "embed") {
 else url_params_display_as_embed = false;
 if (_SHOW_WATERMARKS && !url_params_display_as_embed) header_bar_mediaboard_link.style["display"] = "inherit";
 if (_SHOW_WATERMARKS && url_params_display_as_embed) watermark.style["display"] = "inherit";
-
-if (window.location.pathname.startsWith("_ROOT_URL" + "thread/")) {
-	let second_slash_index = window.location.pathname.indexOf("/", "_ROOT_URL".length + 7);
-	if (second_slash_index > 0) {
-		let thread_number = parseInt(window.location.pathname.substring("_ROOT_URL".length + 7, second_slash_index));
-		if (!isNaN(thread_number)) {
-			state.selected_thread.id = thread_number;
-		}
-		else {
-			alert("Error: thread_number is NaN");
-		}
-	}
-	else {
-		alert("Error: missing trailing / in URL for parsing thread number");
-	}
-}
-else {
-	state.selected_thread.id = -1;
-}
+state.selected_thread.id = Number(url_params.get("thread"));
+state.selected_thread.id ??= -1;
+if (url_params.get("thread") > -1)
 
 window.onpopstate = function(event) {
 	if (event.state) {
@@ -408,7 +392,7 @@ document.body.onclick = (event) => {
 const FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
 const FIGURE_THUMBNAIL = 1;
 function expandEmbedFigure(figure_element) {
-	figure_element.children[FIGURE_EMBED].setAttribute("src", "_ROOT_URL" + media_url + figure_element.getAttribute("filename"));
+	figure_element.children[FIGURE_EMBED].setAttribute("src", window.location.pathname + media_url + figure_element.getAttribute("filename"));
 	figure_element.children[FIGURE_EMBED].style["display"] = "inherit";
 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "none";
 }
@@ -439,7 +423,7 @@ async function logoutAction() {
 	// manage_server_button.style["display"] = "none";
 	// localStorage.removeItem("server_permissions");
 	state.server_permissions = undefined;
-	const fetch_response = await fetch("_ROOT_URL" + "registration/logout", {method: "POST"});
+	const fetch_response = await fetch(window.location.pathname + "registration/logout", {method: "POST"});
 	if (fetch_response && fetch_response.ok) {
 		refresh_send();
 		getClientInfo();
@@ -451,7 +435,7 @@ async function logoutAction() {
 
 function openThreadList() {
 	state.selected_thread.id = -1;
-	history.pushState(state, "", "_ROOT_URL");
+	history.pushState(state, "", window.location.pathname);
 	refresh_send();
 }
 
@@ -470,7 +454,7 @@ async function refresh_send() {
 }
 
 async function getAllThreads() {
-	let response = await fetch("_ROOT_URL" + "api/threads");
+	let response = await fetch(window.location.pathname + "api/threads");
 	console.log(response);
 	if (response.ok) {
 		await response.json().then(response_obj => {
@@ -514,7 +498,7 @@ function showAllThreads(message_json) {
 				let manage_thread_permissions_button = document.createElement("a");
 				manage_thread_permissions_button.classList.add("Button", "ToolBarButton");
 				manage_thread_permissions_button.textContent = "Manage permissions";
-				manage_thread_permissions_button.setAttribute("href", "_ROOT_URL" + `manage_permissions.html?location=/thread/${thread.id}/`);
+				manage_thread_permissions_button.setAttribute("href", window.location.pathname + `manage_permissions.html?location=/thread/${thread.id}/`);
 				thread_toolbar.append(manage_thread_permissions_button);
 			}
 
@@ -536,12 +520,13 @@ function showAllThreads(message_json) {
 
 function openThread(thread_id) {
 	state.selected_thread.id = thread_id;
-	history.pushState(state, "", "_ROOT_URL" + "thread/" + state.selected_thread.id + "/");
+	// TODO use url_params.toString() if need bee
+	history.pushState(state, "", window.location.pathname + "?thread=" + state.selected_thread.id);
 	getThread();
 }
 
 async function getThread() {
-	let response = await fetch("_ROOT_URL" + `api/thread/${state.selected_thread.id}`);
+	let response = await fetch(window.location.pathname + `api/thread/${state.selected_thread.id}`);
 	if (response.ok) {
 		await response.json().then(response_obj => {
 			console.log(response_obj);
@@ -703,7 +688,7 @@ function createPost(data, client_permissions) {
 			let thumbnail_element = document.createElement("img");
 			thumbnail_element.classList.add("EmbedThumbnail");
 			let thumbnail_filename = file.thumbnail_file_extension ? `THUMBNAIL_${file.filename}.${file.thumbnail_file_extension}` : "THUMBNAIL_" + file["filename"] + "._THUMBNAIL_FILE_FORMAT";
-			thumbnail_element.setAttribute("src", "_ROOT_URL" + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+			thumbnail_element.setAttribute("src", window.location.pathname + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
 			if (file["width"] && file["height"]) {
 				if (file["width"] < file["height"]) {
 					thumbnail_element.width = file["width"] < file["height"]>>1 ? Math.ceil(thumbnail_size / 2) : Math.ceil(thumbnail_size * (file["width"]/file["height"]));
@@ -728,7 +713,7 @@ function createPost(data, client_permissions) {
 			let audio_element = document.createElement("audio");
 			audio_element.controls = true;
 			audio_element.setAttribute("controlslist", "nofullscreen nodownload");
-			audio_element.setAttribute("src", "_ROOT_URL" + media_url + file["filename"].replace(" ", "%20"));
+			audio_element.setAttribute("src", window.location.pathname + media_url + file["filename"].replace(" ", "%20"));
 			figure_element.appendChild(audio_element);
 		}
 		let pretty_filename;
@@ -739,7 +724,7 @@ function createPost(data, client_permissions) {
 			pretty_filename = file["filename"].slice(0, filename_extension_i - media_uuid_len) + file["filename"].slice(filename_extension_i, file["filename"].length);
 		}
 		let figcaption_element = document.createElement("figcaption");
-		let media_src = "_ROOT_URL" + media_url + file["filename"].replace(" ", "%20");
+		let media_src = window.location.pathname + media_url + file["filename"].replace(" ", "%20");
 		let figcaption_element_a = document.createElement("a");
 		figcaption_element_a.setAttribute("href", media_src);
 		figcaption_element_a.setAttribute("target", "_blank");
@@ -952,7 +937,7 @@ class UploadedFile {
 			}
 		});
 		request.responseType = "text";
-		request.open("POST", "_ROOT_URL" + "api/upload/");
+		request.open("POST", window.location.pathname + "api/upload/");
 		request.timeout = 60*60*1000; // 1 hour
 		request.onreadystatechange = () => {
 			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
@@ -986,10 +971,10 @@ class UploadedFile {
 					const thumbnail_file_extension = request.getResponseHeader("Thumbnail-File-Extension");
 					if (thumbnail_file_extension) {
 						this.container_element.setAttribute("data-thumbnail-file-extension", thumbnail_file_extension);
-						this.thumbnail_element.setAttribute("src", "_ROOT_URL" + media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
+						this.thumbnail_element.setAttribute("src", window.location.pathname + media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
 					}
 					else if (Format.fromFileName(server_filename) === Format.IMAGE) {
-						this.thumbnail_element.setAttribute("src", "_ROOT_URL" + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
+						this.thumbnail_element.setAttribute("src", window.location.pathname + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
 					}
 					this.status_element.textContent = "Upload complete";
 					this.status_element.classList.add("UploadCompleteIndicator");
@@ -1020,7 +1005,7 @@ function connectToServer() {
 	let listening_to_thread = state.selected_thread.id;
 	let sock;
 	if (!websocket_connected) {
-		sock = new WebSocket("_WEBSOCKET_URL");
+		sock = new WebSocket(websocket_url);
 		websocket_connected = true;
 	}
 	else {
@@ -1156,7 +1141,7 @@ async function postMessage() {
 	const fetch_response = await fetch("api/message", {method: "POST", body: JSON.stringify(data)});
 
 	/*
-	const fetch_response = await fetch("_ROOT_URL" + "api/" + "create_message/", {
+	const fetch_response = await fetch(window.location.pathname + "api/" + "create_message/", {
 		method: "POST",
 		headers: {"Token": API.getAccountToken()},
 		body: JSON.stringify(data)
@@ -1172,17 +1157,6 @@ async function deleteMessage(thread_id, message_id) {
 		id_in_thread: message_id
 	};
 	const fetch_response = await fetch(`api/post/${thread_id}/${message_id}`, {method: "DELETE"});
-	/*
-	fetch("_ROOT_URL" + api_url + "delete_message/" + `${thread_id}/${message_id}/`, {
-		method: "DELETE",
-		headers: {"Token": API.getAccountToken()},
-		// ,headers: {
-			// "auth-scheme": "token",
-		// 	"key": account_key || local_key
-		// }
-		body: JSON.stringify(data)
-	});
-	*/
 	return fetch_response;
 }
 
@@ -1200,10 +1174,6 @@ async function postThread() {
 	};
 	console.log(data)
 	const fetch_response = await fetch("api/thread", {method: "POST", body: JSON.stringify(data)});
-	//await fetch("_ROOT_URL" + api_url + "create_thread/", {
-	//	method: "POST",
-	//	body: JSON.stringify(data)
-	//});
 	return fetch_response;
 }
 

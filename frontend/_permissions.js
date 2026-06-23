@@ -18,14 +18,14 @@ class UserListFactory {
 		this.user_lists.push(user_list);
 	}
 	async refreshUsers() {
-		let response = await fetch("_ROOT_URL" + "api/users");
+		let response = await fetch("../api/users");
 		if (response.ok) {
 			let response_json;
 			try {
 				response_json = await response.json()
 			}
 			catch (error) {
-				error_message.innerText = `Could not parse users JSON;\n`;
+				error_message.innerText = `Could not parse users JSON`;
 				error_dialog.showModal();
 				return null;
 			}
@@ -35,6 +35,10 @@ class UserListFactory {
 			for (let user_list of this.user_lists) {
 				user_list.refresh(this.users_json);
 			}
+		}
+		else {
+			error_message.innerText = "Could not retrieve users from API.";
+			error_dialog.showModal();
 		}
 	}
 }
@@ -49,7 +53,7 @@ class GroupListFactory {
 		this.group_lists.push(group_list);
 	}
 	async refreshGroups() {
-		let response = await fetch("_ROOT_URL" + "api/groups");
+		let response = await fetch("../api/groups");
 		if (response.ok) {
 			let response_json;
 			try {
@@ -179,7 +183,7 @@ class ManageGroupsGroupList extends GroupList {
 		this.rename_button = rename_button;
 		this.delete_button.onclick = async() => {
 			this.delete_button.disabled = true;
-			let response = await fetch("_ROOT_URL" + `api/group/${this.selected_group.id}`, {method: "DELETE"});
+			let response = await fetch(`../api/group/${this.selected_group.id}`, {method: "DELETE"});
 			if (response.ok) {
 				group_list_factory.refreshGroups();
 				this.selected_group_indicator.textContent = "None selected";
@@ -262,7 +266,7 @@ class ManageGroupsGroupList extends GroupList {
 		// 	let group_id = Number(element.id.substring("group-".length));
 		// 	data_to_send.new_group_heirarchy.push(group_id);
 		// }
-		let response = await fetch("_ROOT_URL" + "api/group_heirarchy", {method: "PUT", body: JSON.stringify(data_to_send)});
+		let response = await fetch("../api/group_heirarchy", {method: "PUT", body: JSON.stringify(data_to_send)});
 		return response;
 	}
 	async createNewGroup() {
@@ -271,7 +275,7 @@ class ManageGroupsGroupList extends GroupList {
 				name: create_group_form_group_name.value
 			}
 		};
-		let response = await fetch("_ROOT_URL" + "api/create_group", {method: "POST", body: JSON.stringify(new_group_data)});
+		let response = await fetch("../api/create_group", {method: "POST", body: JSON.stringify(new_group_data)});
 		if (response.ok) {
 			group_list_factory.refreshGroups();
 			// const new_group_id = response.headers.get("New-Group-ID");
@@ -395,7 +399,7 @@ class ManageGroupsUser extends User {
 		}
 		this.remove_button.onclick = async() => {
 			// this.member_list.removeClickEvent();
-			let response = await fetch("_ROOT_URL" + `api/group/${this.user_list.group_manager.group_list.selected_group.id}/member/${this.id}`, {method: "DELETE"});
+			let response = await fetch(`../api/group/${this.user_list.group_manager.group_list.selected_group.id}/member/${this.id}`, {method: "DELETE"});
 			if (response.ok) {
 				this.user_list.user_list_container.removeChild(this.element);
 				user_list_factory.refreshUsers();
@@ -420,7 +424,7 @@ class ManageGroupsMemberList extends UserList {
 	}
 	async refresh() {
 		if (this.group_manager.group_list.selected_group != null) {
-			let response = await fetch("_ROOT_URL" + `api/group/${this.group_manager.group_list.selected_group.id}/members`);
+			let response = await fetch(`../api/group/${this.group_manager.group_list.selected_group.id}/members`);
 			if (response.ok) {
 				let response_json;
 				try {
@@ -491,15 +495,26 @@ class PermissionSettingsGroupList extends GroupList {
 		return new_group;
 	}
 	async removeGroup(group) {
-		let response = await fetch("_ROOT_URL" + "api/" + this.permission_settings_object.api_location + `permissions/group/${group.id}`, {method: "DELETE"});
-		if (response.ok) {
-			this.group_list_container.removeChild(group.element);
-			// TODO stop showing permissions if deleted group was selected
-			await this.permission_settings_object.refreshPermissions(); // to show the group in the add group dialog
-			this.permission_settings_object.add_group_group_list.refresh(group_list_factory.groups_json);
-			if (this.selected_group.id === group.id) {
-				this.permission_settings_object.deselect();
+		try {
+			let response = await fetch("../api/" + this.permission_settings_object.api_location + `permissions/group/${group.id}`, {method: "DELETE"});
+			if (response.ok) {
+				if (this.selected_group.id === group.id) {
+					this.permission_settings_object.deselect();
+				}
+				this.group_list_container.removeChild(group.element);
+				await this.permission_settings_object.refreshPermissions(); // to show the group in the add group dialog
+				this.permission_settings_object.add_group_group_list.refresh(group_list_factory.groups_json);
 			}
+			else {
+				let response_error_message = response.headers.get("message");
+				response_error_message ??= `${response.status}\n${response.statusText}`;
+				throw new Error(response_error_message);
+			}
+		}
+		catch(error) {
+			console.error(error);
+			error_message.innerText = error && error.message ? error.message : "An unknown error occured";
+			error_dialog.showModal();
 		}
 	}
 	refresh(groups_json) {
@@ -557,15 +572,26 @@ class PermissionSettingsUserList extends UserList {
 		return new_user;
 	}
 	async removeUser(user) {
-		let response = await fetch("_ROOT_URL" + "api/" + this.permission_settings_object.api_location + `permissions/user/${user.id}`, {method: "DELETE"});
-		if (response.ok) {
-			this.user_list_container.removeChild(user.element);
-			// TODO stop showing permissions if deleted user was selected
-			await this.permission_settings_object.refreshPermissions(); // to show the user in the add user dialog
-			this.permission_settings_object.add_user_user_list.refresh(user_list_factory.users_json);
-			if (this.selected_user.id === user.id) {
-				this.permission_settings_object.deselect();
+		try {
+			let response = await fetch("../api/" + this.permission_settings_object.api_location + `permissions/user/${user.id}`, {method: "DELETE"});
+			if (response.ok) {
+				if (this.selected_user.id === user.id) {
+					this.permission_settings_object.deselect();
+				}
+				this.user_list_container.removeChild(user.element);
+				await this.permission_settings_object.refreshPermissions(); // to show the user in the add user dialog
+				this.permission_settings_object.add_user_user_list.refresh(user_list_factory.users_json);
 			}
+			else {
+				let response_error_message = response.headers.get("message");
+				response_error_message ??= `${response.status}\n${response.statusText}`;
+				throw new Error(response_error_message);
+			}
+		}
+		catch(error) {
+			console.error(error);
+			error_message.innerText = error && error.message ? error.message : "An unknown error occured";
+			error_dialog.showModal();
 		}
 	}
 	refresh(users_json) {
@@ -616,7 +642,7 @@ class PermissionSettingsAddGroupGroupList extends GroupList {
 		this.group_list_container.replaceChildren(fragment);
 	}
 	async groupClickEvent(group) {
-		let response = await fetch("_ROOT_URL" + "api/" + this.permission_settings_object.api_location + `permissions/group/${group.id}`, {method: "POST"});
+		let response = await fetch("../api/" + this.permission_settings_object.api_location + `permissions/group/${group.id}`, {method: "POST"});
 		if (response.ok) {
 			this.group_list_container.removeChild(group.element);
 			await this.permission_settings_object.refreshPermissions();
@@ -658,7 +684,7 @@ class PermissionSettingsAddUserUserList extends UserList {
 		this.user_list_container.replaceChildren(fragment);
 	}
 	async userClickEvent(user) {
-		let response = await fetch("_ROOT_URL" + "api/" + this.permission_settings_object.api_location + `permissions/user/${user.id}`, {method: "POST"});
+		let response = await fetch("../api/" + this.permission_settings_object.api_location + `permissions/user/${user.id}`, {method: "POST"});
 		if (response.ok) {
 			this.user_list_container.removeChild(user.element);
 			await this.permission_settings_object.refreshPermissions();
@@ -807,11 +833,11 @@ class PermissionSettings {
 		};
 		if (this.group_is_selected === true) {
 			this.permissions_json["group_permissions"][this.group_list.selected_group.id]["permission_collection"][request_json.permission] = request_json.setting;
-			response = await fetch("_ROOT_URL" + "api/" + this.api_location + `permissions/group/${this.group_list.selected_group.id}`, {method: "PUT", body: JSON.stringify(request_json)});
+			response = await fetch("../api/" + this.api_location + `permissions/group/${this.group_list.selected_group.id}`, {method: "PUT", body: JSON.stringify(request_json)});
 		}
 		else if (this.user_is_selected === true) {
 			this.permissions_json["user_permissions"][this.user_list.selected_user.id]["permission_collection"][request_json.permission] = request_json.setting;
-			response = await fetch("_ROOT_URL" + "api/" + this.api_location + `permissions/user/${this.user_list.selected_user.id}`, {method: "PUT", body: JSON.stringify(request_json)});
+			response = await fetch("../api/" + this.api_location + `permissions/user/${this.user_list.selected_user.id}`, {method: "PUT", body: JSON.stringify(request_json)});
 		}
 		else {
 			error_message.textContent = "No group or user is selected";
@@ -819,7 +845,7 @@ class PermissionSettings {
 		}
 	}
 	async refreshPermissions() {
-		let response = await fetch("_ROOT_URL" + "api/" + this.api_location + "permissions");
+		let response = await fetch("../api/" + this.api_location + "permissions");
 		if (response.ok) {
 			let response_json;
 			try {
@@ -874,7 +900,7 @@ class addUserToGroupsGroupList {
 			});
 		// console.log(groups_to_add);
 		if (groups_to_add.length > 0) {
-			let response = await fetch("_ROOT_URL" + `api/user/${the_user_list.selected_user.id}/add_groups`, {method: "POST", body: JSON.stringify({"groups_by_id":groups_to_add})});
+			let response = await fetch(`../api/user/${the_user_list.selected_user.id}/add_groups`, {method: "POST", body: JSON.stringify({"groups_by_id":groups_to_add})});
 			if (response.ok === true) {
 				await user_list_factory.refreshUsers(); // TODO only refresh the user the groups were added to
 				this.refresh(group_list_factory.groups_json);
