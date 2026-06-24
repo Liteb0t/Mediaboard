@@ -10,7 +10,7 @@ class UserAuthentication {
 	}
 	async requestAccountParameters(new_account = false) {
 		const url_extension = new_account ? "request_new_account_parameters" : "request_login_parameters";
-		const request_new_account_parameters_response = await fetch("../registration/" + url_extension, {
+		const request_new_account_parameters_response = await fetch("./registration/" + url_extension, {
 			method: "POST",
 			body: JSON.stringify({username: this.username})
 		});
