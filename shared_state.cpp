@@ -48,10 +48,12 @@ shared_state::shared_state(boost::filesystem::path document_root, boost::filesys
 }
 
 void shared_state::setAdditionalImageFormatsFromConfig(const StateConfig& config) {
-	if (config.heic_thumbnails)
-		this->image_formats_to_create_thumbnails_for.emplace("image/heic");
 	if (config.avif_thumbnails)
 		this->image_formats_to_create_thumbnails_for.emplace("image/avif");
+	if (config.heic_thumbnails || config.convert_heic_to_jpg)
+		this->image_formats_to_create_thumbnails_for.emplace("image/heic");
+	if (config.svg_thumbnails)
+		this->image_formats_to_create_thumbnails_for.emplace("image/svg+xml");
 	if (config.webp_thumbnails)
 		this->image_formats_to_create_thumbnails_for.emplace("image/webp");
 	if (config.mp4_thumbnails)

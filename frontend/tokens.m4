@@ -1,7 +1,7 @@
 # This is the configuration file for the front-end. For back-end config, see 'config.ini'
 # This file is used during CMake's build process to fill in macros in the frontend.
 
-define(`_SITE_NAME', `Change SITE_NAME in frontend/tokens.m4')
+define(`_SITE_NAME', `Fuze Mediaboard')
 define(`_FAVICON_URL', `https://fuze.page/favicon.ico')
 define(`_SHOW_WATERMARKS', `true')
 
@@ -10,7 +10,7 @@ define(`_THUMBNAIL_FILE_FORMAT', `jpg')
 # For best results, make sure the thumbnail_size setting in config.ini matches this.
 define(`_THUMBNAIL_SIZE', `150')
 
-# Also edit the parser_->body_limit in http_session.cpp
+# Also edit max_http_body in config.ini. May be removed in a future version.
 define(`_FILE_SIZE_LIMIT_MB', `100')
 
 # These are not supposed to be changed

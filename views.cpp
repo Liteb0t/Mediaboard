@@ -532,10 +532,3 @@ FuzeHttp::Response acceptInvite(shared_state* state, FuzeHttp::Request req, std:
 		}}
 	};
 }
-
-FuzeHttp::Response showThread(shared_state* state, FuzeHttp::Request req, int thread_id) {
-	return FuzeHttp::Response{
-		.status = http::status::ok,
-		.file = std::format("{}/index.html", state->getDocumentRoot().string())
-	};
-}

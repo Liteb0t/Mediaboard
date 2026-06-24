@@ -173,6 +173,7 @@ main {
 			.EmbedThumbnail, .EmbedImage, .EmbedVideo {
 				max-width: 100%;
 				max-height: 90vh;
+				width: auto;
 				height: auto;
 			}
 			.EmbedThumbnail, .EmbedImage {
@@ -182,6 +183,7 @@ main {
 	}
 	&.Deleted {
 		text-decoration: line-through;
+		opacity: 0.73;
 	}
 }
 
@@ -329,9 +331,7 @@ if (url_params.get("display") === "embed") {
 else url_params_display_as_embed = false;
 if (_SHOW_WATERMARKS && !url_params_display_as_embed) header_bar_mediaboard_link.style["display"] = "inherit";
 if (_SHOW_WATERMARKS && url_params_display_as_embed) watermark.style["display"] = "inherit";
-state.selected_thread.id = Number(url_params.get("thread"));
-state.selected_thread.id ??= -1;
-if (url_params.get("thread") > -1)
+state.selected_thread.id = url_params.get("thread") ? Number(url_params.get("thread")) : -1;
 
 window.onpopstate = function(event) {
 	if (event.state) {

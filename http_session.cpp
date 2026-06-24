@@ -81,9 +81,7 @@ void http_session::do_read() {
 
 	// Apply a reasonable limit to the allowed size
 	// of the body in bytes to prevent abuse.
-	// 6MB would match 4chins
-	// This is 100MB
-	parser_->body_limit(100 << 20);
+	parser_->body_limit(this->state_->config.max_http_body_in_megabytes << 20);
 
 	// Set the timeout.
 	stream_.expires_after(std::chrono::minutes(60));

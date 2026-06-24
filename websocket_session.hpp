@@ -15,7 +15,7 @@
 #include "shared_state.hpp"
 
 #include <boost/asio.hpp>
-#include <boost/hash2/sha1.hpp>
+// #include <boost/hash2/sha1.hpp>
 #include <cstdlib>
 #include <memory>
 #include <print>

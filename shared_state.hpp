@@ -27,9 +27,11 @@ class websocket_session;
 struct StateConfig {
 	std::string thumbnail_file_extension;
 	unsigned int thumbnail_size;
+	unsigned int max_http_body_in_megabytes;
 	bool convert_heic_to_jpg;
-	bool heic_thumbnails;
 	bool avif_thumbnails;
+	bool heic_thumbnails;
+	bool svg_thumbnails;
 	bool webp_thumbnails;
 	bool mp4_thumbnails;
 	bool webm_thumbnails;

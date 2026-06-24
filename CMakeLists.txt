@@ -25,22 +25,24 @@ add_compile_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
 add_compile_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
 include_directories(${ImageMagick_INCLUDE_DIRS})
 
-find_package(PostgreSQL REQUIRED)
-include_directories (${PostgreSQL_INCLUDE_DIRS})
-link_directories(${PostgreSQL_LIBRARY_DIRS})
-
-find_package(SQLite3) # CMake >= 4.3
-if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
-  add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
-endif()
-
 add_executable(MediaboardServer)
 if(FUZEDBI_USE_POSTGRES)
   message("FuzeDBI will use PostgreSQL interface")
+
+  find_package(PostgreSQL REQUIRED)
+  include_directories (${PostgreSQL_INCLUDE_DIRS})
+  link_directories(${PostgreSQL_LIBRARY_DIRS})
+
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_POSTGRES)
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="postgresql")
 else()
   message("FuzeDBI will use SQLite interface")
+
+  find_package(SQLite3) # CMake >= 4.3
+  if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
+    add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
+  endif()
+
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_SQLITE)
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="sqlite")
 endif()
@@ -50,10 +52,13 @@ target_link_libraries(MediaboardServer
     Boost::json
     Boost::program_options
     ${ImageMagick_LIBRARIES}
-    PostgreSQL::PostgreSQL
-    SQLite3::SQLite3
     sodium
 )
+if(FUZEDBI_USE_POSTGRES)
+  target_link_libraries(MediaboardServer PRIVATE PostgreSQL::PostgreSQL)
+else()
+  target_link_libraries(MediaboardServer PRIVATE SQLite3::SQLite3)
+endif()
 target_sources(MediaboardServer
   PRIVATE
     Board.cpp

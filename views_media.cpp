@@ -126,21 +126,23 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 			Magick::Image thumbnail;
 			if (create_thumbnail_for_image) {
 				thumbnail.read(out_file_path.string());
-				Magick::Image image;
-				image.read(out_file_path.string());
-				if (state->config.strip_metadata) {
-					image.autoOrient();
-					image.strip(); // Removes metadata
+				if (file_mime_type != "image/svg+xml") { // stripping image messes up svg files
+					Magick::Image image;
+					image.read(out_file_path.string());
+					if (state->config.strip_metadata) {
+						image.autoOrient();
+						image.strip(); // Removes metadata
+					}
+					if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
+						image.quality(80);
+						image.write(out_file_path.string().substr(0, out_file_path.string().rfind('.'))+".jpg");
+						std::println("out_filename was first {}", out_filename);
+						out_filename = out_filename.substr(0, out_filename.rfind('.'))+".jpg";
+						std::println("out_filename is now {}", out_filename);
+					}
+					else if (state->config.strip_metadata)
+						image.write(out_file_path.string());
 				}
-				if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
-					image.quality(80);
-					image.write(out_file_path.string().substr(0, out_file_path.string().rfind('.'))+".jpg");
-					std::println("out_filename was first {}", out_filename);
-					out_filename = out_filename.substr(0, out_filename.rfind('.'))+".jpg";
-					std::println("out_filename is now {}", out_filename);
-				}
-				else if (state->config.strip_metadata)
-					image.write(out_file_path.string());
 			}
 			else {
 				thumbnail.read(std::format("{}[0]", out_file_path.string())); // read the first frame into ImageMagick ffmpeg delegate
