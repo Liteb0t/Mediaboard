@@ -11,6 +11,14 @@
 `cmake`\
 `m4`\
 `libsqlite3-dev`
+### Required packages (FreeBSD 15.0)
+`ImageMagick7-nox11`\
+`boost-libs`\
+`sqlite3`\
+`postgresql18-server`   Versions 15-17 work too\
+`postgresql18-contrib`   ^\
+If using the PostgreSQL interface, add the following line to `/etc/rc.conf`:\
+`postgresql_enable="YES"`
 ### Imagemagick
 Note: FreeBSD users can skip this step because the pkg contains all the required delegates.\
 Clone and configure [Imagemagick](https://github.com/ImageMagick/ImageMagick) with the delegates for JPEG, PNG, WEBP, XML, and JPEG-XL.\
@@ -30,23 +38,6 @@ MAGICK_MEMORY_LIMIT=512MiB
 MAGICK_MAP_LIMIT=1GiB
 MAGICK_DISK_LIMIT=2GiB
 ```
-### Required packages (FreeBSD 15.0)
-`ImageMagick7-nox11`\
-`boost-libs`\
-`sqlite3`\
-`postgresql18-server`   Versions 15-17 work too\
-`postgresql18-contrib`   ^\
-If using the PostgreSQL interface, add the following line to `/etc/rc.conf`:\
-`postgresql_enable="YES"`
-### Developing on MacOS
-Install [Homebrew](https://brew.sh/)\
-Brew install: `imagemagick` `boost` `postgresql@17` `cmake`\
-add to ~/.zshrc:\
-`export PATH=/opt/homebrew/Cellar/postgresql@17/<INSERT VERSION>/bin:$PATH`\
-The pkg-config for postgresql may not work out of the box. If that is the case, follow these instructions:
-`Brew ls postgresql | grep pkgconfig`\
-`export PATH=/opt/homebrew/Cellar/postgresql@17/<INSERT VERSION>/bin:$PATH` - Adjust the postgresql version to match the result from `brew ls` in the line above.\
-`export PKG_CONFIG_PATH=/opt/homebrew/Cellar/postgresql@17/<INSERT VERSION>/lib/pkgconfig/`
 ### Building
 First ensure that submodules are downloaded. Use this command:\
 `git submodule update --init --recursive`\
@@ -85,3 +76,12 @@ Then to bundle the dependencies, use [Linuxdeploy](https://github.com/linuxdeplo
 `pg_dump fuze_mediaboard > mediaboard_dump.sql`
 #### Restore PostgreSQL database
 `psql -X --set ON_ERROR_STOP=on fuze_mediaboard < mediaboard_dump.sql`
+#### Developing on MacOS
+Install [Homebrew](https://brew.sh/)\
+Brew install: `imagemagick` `boost` `postgresql@17` `cmake`\
+add to ~/.zshrc:\
+`export PATH=/opt/homebrew/Cellar/postgresql@17/<INSERT VERSION>/bin:$PATH`\
+The pkg-config for postgresql may not work out of the box. If that is the case, follow these instructions:
+`Brew ls postgresql | grep pkgconfig`\
+`export PATH=/opt/homebrew/Cellar/postgresql@17/<INSERT VERSION>/bin:$PATH` - Adjust the postgresql version to match the result from `brew ls` in the line above.\
+`export PKG_CONFIG_PATH=/opt/homebrew/Cellar/postgresql@17/<INSERT VERSION>/lib/pkgconfig/`
