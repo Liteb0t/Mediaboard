@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
 
 project(Mediaboard
-  VERSION 0.1
+  VERSION 0.1.3
   DESCRIPTION "Chat server with file-sharing and advanced permissions"
   LANGUAGES C CXX
   HOMEPAGE_URL "https://fuze.page/software/mediaboard"
@@ -14,18 +14,24 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS 1) # writes compile_commands.json for clangd t
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(SODIUM_DISABLE_TESTS ON)
 option(FUZEDBI_USE_POSTGRES "Use PostgreSQL interface instead of SQLite" OFF)
+option(WITH_MAGICK "Compile with ImageMagick support" ON)
 include(GNUInstallDirs)
 
 # Find dependencies sneeded by the project
 cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
 find_package(Boost 1.88 COMPONENTS filesystem json program_options REQUIRED)
 
-find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
-add_compile_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
-add_compile_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
-include_directories(${ImageMagick_INCLUDE_DIRS})
-
 add_executable(MediaboardServer)
+if(WITH_MAGICK)
+  find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
+  add_compile_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
+  add_compile_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
+  include_directories(${ImageMagick_INCLUDE_DIRS})
+  target_compile_definitions(MediaboardServer PUBLIC WITH_MAGICK)
+  target_link_libraries(MediaboardServer PRIVATE ${ImageMagick_LIBRARIES})
+else()
+  message("Compiling without ImageMagick support. Certain features such as thumbnail creation will not work.")
+endif()
 if(FUZEDBI_USE_POSTGRES)
   message("FuzeDBI will use PostgreSQL interface")
 
@@ -35,6 +41,7 @@ if(FUZEDBI_USE_POSTGRES)
 
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_POSTGRES)
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="postgresql")
+  target_link_libraries(MediaboardServer PRIVATE PostgreSQL::PostgreSQL)
 else()
   message("FuzeDBI will use SQLite interface")
 
@@ -45,20 +52,15 @@ else()
 
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_SQLITE)
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="sqlite")
+  target_link_libraries(MediaboardServer PRIVATE SQLite3::SQLite3)
 endif()
 target_link_libraries(MediaboardServer
   PRIVATE
     Boost::filesystem
     Boost::json
     Boost::program_options
-    ${ImageMagick_LIBRARIES}
     sodium
 )
-if(FUZEDBI_USE_POSTGRES)
-  target_link_libraries(MediaboardServer PRIVATE PostgreSQL::PostgreSQL)
-else()
-  target_link_libraries(MediaboardServer PRIVATE SQLite3::SQLite3)
-endif()
 target_sources(MediaboardServer
   PRIVATE
     Board.cpp

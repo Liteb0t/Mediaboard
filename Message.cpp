@@ -1,5 +1,4 @@
 #include "Message.hpp"
-#include "Magick++/Image.h"
 #include <boost/json/serialize.hpp>
 #include <chrono>
 #include <string>

@@ -13,7 +13,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>
 #include <boost/smart_ptr.hpp>
+#ifdef WITH_MAGICK
 #include <Magick++.h>
+#endif
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -113,7 +115,11 @@ std::optional<ProgramDirectories> getProgramDirectories(boost::filesystem::path 
 }
 
 int main(int argc, char* argv[]) {
+#ifdef WITH_MAGICK
 	Magick::InitializeMagick(*argv);  // Required on Windows and MacOS
+#else
+	std::println("Fuze Mediaboard was compiled without ImageMagick support. Certain features such as thumbnail creation will not work.");
+#endif
 	if (sodium_init() < 0) {
 		std::cerr << "libsodium couldn't be initialised" << std::endl;
 		return 1;

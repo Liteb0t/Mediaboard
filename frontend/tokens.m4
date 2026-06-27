@@ -13,7 +13,7 @@ define(`_THUMBNAIL_FILE_FORMAT`, `jpg`)
 define(`_THUMBNAIL_SIZE`, `150`)
 
 # Also edit max_http_body in config.ini. May be removed in a future version.
-define(`_FILE_SIZE_LIMIT_MB`, `100`)
+define(`_FILE_SIZE_LIMIT_MB`, `25`)
 
 # These are not supposed to be changed
 define(`_POST_MAX_NAME`, `32`)

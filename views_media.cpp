@@ -9,7 +9,9 @@
 #include <boost/filesystem/operations.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#ifdef WITH_MAGICK
 #include <Magick++.h>
+#endif
 #include <fstream>
 #include <iostream>
 #include <print>
@@ -113,7 +115,15 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 		return FuzeHttp::Response{.status = http::status::internal_server_error, .error_message = error_message.str()};
 	}
 	std::cout << "END OF FILE" << std::endl;
+	FuzeHttp::Response response{
+		.status = http::status::accepted,
+		.headers = {{
+			{"File-Name", out_filename}
+		}}
+	};
 
+	// Create thumbnail if applicable
+#ifdef WITH_MAGICK
 	const std::string_view file_mime_type = FuzeHttp::getMimeType(out_filename);
 	std::print("MIME type: {}", file_mime_type);
 	bool create_thumbnail_for_image = state->canCreateThumbnailForImageFormat(file_mime_type);
@@ -178,13 +188,6 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 			std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Image will therefore not be made." << std::endl;
 		}
 	}
-	// std::string filename_utf_8 = boost::locale::conv::to_utf(out_filename, "UTF-8");
-	FuzeHttp::Response response{
-		.status = http::status::accepted,
-		.headers = {{
-			{"File-Name", out_filename}
-		}}
-	};
 	if (create_thumbnail_for_image || create_thumbnail_for_video) {
 		if (create_thumbnail_for_image || (create_thumbnail_for_video && uploaded_file_has_thumbnail)) {
 			response.headers.value().emplace("Image-Width", std::to_string(image_width));
@@ -193,6 +196,7 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 		if (uploaded_file_has_thumbnail)
 			response.headers.value().emplace("Thumbnail-File-Extension", state->config.thumbnail_file_extension);
 	}
+#endif
 	return response;
 }
 
