@@ -4,11 +4,11 @@
 		<!--
 		include(`tokens.m4')
 		-->
-		<title>Manage server - _SITE_NAME</title>
+		<title>Manage server - CONFIG_site_name</title>
 		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
-		<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
+		<link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
 		<link rel="stylesheet" href="static/styles.css">
 		<link rel="stylesheet" href="static/permissions.css">
 	</head>
@@ -26,7 +26,7 @@
 				</fieldset>
 				<!-- Manage permissions -->
 				<div id="manage_permissions_container">
-					<h2>Manage permissions - _SITE_NAME</h2>
+					<h2>Manage permissions - CONFIG_site_name</h2>
 					<div class="PermissionSettingsGrid">
 						<fieldset class="Groups">
 							<legend>Groups</legend>
@@ -58,7 +58,7 @@
 				</div>
 				<!-- Manage groups -->
 				<div id="manage_groups_container" style="display: none">
-					<h2>Manage groups - _SITE_NAME</h2>
+					<h2>Manage groups - CONFIG_site_name</h2>
 					<div class="ToolBar">
 						<button onclick="create_group_dialog.showModal()">New group</button>
 						<div id="selected_group_indicator_container" class="RightAligned">
@@ -88,7 +88,7 @@
 				</div>
 				<!-- Manage users -->
 				<div id="manage_users_container" style="display: none">
-					<h2>Manage users - _SITE_NAME</h2>
+					<h2>Manage users - CONFIG_site_name</h2>
 					<ul id="user_list_element" class="MetroList"></ul>
 				</div>
 			</div>

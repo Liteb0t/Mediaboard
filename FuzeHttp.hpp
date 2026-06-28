@@ -163,6 +163,7 @@ public:
 	virtual size_t getPathSize() const = 0;
 	virtual Response executeView(StateType state, Request& req) = 0;
 	virtual bool attemptPathMatch(http::verb req_method, std::string_view section, size_t index) = 0;
+	bool is_wild = false;
 };
 
 template<typename StateType, class... AllArgs>
@@ -183,24 +184,23 @@ public:
 		// int all_args_i = 0;
 		for (std::variant<const char*, int, std::string, Client> var : std::initializer_list<std::variant<const char*, int, std::string, Client>>{ args... }) {
 			this->all_args[index] = var;
-			if (var.index() == 3) { // Client
+			if (var.index() == 3) {
 				this->path_starts_at++;
 			}
 			if (!std::holds_alternative<const char*>(var)) {
 				this->pattern_position_to_view_arg_index[index] = arg_index++;
 				// std::cout << "Arg is not a char array!" << std::endl;
 			}
-			if (index == this->all_args.size() - 1)
-				this->is_wild = (var.index() == 0 && std::get<const char*>(var)[0] == '*');
 			else
-				index++;
+				this->is_wild = std::get<const char*>(var)[0] == '*';
+			index++;
 		}
 		// std::cout << "Final all_args length: " << this->all_args.size() << std::endl;
 	}
 	Response executeView(StateType state, Request& req) override {
 		std::optional<int> set_session_for_client_id;
-		std::optional<Client> client = state->getClientIfExists(req);
 		if (std::tuple_size<ArgTuple>{} > 0 && this->all_args[0].index() == 3) { // There is a Client{} parameter in the view
+			std::optional<Client> client = state->getClientIfExists(req);
 			if (!client) {
 				client = state->createClient(); // Create anonymous client, because accounts are assigned a client on login
 				set_session_for_client_id = client.value().id;
@@ -214,9 +214,6 @@ public:
 			if (!res.headers) res.headers.emplace();
 			res.headers->insert({"Set-Cookie", formatCookie(session_id_base64)});
 		}
-		if (set_session_for_client_id || client) {
-			res.headers->insert({"Cache-Control", "private"}); // Would conflict with other Cache-Control if it exists, so not the ideal solution
-		}
 		return res;
 	}
 	size_t getPathSize() const override {
@@ -227,9 +224,12 @@ public:
 		// std::cout << "Path starts at " << this->path_starts_at << std::endl;
 		if (req_method != this->req_method)
 			return false;
-		if (index >= this->all_args.size()) {
+		// std::println("Index: {} \tall_args: {}", index, this->all_args.size());
+		if (this->is_wild && index >= this->all_args.size() - 1)
+			return true;
+		else if (index >= this->all_args.size()) {
 			// std::cout << "Index " << index << "Is greater than number of args " << this->all_args.size() << std::endl;
-			return this->is_wild;
+			return false;
 		}
 		// std::cout << ", getting variant";
 		const std::variant<const char*, int, std::string, Client> vari = this->all_args[index];
@@ -287,7 +287,6 @@ private:
 	ArgTuple view_args;
 	// ExtrasTuple extra_args;
 	http::verb req_method;
-	bool is_wild;
 	// std::vector<std::variant<Client, const char*, int, std::string>> path;
 	std::array<std::variant<const char*, int, std::string, Client>, sizeof...(AllArgs)> all_args;
 	int path_starts_at = 0;
@@ -359,24 +358,41 @@ public:
 				location_start_bound = location_end_bound;
 			}
 		}
+		int id_of_view_to_keep;
 		// Remove matches for URLs shorter than the pattern
-		std::erase_if(matched_views, [this, section_index](const int view_id){
-			return this->views.at(view_id)->getPathSize() > section_index;
-		});
+		// std::erase_if(matched_views, [this, section_index](const int view_id){
+		// 	return this->views.at(view_id)->getPathSize() > section_index;
+		// });
 		if (matched_views.size() > 1) {
+			int last_path_length = 1000000000;
 			std::println("Multiple views matched");
+			// Finds wildcard path with least number of segments, or any path that's absolute
+			for (int view_id : matched_views) {
+				if (this->views.at(view_id)->is_wild) {
+					if (this->views.at(view_id)->getPathSize() < last_path_length) {
+						last_path_length = this->views.at(view_id)->getPathSize();
+						id_of_view_to_keep = view_id;
+					}
+				}
+				else {
+					id_of_view_to_keep = view_id;
+					break;
+				}
+			}
+			// std::erase_if(matched_views, [this](const int view_id){
+			// 	return this->views.at(view_id)->is_wild;
+			// });
 		}
-		if (matched_views.size() >= 1) {
-			// std::cout << "Matching finished: number of matches: " << matched_views.size() << std::endl;
-			return views.at(*matched_views.begin())->executeView(state, req);
+		else if (matched_views.size() == 1)
+			id_of_view_to_keep = *matched_views.begin();
+		else {
+			// std::cout << "No patterns were matched to path_name " << path_name << std::endl;
+			return FuzeHttp::Response{.status = http::status::not_found};
 		}
+			return views.at(id_of_view_to_keep)->executeView(state, req);
 		// else if (req.method() == http::verb::get) {
 		// 	return FuzeHttp::Response{.status = http::status::ok, .file = std::filesystem::canonical(path_name.substr(1), state->document_root)};
 		// }
-		else {
-			std::cout << "No patterns were matched to path_name " << path_name << std::endl;
-			return FuzeHttp::Response{.status = http::status::not_found};
-		}
 	}
 private:
 	// StateType state;

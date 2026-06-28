@@ -12,7 +12,10 @@
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/program_options.hpp>
+#include <boost/program_options/options_description.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/make_shared_array.hpp>
+#include <memory>
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
@@ -119,9 +122,95 @@ std::optional<ProgramDirectories> getProgramDirectories(std::filesystem::path pr
 	};
 }
 
-void applyOptionsToTemplates(const boost::program_options::options_description& options, const std::filesystem::path& document_root, const std::filesystem::path& template_root) {
-	std::println("[dummy] adding options to templates");
+template<typename T>
+std::string valueAsString(const T& value);
+
+template<typename T>
+requires(requires(const T& val) {std::to_string(val);})
+std::string valueAsString(const T& value) {
+	return std::to_string(value);
 }
+template<>
+std::string valueAsString(const std::string& value) {
+	return value;
+}
+
+class Option {
+public:
+	constexpr Option(std::string token) :token(token) {}
+	const std::string token;
+	virtual boost::shared_ptr<boost::program_options::option_description> desc() = 0;
+	virtual std::string string() const = 0;
+};
+
+template<typename OptionType>
+requires (std::is_convertible_v<std::remove_pointer_t<OptionType>, std::string> || requires(std::remove_pointer_t<OptionType> o){std::to_string(o);})
+class TemplateOption : public Option {
+public:
+	TemplateOption(std::string token, OptionType default_value, std::string description = "") :
+		Option(token), default_value(default_value), description(description), value(std::make_shared<OptionType>(default_value)) {
+	}
+	TemplateOption(std::string token, std::shared_ptr<OptionType>&& value_ptr, OptionType default_value, std::string description = "")
+	// requires (std::is_pointer_v<OptionType>)
+			: Option(token), default_value(default_value), description(description), value(value_ptr) {
+	}
+	boost::shared_ptr<boost::program_options::option_description> desc() override {
+		// if constexpr (std::is_pointer_v<OptionType>)
+		// 	return boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value<std::remove_pointer_t<OptionType>>(value), this->description ? description.value().c_str() : ""));
+		// else
+			return boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value<OptionType>(value.get())->default_value(default_value), this->description ? description.value().c_str() : ""));
+	}
+	virtual std::string string() const override {
+		// if constexpr (std::is_pointer_v<OptionType>)
+		// 	return "";
+			// return valueAsString(*value);
+		// else
+			return valueAsString(*value);
+	}
+private:
+	std::shared_ptr<OptionType> value;
+	OptionType default_value;
+	const std::optional<const std::string> description;
+};
+
+std::vector<Option*> template_options{
+	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
+	new TemplateOption<std::string>("favicon_url", "https://fuze.page/favicon.ico"),
+	new TemplateOption<bool>("show_watermarks", true)
+	// new TemplateOption<unsigned int>("thumbnail_size", {.default_value=150})
+};
+
+void applyOptionsToTemplates(const std::vector<Option*>& options, const std::filesystem::path& document_root, const std::filesystem::path& template_root) {
+	std::println("[dummy] adding options to templates");
+	for (const std::filesystem::directory_entry& dir_entry : std::filesystem::directory_iterator(template_root)) {
+		if (std::filesystem::is_regular_file(dir_entry)) {
+			std::println("[applyOptionsToTemplates] path: {}", dir_entry.path().string());
+			std::ifstream file_template_stream(dir_entry.path());
+			std::string out_filename = dir_entry.path().filename().string();
+			if (out_filename[0] == '_')
+				out_filename = out_filename.substr(1);
+			std::ofstream file_output_stream(document_root / out_filename);
+			std::string file_contents;
+			while (std::getline(file_template_stream, file_contents)) {
+				for (auto option : options) {
+					std::println("Would replace CONFIG_{} with {}", option->token, option->string());
+					boost::replace_all(file_contents, std::format("CONFIG_{}", option->token), option->string());
+				}
+				file_output_stream << file_contents << std::endl;
+			}
+			file_output_stream.close();
+			file_template_stream.close();
+		}
+		// if (std::holds_alternative<std::string>(option))
+		// 	std::print("")
+	}
+}
+
+// struct TemplateOptionsStruct {
+// 	std::string site_name;
+// 	std::string favicon_url;
+// 	int thumbnail_size;
+// } template_options_struct;
 
 int main(int argc, char* argv[]) {
 #ifdef WITH_MAGICK
@@ -155,6 +244,11 @@ int main(int argc, char* argv[]) {
 		("version,v", "Show version string.")
 		("help,h", "Show list of options.");
 
+	// std::string site_name, favicon_url;
+	// boost::shared_ptr<boost::program_options::option_description> desc( new boost::program_options::option_description("site_name", boost::program_options::value<std::string>(&site_name)));
+
+	// TemplateOption favicon_url_opt("favicon_url", &favicon_url);
+
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
@@ -166,7 +260,7 @@ int main(int argc, char* argv[]) {
 		("webm_thumbnails", boost::program_options::value<bool>(&state_config.webm_thumbnails)->default_value(false))
 		("convert_heic_to_jpg", boost::program_options::value<bool>(&state_config.convert_heic_to_jpg)->default_value(false), "Converts HEIC images into JPG on upload.")
 		("data_directory", boost::program_options::value<std::string>(&data_directory_str))
-		("max_http_body", boost::program_options::value<unsigned int>(&state_config.max_http_body_in_megabytes)->default_value(25), "In MB")
+		// ("file_size_limit_mb", boost::program_options::value<unsigned int>(&state_config.file_size_limit_mb)->default_value(25), "In MB")
 		("media_directory,m", boost::program_options::value<std::string>(&media_directory_str),  "File path where user-submitted media is stored. data_directory is used if none is specified.")
 		("sqlite_database_file,s", boost::program_options::value<std::string>(&sqlite_database_file_str),  "File where SQLite data is stored. data_directory is used if none is specified.")
 		("server_port,p", boost::program_options::value<unsigned short>(&server_port)->default_value(8300), "The port which the server will serve. Make sure it isn't already in use by another service.")
@@ -177,9 +271,20 @@ int main(int argc, char* argv[]) {
 		("postgresql_host,h", boost::program_options::value<std::string>(&postgresql_host)->default_value("localhost"),  "Host for the PostgreSQL database.")
 		("postgresql_port,p", boost::program_options::value<unsigned short>(&postgresql_port)->default_value(5432), "The port at which the database is available.")
 		("postgresql_database_name,n", boost::program_options::value<std::string>(&postgresql_database_name)->default_value("fuze_mediaboard"), "Name of the PostgreSQL database.")
-		("threads,t", boost::program_options::value<unsigned int>(&threads)->default_value(1), "Number of async threads. For now, only use 1 in production.")
-		("thumbnail_file_extension", boost::program_options::value<std::string>(&state_config.thumbnail_file_extension)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.")
-		("thumbnail_size", boost::program_options::value<unsigned int>(&state_config.thumbnail_size)->default_value(150), "Maximum width and height of image thumbnails, in pixels.");
+		("threads,t", boost::program_options::value<unsigned int>(&threads)->default_value(1), "Number of async threads. For now, only use 1 in production.");
+		// ("thumbnail_file_extension", boost::program_options::value<std::string>(&state_config.thumbnail_file_extension)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.");
+		// ("thumbnail_size", boost::program_options::value<unsigned int>(&state_config.thumbnail_size)->default_value(150), "Maximum width and height of image thumbnails, in pixels.");
+
+	// universal_options.add(desc);
+	// universal_options.add(favicon_url_opt.desc());
+
+	template_options.push_back(new TemplateOption("thumbnail_file_extension", std::make_shared<std::string>(state_config.thumbnail_file_extension), std::string("jpg")));
+	template_options.push_back(new TemplateOption("thumbnail_size", std::make_shared<unsigned int>(state_config.thumbnail_size), static_cast<unsigned int>(150)));
+	template_options.push_back(new TemplateOption("file_size_limit_mb", std::make_shared<unsigned int>(state_config.file_size_limit_mb), static_cast<unsigned int>(25)));
+ //
+	for (auto option : template_options) {
+		universal_options.add(option->desc());
+	}
 
 	boost::program_options::options_description command_line_options;
 	command_line_options.add(command_line_specific_options).add(universal_options);
@@ -286,7 +391,13 @@ int main(int argc, char* argv[]) {
 
 	std::filesystem::path document_root = program_directories.data / "frontend";
 	std::filesystem::path template_root = program_directories.data / "frontend" / "templates";
-	applyOptionsToTemplates(command_line_options, document_root, template_root);
+	try {
+		applyOptionsToTemplates(template_options, document_root, template_root);
+	}
+	catch (const std::exception& exception) {
+		std::println(std::cerr, "An error occured when generating frontend files: {}", exception.what());
+		return 1;
+	}
 
 	std::cout << "Initialising shared state..." << std::endl;
 	shared_state* state;

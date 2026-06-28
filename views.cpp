@@ -12,9 +12,10 @@ FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
 	// for (const auto& header : req) {
 	// 	std::println("{} : {}", std::string(header.name_string()), std::string(header.value()));
 	// }
+	std::println("Serving from document root");
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.file = std::format("{}/index.html", state->getDocumentRoot().string())
+		.file = std::format("{}/{}", state->getDocumentRoot().string(), FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target()))) // TODO change this because it sucks
 	};
 }
 
@@ -342,6 +343,7 @@ FuzeHttp::Response deleteThreadUserPermission(shared_state* state, FuzeHttp::Req
 
 FuzeHttp::Response getThreads(shared_state* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
+	std::println("called getThreads");
 	return FuzeHttp::Response{
 		.status = http::status::ok,
 		.body = state->main_board()->dumpAllThreads(client)

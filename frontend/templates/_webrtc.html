@@ -4,17 +4,17 @@
 	<!--
 		include(`tokens.m4')
 	-->
-	<title>WebRTC - _SITE_NAME</title>
+	<title>WebRTC - CONFIG_site_name</title>
 	<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta charset="utf-8">
-	<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
+	<link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
 	<link rel="stylesheet" href="static/styles.css">
 </head>
 <body>
 	<!--Navbar can go here-->
 	<main>
-		<h1>WebRTC - _SITE_NAME</h1>
+		<h1>WebRTC - CONFIG_site_name</h1>
 		<button onclick="startVideoShare(false)">Share video</button>
 		<button id="share_window_button" styles="display: none;" onclick="startVideoShare(true)">Share window</button>
 		<button onclick="startAudioShare()">Share audio</button><br>

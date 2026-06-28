@@ -4,18 +4,18 @@
 		<!--
 			include(`tokens.m4')
 		-->
-		<title>_SITE_NAME</title>
+		<title>CONFIG_site_name</title>
 		<meta name="description" content="Fuze Mediaboard is an imageboard engine with advanced permissions.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
-		<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
+		<link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
 		<link rel="stylesheet" href="static/styles.css">
 	</head>
 	<body>
 		<!--Navbar can go here-->
 		<main>
 			<div id="header_bar" class="ToolBar WithBorders">
-				<div id="WebsiteName"><b>_SITE_NAME</b></div>
+				<div id="WebsiteName"><b>CONFIG_site_name</b></div>
 				<button id="threads_button" class="ToolBarButton" onclick="openThreadList()">&#x1F5D0; Threads</button>
 				<button id="refresh_button" class="ToolBarButton" onclick="loading_dialog.showModal();refresh_send().then(() => {loading_dialog.close();});">&#x2B6E; Refresh</button>
 				<a id="manage_server_button" class="Button ToolBarButton" href="manage_server.html" style="display: none;">Manage server</a>
@@ -297,8 +297,8 @@ loading_dialog.showModal();
 const media_url = "media/";
 const thumbnail_url = "media/thumbnails/";
 const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
-const thumbnail_size = _THUMBNAIL_SIZE;
-const file_size_limit = _FILE_SIZE_LIMIT_MB*1024*1024;
+const thumbnail_size = CONFIG_thumbnail_size;
+const file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
 // 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
 const valid_uri_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 const media_uuid_len = 36;
@@ -329,8 +329,8 @@ if (url_params.get("display") === "embed") {
 	url_params_display_as_embed = true;
 }
 else url_params_display_as_embed = false;
-if (_SHOW_WATERMARKS && !url_params_display_as_embed) header_bar_mediaboard_link.style["display"] = "inherit";
-if (_SHOW_WATERMARKS && url_params_display_as_embed) watermark.style["display"] = "inherit";
+if (CONFIG_show_watermarks && !url_params_display_as_embed) header_bar_mediaboard_link.style["display"] = "inherit";
+if (CONFIG_show_watermarks && url_params_display_as_embed) watermark.style["display"] = "inherit";
 state.selected_thread.id = url_params.get("thread") ? Number(url_params.get("thread")) : -1;
 
 window.onpopstate = function(event) {
@@ -454,7 +454,7 @@ async function refresh_send() {
 }
 
 async function getAllThreads() {
-	let response = await fetch(window.location.pathname + "api/threads");
+	let response = await fetch("./api/threads");
 	console.log(response);
 	if (response.ok) {
 		await response.json().then(response_obj => {
@@ -687,7 +687,7 @@ function createPost(data, client_permissions) {
 			// Thumbnail
 			let thumbnail_element = document.createElement("img");
 			thumbnail_element.classList.add("EmbedThumbnail");
-			let thumbnail_filename = file.thumbnail_file_extension ? `THUMBNAIL_${file.filename}.${file.thumbnail_file_extension}` : "THUMBNAIL_" + file["filename"] + "._THUMBNAIL_FILE_FORMAT";
+			let thumbnail_filename = file.thumbnail_file_extension ? `THUMBNAIL_${file.filename}.${file.thumbnail_file_extension}` : "THUMBNAIL_" + file["filename"] + ".CONFIG_thumbnail_file_extension";
 			thumbnail_element.setAttribute("src", window.location.pathname + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
 			if (file["width"] && file["height"]) {
 				if (file["width"] < file["height"]) {
@@ -882,7 +882,7 @@ class UploadedFile {
 		this.filename = file_object.name;
 		if (file_object.size > file_size_limit) {
 			file_upload.value = "";
-			throw new Error(`The file ${file_object.name} exceeds the _FILE_SIZE_LIMIT_MB megabyte limit. <br>
+			throw new Error(`The file ${file_object.name} exceeds the CONFIG_file_size_limit_mb megabyte limit. <br>
 				<code>${file_object.size}</code> - this file (bytes)<br>
 				<code>${file_size_limit}</code> - limit (bytes)`);
 		}
@@ -974,7 +974,7 @@ class UploadedFile {
 						this.thumbnail_element.setAttribute("src", window.location.pathname + media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
 					}
 					else if (Format.fromFileName(server_filename) === Format.IMAGE) {
-						this.thumbnail_element.setAttribute("src", window.location.pathname + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + "._THUMBNAIL_FILE_FORMAT");
+						this.thumbnail_element.setAttribute("src", window.location.pathname + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + ".CONFIG_thumbnail_file_extension");
 					}
 					this.status_element.textContent = "Upload complete";
 					this.status_element.classList.add("UploadCompleteIndicator");

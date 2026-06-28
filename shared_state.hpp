@@ -26,8 +26,8 @@ class websocket_session;
 
 struct StateConfig {
 	std::string thumbnail_file_extension;
-	unsigned int thumbnail_size;
-	unsigned int max_http_body_in_megabytes;
+	unsigned int thumbnail_size = 150;
+	unsigned int file_size_limit_mb;
 	bool convert_heic_to_jpg;
 	bool avif_thumbnails;
 	bool heic_thumbnails;
@@ -85,7 +85,7 @@ private:
 	// const std::filesystem::path program_location;
 	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
 	FuzeDBI::Connection* fuze_dbi;
-	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg"};
+	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png"};
 	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;
 
 	// This mutex synchronizes all access to sessions_

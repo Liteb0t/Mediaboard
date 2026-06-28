@@ -4,17 +4,17 @@
 		<!--
 			include(`tokens.m4')
 		-->
-		<title>Authentication - _SITE_NAME</title>
+		<title>Authentication - CONFIG_site_name</title>
 		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
-		<link rel="icon" type="image/x-icon" href="_FAVICON_URL">
+		<link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
 		<link rel="stylesheet" href="static/styles.css">
 	</head>
 	<body>
 		<!--Navbar can go here-->
 		<main>
-			<h2>Authentication - _SITE_NAME</h2>
+			<h2>Authentication - CONFIG_site_name</h2>
 			<p id="invite_information" style="display: none">You have been invited to join this server.</p>
 			<form action="" method="POST" autocomplete="account">
 				<div class="FormGrid">
@@ -112,7 +112,7 @@ async function registerAction() {
 	catch (error) {
 		status_dialog.close();
 		console.error(error.message);
-		error_messages.innerText = error ? error.message : "An unknown error occured";
+		error_messages.innerText = error.message ? error.message : "An unknown error occured";
 	}
 }
 
@@ -151,7 +151,8 @@ async function loginAction() {
 	catch (error) {
 		status_dialog.close();
 		console.error(error);
-		error_messages.innerText = error ? error.message : "An unknown error occured";
+		console.error(error.message ? error.message : "An unknown error occured");
+		error_messages.innerText = error.message ? error.message : "An unknown error occured";
 	}
 }
 

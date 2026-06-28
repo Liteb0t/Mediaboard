@@ -101,6 +101,7 @@ std::string Board::dumpAllThreads(const std::optional<Client>& client) const {
 			threads_json.emplace_back(thread_json);
 		}
 	}
+	std::println("[Board] Finished assembling threads list into JSON");
 	return boost::json::serialize(boost::json::value{
 		{"type", "thread_catalog"},
 		{"threads", threads_json}

@@ -2,6 +2,7 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
+#include <boost/beast/http/empty_body.hpp>
 
 char FuzeHttp::fromHex(char ch) {
 	return std::isdigit(ch) ? ch - '0' : std::tolower(ch) - 'a' + 10;
@@ -83,13 +84,6 @@ std::string FuzeHttp::getDecodedURL(boost::string_view raw_URL) {
 		else
 			decoded_url +=  c;
 	}
-	// Request path must be absolute and not contain "..".
-	if( decoded_url.empty() ||
-		decoded_url[0] != '/' ||
-		decoded_url[0] == '?' ||
-		decoded_url.find("..") != std::string::npos)
-		throw std::invalid_argument("Illegal request-target");
-
 	return decoded_url;
 }
 
@@ -148,11 +142,6 @@ http::response<http::string_body> FuzeHttp::buildResponse(FuzeHttp::Response bas
 template<>
 http::response<http::file_body> FuzeHttp::buildResponse(FuzeHttp::Response basic_response, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
 	std::cout << "Attempting to open " << basic_response.file.value() << std::endl;
-	if (!std::filesystem::exists(basic_response.file.value()))
-		throw std::runtime_error("File not found");
-	if (!std::filesystem::is_regular_file(basic_response.file.value()))
-		throw std::runtime_error("Is a directory");
-
 	// Attempt to open the file
 	beast::error_code ec;
 	http::file_body::value_type body;
