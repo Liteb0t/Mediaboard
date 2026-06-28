@@ -148,9 +148,9 @@ http::response<http::string_body> FuzeHttp::buildResponse(FuzeHttp::Response bas
 template<>
 http::response<http::file_body> FuzeHttp::buildResponse(FuzeHttp::Response basic_response, const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req) {
 	std::cout << "Attempting to open " << basic_response.file.value() << std::endl;
-	if (!boost::filesystem::exists(basic_response.file.value()))
+	if (!std::filesystem::exists(basic_response.file.value()))
 		throw std::runtime_error("File not found");
-	if (!boost::filesystem::is_regular_file(basic_response.file.value()))
+	if (!std::filesystem::is_regular_file(basic_response.file.value()))
 		throw std::runtime_error("Is a directory");
 
 	// Attempt to open the file

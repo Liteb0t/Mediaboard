@@ -1,7 +1,4 @@
 "use strict";
-/*
-include(`tokens.m4')
-*/
 
 class PRESET_GROUPS {
 	static ADMINISTRATORS = 0;

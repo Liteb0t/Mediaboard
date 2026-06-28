@@ -17,7 +17,7 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 
-shared_state::shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location, StateConfig config, FuzeDBI::Connection* fuze_database_interface)
+shared_state::shared_state(std::filesystem::path document_root, std::filesystem::path media_location, StateConfig config, FuzeDBI::Connection* fuze_database_interface)
 		: State(fuze_database_interface),
 		config(config),
 		fuze_dbi(fuze_database_interface),

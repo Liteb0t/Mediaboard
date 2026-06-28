@@ -1,7 +1,4 @@
 "use strict";
-/*
- include(`tokens.m4')
-*/
 
 class UserAuthentication {
 	constructor(username, password) {

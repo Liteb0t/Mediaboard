@@ -72,7 +72,7 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	}
 	out_filename.insert(filename_uuid_index, uuid_str);
 
-	const boost::filesystem::path out_file_path = state->getMediaLocation() / out_filename;
+	const std::filesystem::path out_file_path = state->getMediaLocation() / out_filename;
 	// Write to the file
 	std::ofstream outfile(out_file_path.string(), std::ios::binary);
 	bool is_initial_line = true;
@@ -178,7 +178,7 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->config.thumbnail_file_extension));
 			uploaded_file_has_thumbnail = true;
 			if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
-				boost::filesystem::remove(out_file_path);
+				std::filesystem::remove(out_file_path);
 			}
 		}
 		catch( Magick::Warning& magick_warning ) {
@@ -211,15 +211,17 @@ FuzeHttp::Response getMedia(shared_state* state, FuzeHttp::Request req, std::str
 	if (filename_extension_index >= 36) {
 		file_name.erase(filename_extension_index - 36, 36);
 	}
-	boost::filesystem::path file_path = state->getMediaLocation() / location;
-	if (!boost::filesystem::exists(file_path))
+	std::filesystem::path file_path = state->getMediaLocation() / location;
+	if (!std::filesystem::exists(file_path))
 		return FuzeHttp::Response{http::status::not_found};
-	if (!boost::filesystem::is_regular_file(file_path))
+	if (!std::filesystem::is_regular_file(file_path))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Is a directory"};
 	return FuzeHttp::Response{
 		.status = http::status::ok,
 		.headers = {{
 			{"Content-Disposition", std::format("inline; filename=\"{}\"", file_name)}
+			// Would conflict with Cache-Control set in FuzeHttp.hpp
+			// ,{"Cache-Control", "max-age=31536000, immutable"}
 		}},
 		.file = file_path.string()
 	};

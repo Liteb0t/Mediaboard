@@ -10,7 +10,7 @@ const std::string current_version = "0.1.3";
 
 namespace Migrations {
 // Populates database with entries in database_template.sql, and sets the version
-void firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::filesystem::path& template_path, const boost::filesystem::path& absolute_sqlite_path);
+void firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const std::filesystem::path& template_path, const std::filesystem::path& absolute_sqlite_path);
 // Returns true if any migrations need to be made by psql
 bool writeMigrations(std::ostream& stream, const std::string& database_version_string, const StateConfig& state_config);
 // void writeNewMigrations(FuzeDBI::Connection* fuze_dbi, Fuze::MigrationHelper::Migrations& migrater);

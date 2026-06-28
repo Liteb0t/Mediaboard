@@ -16,6 +16,7 @@
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
+#include <filesystem>
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
@@ -24,94 +25,102 @@
 #include <vector>
 
 struct ProgramDirectories {
-	boost::filesystem::path data;
-	boost::filesystem::path media;
-	boost::filesystem::path sqlite_file;
+	std::filesystem::path data;
+	std::filesystem::path media;
+	std::filesystem::path sqlite_file;
 };
 
-boost::filesystem::path getConfigDirectory(boost::filesystem::path program_location, std::optional<std::string> config_file, std::optional<std::string> data_directory_config) {
-	boost::filesystem::path config_path;
+std::filesystem::path getConfigDirectory(std::filesystem::path program_location, std::optional<std::string> config_file, std::optional<std::string> data_directory_config) {
+	std::filesystem::path config_path;
 	if (config_file) { // Line set in cmdline options
 		config_path = config_file.value();
 	}
 	// XDG_DATA_HOME directories are only used in the AppImage distribution. Maybe change in the future.
 	else if (std::getenv("APPDIR")) {
 		if (data_directory_config)
-			config_path = boost::filesystem::path(data_directory_config.value()) / "config.ini";
+			config_path = std::filesystem::path(data_directory_config.value()) / "config.ini";
 		else if (const char* xdg_data_home = std::getenv("XDG_DATA_HOME"))
-			config_path = boost::filesystem::path(xdg_data_home) / "FuzeMediaboard" / "config.ini";
+			config_path = std::filesystem::path(xdg_data_home) / "FuzeMediaboard" / "config.ini";
 		else if (const char* unix_home = std::getenv("HOME"))
-			config_path = boost::filesystem::path(unix_home) / ".local" / "share" / "FuzeMediaboard" / "config.ini";
+			config_path = std::filesystem::path(unix_home) / ".local" / "share" / "FuzeMediaboard" / "config.ini";
 
-		if (!boost::filesystem::exists(config_path)) {
-			boost::filesystem::path data_directory = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // To match Unix
+		if (!std::filesystem::exists(config_path)) {
+			std::filesystem::path data_directory = std::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // To match Unix
 
 			std::println("Copying config.ini from AppImage to {}", config_path.string());
-			if (!boost::filesystem::exists(data_directory / "config.ini"))
+			if (!std::filesystem::exists(data_directory / "config.ini"))
 				throw std::runtime_error("config.ini not found in AppImage data directory.");
 			else {
-				boost::filesystem::create_directories(config_path.parent_path());
-				boost::filesystem::copy(data_directory / "config.ini", config_path);
+				std::filesystem::create_directories(config_path.parent_path());
+				std::filesystem::copy(data_directory / "config.ini", config_path);
 			}
 		}
 	}
 	else if (data_directory_config) {
-		config_path = boost::filesystem::path(data_directory_config.value()) / "config.ini";
+		config_path = std::filesystem::path(data_directory_config.value()) / "config.ini";
 	}
 	else {
-		config_path = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard" / "config.ini");
+		config_path = std::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard" / "config.ini");
 	}
 	return config_path;
 }
 
-std::optional<ProgramDirectories> getProgramDirectories(boost::filesystem::path program_location, std::optional<std::string> data_directory_config, std::optional<std::string> media_directory_config, std::optional<std::string> sqlite_database_file_config) {
-	boost::filesystem::path data_directory; // Typically in ~/.local/share/FuzeMediaboard, except for AppImage
-	boost::filesystem::path writeable_directory; // Different from data_directory in AppImage
-	// boost::filesystem::path config_file; // Different from data_directory in AppImage
+std::optional<ProgramDirectories> getProgramDirectories(std::filesystem::path program_location, std::optional<std::string> data_directory_config, std::optional<std::string> media_directory_config, std::optional<std::string> sqlite_database_file_config) {
+	std::filesystem::path data_directory; // Typically in ~/.local/share/FuzeMediaboard, except for AppImage
+	std::filesystem::path writeable_directory; // Different from data_directory in AppImage
+	// std::filesystem::path config_file; // Different from data_directory in AppImage
 	// Get the path to this program, so files can be read/written relative to the executable
 	if (data_directory_config)
 		writeable_directory = data_directory_config.value();
 	else if (std::getenv("APPDIR")) {
 		if (const char* xdg_data_home = std::getenv("XDG_DATA_HOME"))
-			writeable_directory = boost::filesystem::path(xdg_data_home) / "FuzeMediaboard";
+			writeable_directory = std::filesystem::path(xdg_data_home) / "FuzeMediaboard";
 		else if (const char* unix_home = std::getenv("HOME"))
-			writeable_directory = boost::filesystem::path(unix_home) / ".local" / "share" / "FuzeMediaboard";
+			writeable_directory = std::filesystem::path(unix_home) / ".local" / "share" / "FuzeMediaboard";
 		else
 			throw std::runtime_error("Running from AppImage requires XDG_DATA_HOME or HOME environment variables.");
 
 	}
 	else
-		writeable_directory = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // For development
+		writeable_directory = std::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // For development
 
 
-	boost::filesystem::create_directories(writeable_directory);
-	// boost::filesystem::create_directories(config_file.parent_path());
+	std::filesystem::create_directories(writeable_directory);
+	// std::filesystem::create_directories(config_file.parent_path());
 
 	if (std::getenv("APPDIR")) {
-		data_directory = boost::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // To match Unix
-		// if (!boost::filesystem::exists(config_file)) {
+		data_directory = std::filesystem::absolute(program_location / ".." / "share" / "FuzeMediaboard"); // To match Unix
+		// if (!std::filesystem::exists(config_file)) {
 		// 	std::print("Copying config.ini from AppImage");
-		// 	boost::filesystem::copy(data_directory / "config.ini", config_file);
+		// 	std::filesystem::copy(data_directory / "config.ini", config_file);
 		// }
 	}
 	else {
 		data_directory = writeable_directory;
 	}
-	boost::filesystem::path sqlite_file;
+	std::filesystem::path sqlite_file;
 	if (sqlite_database_file_config) {
 		sqlite_file = sqlite_database_file_config.value();
-		if (boost::filesystem::is_directory(sqlite_file))
+		if (std::filesystem::is_directory(sqlite_file))
 			sqlite_file += "mediaboard_sqlite_data.db";
 	}
 	else
 		sqlite_file = writeable_directory / "sqlite_data.db";
-	boost::filesystem::path media_directory = media_directory_config ? media_directory_config.value() : writeable_directory / "media";
-	boost::filesystem::create_directories(media_directory / "thumbnails");
+	std::filesystem::path media_directory;
+	if (media_directory_config)
+		media_directory = media_directory_config.value();
+	else
+		media_directory = writeable_directory / "media";
+	std::filesystem::create_directories(media_directory / "thumbnails");
 	return ProgramDirectories{
 		.data = data_directory,
 		.media = media_directory,
 		.sqlite_file = sqlite_file
 	};
+}
+
+void applyOptionsToTemplates(const boost::program_options::options_description& options, const std::filesystem::path& document_root, const std::filesystem::path& template_root) {
+	std::println("[dummy] adding options to templates");
 }
 
 int main(int argc, char* argv[]) {
@@ -126,7 +135,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	std::error_code ec;
-	boost::filesystem::path program_location = boost::dll::program_location().parent_path();
+	std::filesystem::path program_location = boost::dll::program_location().parent_path().string();
 	if (ec)
 		throw std::runtime_error("An error occured when attempting to get the current program's location.");
 	else
@@ -182,7 +191,7 @@ int main(int argc, char* argv[]) {
 
 		if (variable_map.count("config"))
 			config_file = config_file_str;
-		boost::filesystem::path config_file_path = getConfigDirectory(program_location, config_file, data_directory_config);
+		std::filesystem::path config_file_path = getConfigDirectory(program_location, config_file, data_directory_config);
 		// Load config.ini
 		std::ifstream config_file_ifstream(config_file_path.string());
 		if (config_file_ifstream) {
@@ -256,8 +265,8 @@ int main(int argc, char* argv[]) {
 			Migrations::makeMigrations(fuze_database_interface, version_string.value(), state_config);
 		}
 		else {
-			// boost::filesystem::path template_path = boost::filesystem::absolute("database_template.sql", database_location);
-			// if (!boost::filesystem::exists(template_path))
+			// std::filesystem::path template_path = std::filesystem::absolute("database_template.sql", database_location);
+			// if (!std::filesystem::exists(template_path))
 			// 	throw std::runtime_error(std::format("Database template file {} not found.", template_path.string()));
 			Migrations::firstTimeSetup(fuze_database_interface, program_directories.data / "database_template.sql", program_directories.sqlite_file.string());
 		}
@@ -275,10 +284,13 @@ int main(int argc, char* argv[]) {
 	// The io_context is required for all I/O - see https://www.boost.org/doc/libs/latest/doc/html/boost_asio/overview/basics.html
 	boost::asio::io_context io_context;
 
+	std::filesystem::path document_root = program_directories.data / "frontend";
+	std::filesystem::path template_root = program_directories.data / "frontend" / "templates";
+	applyOptionsToTemplates(command_line_options, document_root, template_root);
+
 	std::cout << "Initialising shared state..." << std::endl;
 	shared_state* state;
 	try {
-		boost::filesystem::path document_root = program_directories.data / "frontend";
 		state = new shared_state(document_root, program_directories.media, state_config, fuze_database_interface);
 		state->start();
 	}

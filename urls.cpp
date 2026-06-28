@@ -11,7 +11,7 @@ using namespace http;
 void addURLsToController(FuzeHttp::Controller<shared_state*>* controller) {
 	// C-style strings are immutable parts of the URL, and strings/ints are variables passed into the view.
 	// Client{} is used when the function needs to identify the user via a cookie.
-	controller->addPattern(verb::get, showMainPage						);
+	controller->addPattern(verb::get, showMainPage						,"*");
 	controller->addPattern(verb::post, createGroup,						"api", "create_group"); // TODO move to server/permissions
 	controller->addPattern(verb::delete_, deleteGroup,					"api", "group", int());
 	controller->addPattern(verb::delete_, removeMemberFromGroup,		"api", "group", int(), "member", int());

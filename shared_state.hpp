@@ -41,7 +41,7 @@ struct StateConfig {
 // Represents the shared server state
 class shared_state : public FuzeHttp::State {
 public:
-	shared_state(boost::filesystem::path document_root, boost::filesystem::path media_location_relative, StateConfig config, FuzeDBI::Connection* fuze_database_interface);
+	shared_state(std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config, FuzeDBI::Connection* fuze_database_interface);
 	const StateConfig config;
 	void start();
 	void setAdditionalImageFormatsFromConfig(const StateConfig& config);
@@ -77,12 +77,12 @@ public:
 	void sendToWebRTC(std::string message);
 	void clearWebsockets();
 
-	const boost::filesystem::path& getMediaLocation() const { return media_location; }
-	// const boost::filesystem::path& getProgramLocation() const { return program_location; }
+	const std::filesystem::path& getMediaLocation() const { return media_location; }
+	// const std::filesystem::path& getProgramLocation() const { return program_location; }
 	const char* getSecret() const { return this->secret_base64; }
 private:
-	const boost::filesystem::path media_location;
-	// const boost::filesystem::path program_location;
+	const std::filesystem::path media_location;
+	// const std::filesystem::path program_location;
 	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
 	FuzeDBI::Connection* fuze_dbi;
 	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png", "image/svg"};

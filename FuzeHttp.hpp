@@ -7,6 +7,7 @@
 #include <boost/beast/http/status.hpp>
 #include <sodium.h>
 #include <charconv>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <sys/un.h>
@@ -61,7 +62,7 @@ struct Response {
 	std::optional<std::unordered_map<std::string, std::string>> headers;
 	std::optional<std::string> error_message;
 	std::optional<boost::json::value> json;
-	std::optional<boost::filesystem::path> file;
+	std::optional<std::filesystem::path> file;
 	std::optional<std::string> body;
 };
 using Headers = std::unordered_map<std::string, std::string>;
@@ -182,21 +183,24 @@ public:
 		// int all_args_i = 0;
 		for (std::variant<const char*, int, std::string, Client> var : std::initializer_list<std::variant<const char*, int, std::string, Client>>{ args... }) {
 			this->all_args[index] = var;
-			if (var.index() == 3) {
+			if (var.index() == 3) { // Client
 				this->path_starts_at++;
 			}
 			if (!std::holds_alternative<const char*>(var)) {
 				this->pattern_position_to_view_arg_index[index] = arg_index++;
 				// std::cout << "Arg is not a char array!" << std::endl;
 			}
-			index++;
+			if (index == this->all_args.size() - 1)
+				this->is_wild = (var.index() == 0 && std::get<const char*>(var)[0] == '*');
+			else
+				index++;
 		}
 		// std::cout << "Final all_args length: " << this->all_args.size() << std::endl;
 	}
 	Response executeView(StateType state, Request& req) override {
 		std::optional<int> set_session_for_client_id;
+		std::optional<Client> client = state->getClientIfExists(req);
 		if (std::tuple_size<ArgTuple>{} > 0 && this->all_args[0].index() == 3) { // There is a Client{} parameter in the view
-			std::optional<Client> client = state->getClientIfExists(req);
 			if (!client) {
 				client = state->createClient(); // Create anonymous client, because accounts are assigned a client on login
 				set_session_for_client_id = client.value().id;
@@ -210,6 +214,9 @@ public:
 			if (!res.headers) res.headers.emplace();
 			res.headers->insert({"Set-Cookie", formatCookie(session_id_base64)});
 		}
+		if (set_session_for_client_id || client) {
+			res.headers->insert({"Cache-Control", "private"}); // Would conflict with other Cache-Control if it exists, so not the ideal solution
+		}
 		return res;
 	}
 	size_t getPathSize() const override {
@@ -222,7 +229,7 @@ public:
 			return false;
 		if (index >= this->all_args.size()) {
 			// std::cout << "Index " << index << "Is greater than number of args " << this->all_args.size() << std::endl;
-			return false;
+			return this->is_wild;
 		}
 		// std::cout << ", getting variant";
 		const std::variant<const char*, int, std::string, Client> vari = this->all_args[index];
@@ -280,6 +287,7 @@ private:
 	ArgTuple view_args;
 	// ExtrasTuple extra_args;
 	http::verb req_method;
+	bool is_wild;
 	// std::vector<std::variant<Client, const char*, int, std::string>> path;
 	std::array<std::variant<const char*, int, std::string, Client>, sizeof...(AllArgs)> all_args;
 	int path_starts_at = 0;
@@ -355,15 +363,18 @@ public:
 		std::erase_if(matched_views, [this, section_index](const int view_id){
 			return this->views.at(view_id)->getPathSize() > section_index;
 		});
+		if (matched_views.size() > 1) {
+			std::println("Multiple views matched");
+		}
 		if (matched_views.size() >= 1) {
 			// std::cout << "Matching finished: number of matches: " << matched_views.size() << std::endl;
 			return views.at(*matched_views.begin())->executeView(state, req);
 		}
-		else if (req.method() == http::verb::get) {
-			return FuzeHttp::Response{.status = http::status::ok, .file = boost::filesystem::canonical(path_name.substr(1), state->document_root)};
-		}
+		// else if (req.method() == http::verb::get) {
+		// 	return FuzeHttp::Response{.status = http::status::ok, .file = std::filesystem::canonical(path_name.substr(1), state->document_root)};
+		// }
 		else {
-			// std::cout << "No patterns were matched to path_name " << path_name << std::endl;
+			std::cout << "No patterns were matched to path_name " << path_name << std::endl;
 			return FuzeHttp::Response{.status = http::status::not_found};
 		}
 	}
@@ -389,13 +400,13 @@ public: // TODO change to protected if possible
 	std::string createInvite(int granted_group_id);
 	int getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const; // returns PUBLIC if none found
 
-	// std::variant<http::file_body::value_type, FuzeHttp::Response> openFile(boost::filesystem::path path) const;
+	// std::variant<http::file_body::value_type, FuzeHttp::Response> openFile(std::filesystem::path path) const;
 
-	const boost::filesystem::path& getDocumentRoot() const { return document_root; }
+	const std::filesystem::path& getDocumentRoot() const { return document_root; }
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;
-	boost::filesystem::path document_root;
+	std::filesystem::path document_root;
 private:
 	FuzeDBI::Connection* fuze_dbi;
 	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);

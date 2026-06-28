@@ -5,11 +5,11 @@
 #include <sstream>
 #include <print>
 
-void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const boost::filesystem::path& template_path, const boost::filesystem::path& absolute_sqlite_path) {
+void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const std::filesystem::path& template_path, const std::filesystem::path& absolute_sqlite_path) {
 	int ec; char* error_message;
 	std::println("Doing first-time setup");
 	std::println("Opening database template at {}", template_path.string());
-	if (!boost::filesystem::exists(template_path))
+	if (!std::filesystem::exists(template_path))
 		throw std::runtime_error("Error: database template not found");
 #ifdef FUZEDBI_POSTGRES
 	std::println("It appears you are setting up the PostgreSQL database for the first time. Please ensure that the database is empty and the user has full read/write permissions.");
