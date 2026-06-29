@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<!--
-		include(`tokens.m4')
-		-->
 		<title>Manage server - CONFIG_site_name</title>
 		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -71,7 +68,7 @@
 						<h2>Create group</h2>
 						<form action="" method="POST">
 							<label for="create_group_form_group_name">Name</label>
-							<input type="text" id="create_group_form_group_name" name="group-name" minlength="1" maxlength="_GROUP_MAX_NAME">
+							<input type="text" id="create_group_form_group_name" name="group-name" minlength="1" maxlength="CONFIG_group_max_name">
 						</form>
 						<div class="ToolBar">
 							<input type="button" value="OK" onclick="group_manager.group_list.createNewGroup();create_group_dialog.close()"><button onclick="create_group_dialog.close()">Cancel</button>

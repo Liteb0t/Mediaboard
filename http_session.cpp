@@ -43,10 +43,10 @@ http::message_generator handle_request(
 		if (basic_res.json || basic_res.body)
 			return FuzeHttp::buildResponse<http::string_body>(basic_res, req);
 		else if (basic_res.file) {
+			if (!std::filesystem::is_regular_file(basic_res.file.value()))
+				basic_res.file = basic_res.file.value() / "index.html";
 			if (!std::filesystem::exists(basic_res.file.value()))
 				return FuzeHttp::buildResponse<http::empty_body>(FuzeHttp::Response{.status=http::status::bad_request, .error_message="File not found"}, req);
-			else if (!std::filesystem::is_regular_file(basic_res.file.value()))
-				return FuzeHttp::buildResponse<http::empty_body>(FuzeHttp::Response{.status=http::status::bad_request, .error_message="Is a directory"}, req);
 			else
 				return FuzeHttp::buildResponse<http::file_body>(basic_res, req);
 		}
@@ -85,8 +85,8 @@ void http_session::do_read() {
 
 	// Apply a reasonable limit to the allowed size
 	// of the body in bytes to prevent abuse.
-	// parser_->body_limit(this->state_->config.file_size_limit_mb << 20);
-	parser_->body_limit(25 << 20);
+	parser_->body_limit(this->state_->config.file_size_limit_mb << 20);
+	// parser_->body_limit(25 << 20);
 
 	// Set the timeout.
 	stream_.expires_after(std::chrono::minutes(60));

@@ -3,6 +3,7 @@
 // Fuze Mediaboard was built on top of an example project by Vinnie Falco.
 // https://github.com/vinniefalco/CppCon2018
 
+#include "Message.hpp"
 #include "listener.hpp"
 #include "migrations.hpp"
 #include "permission_managed_object.hpp"
@@ -135,53 +136,92 @@ std::string valueAsString(const std::string& value) {
 	return value;
 }
 
-class Option {
+class TemplateMacro {
 public:
-	constexpr Option(std::string token) :token(token) {}
+	constexpr TemplateMacro(std::string token) :token(token) {}
 	const std::string token;
-	virtual boost::shared_ptr<boost::program_options::option_description> desc() = 0;
+	virtual void addOptionToListIfOptional(boost::program_options::options_description& options) = 0;
 	virtual std::string string() const = 0;
+	virtual bool isOption() const = 0;
 };
 
 template<typename OptionType>
 requires (std::is_convertible_v<std::remove_pointer_t<OptionType>, std::string> || requires(std::remove_pointer_t<OptionType> o){std::to_string(o);})
-class TemplateOption : public Option {
+class TemplateOption : public TemplateMacro {
 public:
 	TemplateOption(std::string token, OptionType default_value, std::string description = "") :
-		Option(token), default_value(default_value), description(description), value(std::make_shared<OptionType>(default_value)) {
+		TemplateMacro(token), default_value(default_value), description(description), value(std::make_shared<OptionType>(default_value)) {
 	}
-	TemplateOption(std::string token, std::shared_ptr<OptionType>&& value_ptr, OptionType default_value, std::string description = "")
-	// requires (std::is_pointer_v<OptionType>)
-			: Option(token), default_value(default_value), description(description), value(value_ptr) {
-	}
-	boost::shared_ptr<boost::program_options::option_description> desc() override {
-		// if constexpr (std::is_pointer_v<OptionType>)
-		// 	return boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value<std::remove_pointer_t<OptionType>>(value), this->description ? description.value().c_str() : ""));
-		// else
-			return boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value<OptionType>(value.get())->default_value(default_value), this->description ? description.value().c_str() : ""));
+	// TemplateOption(std::string token, std::shared_ptr<OptionType>&& value_ptr, OptionType default_value, std::string description = "")
+	// 		: TemplateMacro(token), default_value(default_value), description(description), value(value_ptr) {
+	// }
+	virtual void addOptionToListIfOptional(boost::program_options::options_description& options) override {
+		options.add(boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value<OptionType>(value.get())->default_value(default_value), this->description ? description.value().c_str() : "")));
 	}
 	virtual std::string string() const override {
-		// if constexpr (std::is_pointer_v<OptionType>)
-		// 	return "";
-			// return valueAsString(*value);
-		// else
-			return valueAsString(*value);
+		return valueAsString(*value);
 	}
+	virtual bool isOption() const override { return true; };
 private:
 	std::shared_ptr<OptionType> value;
 	OptionType default_value;
 	const std::optional<const std::string> description;
 };
 
-std::vector<Option*> template_options{
-	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
-	new TemplateOption<std::string>("favicon_url", "https://fuze.page/favicon.ico"),
-	new TemplateOption<bool>("show_watermarks", true)
-	// new TemplateOption<unsigned int>("thumbnail_size", {.default_value=150})
+template<typename OptionType>
+requires (std::is_convertible_v<std::remove_pointer_t<OptionType>, std::string> || requires(std::remove_pointer_t<OptionType> o){std::to_string(o);})
+class TemplateOptionPtr : public TemplateMacro {
+public:
+	TemplateOptionPtr(std::string token, OptionType* value_ptr, OptionType default_value, std::string description = "")
+			: TemplateMacro(token), default_value(default_value), description(description), value_ptr(value_ptr) {
+	}
+	virtual void addOptionToListIfOptional(boost::program_options::options_description& options) override {
+		options.add(boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value<OptionType>(value_ptr)->default_value(default_value), this->description ? description.value().c_str() : "")));
+	}
+	virtual std::string string() const override {
+		return valueAsString(*value_ptr);
+	}
+	virtual bool isOption() const override { return true; };
+private:
+	OptionType* value_ptr;
+	OptionType default_value;
+	const std::optional<const std::string> description;
 };
 
-void applyOptionsToTemplates(const std::vector<Option*>& options, const std::filesystem::path& document_root, const std::filesystem::path& template_root) {
-	std::println("[dummy] adding options to templates");
+template<typename OptionType>
+requires (std::is_convertible_v<OptionType, std::string> || requires(OptionType o){std::to_string(o);})
+class TemplateConstant : public TemplateMacro {
+public:
+	TemplateConstant(std::string token, OptionType default_value, std::string description = "") :
+		TemplateMacro(token), default_value(default_value), description(description), value(default_value) {
+	}
+	virtual void addOptionToListIfOptional(boost::program_options::options_description& options) override {}
+	virtual std::string string() const override {
+		return valueAsString(value);
+	}
+	virtual bool isOption() const override { return false; };
+private:
+	OptionType value;
+	OptionType default_value;
+	const std::optional<const std::string> description;
+};
+
+std::vector<TemplateMacro*> template_macros{
+	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
+	new TemplateOption<std::string>("favicon_url", "https://fuze.page/favicon.ico"),
+	new TemplateOption("show_watermarks", true),
+	new TemplateConstant("post_max_name", static_cast<int>(MESSAGE_FIELDS::MAX_NAME)),
+	new TemplateConstant("post_max_file_name", static_cast<int>(MESSAGE_FIELDS::MAX_FILE_NAME)),
+	new TemplateConstant("post_max_content", static_cast<int>(MESSAGE_FIELDS::MAX_CONTENT)),
+	new TemplateConstant("group_max_name", static_cast<int>(Group::MAX_NAME)),
+	new TemplateConstant("account_max_username", static_cast<int>(Account::MAX_USERNAME)),
+	new TemplateConstant("mediaboard_version", current_version)
+};
+
+void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const std::filesystem::path& document_root, const std::filesystem::path& template_root) {
+	std::println("Adding options to templates...");
+	for (auto option : options)
+		std::println("{} :: {}", option->token, option->string());
 	for (const std::filesystem::directory_entry& dir_entry : std::filesystem::directory_iterator(template_root)) {
 		if (std::filesystem::is_regular_file(dir_entry)) {
 			std::println("[applyOptionsToTemplates] path: {}", dir_entry.path().string());
@@ -189,11 +229,11 @@ void applyOptionsToTemplates(const std::vector<Option*>& options, const std::fil
 			std::string out_filename = dir_entry.path().filename().string();
 			if (out_filename[0] == '_')
 				out_filename = out_filename.substr(1);
+			std::print(" ->{} ", out_filename);
 			std::ofstream file_output_stream(document_root / out_filename);
 			std::string file_contents;
 			while (std::getline(file_template_stream, file_contents)) {
 				for (auto option : options) {
-					std::println("Would replace CONFIG_{} with {}", option->token, option->string());
 					boost::replace_all(file_contents, std::format("CONFIG_{}", option->token), option->string());
 				}
 				file_output_stream << file_contents << std::endl;
@@ -204,6 +244,7 @@ void applyOptionsToTemplates(const std::vector<Option*>& options, const std::fil
 		// if (std::holds_alternative<std::string>(option))
 		// 	std::print("")
 	}
+	std::println("Done.");
 }
 
 // struct TemplateOptionsStruct {
@@ -236,6 +277,7 @@ int main(int argc, char* argv[]) {
 	std::string config_file_str, data_directory_str, media_directory_str, database_engine, sqlite_database_file_str, postgresql_uri, postgresql_user, postgresql_host, thumbnail_file_format, postgresql_database_name;
 	unsigned int threads, thumbnail_size;
 	StateConfig state_config;
+	std::shared_ptr<StateConfig> state_config_shared;
 	bool postgresql_use_uri;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
 	command_line_specific_options.add_options()
@@ -275,15 +317,13 @@ int main(int argc, char* argv[]) {
 		// ("thumbnail_file_extension", boost::program_options::value<std::string>(&state_config.thumbnail_file_extension)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.");
 		// ("thumbnail_size", boost::program_options::value<unsigned int>(&state_config.thumbnail_size)->default_value(150), "Maximum width and height of image thumbnails, in pixels.");
 
-	// universal_options.add(desc);
-	// universal_options.add(favicon_url_opt.desc());
+	// Macros which link to state_config
+	template_macros.push_back(new TemplateOptionPtr("thumbnail_file_extension", &state_config.thumbnail_file_extension, std::string("jpg")));
+	template_macros.push_back(new TemplateOptionPtr("thumbnail_size", &state_config.thumbnail_size, static_cast<unsigned int>(150)));
+	template_macros.push_back(new TemplateOptionPtr("file_size_limit_mb", &state_config.file_size_limit_mb, static_cast<unsigned int>(25)));
 
-	template_options.push_back(new TemplateOption("thumbnail_file_extension", std::make_shared<std::string>(state_config.thumbnail_file_extension), std::string("jpg")));
-	template_options.push_back(new TemplateOption("thumbnail_size", std::make_shared<unsigned int>(state_config.thumbnail_size), static_cast<unsigned int>(150)));
-	template_options.push_back(new TemplateOption("file_size_limit_mb", std::make_shared<unsigned int>(state_config.file_size_limit_mb), static_cast<unsigned int>(25)));
- //
-	for (auto option : template_options) {
-		universal_options.add(option->desc());
+	for (auto macro : template_macros) {
+		macro->addOptionToListIfOptional(universal_options);
 	}
 
 	boost::program_options::options_description command_line_options;
@@ -392,7 +432,7 @@ int main(int argc, char* argv[]) {
 	std::filesystem::path document_root = program_directories.data / "frontend";
 	std::filesystem::path template_root = program_directories.data / "frontend" / "templates";
 	try {
-		applyOptionsToTemplates(template_options, document_root, template_root);
+		applyOptionsToTemplates(template_macros, document_root, template_root);
 	}
 	catch (const std::exception& exception) {
 		std::println(std::cerr, "An error occured when generating frontend files: {}", exception.what());

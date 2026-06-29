@@ -360,9 +360,9 @@ public:
 		}
 		int id_of_view_to_keep;
 		// Remove matches for URLs shorter than the pattern
-		// std::erase_if(matched_views, [this, section_index](const int view_id){
-		// 	return this->views.at(view_id)->getPathSize() > section_index;
-		// });
+		std::erase_if(matched_views, [this, section_index](const int view_id){
+			return this->views.at(view_id)->getPathSize() - this->views.at(view_id)->is_wild > section_index;
+		});
 		if (matched_views.size() > 1) {
 			int last_path_length = 1000000000;
 			std::println("Multiple views matched");

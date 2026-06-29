@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
 
 project(Mediaboard
-  VERSION 0.1.3
+  VERSION 0.1.4
   DESCRIPTION "Chat server with file-sharing and advanced permissions"
   LANGUAGES C CXX
   HOMEPAGE_URL "https://fuze.page/software/mediaboard"

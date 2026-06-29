@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<!--
-			include(`tokens.m4')
-		-->
 		<title>CONFIG_site_name</title>
 		<meta name="description" content="Fuze Mediaboard is an imageboard engine with advanced permissions.">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -31,7 +28,7 @@
 				<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
 				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
 
-				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard 0.1.3</a>
+				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard CONFIG_mediaboard_version</a>
 			</div>
 			<h3 id="location_indicator"></h3>
 			<noscript>
@@ -41,10 +38,10 @@
 		</main>
 		<div id="body_separator" class="FlexSeparator"></div>
 		<details id="reply_container" style="display: none" open="">
-			<summary onclick="onReplyContainerOpen()"><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator"></span></div></summary>
+			<summary><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator"></span></div></summary>
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
-			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Username" maxlength="_POST_MAX_NAME" />
+			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Username" maxlength="CONFIG_post_max_name" />
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned Button" onclick="postAction()">
 			</div>
 			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content"></div>
@@ -56,7 +53,7 @@
 			</form>
 		</details>
 		<div id="bottom_marker"></div>
-		<a id="watermark" style="display: none" href="https://fuze.page/software/mediaboard/">Fuze Mediaboard 0.1.3</a>
+		<a id="watermark" style="display: none" href="https://fuze.page/software/mediaboard/">Fuze Mediaboard CONFIG_mediaboard_version</a>
 		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="thread_posted_dialog" closedby="any">
 			<h2>Thread posted!</h2>
@@ -85,7 +82,7 @@
 		</dialog>
 		<dialog id="post_name_too_long_dialog" closedby="any">
 			<h2>Error</h2>
-			<p>Name too long. Limit: _POST_MAX_NAME<br>This post: <span id="post_name_too_long_dialog_name_length"></span></p>
+			<p>Name too long. Limit: CONFIG_post_max_name<br>This post: <span id="post_name_too_long_dialog_name_length"></span></p>
 			<div class="ToolBar"><button onclick="post_name_too_long_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 		<dialog id="post_file_upload_not_complete_dialog" closedby="any">
@@ -294,8 +291,8 @@ main {
 <script>
 "use strict";
 loading_dialog.showModal();
-const media_url = "media/";
-const thumbnail_url = "media/thumbnails/";
+const media_url = "./media/";
+const thumbnail_url = "./media/thumbnails/";
 const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
 const thumbnail_size = CONFIG_thumbnail_size;
 const file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
@@ -392,7 +389,7 @@ document.body.onclick = (event) => {
 const FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
 const FIGURE_THUMBNAIL = 1;
 function expandEmbedFigure(figure_element) {
-	figure_element.children[FIGURE_EMBED].setAttribute("src", window.location.pathname + media_url + figure_element.getAttribute("filename"));
+	figure_element.children[FIGURE_EMBED].setAttribute("src", media_url + figure_element.getAttribute("filename"));
 	figure_element.children[FIGURE_EMBED].style["display"] = "inherit";
 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "none";
 }
@@ -423,7 +420,7 @@ async function logoutAction() {
 	// manage_server_button.style["display"] = "none";
 	// localStorage.removeItem("server_permissions");
 	state.server_permissions = undefined;
-	const fetch_response = await fetch(window.location.pathname + "registration/logout", {method: "POST"});
+	const fetch_response = await fetch("./registration/logout", {method: "POST"});
 	if (fetch_response && fetch_response.ok) {
 		refresh_send();
 		getClientInfo();
@@ -498,7 +495,7 @@ function showAllThreads(message_json) {
 				let manage_thread_permissions_button = document.createElement("a");
 				manage_thread_permissions_button.classList.add("Button", "ToolBarButton");
 				manage_thread_permissions_button.textContent = "Manage permissions";
-				manage_thread_permissions_button.setAttribute("href", window.location.pathname + `manage_permissions.html?location=/thread/${thread.id}/`);
+				manage_thread_permissions_button.setAttribute("href", `./manage_permissions.html?location=/thread/${thread.id}/`);
 				thread_toolbar.append(manage_thread_permissions_button);
 			}
 
@@ -526,7 +523,7 @@ function openThread(thread_id) {
 }
 
 async function getThread() {
-	let response = await fetch(window.location.pathname + `api/thread/${state.selected_thread.id}`);
+	let response = await fetch(`./api/thread/${state.selected_thread.id}`);
 	if (response.ok) {
 		await response.json().then(response_obj => {
 			console.log(response_obj);
@@ -688,7 +685,7 @@ function createPost(data, client_permissions) {
 			let thumbnail_element = document.createElement("img");
 			thumbnail_element.classList.add("EmbedThumbnail");
 			let thumbnail_filename = file.thumbnail_file_extension ? `THUMBNAIL_${file.filename}.${file.thumbnail_file_extension}` : "THUMBNAIL_" + file["filename"] + ".CONFIG_thumbnail_file_extension";
-			thumbnail_element.setAttribute("src", window.location.pathname + thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+			thumbnail_element.setAttribute("src", thumbnail_url + thumbnail_filename.replace(" ", "%20"));
 			if (file["width"] && file["height"]) {
 				if (file["width"] < file["height"]) {
 					thumbnail_element.width = file["width"] < file["height"]>>1 ? Math.ceil(thumbnail_size / 2) : Math.ceil(thumbnail_size * (file["width"]/file["height"]));
@@ -713,7 +710,7 @@ function createPost(data, client_permissions) {
 			let audio_element = document.createElement("audio");
 			audio_element.controls = true;
 			audio_element.setAttribute("controlslist", "nofullscreen nodownload");
-			audio_element.setAttribute("src", window.location.pathname + media_url + file["filename"].replace(" ", "%20"));
+			audio_element.setAttribute("src", media_url + file["filename"].replace(" ", "%20"));
 			figure_element.appendChild(audio_element);
 		}
 		let pretty_filename;
@@ -724,7 +721,7 @@ function createPost(data, client_permissions) {
 			pretty_filename = file["filename"].slice(0, filename_extension_i - media_uuid_len) + file["filename"].slice(filename_extension_i, file["filename"].length);
 		}
 		let figcaption_element = document.createElement("figcaption");
-		let media_src = window.location.pathname + media_url + file["filename"].replace(" ", "%20");
+		let media_src = media_url + file["filename"].replace(" ", "%20");
 		let figcaption_element_a = document.createElement("a");
 		figcaption_element_a.setAttribute("href", media_src);
 		figcaption_element_a.setAttribute("target", "_blank");
@@ -783,12 +780,12 @@ content_field.oninput = () => {
 	}
 
 	let content_field_length = (content_field_text_encoder.encode(content_field.innerText)).length;
-	if (content_field_length > Math.round(_POST_MAX_CONTENT * 0.8)) {
+	if (content_field_length > Math.round(CONFIG_post_max_content * 0.8)) {
 		if (content_length_indicator.style["display"] === "none") {
 			content_length_indicator.style["display"] = "inherit";
 		}
-		content_length_indicator.textContent = `${content_field_length}/${_POST_MAX_CONTENT}`;
-		if (content_field_length > _POST_MAX_CONTENT) {
+		content_length_indicator.textContent = `${content_field_length}/${CONFIG_post_max_content}`;
+		if (content_field_length > CONFIG_post_max_content) {
 			if (!content_length_indicator.classList.contains("LimitExceeded")) {
 				content_length_indicator.classList.add("LimitExceeded");
 			}
@@ -887,8 +884,8 @@ class UploadedFile {
 				<code>${file_size_limit}</code> - limit (bytes)`);
 		}
 		const file_name_size = (new TextEncoder().encode(file_object.name)).length;
-		if (file_name_size > _POST_MAX_FILE_NAME) {
-			throw new Error(`File name "${file_object.name}" exceeds the limit of _POST_MAX_FILE_NAME bytes.<br>
+		if (file_name_size > CONFIG_post_max_file_name) {
+			throw new Error(`File name "${file_object.name}" exceeds the limit of CONFIG_post_max_file_name bytes.<br>
 				This file name: ${file_name_size} bytes.`);
 		}
 		console.log("UploadedFile test passed...");
@@ -937,7 +934,7 @@ class UploadedFile {
 			}
 		});
 		request.responseType = "text";
-		request.open("POST", window.location.pathname + "api/upload/");
+		request.open("POST", "./api/upload/");
 		request.timeout = 60*60*1000; // 1 hour
 		request.onreadystatechange = () => {
 			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
@@ -971,10 +968,10 @@ class UploadedFile {
 					const thumbnail_file_extension = request.getResponseHeader("Thumbnail-File-Extension");
 					if (thumbnail_file_extension) {
 						this.container_element.setAttribute("data-thumbnail-file-extension", thumbnail_file_extension);
-						this.thumbnail_element.setAttribute("src", window.location.pathname + media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
+						this.thumbnail_element.setAttribute("src", media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
 					}
 					else if (Format.fromFileName(server_filename) === Format.IMAGE) {
-						this.thumbnail_element.setAttribute("src", window.location.pathname + media_url + "thumbnails/THUMBNAIL_" + decoded_filename + ".CONFIG_thumbnail_file_extension");
+						this.thumbnail_element.setAttribute("src", media_url + "thumbnails/THUMBNAIL_" + decoded_filename + ".CONFIG_thumbnail_file_extension");
 					}
 					this.status_element.textContent = "Upload complete";
 					this.status_element.classList.add("UploadCompleteIndicator");
@@ -1092,11 +1089,11 @@ async function postAction() {
 	if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
 		post_content_empty_dialog.showModal();
 	}
-	else if (name_length_bytes > _POST_MAX_NAME) {
+	else if (name_length_bytes > CONFIG_post_max_name) {
 		post_name_too_long_dialog_name_length.textContent = name_length_bytes;
 		post_name_too_long_dialog.showModal();
 	}
-	else if (content_length_bytes > _POST_MAX_CONTENT) {
+	else if (content_length_bytes > CONFIG_post_max_content) {
 		post_content_too_long_dialog_content_length.textContent = content_length_bytes;
 		post_content_too_long_dialog.showModal();
 	}
