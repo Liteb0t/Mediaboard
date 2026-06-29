@@ -5,7 +5,7 @@ add_custom_target(frontend
   WORKING_DIRECTORY
     ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend
   DEPENDS
-    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/templates
     ${CMAKE_CURRENT_SOURCE_DIR}/static
   VERBATIM
 )
@@ -19,5 +19,9 @@ add_custom_command(
 )
 install(
   DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/static
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard/frontend
+)
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/templates
   DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard/frontend
 )
