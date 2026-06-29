@@ -135,7 +135,7 @@ main {
 
 .Post {
 	margin-top: 0.25rem;
-	word-wrap: break-word;
+	word-wrap: anywhere;
 	&:not(:last-child) {
 		border-bottom: 1px solid #000;
 	}
@@ -167,7 +167,7 @@ main {
 		.EmbedFigure {
 			display: inline-block;
 			margin: 0;
-			.EmbedThumbnail, .EmbedImage, .EmbedVideo {
+			.EmbedImage, .EmbedVideo {
 				max-width: 100%;
 				max-height: 90vh;
 				width: auto;
@@ -296,8 +296,6 @@ const thumbnail_url = "./media/thumbnails/";
 const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
 const thumbnail_size = CONFIG_thumbnail_size;
 const file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
-// 66 unreserved URI chars: https://www.rfc-editor.org/rfc/rfc3986#page-13
-const valid_uri_chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
 const media_uuid_len = 36;
 const localDate = new Date();
 const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
@@ -713,23 +711,29 @@ function createPost(data, client_permissions) {
 			audio_element.setAttribute("src", media_url + file["filename"].replace(" ", "%20"));
 			figure_element.appendChild(audio_element);
 		}
-		let pretty_filename;
+		let download_filename, caption_filename;
 		if (filename_extension_i == -1) {
-			pretty_filename = file["filename"].slice(0, file["filename"].length - media_uuid_len);
+			download_filename = file["filename"].slice(0, file["filename"].length - media_uuid_len);
+			caption_filename = download_filename.length < 32 ? download_filename : (download_filename.substr(0, 28) + "(...)");
 		}
 		else {
-			pretty_filename = file["filename"].slice(0, filename_extension_i - media_uuid_len) + file["filename"].slice(filename_extension_i, file["filename"].length);
+			download_filename = file["filename"].slice(0, filename_extension_i - media_uuid_len);
+			caption_filename = download_filename.length < 32 ? download_filename : (download_filename.substr(0, 28) + "(...)");
+			download_filename += file["filename"].slice(filename_extension_i, file["filename"].length);
+			caption_filename += file["filename"].slice(filename_extension_i, file["filename"].length);
 		}
 		let figcaption_element = document.createElement("figcaption");
 		let media_src = media_url + file["filename"].replace(" ", "%20");
 		let figcaption_element_a = document.createElement("a");
 		figcaption_element_a.setAttribute("href", media_src);
 		figcaption_element_a.setAttribute("target", "_blank");
-		figcaption_element_a.textContent = pretty_filename;
+		figcaption_element_a.textContent = caption_filename;
+		if (caption_filename.length !== download_filename.length)
+			figcaption_element_a.title = download_filename;
 
 		let file_download_button = document.createElement("a");
 		file_download_button.setAttribute("href", media_src);
-		file_download_button.setAttribute("download", pretty_filename);
+		file_download_button.setAttribute("download", download_filename);
 		file_download_button.setAttribute("title", "Download");
 		file_download_button.innerText = "\ud83d\udce5\ufe0e";
 
@@ -828,20 +832,6 @@ const callback = (entries, observer) => {
 }
 const scrolled_to_bottom_observer = new IntersectionObserver(callback, options);
 
-/*
-function sanitiseFileName(file_name) {
-	let sanitised_file_name = "";
-	for (let i = 0; i < file_name.length; i++) {
-		if (valid_uri_chars.indexOf(file_name[i]) === -1) {
-			sanitised_file_name += "_";
-		}
-		else {
-			sanitised_file_name += file_name[i];
-		}
-	}
-	return sanitised_file_name;
-}
-*/
 function decode_utf8(s) {
 	return decodeURIComponent(escape(s));
 }
@@ -921,8 +911,6 @@ class UploadedFile {
 	upload() {
 		let formdata = new FormData();
 		formdata.append("File_1", this.file);
-		// let file_name = sanitiseFileName(file_object.name);
-		// console.log("file_name: " + file_name);
 		let received_error = false;
 		let request = new XMLHttpRequest();
 		this.progress_element.max = this.file.size;
