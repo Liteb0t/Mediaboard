@@ -15,7 +15,6 @@
 #include "FuzeDBI.hpp"
 #include "FuzeHttp.hpp"
 #include "permission_managed_object.hpp"
-#include <boost/filesystem.hpp>
 #include <boost/smart_ptr.hpp>
 #include <mutex>
 #include <string>

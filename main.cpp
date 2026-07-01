@@ -9,9 +9,10 @@
 #include "permission_managed_object.hpp"
 #include "shared_state.hpp"
 #include <boost/asio/signal_set.hpp>
+#include <boost/bimap.hpp>
 #include <boost/dll.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
-#include <boost/filesystem/operations.hpp>
+#include <boost/hash2/md5.hpp>
 #include <boost/program_options.hpp>
 #include <boost/program_options/options_description.hpp>
 #include <boost/smart_ptr.hpp>
@@ -218,7 +219,7 @@ std::vector<TemplateMacro*> template_macros{
 	new TemplateConstant("mediaboard_version", current_version)
 };
 
-void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const std::filesystem::path& document_root, const std::filesystem::path& template_root) {
+void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const std::filesystem::path& document_root, const std::filesystem::path& template_root, const boost::bimap<std::string, std::string>& path_to_busted_path) {
 	std::println("Adding options to templates...");
 	for (auto option : options)
 		std::println("{} :: {}", option->token, option->string());
@@ -231,12 +232,26 @@ void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const s
 				out_filename = out_filename.substr(1);
 			std::print(" ->{} ", out_filename);
 			std::ofstream file_output_stream(document_root / out_filename);
-			std::string file_contents;
-			while (std::getline(file_template_stream, file_contents)) {
+			std::string file_line;
+			while (std::getline(file_template_stream, file_line)) {
 				for (auto option : options) {
-					boost::replace_all(file_contents, std::format("CONFIG_{}", option->token), option->string());
+					boost::replace_all(file_line, std::format("CONFIG_{}", option->token), option->string());
 				}
-				file_output_stream << file_contents << std::endl;
+				if (size_t file_token_i; (file_token_i = file_line.find("FILE_")) != std::string::npos) {
+					size_t file_token_value_i = file_token_i + sizeof "FILE_";
+					std::println("{}", file_line[file_token_value_i]);
+					if (file_line[file_token_value_i - 1] != '"')
+						throw std::runtime_error("FILE_ macro requires \" characters around path");
+					size_t closing_index = file_line.find('"', file_token_value_i);
+					std::println("{}", file_line[closing_index]);
+					if (closing_index == std::string::npos)
+						throw std::runtime_error("FILE_ macro missing closing \" character");
+					std::string file_token_value = file_line.substr(file_token_value_i, closing_index - file_token_value_i);
+					std::println("file_token_value: {}", file_token_value);
+					// TODO replace file_token_value with cache-busted version by finding path from map
+					// std::filesystem::path dependency_path = file_token_value;
+				}
+				file_output_stream << file_line << std::endl;
 			}
 			file_output_stream.close();
 			file_template_stream.close();
@@ -431,8 +446,40 @@ int main(int argc, char* argv[]) {
 
 	std::filesystem::path document_root = program_directories.data / "frontend";
 	std::filesystem::path template_root = program_directories.data / "frontend" / "templates";
+	boost::bimap<std::string, std::string> path_to_busted_path;
+	// std::unordered_map<std::filesystem::path, std::string> path_to_busted_filename;
 	try {
-		applyOptionsToTemplates(template_macros, document_root, template_root);
+		// applyOptionsToTemplates(template_macros, document_root, template_root);
+		// Phase 1 :: Compute hash of every file to be used in cache busting.
+		for (const auto& frontend_file : std::filesystem::recursive_directory_iterator(document_root)) {
+			if (!std::filesystem::is_regular_file(frontend_file))
+				continue;
+			std::cout << frontend_file << std::endl;
+			std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
+			char file_buffer[frontend_file.file_size()];
+			std::ifstream file_stream(frontend_file_path);
+			file_stream.read(file_buffer, frontend_file.file_size());
+			boost::hash2::md5_128 file_hash;
+			file_hash.update(file_buffer, sizeof file_buffer);
+			char file_hash_base64[sodium_base64_ENCODED_LEN(20, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
+			sodium_bin2base64(
+				file_hash_base64, sizeof file_hash_base64,
+				file_hash.result().data(), file_hash.result().size(),
+				// (unsigned char*)key_bytes, 20,
+				sodium_base64_VARIANT_URLSAFE_NO_PADDING
+			);
+			std::string frontend_filename = frontend_file_path.filename();
+			int file_extension_index;
+			if ((file_extension_index = frontend_filename.rfind(".")) == -1) {
+				file_extension_index = frontend_filename.size();
+			}
+			std::string busted_filename = frontend_filename.insert(file_extension_index, file_hash_base64);
+			std::filesystem::path busted_file_path = frontend_file_path.parent_path() / busted_filename;
+			std::println("For file {} got hash {}\nBusted path: {}", frontend_file_path.string(), file_hash_base64, busted_file_path.string());
+			path_to_busted_path.insert(boost::bimap<std::string, std::string>::value_type(frontend_file_path.string(), busted_file_path.string()));
+		}
+		// Phase 2 :: insert hashes into file paths
+		applyOptionsToTemplates(template_macros, document_root, template_root, path_to_busted_path);
 	}
 	catch (const std::exception& exception) {
 		std::println(std::cerr, "An error occured when generating frontend files: {}", exception.what());

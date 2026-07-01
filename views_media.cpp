@@ -6,7 +6,6 @@
 #include "shared_state.hpp"
 #include <boost/beast/http/status.hpp>
 // #include <boost/uuid/uuid.hpp>
-#include <boost/filesystem/operations.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 #ifdef WITH_MAGICK

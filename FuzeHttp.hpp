@@ -14,7 +14,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem/operations.hpp>
 #include <boost/json.hpp>
 #include <iostream>
 #include <variant>
@@ -407,22 +406,24 @@ public: // TODO change to protected if possible
 	std::optional<Client> getClientIfExists(FuzeHttp::Request req) const;
 	Client createClient(std::optional<int> account_id = {});
 	// std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
-
 	std::string createSession(int client_id);
-	const std::optional<Client> getClientFromSession(const std::string& session_id_base64) const;
-	void clearExpiredSessions();
-
-	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
 	std::string createInvite(int granted_group_id);
 	int getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const; // returns PUBLIC if none found
+	void clearExpiredSessions();
+	const std::filesystem::path& getDocumentRoot() const { return document_root; }
+protected:
+	const std::optional<Client> getClientFromSession(const std::string& session_id_base64) const;
+
+	// void createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password);
 
 	// std::variant<http::file_body::value_type, FuzeHttp::Response> openFile(std::filesystem::path path) const;
 
-	const std::filesystem::path& getDocumentRoot() const { return document_root; }
+
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;
 	std::filesystem::path document_root;
+	std::unordered_map<std::filesystem::path, std::string> document_etags;
 private:
 	FuzeDBI::Connection* fuze_dbi;
 	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);

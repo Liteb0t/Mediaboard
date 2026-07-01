@@ -1,5 +1,4 @@
 #include "migrations.hpp"
-#include <boost/filesystem/operations.hpp>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
