@@ -10,6 +10,9 @@
 #include "shared_state.hpp"
 #include <boost/asio/signal_set.hpp>
 #include <boost/bimap.hpp>
+#include <boost/json/object.hpp>
+#include <boost/json/serialize.hpp>
+#define BOOST_DLL_USE_STD_FS
 #include <boost/dll.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/hash2/md5.hpp>
@@ -219,45 +222,56 @@ std::vector<TemplateMacro*> template_macros{
 	new TemplateConstant("mediaboard_version", current_version)
 };
 
-void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const std::filesystem::path& document_root, const std::filesystem::path& template_root, const boost::bimap<std::string, std::string>& path_to_busted_path) {
+void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const std::filesystem::path& document_root/*,  const boost::bimap<std::string, std::string>& path_to_busted_path*/) {
 	std::println("Adding options to templates...");
 	for (auto option : options)
 		std::println("{} :: {}", option->token, option->string());
-	for (const std::filesystem::directory_entry& dir_entry : std::filesystem::directory_iterator(template_root)) {
-		if (std::filesystem::is_regular_file(dir_entry)) {
-			std::println("[applyOptionsToTemplates] path: {}", dir_entry.path().string());
-			std::ifstream file_template_stream(dir_entry.path());
-			std::string out_filename = dir_entry.path().filename().string();
-			if (out_filename[0] == '_')
-				out_filename = out_filename.substr(1);
-			std::print(" ->{} ", out_filename);
-			std::ofstream file_output_stream(document_root / out_filename);
-			std::string file_line;
-			while (std::getline(file_template_stream, file_line)) {
-				for (auto option : options) {
-					boost::replace_all(file_line, std::format("CONFIG_{}", option->token), option->string());
-				}
-				if (size_t file_token_i; (file_token_i = file_line.find("FILE_")) != std::string::npos) {
-					size_t file_token_value_i = file_token_i + sizeof "FILE_";
-					std::println("{}", file_line[file_token_value_i]);
-					if (file_line[file_token_value_i - 1] != '"')
-						throw std::runtime_error("FILE_ macro requires \" characters around path");
-					size_t closing_index = file_line.find('"', file_token_value_i);
-					std::println("{}", file_line[closing_index]);
-					if (closing_index == std::string::npos)
-						throw std::runtime_error("FILE_ macro missing closing \" character");
-					std::string file_token_value = file_line.substr(file_token_value_i, closing_index - file_token_value_i);
-					std::println("file_token_value: {}", file_token_value);
-					// TODO replace file_token_value with cache-busted version by finding path from map
-					// std::filesystem::path dependency_path = file_token_value;
-				}
-				file_output_stream << file_line << std::endl;
-			}
-			file_output_stream.close();
-			file_template_stream.close();
+	for (const std::filesystem::directory_entry& dir_entry : std::filesystem::recursive_directory_iterator(document_root)) {
+		if (!std::filesystem::is_regular_file(dir_entry))
+			continue;
+		int file_extension_index;
+		if ((file_extension_index = dir_entry.path().filename().string().rfind(".")) == -1) {
+			file_extension_index = dir_entry.path().filename().string().size();
 		}
-		// if (std::holds_alternative<std::string>(option))
-		// 	std::print("")
+		if (!dir_entry.path().filename().string().substr(0, file_extension_index).ends_with(".template"))
+			continue;
+		std::println("[applyOptionsToTemplates] path: {}", dir_entry.path().string());
+		std::ifstream file_template_stream(dir_entry.path());
+		std::string out_filename = dir_entry.path().filename().string().substr(0, file_extension_index - sizeof(".template")+1) + dir_entry.path().filename().string().substr(file_extension_index);
+		// if (out_filename.starts_with('_'))
+		// 	out_filename = out_filename.substr(1);
+		std::println(" ->{} ", out_filename);
+		std::ofstream file_output_stream(document_root / out_filename);
+		std::string file_line;
+		while (std::getline(file_template_stream, file_line)) {
+			for (auto option : options) {
+				boost::replace_all(file_line, std::format("CONFIG_{}", option->token), option->string());
+			}
+			if (size_t file_token_i; (file_token_i = file_line.find("FILE_")) != std::string::npos) {
+				size_t file_token_value_i = file_token_i + sizeof "FILE_";
+				// std::println("{}", file_line[file_token_value_i]);
+				if (file_line[file_token_value_i - 1] != '"')
+					throw std::runtime_error("FILE_ macro requires \" characters around path");
+				size_t closing_index = file_line.find('"', file_token_value_i);
+				// std::println("{}", file_line[closing_index]);
+				if (closing_index == std::string::npos)
+					throw std::runtime_error("FILE_ macro missing closing \" character");
+				std::string file_token_value = file_line.substr(file_token_value_i, closing_index - file_token_value_i);
+				std::println("file_token_value: {}", file_token_value);
+				std::filesystem::path file_token_path = file_token_value;
+				std::println("file_token_path: {}", file_token_value);
+				std::filesystem::path resolved_file_token_path = dir_entry.path().parent_path() / file_token_path;
+				std::println("resolved_file_token_path: {}", resolved_file_token_path.string());
+
+				// std::filesystem::path resolved_proximate_file_token_path = std::filesystem::proximate(file_token_path);
+				// std::println("resolved_file_token_path: {}", resolved_file_token_path.string());
+				// TODO replace file_token_value with cache-busted version by finding path from map
+				// std::filesystem::path dependency_path = file_token_value;
+			}
+			file_output_stream << file_line << std::endl;
+		}
+		file_output_stream.close();
+		file_template_stream.close();
 	}
 	std::println("Done.");
 }
@@ -280,7 +294,7 @@ int main(int argc, char* argv[]) {
 	}
 
 	std::error_code ec;
-	std::filesystem::path program_location = boost::dll::program_location().parent_path().string();
+	std::filesystem::path program_location = boost::dll::program_location().parent_path();
 	if (ec)
 		throw std::runtime_error("An error occured when attempting to get the current program's location.");
 	else
@@ -445,15 +459,58 @@ int main(int argc, char* argv[]) {
 	boost::asio::io_context io_context;
 
 	std::filesystem::path document_root = program_directories.data / "frontend";
-	std::filesystem::path template_root = program_directories.data / "frontend" / "templates";
+	std::filesystem::path manifest_file = program_directories.data / "manifest.json";
+	// std::filesystem::path template_root = program_directories.data / "frontend" / "templates";
 	boost::bimap<std::string, std::string> path_to_busted_path;
-	// std::unordered_map<std::filesystem::path, std::string> path_to_busted_filename;
+	std::unordered_map<std::string, std::filesystem::path> busted_target_to_path;
 	try {
+		std::unordered_map<std::string /*target*/, std::string /*etag*/> manifest_frontend_etags;
+		if (!std::filesystem::exists(manifest_file)) {
+
+			for (const auto& frontend_file : std::filesystem::recursive_directory_iterator(document_root)) {
+				std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
+				std::string file_last_modified = std::to_string(std::filesystem::last_write_time(frontend_file).time_since_epoch().count());
+				// char file_buffer[frontend_file.file_size()];
+				// std::ifstream file_stream(frontend_file_path);
+				// file_stream.read(file_buffer, frontend_file.file_size());
+				boost::hash2::md5_128 file_timestamp_hash;
+				file_timestamp_hash.update(file_last_modified.c_str(), file_last_modified.length());
+				char file_timestamp_hash_base64[sodium_base64_ENCODED_LEN(128 / 8, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
+				sodium_bin2base64(
+					file_timestamp_hash_base64, sizeof file_timestamp_hash_base64,
+					file_timestamp_hash.result().data(), file_timestamp_hash.result().size(),
+					// (unsigned char*)key_bytes, 20,
+					sodium_base64_VARIANT_URLSAFE_NO_PADDING
+				);
+				manifest_frontend_etags.emplace(frontend_file_path.string(), file_timestamp_hash_base64);
+			}
+			boost::json::object manifest_obj;
+			boost::json::object manifest_frontend_obj;
+			for (const auto& target : manifest_frontend_etags)
+				manifest_frontend_obj.emplace(target.first, target.second);
+			manifest_obj.emplace("frontend", manifest_frontend_obj);
+			std::ofstream manifest_json_out(manifest_file);
+			std::string json_as_str = boost::json::serialize(manifest_obj);
+			manifest_json_out.write(json_as_str.c_str(), json_as_str.length());
+		}
+		else {
+			std::ifstream manifest_json_in(manifest_file);
+			std::string json_as_str;
+			std::string file_line;
+			while (std::getline(manifest_json_in, file_line))
+				json_as_str += file_line;
+			boost::json::object manifest_obj = boost::json::parse(json_as_str).as_object();
+			for (const auto& frontend_json_entry : manifest_obj.at("frontend").as_object()) {
+				manifest_frontend_etags.emplace(std::string(frontend_json_entry.key()), frontend_json_entry.value().as_string());
+			}
+		}
 		// applyOptionsToTemplates(template_macros, document_root, template_root);
 		// Phase 1 :: Compute hash of every file to be used in cache busting.
-		for (const auto& frontend_file : std::filesystem::recursive_directory_iterator(document_root)) {
-			if (!std::filesystem::is_regular_file(frontend_file))
-				continue;
+		// for (const auto& frontend_file : std::filesystem::recursive_directory_iterator(document_root)) {
+			// if (!std::filesystem::is_regular_file(frontend_file))
+			// 	continue;
+
+			/*
 			std::cout << frontend_file << std::endl;
 			std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
 			char file_buffer[frontend_file.file_size()];
@@ -471,15 +528,22 @@ int main(int argc, char* argv[]) {
 			std::string frontend_filename = frontend_file_path.filename();
 			int file_extension_index;
 			if ((file_extension_index = frontend_filename.rfind(".")) == -1) {
-				file_extension_index = frontend_filename.size();
+				file_extension_index = frontend_filename.length();
 			}
+			frontend_filename = frontend_filename.substr(0, file_extension_index - sizeof(".template")+1);
+			if (frontend_filename.length() != file_extension_index)
+				frontend_filename += frontend_filename.substr(file_extension_index);
+
 			std::string busted_filename = frontend_filename.insert(file_extension_index, file_hash_base64);
 			std::filesystem::path busted_file_path = frontend_file_path.parent_path() / busted_filename;
+			frontend_file_path = frontend_file_path.parent_path() / frontend_filename;
 			std::println("For file {} got hash {}\nBusted path: {}", frontend_file_path.string(), file_hash_base64, busted_file_path.string());
-			path_to_busted_path.insert(boost::bimap<std::string, std::string>::value_type(frontend_file_path.string(), busted_file_path.string()));
-		}
+			// path_to_busted_path.insert(boost::bimap<std::string, std::string>::value_type(frontend_file_path.string(), busted_file_path.string()));
+			busted_target_to_path.emplace(frontend_file_path.string(), busted_file_path);
+			*/
+		// }
 		// Phase 2 :: insert hashes into file paths
-		applyOptionsToTemplates(template_macros, document_root, template_root, path_to_busted_path);
+		// applyOptionsToTemplates(template_macros, document_root/*, path_to_busted_path*/);
 	}
 	catch (const std::exception& exception) {
 		std::println(std::cerr, "An error occured when generating frontend files: {}", exception.what());

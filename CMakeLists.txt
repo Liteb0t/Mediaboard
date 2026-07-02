@@ -19,7 +19,7 @@ include(GNUInstallDirs)
 
 # Find dependencies sneeded by the project
 cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
-find_package(Boost 1.88 COMPONENTS filesystem json program_options REQUIRED)
+find_package(Boost 1.88 COMPONENTS json program_options REQUIRED)
 
 add_executable(MediaboardServer)
 if(WITH_MAGICK)
@@ -56,7 +56,6 @@ else()
 endif()
 target_link_libraries(MediaboardServer
   PRIVATE
-    Boost::filesystem
     Boost::json
     Boost::program_options
     sodium
@@ -89,11 +88,32 @@ install(
     database_template.sql
   DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard
 )
+
+# file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend)
+add_custom_target(frontend
+  WORKING_DIRECTORY
+    ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend
+  DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/frontend
+  VERBATIM
+)
+# Maybe change to copy files individually, since directory copy brings unwanted CMakeLists.txt and swap files into the build
+add_custom_command(
+  TARGET frontend POST_BUILD
+  COMMAND
+    ${CMAKE_COMMAND} -E copy_directory
+      ${CMAKE_CURRENT_SOURCE_DIR}/frontend
+      ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/
+)
+install(
+  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/frontend
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard/
+)
 add_dependencies(MediaboardServer
   frontend
 )
 add_subdirectory(assets)
-add_subdirectory(frontend)
+# add_subdirectory(frontend)
 add_subdirectory(dependencies)
 
 install(
