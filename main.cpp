@@ -222,7 +222,24 @@ std::vector<TemplateMacro*> template_macros{
 	new TemplateConstant("mediaboard_version", current_version)
 };
 
-void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const std::filesystem::path& document_root/*,  const boost::bimap<std::string, std::string>& path_to_busted_path*/) {
+bool fileNameEndsWith(const std::string& file_name, const std::string& delimiter) {
+	int file_extension_index;
+	if ((file_extension_index = file_name.rfind(".")) == -1) {
+		file_extension_index = file_name.size();
+	}
+	return file_name.substr(0, file_extension_index).ends_with(delimiter);
+}
+
+std::string insertExtensionToFileName(const std::string& file_name, const std::string& extension) {
+	int file_extension_index;
+	if ((file_extension_index = file_name.rfind(".")) == -1) {
+		file_extension_index = file_name.size();
+	}
+	std::string new_file_name = file_name.substr(0, file_extension_index) + extension + file_name.substr(file_extension_index);
+	return new_file_name;
+}
+
+void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const std::filesystem::path& document_root, const std::unordered_map<std::string /*target*/, std::string /*etag*/> manifest_frontend_etags/*,  const boost::bimap<std::string, std::string>& path_to_busted_path*/) {
 	std::println("Adding options to templates...");
 	for (auto option : options)
 		std::println("{} :: {}", option->token, option->string());
@@ -237,11 +254,11 @@ void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const s
 			continue;
 		std::println("[applyOptionsToTemplates] path: {}", dir_entry.path().string());
 		std::ifstream file_template_stream(dir_entry.path());
-		std::string out_filename = dir_entry.path().filename().string().substr(0, file_extension_index - sizeof(".template")+1) + dir_entry.path().filename().string().substr(file_extension_index);
+		std::string out_filename = dir_entry.path().filename().string().substr(0, file_extension_index - sizeof(".template")+1) + ".GENERATED" + dir_entry.path().filename().string().substr(file_extension_index);
 		// if (out_filename.starts_with('_'))
 		// 	out_filename = out_filename.substr(1);
 		std::println(" ->{} ", out_filename);
-		std::ofstream file_output_stream(document_root / out_filename);
+		std::ofstream file_output_stream(dir_entry.path().parent_path() / out_filename);
 		std::string file_line;
 		while (std::getline(file_template_stream, file_line)) {
 			for (auto option : options) {
@@ -262,8 +279,14 @@ void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const s
 				std::println("file_token_path: {}", file_token_value);
 				std::filesystem::path resolved_file_token_path = dir_entry.path().parent_path() / file_token_path;
 				std::println("resolved_file_token_path: {}", resolved_file_token_path.string());
+				std::filesystem::path proximate_file_token_path = std::filesystem::proximate(resolved_file_token_path, document_root);
+				if (auto it = manifest_frontend_etags.find(proximate_file_token_path.string()); it != manifest_frontend_etags.end()) {
+					std::println("Found manifest etag! {}", it->second);
+				}
+				else
+					throw std::runtime_error("Busted path not found");
 
-				// std::filesystem::path resolved_proximate_file_token_path = std::filesystem::proximate(file_token_path);
+				// std::filesystem::path proximate_file_token_path = std::filesystem::proximate(file_token_path);
 				// std::println("resolved_file_token_path: {}", resolved_file_token_path.string());
 				// TODO replace file_token_value with cache-busted version by finding path from map
 				// std::filesystem::path dependency_path = file_token_value;
@@ -274,6 +297,39 @@ void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, const s
 		file_template_stream.close();
 	}
 	std::println("Done.");
+}
+
+template<typename BoostHashType, typename StringType>
+requires (requires(BoostHashType hasher, const StringType& str){hasher.update(str.c_str(), str.length());})
+std::string getHash(const StringType& source_data) {
+	BoostHashType hash;
+	hash.update(source_data.c_str(), source_data.length());
+	char hash_base64[sodium_base64_ENCODED_LEN(128 / 8, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
+	sodium_bin2base64(
+		hash_base64, sizeof hash_base64,
+		hash.result().data(), hash.result().size(),
+		// (unsigned char*)key_bytes, 20,
+		sodium_base64_VARIANT_URLSAFE_NO_PADDING
+	);
+	return hash_base64;
+}
+
+std::string getEtagFromFile(const std::filesystem::path& file) {
+	std::string file_last_modified = std::to_string(std::filesystem::last_write_time(file).time_since_epoch().count());
+	return getHash<boost::hash2::md5_128>(file_last_modified);
+}
+
+std::string writeManifestJson(const std::filesystem::path& manifest_file, const std::unordered_map<std::string /*target*/, std::string /*etag*/>& manifest_frontend_etags, const std::string& combined_hash) {
+	boost::json::object manifest_obj;
+	boost::json::object manifest_frontend_obj;
+	for (const auto& target : manifest_frontend_etags)
+		manifest_frontend_obj.emplace(target.first, target.second);
+	manifest_obj.emplace("frontend", manifest_frontend_obj);
+	manifest_obj.emplace("combined_hash", combined_hash);
+	std::ofstream manifest_json_out(manifest_file);
+	std::string json_as_str = boost::json::serialize(manifest_obj);
+	manifest_json_out.write(json_as_str.c_str(), json_as_str.length());
+	return json_as_str;
 }
 
 // struct TemplateOptionsStruct {
@@ -357,6 +413,7 @@ int main(int argc, char* argv[]) {
 
 	boost::program_options::options_description command_line_options;
 	command_line_options.add(command_line_specific_options).add(universal_options);
+	std::filesystem::path config_file_path;
 
 	boost::program_options::variables_map variable_map;
 	try {
@@ -365,7 +422,7 @@ int main(int argc, char* argv[]) {
 
 		if (variable_map.count("config"))
 			config_file = config_file_str;
-		std::filesystem::path config_file_path = getConfigDirectory(program_location, config_file, data_directory_config);
+		config_file_path = getConfigDirectory(program_location, config_file, data_directory_config);
 		// Load config.ini
 		std::ifstream config_file_ifstream(config_file_path.string());
 		if (config_file_ifstream) {
@@ -465,85 +522,69 @@ int main(int argc, char* argv[]) {
 	std::unordered_map<std::string, std::filesystem::path> busted_target_to_path;
 	try {
 		std::unordered_map<std::string /*target*/, std::string /*etag*/> manifest_frontend_etags;
-		if (!std::filesystem::exists(manifest_file)) {
-
-			for (const auto& frontend_file : std::filesystem::recursive_directory_iterator(document_root)) {
-				std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
-				std::string file_last_modified = std::to_string(std::filesystem::last_write_time(frontend_file).time_since_epoch().count());
-				// char file_buffer[frontend_file.file_size()];
-				// std::ifstream file_stream(frontend_file_path);
-				// file_stream.read(file_buffer, frontend_file.file_size());
-				boost::hash2::md5_128 file_timestamp_hash;
-				file_timestamp_hash.update(file_last_modified.c_str(), file_last_modified.length());
-				char file_timestamp_hash_base64[sodium_base64_ENCODED_LEN(128 / 8, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
-				sodium_bin2base64(
-					file_timestamp_hash_base64, sizeof file_timestamp_hash_base64,
-					file_timestamp_hash.result().data(), file_timestamp_hash.result().size(),
-					// (unsigned char*)key_bytes, 20,
-					sodium_base64_VARIANT_URLSAFE_NO_PADDING
-				);
-				manifest_frontend_etags.emplace(frontend_file_path.string(), file_timestamp_hash_base64);
-			}
-			boost::json::object manifest_obj;
-			boost::json::object manifest_frontend_obj;
-			for (const auto& target : manifest_frontend_etags)
-				manifest_frontend_obj.emplace(target.first, target.second);
-			manifest_obj.emplace("frontend", manifest_frontend_obj);
-			std::ofstream manifest_json_out(manifest_file);
-			std::string json_as_str = boost::json::serialize(manifest_obj);
-			manifest_json_out.write(json_as_str.c_str(), json_as_str.length());
-		}
-		else {
+		std::optional<std::string> old_combined_hash;
+		bool manifest_file_existed;
+		if (std::filesystem::exists(manifest_file)) {
+			manifest_file_existed = true;
 			std::ifstream manifest_json_in(manifest_file);
-			std::string json_as_str;
-			std::string file_line;
+			std::string file_line, json_as_str;
 			while (std::getline(manifest_json_in, file_line))
 				json_as_str += file_line;
 			boost::json::object manifest_obj = boost::json::parse(json_as_str).as_object();
 			for (const auto& frontend_json_entry : manifest_obj.at("frontend").as_object()) {
-				manifest_frontend_etags.emplace(std::string(frontend_json_entry.key()), frontend_json_entry.value().as_string());
+				std::filesystem::path frontend_file_path = std::string(frontend_json_entry.key());
+				if (!std::filesystem::is_regular_file(frontend_file_path))
+					continue;
+				if (fileNameEndsWith(frontend_file_path.filename(), ".template"))
+					continue;
+				if (fileNameEndsWith(frontend_file_path.filename(), ".GENERATED"))
+					continue;
+				// std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
+				if (!manifest_frontend_etags.contains(frontend_file_path.string()))
+					manifest_frontend_etags.emplace(std::string(frontend_json_entry.key()), frontend_json_entry.value().as_string());
+			}
+			old_combined_hash = manifest_obj.at("combined_hash").as_string();
+		}
+		else
+			manifest_file_existed = false;
+		// create manifest JSON OBJECT
+		boost::json::object manifest_obj;
+		boost::json::object manifest_frontend_json_obj;
+		for (const auto& frontend_file : std::filesystem::recursive_directory_iterator(document_root)) {
+			if (!std::filesystem::is_regular_file(frontend_file))
+				continue;
+			if (fileNameEndsWith(frontend_file.path().filename(), ".GENERATED"))
+				continue;
+			std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
+			if (!manifest_frontend_etags.contains(frontend_file_path.string())) {
+				std::string new_etag = getEtagFromFile(frontend_file);
+				if (!fileNameEndsWith(frontend_file.path().filename(), ".template"))
+					manifest_frontend_etags.emplace(frontend_file_path.string(), new_etag);
+				manifest_frontend_json_obj.emplace(frontend_file_path.string(), new_etag);
 			}
 		}
-		// applyOptionsToTemplates(template_macros, document_root, template_root);
-		// Phase 1 :: Compute hash of every file to be used in cache busting.
-		// for (const auto& frontend_file : std::filesystem::recursive_directory_iterator(document_root)) {
-			// if (!std::filesystem::is_regular_file(frontend_file))
-			// 	continue;
+		std::string config_hash = getHash<boost::hash2::md5_128>(std::to_string(std::filesystem::last_write_time(config_file_path).time_since_epoch().count()));
+		std::string new_frontend_hash = getHash<boost::hash2::md5_128>(boost::json::serialize(manifest_frontend_json_obj));
+		std::string new_combined_hash = getHash<boost::hash2::md5_128>(config_hash + new_frontend_hash);
+		manifest_obj.emplace("frontend", manifest_frontend_json_obj);
+		manifest_obj.emplace("combined_hash", new_combined_hash);
+		std::string new_json_as_str = boost::json::serialize(manifest_obj);
+		std::ofstream manifest_json_out(manifest_file);
+		manifest_json_out.write(new_json_as_str.c_str(), new_json_as_str.length());
+		// if combined_hash is different, write to file and process templates
 
-			/*
-			std::cout << frontend_file << std::endl;
-			std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
-			char file_buffer[frontend_file.file_size()];
-			std::ifstream file_stream(frontend_file_path);
-			file_stream.read(file_buffer, frontend_file.file_size());
-			boost::hash2::md5_128 file_hash;
-			file_hash.update(file_buffer, sizeof file_buffer);
-			char file_hash_base64[sodium_base64_ENCODED_LEN(20, sodium_base64_VARIANT_URLSAFE_NO_PADDING)];
-			sodium_bin2base64(
-				file_hash_base64, sizeof file_hash_base64,
-				file_hash.result().data(), file_hash.result().size(),
-				// (unsigned char*)key_bytes, 20,
-				sodium_base64_VARIANT_URLSAFE_NO_PADDING
-			);
-			std::string frontend_filename = frontend_file_path.filename();
-			int file_extension_index;
-			if ((file_extension_index = frontend_filename.rfind(".")) == -1) {
-				file_extension_index = frontend_filename.length();
-			}
-			frontend_filename = frontend_filename.substr(0, file_extension_index - sizeof(".template")+1);
-			if (frontend_filename.length() != file_extension_index)
-				frontend_filename += frontend_filename.substr(file_extension_index);
+		// writeManifestJson(manifest_file, manifest_frontend_etags, config_file_path);
 
-			std::string busted_filename = frontend_filename.insert(file_extension_index, file_hash_base64);
-			std::filesystem::path busted_file_path = frontend_file_path.parent_path() / busted_filename;
-			frontend_file_path = frontend_file_path.parent_path() / frontend_filename;
-			std::println("For file {} got hash {}\nBusted path: {}", frontend_file_path.string(), file_hash_base64, busted_file_path.string());
-			// path_to_busted_path.insert(boost::bimap<std::string, std::string>::value_type(frontend_file_path.string(), busted_file_path.string()));
-			busted_target_to_path.emplace(frontend_file_path.string(), busted_file_path);
-			*/
-		// }
-		// Phase 2 :: insert hashes into file paths
-		// applyOptionsToTemplates(template_macros, document_root/*, path_to_busted_path*/);
+		// json_as_str = writeManifestJson(manifest_file, manifest_frontend_etags);
+
+		std::println("manifest_frontend_etags:");
+		for (const auto& target : manifest_frontend_etags)
+			std::println("{} :: {}", target.first, target.second);
+
+		if (!old_combined_hash || (old_combined_hash.value() != new_combined_hash))
+			applyOptionsToTemplates(template_macros, document_root, manifest_frontend_etags);
+		else
+			std::println("No changes to frontend detected.");
 	}
 	catch (const std::exception& exception) {
 		std::println(std::cerr, "An error occured when generating frontend files: {}", exception.what());
