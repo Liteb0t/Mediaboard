@@ -64,7 +64,7 @@ target_sources(MediaboardServer
   PRIVATE
     Board.cpp
     FuzeHttp.cpp
-    # FuzeMigrationHelper.cpp
+    FuzeHttpUtils.cpp
     Group.cpp
     http_session.cpp
     listener.cpp
@@ -88,23 +88,36 @@ install(
     database_template.sql
   DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard
 )
-
+set(frontend_list "") ## its a list which will be used as DEPENDS on add_custom_target
 # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend)
-add_custom_target(frontend
-  WORKING_DIRECTORY
-    ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend
+file(GLOB_RECURSE frontend_files CONFIGURE_DEPENDS RELATIVE ${CMAKE_SOURCE_DIR}/frontend ${CMAKE_SOURCE_DIR}/frontend/*)
+foreach(file ${frontend_files})
+  set(destination ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/${file})
+  add_custom_command(
+    OUTPUT ${destination}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/frontend/${file} ${destination}
+    DEPENDS ${CMAKE_SOURCE_DIR}/frontend/${file}
+    COMMENT "Copying ${CMAKE_SOURCE_DIR}/frontend/${file}"
+  )
+  list(APPEND frontend_list ${destination})
+endforeach()
+
+add_custom_target(frontend ALL
+  # WORKING_DIRECTORY
+  #   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend
   DEPENDS
-    ${CMAKE_CURRENT_SOURCE_DIR}/frontend
-  VERBATIM
+    ${frontend_list}
+    # ${CMAKE_CURRENT_SOURCE_DIR}/frontend
+ #  VERBATIM
 )
 # Maybe change to copy files individually, since directory copy brings unwanted CMakeLists.txt and swap files into the build
-add_custom_command(
-  TARGET frontend POST_BUILD
-  COMMAND
-    ${CMAKE_COMMAND} -E copy_directory
-      ${CMAKE_CURRENT_SOURCE_DIR}/frontend
-      ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/
-)
+# add_custom_command(
+#   TARGET frontend POST_BUILD
+#   COMMAND
+#     ${CMAKE_COMMAND} -E copy_directory
+#       ${CMAKE_CURRENT_SOURCE_DIR}/frontend
+#       ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/
+# )
 install(
   DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/frontend
   DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard/
