@@ -87,6 +87,17 @@ std::string FuzeHttp::getDecodedURL(boost::string_view raw_URL) {
 	return decoded_url;
 }
 
+std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
+	// path_name excludes URL parameters (stuff after '?')
+	// removes trailing / but leaves first /
+	std::string_view path_name = source_URL;
+	int decoded_url_questionmark_index = source_URL.rfind('?');
+	if (decoded_url_questionmark_index != std::string::npos)
+		path_name = path_name.substr(0, decoded_url_questionmark_index);
+	std::cout << "path_name: " << path_name << std::endl;
+	return path_name;
+}
+
 void FuzeHttp::generatePasswordHashHashBase64(char* password_hash_hash_base64, size_t password_hash_hash_base64_len, const char* password_hash_base64, size_t password_hash_base64_len) {
 	// hash of password hash in base64 is stored in DB
 	unsigned char password_hash_hash[crypto_generichash_BYTES];
@@ -100,19 +111,6 @@ void FuzeHttp::generatePasswordHashHashBase64(char* password_hash_hash_base64, s
 		password_hash_hash, sizeof password_hash_hash,
 		sodium_base64_VARIANT_URLSAFE
 	);
-}
-
-std::string_view FuzeHttp::getPathName(const std::string& source_URL) {
-	// path_name excludes URL parameters (stuff after '?')
-	// removes trailing / but leaves first /
-	std::string_view path_name = source_URL;
-	int decoded_url_questionmark_index = source_URL.rfind('?');
-	if (decoded_url_questionmark_index != std::string::npos)
-		path_name = path_name.substr(0, decoded_url_questionmark_index);
-	if (path_name.back() == '/')
-		path_name = path_name.substr(0, path_name.size() - 1);
-	std::cout << "path_name: " << path_name << std::endl;
-	return path_name;
 }
 
 template<>
@@ -185,8 +183,8 @@ http::response<http::empty_body> FuzeHttp::buildResponse(FuzeHttp::Response basi
 	return res;
 }
 
-FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
-		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi) {
+FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
+		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi), busted_target_to_target(busted_target_to_target), files_generated_from_templates(files_generated_from_templates) {
 	// Load sessions from the database
 	for (auto session_tuple :fuze_dbi->queryRows<std::tuple<int, std::string, int>>("SELECT client_id, key, created_at FROM session")) {
 		int seconds_since_epoch = std::get<2>(session_tuple); // TODO use long instead of int

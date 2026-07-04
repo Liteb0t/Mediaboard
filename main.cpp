@@ -9,7 +9,6 @@
 #include "permission_managed_object.hpp"
 #include "shared_state.hpp"
 #include <boost/asio/signal_set.hpp>
-#include <boost/bimap.hpp>
 #include <boost/json/object.hpp>
 #include <boost/json/serialize.hpp>
 #define BOOST_DLL_USE_STD_FS
@@ -327,10 +326,11 @@ int main(int argc, char* argv[]) {
 	std::filesystem::path document_root = program_directories.data / "frontend";
 	std::filesystem::path manifest_file = program_directories.data / "manifest.json";
 	// std::filesystem::path template_root = program_directories.data / "frontend" / "templates";
-	boost::bimap<std::string, std::string> path_to_busted_path;
-	std::unordered_map<std::string, std::filesystem::path> busted_target_to_path;
+	// boost::bimap<std::string, std::string> path_to_busted_path;
+	// std::unordered_map<std::string, std::filesystem::path> busted_target_to_path;
+	std::unordered_map<std::string /*target*/, std::string /*etag*/> manifest_frontend_etags;
+	std::unordered_set<std::string> files_generated_from_templates;
 	try {
-		std::unordered_map<std::string /*target*/, std::string /*etag*/> manifest_frontend_etags;
 		std::optional<std::string> old_combined_hash;
 		bool manifest_file_existed;
 		if (std::filesystem::exists(manifest_file)) {
@@ -362,10 +362,14 @@ int main(int argc, char* argv[]) {
 		for (const auto& frontend_file : std::filesystem::recursive_directory_iterator(document_root)) {
 			if (!std::filesystem::is_regular_file(frontend_file))
 				continue;
-			if (fileNameEndsWith(frontend_file.path().filename(), ".GENERATED"))
-				continue;
 			std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
-			if (!manifest_frontend_etags.contains(frontend_file_path.string())) {
+			// TODO fix bug where two starts are required to add to files_generated_from_templates
+			if (fileNameEndsWith(frontend_file_path.filename(), ".GENERATED")) {
+				files_generated_from_templates.emplace(
+					frontend_file_path.string().substr(0, frontend_file_path.string().rfind(".GENERATED")) +
+					frontend_file_path.string().substr(frontend_file_path.string().rfind('.')));
+			}
+			else if (!manifest_frontend_etags.contains(frontend_file_path.string())) {
 				std::string new_etag = getEtagFromFile(frontend_file);
 				if (!fileNameEndsWith(frontend_file.path().filename(), ".template"))
 					manifest_frontend_etags.emplace(frontend_file_path.string(), new_etag);
@@ -403,7 +407,15 @@ int main(int argc, char* argv[]) {
 	std::cout << "Initialising shared state..." << std::endl;
 	shared_state* state;
 	try {
-		state = new shared_state(document_root, program_directories.media, state_config, fuze_database_interface);
+		std::unordered_map<std::string, std::string> busted_target_to_target;
+		for (const auto& target : manifest_frontend_etags)
+			busted_target_to_target.emplace(FuzeHttp::insertExtensionToFileName(target.first, target.second), target.first);
+		std::println("Busted target to target:");
+		for (const auto& target : busted_target_to_target)
+			std::println("{} :: {}", target.first, target.second);
+		for (const std::string& target : files_generated_from_templates)
+			std::println("Target to file generated from template: {}", target);
+		state = new shared_state(fuze_database_interface, document_root, program_directories.media, state_config, std::move(busted_target_to_target), std::move(files_generated_from_templates));
 		state->start();
 	}
 	catch (const std::exception& exception) {

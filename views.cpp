@@ -2,6 +2,7 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views.hpp"
 #include "FuzeHttp.hpp"
+#include "FuzeHttpUtils.hpp"
 #include "permission_managed_object.hpp"
 #include "shared_state.hpp"
 #include <boost/beast/http/status.hpp>
@@ -13,9 +14,21 @@ FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
 	// 	std::println("{} : {}", std::string(header.name_string()), std::string(header.value()));
 	// }
 	std::println("Serving from document root");
+	// TODO move logic to FuzeHttp internal
+	// TODO send etag header
+	std::string target = std::string(FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target())).substr(1));
+	// If cache busted target found, get the path without the hash
+	if (target.empty() || target.ends_with('/'))
+		target += "index.html";
+	if (auto it = state->busted_target_to_target.find(target); it != state->busted_target_to_target.end())
+		target = it->second;
+	// If path leads to target of .GENERATED file, add the filename extension
+	else if (auto it = state->files_generated_from_templates.find(target); it != state->files_generated_from_templates.end())
+		target = FuzeHttp::insertExtensionToFileName(*it, ".GENERATED");
+	std::println("[showMainPage] will serve {}", target);
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.file = std::format("{}/{}", state->getDocumentRoot().string(), FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target()))) // TODO change this because it sucks
+		.file = std::format("{}/{}", state->getDocumentRoot().string(), target) // TODO change this because it sucks
 	};
 }
 

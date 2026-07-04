@@ -155,8 +155,8 @@ inline void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, 
 				std::filesystem::path proximate_file_token_path = std::filesystem::proximate(resolved_file_token_path, document_root);
 				if (auto it = manifest_frontend_etags.find(proximate_file_token_path.string()); it != manifest_frontend_etags.end()) {
 					std::println("Found manifest etag! {}", it->second);
-					file_line.erase(file_token_i+1, closing_index - file_token_i);
-					file_line.insert(file_token_i+1, insertExtensionToFileName(file_token_value, it->second));
+					file_line.erase(file_token_i, closing_index+1 - file_token_i);
+					file_line.insert(file_token_i, insertExtensionToFileName(file_token_value, it->second));
 				}
 				else
 					throw std::runtime_error(std::format("Etag not found\nPath: {}\n Line: {}", proximate_file_token_path.string(), file_line));

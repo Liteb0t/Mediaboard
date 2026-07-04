@@ -16,8 +16,8 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 
-shared_state::shared_state(std::filesystem::path document_root, std::filesystem::path media_location, StateConfig config, FuzeDBI::Connection* fuze_database_interface)
-		: State(fuze_database_interface),
+shared_state::shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
+		: State(fuze_database_interface, std::move(busted_target_to_target), std::move(files_generated_from_templates)),
 		config(config),
 		fuze_dbi(fuze_database_interface),
 		media_location(std::move(media_location)) {

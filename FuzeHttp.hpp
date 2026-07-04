@@ -346,7 +346,7 @@ public:
 			else
 				section = path_name.substr(location_start_bound, location_end_bound - location_start_bound);
 
-			// std::cout << "[" <<section<<"]";
+			std::println("section [{}]", section);
 			std::erase_if(matched_views, [this, &req, &section, section_index](const int view_id){
 				return this->views.at(view_id)->attemptPathMatch(req.method(), section, section_index) == false;
 			});
@@ -402,7 +402,7 @@ private:
 
 class State : public PermissionManager {
 public: // TODO change to protected if possible
-	State(FuzeDBI::Connection* fuze_dbi);
+	State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
 	std::optional<Client> getClientIfExists(FuzeHttp::Request req) const;
 	Client createClient(std::optional<int> account_id = {});
 	// std::variant<Client, FuzeHttp::Response> getRequiredClient(FuzeHttp::Request req) const;
@@ -411,6 +411,8 @@ public: // TODO change to protected if possible
 	int getGrantedGroupIdFromInvite(const std::string& invite_key_base64) const; // returns PUBLIC if none found
 	void clearExpiredSessions();
 	const std::filesystem::path& getDocumentRoot() const { return document_root; }
+	const std::unordered_map<std::string, std::string> busted_target_to_target;
+	const std::unordered_set<std::string> files_generated_from_templates;
 protected:
 	const std::optional<Client> getClientFromSession(const std::string& session_id_base64) const;
 
@@ -423,7 +425,7 @@ protected:
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;
 	std::filesystem::path document_root;
-	std::unordered_map<std::filesystem::path, std::string> document_etags;
+	// std::unordered_map<std::filesystem::path, std::string> document_etags;
 private:
 	FuzeDBI::Connection* fuze_dbi;
 	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);

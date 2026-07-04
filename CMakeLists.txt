@@ -103,21 +103,9 @@ foreach(file ${frontend_files})
 endforeach()
 
 add_custom_target(frontend ALL
-  # WORKING_DIRECTORY
-  #   ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend
   DEPENDS
     ${frontend_list}
-    # ${CMAKE_CURRENT_SOURCE_DIR}/frontend
- #  VERBATIM
 )
-# Maybe change to copy files individually, since directory copy brings unwanted CMakeLists.txt and swap files into the build
-# add_custom_command(
-#   TARGET frontend POST_BUILD
-#   COMMAND
-#     ${CMAKE_COMMAND} -E copy_directory
-#       ${CMAKE_CURRENT_SOURCE_DIR}/frontend
-#       ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/
-# )
 install(
   DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/frontend
   DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard/
