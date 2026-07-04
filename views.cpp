@@ -26,7 +26,7 @@ FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
 	else if (auto it = state->files_generated_from_templates.find(target); it != state->files_generated_from_templates.end())
 		target = FuzeHttp::insertExtensionToFileName(*it, ".GENERATED");
 	std::println("[showMainPage] will serve {}", target);
-	return FuzeHttp::Response{
+	return {
 		.status = http::status::ok,
 		.file = std::format("{}/{}", state->getDocumentRoot().string(), target) // TODO change this because it sucks
 	};
