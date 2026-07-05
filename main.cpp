@@ -153,6 +153,19 @@ int main(int argc, char* argv[]) {
 #else
 	std::println("Fuze Mediaboard was compiled without ImageMagick support. Certain features such as thumbnail creation will not work.");
 #endif
+	StateConfig state_config;	// Macros which link to state_config
+	// template_macros.push_back(new TemplateOptionPtr("thumbnail_file_extension", &state_config.thumbnail_file_extension, {.default_value=std::string("jpg")}));
+	// template_macros.push_back(new TemplateOptionPtr("thumbnail_size", &state_config.thumbnail_size, {.default_value=static_cast<unsigned int>(150)}));
+	// template_macros.push_back(new TemplateOptionPtr("file_size_limit_mb", &state_config.file_size_limit_mb, {.default_value=static_cast<unsigned int>(25)}));
+	// template_macros.push_back(new TemplateOptionPtr("avif_thumbnails", &state_config.avif_thumbnails, {.default_value=false}));
+	// template_macros.push_back(new TemplateOptionPtr("heic_thumbnails", &state_config.heic_thumbnails, {.default_value=false, .description="Ignored when convert_heic_to_jpg is enabled."}));
+	// template_macros.push_back(new TemplateOptionPtr("svg_thumbnails", &state_config.svg_thumbnails, {.default_value=false}));
+	// template_macros.push_back(new TemplateOptionPtr("webp_thumbnails", &state_config.webp_thumbnails, {.default_value=false}));
+	// template_macros.push_back(new TemplateOptionPtr("mp4_thumbnails", &state_config.mp4_thumbnails, {.default_value=false}));
+	// template_macros.push_back(new TemplateOptionPtr("webm_thumbnails", &state_config.webm_thumbnails, {.default_value=false}));
+	// template_macros.push_back(new TemplateOptionPtr("convert_heic_to_jpg", &state_config.convert_heic_to_jpg, {.default_value=false, .description="Converts HEIC images into JPG on upload."}));
+	// template_macros.push_back(new TemplateOptionPtr("strip_metadata", &state_config.strip_metadata, {.default_value=false, .description="Remove metadata from newly-uploaded images.", .include_in_frontend=false}));
+
 	if (sodium_init() < 0) {
 		std::cerr << "libsodium couldn't be initialised" << std::endl;
 		return 1;
@@ -170,7 +183,6 @@ int main(int argc, char* argv[]) {
 	unsigned short server_port, postgresql_port;
 	std::string config_file_str, data_directory_str, media_directory_str, database_engine, sqlite_database_file_str, postgresql_uri, postgresql_user, postgresql_host, thumbnail_file_format, postgresql_database_name;
 	unsigned int threads, thumbnail_size;
-	StateConfig state_config;
 	std::shared_ptr<StateConfig> state_config_shared;
 	bool postgresql_use_uri;
 	boost::program_options::options_description command_line_specific_options("Command-line-specific options");
@@ -188,19 +200,11 @@ int main(int argc, char* argv[]) {
 	// These options can be specified in config.ini
 	boost::program_options::options_description universal_options("Universal options");
 	universal_options.add_options()
-		("avif_thumbnails", boost::program_options::value<bool>(&state_config.avif_thumbnails)->default_value(false))
-		("heic_thumbnails", boost::program_options::value<bool>(&state_config.heic_thumbnails)->default_value(false), "Ignored when convert_heic_to_jpg is enabled.")
-		("svg_thumbnails", boost::program_options::value<bool>(&state_config.svg_thumbnails)->default_value(false))
-		("webp_thumbnails", boost::program_options::value<bool>(&state_config.webp_thumbnails)->default_value(false))
-		("mp4_thumbnails", boost::program_options::value<bool>(&state_config.mp4_thumbnails)->default_value(false))
-		("webm_thumbnails", boost::program_options::value<bool>(&state_config.webm_thumbnails)->default_value(false))
-		("convert_heic_to_jpg", boost::program_options::value<bool>(&state_config.convert_heic_to_jpg)->default_value(false), "Converts HEIC images into JPG on upload.")
 		("data_directory", boost::program_options::value<std::string>(&data_directory_str))
 		// ("file_size_limit_mb", boost::program_options::value<unsigned int>(&state_config.file_size_limit_mb)->default_value(25), "In MB")
 		("media_directory,m", boost::program_options::value<std::string>(&media_directory_str),  "File path where user-submitted media is stored. data_directory is used if none is specified.")
 		("sqlite_database_file,s", boost::program_options::value<std::string>(&sqlite_database_file_str),  "File where SQLite data is stored. data_directory is used if none is specified.")
 		("server_port,p", boost::program_options::value<unsigned short>(&server_port)->default_value(8300), "The port which the server will serve. Make sure it isn't already in use by another service.")
-		("strip_metadata", boost::program_options::value<bool>(&state_config.strip_metadata)->default_value(false), "Remove metadata from newly-uploaded images.")
 		("postgresql_use_uri", boost::program_options::value<bool>(&postgresql_use_uri)->default_value(false), "If true, use postgresql_uri to connect.")
 		("postgresql_uri,u", boost::program_options::value<std::string>(&postgresql_uri)->default_value("fuze_mediaboard@localhost:5432"),  "Connection string for the PostgreSQL database.")
 		("postgresql_user,U", boost::program_options::value<std::string>(&postgresql_user)->default_value("mediaboard_server"),  "User which will access the PostgreSQL database.")
@@ -210,11 +214,6 @@ int main(int argc, char* argv[]) {
 		("threads,t", boost::program_options::value<unsigned int>(&threads)->default_value(1), "Number of async threads. For now, only use 1 in production.");
 		// ("thumbnail_file_extension", boost::program_options::value<std::string>(&state_config.thumbnail_file_extension)->default_value("jpg"), "File format in which ImageMagick will create thumbnails.");
 		// ("thumbnail_size", boost::program_options::value<unsigned int>(&state_config.thumbnail_size)->default_value(150), "Maximum width and height of image thumbnails, in pixels.");
-
-	// Macros which link to state_config
-	template_macros.push_back(new TemplateOptionPtr("thumbnail_file_extension", &state_config.thumbnail_file_extension, std::string("jpg")));
-	template_macros.push_back(new TemplateOptionPtr("thumbnail_size", &state_config.thumbnail_size, static_cast<unsigned int>(150)));
-	template_macros.push_back(new TemplateOptionPtr("file_size_limit_mb", &state_config.file_size_limit_mb, static_cast<unsigned int>(25)));
 
 	for (auto macro : template_macros) {
 		macro->addOptionToListIfOptional(universal_options);

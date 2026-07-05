@@ -1,4 +1,5 @@
 #pragma once
+#include <boost/program_options/value_semantic.hpp>
 #include <sodium.h>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/hash2/md5.hpp>
@@ -31,6 +32,7 @@ public:
 	virtual void addOptionToListIfOptional(boost::program_options::options_description& options) = 0;
 	virtual std::string string() const = 0;
 	virtual bool isOption() const = 0;
+	virtual bool includeInFrontend() const { return true; };
 };
 
 template<typename OptionType>
@@ -60,20 +62,38 @@ template<typename OptionType>
 requires (std::is_convertible_v<std::remove_pointer_t<OptionType>, std::string> || requires(std::remove_pointer_t<OptionType> o){std::to_string(o);})
 class TemplateOptionPtr : public TemplateMacro {
 public:
-	TemplateOptionPtr(std::string token, OptionType* value_ptr, OptionType default_value, std::string description = "")
-			: TemplateMacro(token), default_value(default_value), description(description), value_ptr(value_ptr) {
+	struct Args {
+		std::optional<OptionType> default_value;
+		std::optional<const char*> description;
+		bool include_in_frontend = true;
+	};
+	// TemplateOptionPtr(std::string token, OptionType* value_ptr, OptionType default_value, std::string description = "")
+	// 		: TemplateMacro(token), default_value(default_value), description(description), value_ptr(value_ptr) {
+	// }
+	TemplateOptionPtr(std::string token, OptionType* value_ptr, Args args = {})
+			: TemplateMacro(token), value_ptr(value_ptr), typed_value(value_ptr), default_value(args.default_value), description(args.description), include_in_frontend(args.include_in_frontend) {
+		if (this->default_value)
+			this->typed_value.default_value(this->default_value.value());
+		this->value_semantic = &(this->typed_value);
 	}
 	virtual void addOptionToListIfOptional(boost::program_options::options_description& options) override {
-		options.add(boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value<OptionType>(value_ptr)->default_value(default_value), this->description ? description.value().c_str() : "")));
+		// boost::program_options::typed_value value(value_ptr);
+		// boost::program_options::typed_value value = boost::program_options::value<OptionType>(value_ptr);
+		// boost::program_options::value_semantic* value_semantic = &value;
+		options.add(boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), value_semantic, this->description ? description.value() : "")));
 	}
 	virtual std::string string() const override {
 		return valueAsString(*value_ptr);
 	}
 	virtual bool isOption() const override { return true; };
+	virtual bool includeInFrontend() const override { return this->include_in_frontend; };
 private:
 	OptionType* value_ptr;
-	OptionType default_value;
-	const std::optional<const std::string> description;
+	boost::program_options::typed_value<OptionType> typed_value;
+	boost::program_options::value_semantic* value_semantic;
+	std::optional<OptionType> default_value;
+	const std::optional<const char*> description;
+	bool include_in_frontend;
 };
 
 template<typename OptionType>
@@ -135,7 +155,8 @@ inline void applyOptionsToTemplates(const std::vector<TemplateMacro*>& options, 
 		std::string file_line;
 		while (std::getline(file_template_stream, file_line)) {
 			for (auto option : options) {
-				boost::replace_all(file_line, std::format("CONFIG_{}", option->token), option->string());
+				if (option->includeInFrontend())
+					boost::replace_all(file_line, std::format("CONFIG_{}", option->token), option->string());
 			}
 			if (size_t file_token_i; (file_token_i = file_line.find("FILE_")) != std::string::npos) {
 				size_t file_token_value_i = file_token_i + sizeof "FILE_";

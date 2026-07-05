@@ -13,7 +13,7 @@
 #include "beast.hpp"
 #include "Board.hpp"
 #include "FuzeDBI.hpp"
-#include "FuzeHttp.hpp"
+#include "FuzeHttpState.hpp"
 #include "permission_managed_object.hpp"
 #include <boost/smart_ptr.hpp>
 #include <mutex>

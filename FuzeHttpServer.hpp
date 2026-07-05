@@ -1,5 +1,7 @@
 #pragma once
 #include "listener.hpp"
+#define BOOST_DLL_USE_STD_FS
+#include <boost/dll/runtime_symbol_info.hpp>
 #include <iostream>
 
 namespace FuzeHttp {
