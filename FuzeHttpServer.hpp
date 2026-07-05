@@ -1,9 +1,9 @@
 #pragma once
-#include "FuzeHttpState.hpp"
 #include "listener.hpp"
 #define BOOST_DLL_USE_STD_FS
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/program_options.hpp>
+#include "FuzeHttpUtils.hpp"
 
 namespace FuzeHttp {
 class Server {
@@ -74,6 +74,9 @@ public:
 	FuzeDBI::Connection* db;
 	std::filesystem::path document_root;
 	std::filesystem::path media_location;
+	std::unordered_map<std::string /*target*/, std::string /*etag*/> manifest_frontend_etags;
+	std::unordered_map<std::string, std::string> busted_target_to_target;
+	std::unordered_set<std::string> files_generated_from_templates;
 private:
 	// FuzeHttp::State* state;
 	const unsigned short threads = 1;

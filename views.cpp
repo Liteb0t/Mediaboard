@@ -20,10 +20,10 @@ FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
 	// If cache busted target found, get the path without the hash
 	if (target.empty() || target.ends_with('/'))
 		target += "index.html";
-	if (auto it = state->busted_target_to_target.find(target); it != state->busted_target_to_target.end())
+	if (auto it = state->server->busted_target_to_target.find(target); it != state->server->busted_target_to_target.end())
 		target = it->second;
 	// If path leads to target of .GENERATED file, add the filename extension
-	else if (auto it = state->files_generated_from_templates.find(target); it != state->files_generated_from_templates.end())
+	else if (auto it = state->server->files_generated_from_templates.find(target); it != state->server->files_generated_from_templates.end())
 		target = FuzeHttp::insertExtensionToFileName(*it, ".GENERATED");
 	std::println("[showMainPage] will serve {}", target);
 	return {

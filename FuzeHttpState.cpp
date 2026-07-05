@@ -2,8 +2,8 @@
 
 // FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
 // 		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi), busted_target_to_target(busted_target_to_target), files_generated_from_templates(files_generated_from_templates) {
-FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
-		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi) {
+FuzeHttp::State::State(FuzeHttp::Server* server)
+		: PermissionManager(0, server->db), server(server), document_root(server->document_root) {
 	this->loadSessions();
 	this->loadClients();
 	// Link accounts to clients
@@ -20,7 +20,7 @@ FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
 }
 
 void FuzeHttp::State::loadSessions() {
-	for (auto session_tuple :fuze_dbi->queryRows<std::tuple<int, std::string, int>>("SELECT client_id, key, created_at FROM session")) {
+	for (auto session_tuple : server->db->queryRows<std::tuple<int, std::string, int>>("SELECT client_id, key, created_at FROM session")) {
 		int seconds_since_epoch = std::get<2>(session_tuple); // TODO use long instead of int
 		std::chrono::seconds sec(seconds_since_epoch);
 		std::chrono::time_point<std::chrono::system_clock> created_at(sec);
@@ -34,7 +34,7 @@ void FuzeHttp::State::loadSessions() {
 
 void FuzeHttp::State::loadClients() {
 	// TODO clear clients which have expired or dont have an account
-	for (auto client_tuple :fuze_dbi->queryRows<std::tuple<int, int>>("SELECT id, account_id FROM client")) {
+	for (auto client_tuple : server->db->queryRows<std::tuple<int, int>>("SELECT id, account_id FROM client")) {
 		std::optional<int> account_id;
 		if (std::get<1>(client_tuple) != -1)
 			account_id = std::get<1>(client_tuple);
@@ -49,15 +49,15 @@ void FuzeHttp::State::loadClients() {
 }
 
 Client FuzeHttp::State::createClient(std::optional<int> account_id) {
-	int new_client_id = fuze_dbi->query<int>("SELECT client_id FROM _sequences");
-	fuze_dbi->query<void>("UPDATE _sequences SET client_id = $1", new_client_id+1);
+	int new_client_id = server->db->query<int>("SELECT client_id FROM _sequences");
+	server->db->query<void>("UPDATE _sequences SET client_id = $1", new_client_id+1);
 	std::cout << "[FuzeHttp] Creating new client with ID " << new_client_id << std::endl;
 	if (account_id) {
-		fuze_dbi->query<void>("INSERT INTO client(id, account_id) VALUES ($1, $2)", new_client_id, account_id.value());
+		server->db->query<void>("INSERT INTO client(id, account_id) VALUES ($1, $2)", new_client_id, account_id.value());
 		this->accounts.at(account_id.value()).client_id = new_client_id;
 	}
 	else
-		fuze_dbi->query<void>("INSERT INTO client(id) VALUES ($1)", new_client_id);
+		server->db->query<void>("INSERT INTO client(id) VALUES ($1)", new_client_id);
 	Client client{.id = new_client_id, .account_id = account_id};
 	this->clients.emplace(new_client_id, client);
 	return client;
@@ -91,7 +91,7 @@ std::string FuzeHttp::State::createSession(int client_id) {
 		.created_at = std::chrono::system_clock::now()
 	};
 	std::string key_base64 = generateKeyBase64(this->sessions);
-	fuze_dbi->query<void>("INSERT INTO session(client_id, key, created_at) VALUES ($1, $2, $3)", client_id, key_base64, (int)std::chrono::duration_cast<std::chrono::seconds>(session.created_at.time_since_epoch()).count());
+	server->db->query<void>("INSERT INTO session(client_id, key, created_at) VALUES ($1, $2, $3)", client_id, key_base64, (int)std::chrono::duration_cast<std::chrono::seconds>(session.created_at.time_since_epoch()).count());
 	// db->createSession(
 	// 	key_base64,
 	// 	session.client_id,
@@ -106,7 +106,7 @@ void FuzeHttp::State::clearExpiredSessions() {
 	std::chrono::time_point<std::chrono::system_clock> current_time = std::chrono::system_clock::now();
 	std::erase_if(this->sessions, [this, &current_time](const std::pair<std::string, FuzeHttp::Session>& session_pair){
 		if (session_pair.second.created_at + this->authorization_token_lifespan < current_time) {
-			fuze_dbi->query<void>("DELETE FROM session WHERE key = $1", session_pair.first);
+			server->db->query<void>("DELETE FROM session WHERE key = $1", session_pair.first);
 			return true;
 		}
 		else

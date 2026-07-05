@@ -10,6 +10,7 @@
 #ifndef BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 
+#include "FuzeHttpServer.hpp"
 #include "beast.hpp"
 #include "Board.hpp"
 #include "FuzeDBI.hpp"
@@ -40,7 +41,7 @@ struct StateConfig {
 // Represents the shared server state
 class shared_state : public FuzeHttp::State {
 public:
-	shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config);
+	shared_state(FuzeHttp::Server* server, StateConfig config);
 	// shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
 	const StateConfig config;
 	virtual void start() override;

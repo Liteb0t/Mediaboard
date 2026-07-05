@@ -1,4 +1,5 @@
 #include "FuzeHttpServer.hpp"
+#include "FuzeHttp.hpp"
 #include "migrations.hpp"
 #include <fstream>
 #include <iostream>
@@ -259,8 +260,8 @@ int FuzeHttp::Server::processOptions(int argc, char* argv[], std::vector<FuzeHtt
 	// boost::bimap<std::string, std::string> path_to_busted_path;
 	// std::unordered_map<std::string, std::filesystem::path> busted_target_to_path;
 
-	std::unordered_map<std::string , std::string > manifest_frontend_etags;
-	std::unordered_set<std::string> files_generated_from_templates;
+	// std::unordered_map<std::string , std::string > manifest_frontend_etags;
+	// std::unordered_set<std::string> files_generated_from_templates;
 	try {
 		std::optional<std::string> old_combined_hash;
 		bool manifest_file_existed;
@@ -296,14 +297,14 @@ int FuzeHttp::Server::processOptions(int argc, char* argv[], std::vector<FuzeHtt
 			std::filesystem::path frontend_file_path = std::filesystem::proximate(frontend_file.path(), document_root);
 			// TODO fix bug where two starts are required to add to files_generated_from_templates
 			if (fileNameEndsWith(frontend_file_path.filename(), ".GENERATED")) {
-				files_generated_from_templates.emplace(
+				this->files_generated_from_templates.emplace(
 					frontend_file_path.string().substr(0, frontend_file_path.string().rfind(".GENERATED")) +
 					frontend_file_path.string().substr(frontend_file_path.string().rfind('.')));
 			}
-			else if (!manifest_frontend_etags.contains(frontend_file_path.string())) {
+			else if (!this->manifest_frontend_etags.contains(frontend_file_path.string())) {
 				std::string new_etag = getEtagFromFile(frontend_file);
 				if (!fileNameEndsWith(frontend_file.path().filename(), ".template"))
-					manifest_frontend_etags.emplace(frontend_file_path.string(), new_etag);
+					this->manifest_frontend_etags.emplace(frontend_file_path.string(), new_etag);
 				manifest_frontend_json_obj.emplace(frontend_file_path.string(), new_etag);
 			}
 		}
@@ -335,13 +336,13 @@ int FuzeHttp::Server::processOptions(int argc, char* argv[], std::vector<FuzeHtt
 		return 1;
 	}
 	// TODO pass to FuzeHttp::State
-		std::unordered_map<std::string, std::string> busted_target_to_target;
-		for (const auto& target : manifest_frontend_etags)
-			busted_target_to_target.emplace(FuzeHttp::insertExtensionToFileName(target.first, target.second), target.first);
-		std::println("Busted target to target:");
-		for (const auto& target : busted_target_to_target)
-			std::println("{} :: {}", target.first, target.second);
-		for (const std::string& target : files_generated_from_templates)
-			std::println("Target to file generated from template: {}", target);
+	// std::unordered_map<std::string, std::string> busted_target_to_target;
+	for (const auto& target : manifest_frontend_etags)
+		this->busted_target_to_target.emplace(FuzeHttp::insertExtensionToFileName(target.first, target.second), target.first);
+	std::println("Busted target to target:");
+	for (const auto& target : busted_target_to_target)
+		std::println("{} :: {}", target.first, target.second);
+	for (const std::string& target : files_generated_from_templates)
+		std::println("Target to file generated from template: {}", target);
 	return -1;
 }

@@ -62,13 +62,13 @@ int main(int argc, char* argv[]) {
 	template_macros.push_back(new TemplateOptionPtr("thumbnail_file_extension", &state_config.thumbnail_file_extension, {.default_value=std::string("jpg")}));
 	template_macros.push_back(new TemplateOptionPtr("thumbnail_size", &state_config.thumbnail_size, {.default_value=static_cast<unsigned int>(150)}));
 	template_macros.push_back(new TemplateOptionPtr("file_size_limit_mb", &state_config.file_size_limit_mb, {.default_value=static_cast<unsigned int>(25)}));
-	template_macros.push_back(new TemplateOptionPtr("avif_thumbnails", &state_config.avif_thumbnails, {.default_value=false}));
-	template_macros.push_back(new TemplateOptionPtr("heic_thumbnails", &state_config.heic_thumbnails, {.default_value=false, .description="Ignored when convert_heic_to_jpg is enabled."}));
-	template_macros.push_back(new TemplateOptionPtr("svg_thumbnails", &state_config.svg_thumbnails, {.default_value=false}));
-	template_macros.push_back(new TemplateOptionPtr("webp_thumbnails", &state_config.webp_thumbnails, {.default_value=false}));
-	template_macros.push_back(new TemplateOptionPtr("mp4_thumbnails", &state_config.mp4_thumbnails, {.default_value=false}));
-	template_macros.push_back(new TemplateOptionPtr("webm_thumbnails", &state_config.webm_thumbnails, {.default_value=false}));
-	template_macros.push_back(new TemplateOptionPtr("convert_heic_to_jpg", &state_config.convert_heic_to_jpg, {.default_value=false, .description="Converts HEIC images into JPG on upload."}));
+	template_macros.push_back(new TemplateOptionPtr("avif_thumbnails", &state_config.avif_thumbnails, {.default_value=false, .include_in_frontend=false}));
+	template_macros.push_back(new TemplateOptionPtr("heic_thumbnails", &state_config.heic_thumbnails, {.default_value=false, .description="Ignored when convert_heic_to_jpg is enabled.", .include_in_frontend=false}));
+	template_macros.push_back(new TemplateOptionPtr("svg_thumbnails", &state_config.svg_thumbnails, {.default_value=false, .include_in_frontend=false}));
+	template_macros.push_back(new TemplateOptionPtr("webp_thumbnails", &state_config.webp_thumbnails, {.default_value=false, .include_in_frontend=false}));
+	template_macros.push_back(new TemplateOptionPtr("mp4_thumbnails", &state_config.mp4_thumbnails, {.default_value=false, .include_in_frontend=false}));
+	template_macros.push_back(new TemplateOptionPtr("webm_thumbnails", &state_config.webm_thumbnails, {.default_value=false, .include_in_frontend=false}));
+	template_macros.push_back(new TemplateOptionPtr("convert_heic_to_jpg", &state_config.convert_heic_to_jpg, {.default_value=false, .description="Converts HEIC images into JPG on upload.", .include_in_frontend=false}));
 	template_macros.push_back(new TemplateOptionPtr("strip_metadata", &state_config.strip_metadata, {.default_value=false, .description="Remove metadata from newly-uploaded images.", .include_in_frontend=false}));
 	FuzeHttp::Server server;
 	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros)) != -1)
@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
 	std::cout << "Initialising shared state..." << std::endl;
 	shared_state* state;
 	try {
-		state = new shared_state(server.db, server.document_root, server.media_location, state_config);
+		state = new shared_state(&server, state_config);
 		// state = new shared_state(server.db, server.document_root, server.media_location, state_config, std::move(busted_target_to_target), std::move(files_generated_from_templates));
 		state->start();
 	}
