@@ -43,7 +43,7 @@ void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const std::filesy
 	}
 }
 
-bool Migrations::writeMigrations(std::ostream& stream, const std::string& database_version_string, const StateConfig& state_config) {
+bool Migrations::writeMigrations(std::ostream& stream, const std::string& database_version_string) {
 	if (database_version_string <= "0.1")	goto v0_1;
 	if (database_version_string <= "0.1.1")	goto v0_1_1;
 	// If code reaches here, no migrations need to be made
@@ -70,14 +70,14 @@ void Migrations::writeNewMigrations(FuzeDBI::Connection* fuze_dbi, Fuze::Migrati
 }
 */
 
-void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string, const StateConfig& state_config) {
+void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string) {
 	println("Database version: \t{}", database_version_string);
 	println("Server version:   \t{}", current_version);
 	// Fuze::MigrationHelper::Migrations migrater(fuze_dbi);
 	// writeNewMigrations(fuze_dbi, migrater);
 	// migrater.migrateFrom(database_version_string);
 	if (std::stringstream migrations;
-		database_version_string != current_version && Migrations::writeMigrations(migrations, database_version_string, state_config)) {
+		database_version_string != current_version && Migrations::writeMigrations(migrations, database_version_string)) {
 		std::println("Database migrations need to be made. It is recommended to backup the database before proceeding.");
 		std::print("Proceed? (Y/n): ");
 		std::string response;

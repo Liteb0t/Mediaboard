@@ -1,8 +1,25 @@
 #include "FuzeHttpState.hpp"
 
-FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
-		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi), busted_target_to_target(busted_target_to_target), files_generated_from_templates(files_generated_from_templates) {
-	// Load sessions from the database
+// FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
+// 		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi), busted_target_to_target(busted_target_to_target), files_generated_from_templates(files_generated_from_templates) {
+FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi)
+		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi) {
+	this->loadSessions();
+	this->loadClients();
+	// Link accounts to clients
+	for (const auto& client_pair : this->clients) {
+		if (client_pair.second.account_id) {
+			int account_id = client_pair.second.account_id.value();
+			auto it = this->accounts.find(account_id);
+			if (it == this->accounts.end())
+				throw std::runtime_error(std::format("Client {} refers to account {} which does not exist", client_pair.first, account_id));
+			it->second.client_id = client_pair.first;
+			std::cout << "Account " <<account_id << " = Client " <<client_pair.first << std::endl;
+		}
+	}
+}
+
+void FuzeHttp::State::loadSessions() {
 	for (auto session_tuple :fuze_dbi->queryRows<std::tuple<int, std::string, int>>("SELECT client_id, key, created_at FROM session")) {
 		int seconds_since_epoch = std::get<2>(session_tuple); // TODO use long instead of int
 		std::chrono::seconds sec(seconds_since_epoch);
@@ -13,6 +30,9 @@ FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::st
 		};
 		this->sessions.emplace(std::get<1>(session_tuple), std::move(session));
 	}
+}
+
+void FuzeHttp::State::loadClients() {
 	// TODO clear clients which have expired or dont have an account
 	for (auto client_tuple :fuze_dbi->queryRows<std::tuple<int, int>>("SELECT id, account_id FROM client")) {
 		std::optional<int> account_id;

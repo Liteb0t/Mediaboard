@@ -16,34 +16,31 @@
 #include <boost/program_options.hpp>
 #include <iostream>
 
-shared_state::shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
-		: State(fuze_database_interface, std::move(busted_target_to_target), std::move(files_generated_from_templates)),
+using namespace FuzeHttp;
+
+// shared_state::shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
+//		: State(fuze_database_interface, std::move(busted_target_to_target), std::move(files_generated_from_templates)),
+shared_state::shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location, StateConfig config)
+		: State(fuze_database_interface),
 		config(config),
 		fuze_dbi(fuze_database_interface),
 		media_location(std::move(media_location)) {
 	this->document_root = document_root;
-	// Link accounts to clients
-	for (const auto& client_pair : this->clients) {
-		if (client_pair.second.account_id) {
-			int account_id = client_pair.second.account_id.value();
-			auto it = this->accounts.find(account_id);
-			if (it == this->accounts.end())
-				throw std::runtime_error(std::format("Client {} refers to account {} which does not exist", client_pair.first, account_id));
-			it->second.client_id = client_pair.first;
-			std::cout << "Account " <<account_id << " = Client " <<client_pair.first << std::endl;
-		}
-	}
+	std::println("Assigned document_root: {}", document_root.string());
 	this->setAdditionalImageFormatsFromConfig(config);
-	/* FuzeDBI demo
-	fuze_dbi->query<void>("INSERT INTO _info(version) VALUES ($1)", "cocks");
-	auto version = fuze_dbi->query<std::string>("SELECT (version) FROM _info");
-	std::cout << "[shared_state] version: " <<version << std::endl;
-	auto toople = fuze_dbi->query<std::tuple<int, std::string>>("SELECT id, username FROM account");
-	std::cout << "id: " << std::get<0>(toople) << ", username: " << std::get<1>(toople) << std::endl;
-	for (auto row : fuze_dbi->queryRows<std::tuple<int, int>>("SELECT permission_number, setting FROM permission_setting")) {
-		std::cout << std::get<0>(row) << '_' << std::get<1>(row) << std::endl;
-	}
-	*/
+	// this->document_root = document_root;
+
+	// this->options.push_back({
+	// 	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
+	// 	new TemplateOption<std::string>("favicon_url", "https://fuze.page/favicon.ico"),
+	// 	new TemplateOption("show_watermarks", true)
+	// 	new TemplateConstant("post_max_name", static_cast<int>(MESSAGE_FIELDS::MAX_NAME)),
+	// 	new TemplateConstant("post_max_file_name", static_cast<int>(MESSAGE_FIELDS::MAX_FILE_NAME)),
+	// 	new TemplateConstant("post_max_content", static_cast<int>(MESSAGE_FIELDS::MAX_CONTENT)),
+	// 	new TemplateConstant("group_max_name", static_cast<int>(Group::MAX_NAME)),
+	// 	new TemplateConstant("account_max_username", static_cast<int>(Account::MAX_USERNAME)),
+	// 	new TemplateConstant("mediaboard_version", current_version)
+	// });
 }
 
 void shared_state::setAdditionalImageFormatsFromConfig(const StateConfig& config) {

@@ -1,17 +1,17 @@
 #pragma once
+#include "FuzeHttpState.hpp"
 #include "listener.hpp"
 #define BOOST_DLL_USE_STD_FS
 #include <boost/dll/runtime_symbol_info.hpp>
-#include <iostream>
+#include <boost/program_options.hpp>
 
 namespace FuzeHttp {
-template<class StateType>
 class Server {
 public:
-	Server(StateType&& state)
-			:state(state) {
-	}
-	void run() {
+	Server();
+	int processOptions(int argc, char* argv[], std::vector<FuzeHttp::TemplateMacro*> additional_options);
+	template<class StateType>
+	void run(StateType* state) {
 		auto address = boost::asio::ip::make_address("127.0.0.1");
 		// The io_context is required for all I/O - see https://www.boost.org/doc/libs/latest/doc/html/boost_asio/overview/basics.html
 		boost::asio::io_context io_context;
@@ -71,8 +71,11 @@ public:
 		// delete state;
 		// delete database_connection;
 	}
+	FuzeDBI::Connection* db;
+	std::filesystem::path document_root;
+	std::filesystem::path media_location;
 private:
-	StateType state;
+	// FuzeHttp::State* state;
 	const unsigned short threads = 1;
 	const unsigned short server_port = 8300;
 };

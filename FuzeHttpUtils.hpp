@@ -71,16 +71,21 @@ public:
 	// 		: TemplateMacro(token), default_value(default_value), description(description), value_ptr(value_ptr) {
 	// }
 	TemplateOptionPtr(std::string token, OptionType* value_ptr, Args args = {})
-			: TemplateMacro(token), value_ptr(value_ptr), typed_value(value_ptr), default_value(args.default_value), description(args.description), include_in_frontend(args.include_in_frontend) {
-		if (this->default_value)
-			this->typed_value.default_value(this->default_value.value());
-		this->value_semantic = &(this->typed_value);
+			: TemplateMacro(token), value_ptr(value_ptr), /*typed_value(value_ptr),*/ default_value(args.default_value), description(args.description), include_in_frontend(args.include_in_frontend) {
+		// if (this->default_value)
+		// 	this->typed_value.default_value(this->default_value.value());
+		// this->value_semantic = std::make_shared<boost::program_options::value_semantic*>(&(this->typed_value));
+		// this->value_semantic = &(this->typed_value);
 	}
 	virtual void addOptionToListIfOptional(boost::program_options::options_description& options) override {
 		// boost::program_options::typed_value value(value_ptr);
 		// boost::program_options::typed_value value = boost::program_options::value<OptionType>(value_ptr);
 		// boost::program_options::value_semantic* value_semantic = &value;
-		options.add(boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), value_semantic, this->description ? description.value() : "")));
+		// options.add(boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), *value_semantic.get(), this->description ? description.value() : "")));
+		if (this->default_value)
+			options.add(boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value(value_ptr)->default_value(this->default_value.value()), this->description ? description.value() : "")));
+		else
+			options.add(boost::make_shared<boost::program_options::option_description>( boost::program_options::option_description(this->token.c_str(), boost::program_options::value(value_ptr), this->description ? description.value() : "")));
 	}
 	virtual std::string string() const override {
 		return valueAsString(*value_ptr);
@@ -89,8 +94,9 @@ public:
 	virtual bool includeInFrontend() const override { return this->include_in_frontend; };
 private:
 	OptionType* value_ptr;
-	boost::program_options::typed_value<OptionType> typed_value;
-	boost::program_options::value_semantic* value_semantic;
+	// boost::program_options::typed_value<OptionType> typed_value;
+	// boost::program_options::value_semantic* value_semantic;
+	// std::shared_ptr<boost::program_options::value_semantic*> value_semantic;
 	std::optional<OptionType> default_value;
 	const std::optional<const char*> description;
 	bool include_in_frontend;
