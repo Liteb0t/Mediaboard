@@ -24,7 +24,6 @@
 // class shared_state;
 namespace FuzeHttp {
 class Server;
-};
 
 // Accepts incoming connections and launches the sessions
 template<class StateType>
@@ -94,7 +93,7 @@ private:
 			return fail(ec, "accept");
 		else {
 			// Launch a new session for this connection
-			boost::make_shared<http_session<StateType>>(
+			boost::make_shared<FuzeHttp::http_session<StateType>>(
 				std::move(socket),
 				state_,
 				controller)->run();
@@ -111,4 +110,5 @@ private:
 	}
 };
 
+}; // namespace FuzeHttp
 #endif

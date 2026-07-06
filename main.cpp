@@ -5,7 +5,6 @@
 
 #include "FuzeHttpUtils.hpp"
 #include "FuzeHttpServer.hpp"
-#include "migrations.hpp"
 #include "PermissionObject.hpp"
 #include "shared_state.hpp"
 #include <boost/asio/signal_set.hpp>
@@ -27,6 +26,8 @@
 #include <print>
 #include <string>
 #include <vector>
+
+const std::string current_version = "0.1.4";
 
 using namespace FuzeHttp;
 
@@ -67,12 +68,14 @@ int main(int argc, char* argv[]) {
 	template_macros.push_back(new TemplateOptionPtr("convert_heic_to_jpg", &state_config.convert_heic_to_jpg, {.default_value=false, .description="Converts HEIC images into JPG on upload.", .include_in_frontend=false}));
 	template_macros.push_back(new TemplateOptionPtr("strip_metadata", &state_config.strip_metadata, {.default_value=false, .description="Remove metadata from newly-uploaded images.", .include_in_frontend=false}));
 	FuzeHttp::Server server;
-	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros)) != -1)
+	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros, current_version)) != -1)
 		return return_code;
 	std::cout << "Initialising shared state..." << std::endl;
 	shared_state* state;
 	try {
-		state = new shared_state(&server, state_config);
+		bool create_owner_account = server.variable_map.count("create_owner");
+		std::cout << std::flush;
+		state = new shared_state(&server, state_config, create_owner_account);
 		// state = new shared_state(server.db, server.document_root, server.media_location, state_config, std::move(busted_target_to_target), std::move(files_generated_from_templates));
 		state->start();
 	}
@@ -81,5 +84,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 	server.run(state);
+
+
 	return EXIT_SUCCESS;
 }

@@ -3,9 +3,11 @@
 #include "FuzeHttp.hpp"
 // #include "FuzeHttpServer.hpp"
 #include "FuzeHttpUtils.hpp"
+// #include "WebsocketSession.hpp"
 
 namespace FuzeHttp {
 class Server;
+class WebsocketSession;
 class State : public PermissionManager {
 public:
 	// State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
@@ -30,17 +32,27 @@ protected:
 	// std::variant<http::file_body::value_type, FuzeHttp::Response> openFile(std::filesystem::path path) const;
 
 
+	// virtual void onWebsocketJoin  (WebsocketSession* session) {}
+	// virtual void onWebsocketLeave (WebsocketSession* session) {}
+	void websocketJoin (FuzeHttp::WebsocketSession* session);
+	virtual void websocketRead (FuzeHttp::WebsocketSession* session) {}
+	void websocketLeave(FuzeHttp::WebsocketSession* session);
 	std::unordered_map<int, Client> clients;
 	std::unordered_map<std::string /*key_base64*/, Session> sessions;
 	std::unordered_map<std::string /*key_base64*/, Invite> invites;
+	// Keep a list of all the websocket-connected clients
+	std::unordered_set<FuzeHttp::WebsocketSession*> WebsocketSessions;
 	std::filesystem::path document_root;
 	// std::unordered_map<std::filesystem::path, std::string> document_etags;
 	// FuzeDBI::Connection* fuze_dbi;
 	std::vector<FuzeHttp::TemplateMacro*> options;
+	// This mutex synchronizes all access to WebsocketSessions
+	std::mutex mutex_;
 private:
 	void loadSessions();
 	void loadClients();
 	const std::chrono::duration<unsigned int> authorization_token_lifespan = std::chrono::days(365);
 	// friend class FuzeHttp::Server;
+	friend class WebsocketSession;
 }; // class State
 } // namespace FuzeHttp

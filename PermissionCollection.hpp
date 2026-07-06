@@ -3,6 +3,7 @@
 #include "PermissionSetting.hpp"
 #include <unordered_map>
 
+namespace FuzeHttp {
 enum struct ACCOUNT_OR_GROUP {ACCOUNT, GROUP};
 
 class PermissionCollection {
@@ -66,3 +67,4 @@ private:
 	const std::optional<int> group_id;
 	std::unordered_map<PERMISSION, PermissionSetting> permission_map;
 };
+} // namespace FuzeHttp

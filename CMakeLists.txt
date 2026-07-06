@@ -67,12 +67,11 @@ target_sources(MediaboardServer
     FuzeHttpState.cpp
     FuzeHttpServer.cpp
     FuzeHttpUtils.cpp
-    Group.cpp
     # http_session.cpp
     # Listener.cpp
     main.cpp
     Message.cpp
-    migrations.cpp
+    Migrations.cpp
     PermissionObject.cpp
     shared_state.cpp
     Thread.cpp

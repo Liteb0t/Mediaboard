@@ -50,12 +50,12 @@ std::string Thread::dumpThread() const {
 }
 */
 
-boost::json::object Thread::asJson(const std::optional<Client>& client) const {
+boost::json::object Thread::asJson(const std::optional<FuzeHttp::Client>& client) const {
 	boost::json::object thread_json = this->thread_as_json;
 	thread_json.emplace("client_permissions", this->getPermissionsAsJson(client));
 	return thread_json;
 }
-boost::json::object Thread::asJsonWithMessages(const std::optional<Client>& client) const {
+boost::json::object Thread::asJsonWithMessages(const std::optional<FuzeHttp::Client>& client) const {
 	boost::json::object thread_json = this->asJson(client);
 	thread_json.emplace("messages", this->getMessagesAsJson());
 	return thread_json;
@@ -145,33 +145,33 @@ void Thread::markAsDeleted() {
 	fuze_dbi->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1", this->id);
 }
 
-void Thread::addListener(WebsocketSession* listener) {
+void Thread::addListener(FuzeHttp::WebsocketSession* listener) {
 	listeners.insert(listener);
 }
 
-void Thread::removeListener(WebsocketSession* listener) {
+void Thread::removeListener(FuzeHttp::WebsocketSession* listener) {
 	listeners.erase(listener);
 }
 
-boost::json::object Thread::getPermissionsAsJson(const std::optional<Client>& client) const {
+boost::json::object Thread::getPermissionsAsJson(const std::optional<FuzeHttp::Client>& client) const {
 	// json permissions_as_json;
 	// permissions_as_json["manage_permissions"] = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
 	// permissions_as_json["send_message"] = this->clientHasPermission(client, PERMISSION::SEND_MESSAGE);
 	// permissions_as_json["delete_post"] = this->clientHasPermission(client, PERMISSION::DELETE_POST);
 	return {
-		{"manage_permissions", this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS)},
-		{"send_message", this->clientHasPermission(client, PERMISSION::SEND_MESSAGE)},
-		{"delete_post", this->clientHasPermission(client, PERMISSION::DELETE_POST)},
-		{"upload_file", this->clientHasPermission(client, PERMISSION::UPLOAD_FILE)},
+		{"manage_permissions", this->clientHasPermission(client, FuzeHttp::PERMISSION::MANAGE_PERMISSIONS)},
+		{"send_message", this->clientHasPermission(client, FuzeHttp::PERMISSION::SEND_MESSAGE)},
+		{"delete_post", this->clientHasPermission(client, FuzeHttp::PERMISSION::DELETE_POST)},
+		{"upload_file", this->clientHasPermission(client, FuzeHttp::PERMISSION::UPLOAD_FILE)},
 	};
 }
 
-std::unordered_set<WebsocketSession*> Thread::getListeners() const {
+std::unordered_set<FuzeHttp::WebsocketSession*> Thread::getListeners() const {
 	return this->listeners;
 };
 
 void Thread::removeUnauthorizedListeners() {
-	std::erase_if(this->listeners, [this](const WebsocketSession* ws)->bool{
-		return !this->clientHasPermission(ws->getClient(), PERMISSION::VIEW_THREAD);
+	std::erase_if(this->listeners, [this](const FuzeHttp::WebsocketSession* ws)->bool{
+		return !this->clientHasPermission(ws->getClient(), FuzeHttp::PERMISSION::VIEW_THREAD);
 	});
 }

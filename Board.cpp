@@ -88,15 +88,15 @@ void Board::cacheAllThreads() {
 	std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 }
 
-boost::json::object Board::getThreadPermissionsAsJson(int thread_id, const std::optional<Client>& client) const {
+boost::json::object Board::getThreadPermissionsAsJson(int thread_id, const std::optional<FuzeHttp::Client>& client) const {
 	return this->threads.at(thread_id).getPermissionsAsJson(client);
 }
 
-std::string Board::dumpAllThreads(const std::optional<Client>& client) const {
+std::string Board::dumpAllThreads(const std::optional<FuzeHttp::Client>& client) const {
 	boost::json::array threads_json = boost::json::array();
 	for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
 		// boost::shared_ptr<Thread> thread = this->getThread(it->second);
-		if (!this->threads.at(it->second).isDeleted() && this->threads.at(it->second).clientHasPermission(client, PERMISSION::VIEW_THREAD)) {
+		if (!this->threads.at(it->second).isDeleted() && this->threads.at(it->second).clientHasPermission(client, FuzeHttp::PERMISSION::VIEW_THREAD)) {
 			boost::json::object thread_json = this->threads.at(it->second).asJson(client);
 			threads_json.emplace_back(thread_json);
 		}
@@ -108,7 +108,7 @@ std::string Board::dumpAllThreads(const std::optional<Client>& client) const {
 	});
 }
 
-void Board::addListenerToThread(WebsocketSession* listener, int thread_id) {
+void Board::addListenerToThread(FuzeHttp::WebsocketSession* listener, int thread_id) {
 	if (threadExists(thread_id)) {
 		this->threads.at(thread_id).addListener(listener);
 		std::cout << "[Board] Listener added to thread " << thread_id << std::endl;
@@ -117,7 +117,7 @@ void Board::addListenerToThread(WebsocketSession* listener, int thread_id) {
 		std::cout << "[Board] Warning: could not add listener to thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
-void Board::removeListenerFromThread(WebsocketSession* listener, int thread_id) {
+void Board::removeListenerFromThread(FuzeHttp::WebsocketSession* listener, int thread_id) {
 	if (threadExists(thread_id)) {
 		this->threads.at(thread_id).removeListener(listener);
 		std::cout << "[Board] Listener removed from thread " << thread_id << std::endl;

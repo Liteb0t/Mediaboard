@@ -4,6 +4,8 @@
 #include "shared_state.hpp"
 #include "FuzeHttp.hpp"
 
+using namespace FuzeHttp;
+
 FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response createGroup(shared_state* state, FuzeHttp::Request req);
 FuzeHttp::Response deleteGroup(shared_state* state, FuzeHttp::Request req, int group_id);

@@ -7,16 +7,18 @@
 #include <unordered_set>
 #include <boost/json.hpp>
 
+namespace FuzeHttp {
 class WebsocketSession;
+}
 
-class Thread : public PermissionManagedObject {
+class Thread : public FuzeHttp::PermissionManagedObject {
 public:
 	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi, int id, int permission_object_id);
 	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi);
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi);
 	// std::string dumpThread() const;
-	boost::json::object asJson(const std::optional<Client>& client) const;
-	boost::json::object asJsonWithMessages(const std::optional<Client>& client) const;
+	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const;
+	boost::json::object asJsonWithMessages(const std::optional<FuzeHttp::Client>& client) const;
 	// int getNumberOfPosts() const { return this->posts.size(); };
 	// void addInitialPost(json post_json, bool save_to_database);
 	// void createPostFromStruct(struct db_post_struct* post_struct);
@@ -28,9 +30,9 @@ public:
 	// bool keyMatchesMessage(std::string key, int message_id) const;
 	bool messageExists(int message_id_in_thread) const { return this->messages.contains(message_id_in_thread); }
 	int getId() const { return this->id; };
-	void addListener(WebsocketSession* listener);
-	void removeListener(WebsocketSession* listener);
-	std::unordered_set<WebsocketSession*> getListeners() const;
+	void addListener(FuzeHttp::WebsocketSession* listener);
+	void removeListener(FuzeHttp::WebsocketSession* listener);
+	std::unordered_set<FuzeHttp::WebsocketSession*> getListeners() const;
 	void removeUnauthorizedListeners();
 	boost::json::array getMessagesAsJson() const;
 	std::string dumpMessage(int message_id) const;
@@ -38,7 +40,7 @@ public:
 	void markAsDeleted();
 	std::chrono::time_point<std::chrono::system_clock> getLastMessageTime() const { return this->last_message_created_at; }
 	bool isDeleted() const { return this->deleted; }
-	boost::json::object getPermissionsAsJson(const std::optional<Client>& client) const;
+	boost::json::object getPermissionsAsJson(const std::optional<FuzeHttp::Client>& client) const;
 	const Message* getMessage(int message_id_in_thread) const { return &this->messages.at(message_id_in_thread); }
 private:
 	FuzeDBI::Connection* fuze_dbi;
@@ -47,7 +49,7 @@ private:
 	// std::vector<Post> posts;
 	std::map<int, Message> messages;
 	int reply_count = 0;
-	std::unordered_set<WebsocketSession*> listeners;
+	std::unordered_set<FuzeHttp::WebsocketSession*> listeners;
 	// char subject[256];
 	boost::json::object thread_as_json;
 	bool deleted = false; // It is assumed new Thread object are not marked as deleted, because deleted threads are not retrieved from the database, nor can they be created through the API.

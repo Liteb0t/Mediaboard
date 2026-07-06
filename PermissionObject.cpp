@@ -3,6 +3,8 @@
 #include <ostream>
 #include <print>
 
+using namespace FuzeHttp;
+
 PermissionObjectBase::PermissionObjectBase(int permission_object_id, FuzeDBI::Connection* fuze_dbi) // On extraction from database
 		: id(permission_object_id),
 		fuze_dbi(fuze_dbi) {

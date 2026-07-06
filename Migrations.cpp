@@ -1,10 +1,12 @@
-#include "migrations.hpp"
+#include "Migrations.hpp"
 #include <cstdio>
 #include <fstream>
 #include <sstream>
 #include <print>
 
-void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const std::filesystem::path& template_path, const std::filesystem::path& absolute_sqlite_path) {
+using namespace FuzeHttp;
+
+void Migrations::firstTimeSetup(FuzeDBI::Connection* fuze_dbi, const std::filesystem::path& template_path, const std::filesystem::path& absolute_sqlite_path, const std::string& current_version) {
 	int ec; char* error_message;
 	std::println("Doing first-time setup");
 	std::println("Opening database template at {}", template_path.string());
@@ -70,7 +72,7 @@ void Migrations::writeNewMigrations(FuzeDBI::Connection* fuze_dbi, Fuze::Migrati
 }
 */
 
-void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string) {
+void Migrations::makeMigrations(FuzeDBI::Connection* fuze_dbi, const std::string& database_version_string, const std::string& current_version) {
 	println("Database version: \t{}", database_version_string);
 	println("Server version:   \t{}", current_version);
 	// Fuze::MigrationHelper::Migrations migrater(fuze_dbi);

@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 
+namespace FuzeHttp {
 // Caution: only insert values just before NUMBER_OF_PERMISSIONS; otherwise existing database entries will be messed up
 enum struct PERMISSION {  // Mirrors PermissionCollection.permissions in _permissions.js
 	MANAGE_PERMISSIONS,
@@ -44,3 +45,4 @@ private:
 	// PERMISSION permission;
 	THREE_STATE_SETTING setting;
 };
+} // namespace FuzeHttp

@@ -44,7 +44,7 @@ struct StateConfig {
 // Represents the shared server state
 class shared_state : public FuzeHttp::State {
 public:
-	shared_state(FuzeHttp::Server* server, StateConfig config);
+	shared_state(FuzeHttp::Server* server, StateConfig config, bool create_owner_account);
 	// shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
 	const StateConfig config;
 	void start();
@@ -62,21 +62,19 @@ public:
 	int createThread(int board_id, boost::json::object thread_json, int author_client_id);
 	int createMessage(int board_id, boost::json::object message_json, int author_client_id);
 
-	std::string dumpAllGroups(const std::optional<Client>& client) const;
-	// BasicResponse setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups);
+	std::string dumpAllGroups(const std::optional<FuzeHttp::Client>& client) const;
+	// BasicResponse setGroupHeirarchy(const FuzeHttp::Client& client, std::vector<int> ordered_groups);
 	// BasicResponse createAccount(nlohmann::json user_json);
 	// std::string dumpMembersInGroup(int group_id) const;
 	// std::string dumpMembersInGroupAsArray(int group_id) const;
-	std::string dumpAllUsers(const std::optional<Client>& client) const;
+	std::string dumpAllUsers(const std::optional<FuzeHttp::Client>& client) const;
 	// std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
 	const Thread* getThread(int board_id, int thread_id) const { return this->boards.at(board_id).getThread(thread_id); }
 	std::string getIntermediateSaltFromAccount(int account_id);
-	const Client& getClientFromAccountId(int account_id) const;
+	const FuzeHttp::Client& getClientFromAccountId(int account_id) const;
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
-	// BasicResponse addUserToGroups(const Client& client, int user_id, std::vector<int> groups_by_id);
+	// BasicResponse addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id);
 
-	void join  (WebsocketSession* session);
-	void leave (WebsocketSession* session);
 	void sendToThread (std::string message, int thread_id);
 	void sendToWebRTC(std::string message);
 	void clearWebsockets();
@@ -93,10 +91,8 @@ private:
 	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;
 
 	// This mutex synchronizes all access to sessions_
-	std::mutex mutex_;
+	// std::mutex mutex_;
 
-	// Keep a list of all the websocket-connected clients
-	std::unordered_set<WebsocketSession*> WebsocketSessions;
 
 	// std::unordered_map<int, Board> boards;
 	std::unordered_map<int, Board> boards;

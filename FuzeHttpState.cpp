@@ -1,6 +1,7 @@
 #include "FuzeHttpState.hpp"
 #include "FuzeHttpServer.hpp"
 
+using namespace FuzeHttp;
 // FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
 // 		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi), busted_target_to_target(busted_target_to_target), files_generated_from_templates(files_generated_from_templates) {
 FuzeHttp::State::State(FuzeHttp::Server* server)
@@ -141,4 +142,14 @@ const std::optional<Client> FuzeHttp::State::getClientFromSession(const std::str
 		return this->clients.at(session->second.client_id);
 	else
 		return {};
+}
+
+void FuzeHttp::State::websocketJoin(WebsocketSession* session) {
+	std::lock_guard<std::mutex> lock(mutex_);
+	WebsocketSessions.insert(session);
+}
+
+void FuzeHttp::State::websocketLeave(WebsocketSession* session) {
+	std::lock_guard<std::mutex> lock(mutex_);
+	WebsocketSessions.erase(session);
 }

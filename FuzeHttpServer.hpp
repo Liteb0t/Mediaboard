@@ -9,7 +9,7 @@ namespace FuzeHttp {
 class Server {
 public:
 	Server();
-	int processOptions(int argc, char* argv[], std::vector<FuzeHttp::TemplateMacro*> additional_options);
+	int processOptions(int argc, char* argv[], std::vector<FuzeHttp::TemplateMacro*> additional_options, const std::string& current_version);
 	template<class StateType>
 	void run(StateType* state) {
 		auto address = boost::asio::ip::make_address("127.0.0.1");
@@ -35,15 +35,7 @@ public:
 			}
 		);
 
-		// if (variable_map.count("create_owner")) {
-		// 	std::string invite_key = state->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
-		// 	std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << server_port << "/invite/" << invite_key << std::endl;
-		// }
-		// else if (!state->ownerExists())
-		// 	std::println("\nERROR: No owner found. Restart the application with --create_owner");
-		// else
-		// 	std::cout << "The server can now be accessed from http://localhost:" << server_port << std::endl;
-		// std::cout << std::flush;
+		std::cout << "The server can now be accessed from http://localhost:" << server_port << std::endl;
 
 		// Run the I/O service on the requested number of threads
 		std::cout << "Running the I/O service..." << std::endl;
@@ -77,9 +69,10 @@ public:
 	std::unordered_map<std::string /*target*/, std::string /*etag*/> manifest_frontend_etags;
 	std::unordered_map<std::string, std::string> busted_target_to_target;
 	std::unordered_set<std::string> files_generated_from_templates;
+	boost::program_options::variables_map variable_map;
+	const unsigned short server_port = 8300;
 private:
 	// FuzeHttp::State* state;
 	const unsigned short threads = 1;
-	const unsigned short server_port = 8300;
 };
 } // namespace FuzeHttp

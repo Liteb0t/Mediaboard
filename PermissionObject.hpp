@@ -9,6 +9,7 @@
 #include <print>
 #include <vector>
 
+namespace FuzeHttp {
 enum class BUILTIN_GROUPS {
 	OWNER = 0,
 	USERS = 1,
@@ -304,4 +305,5 @@ private:
 	// std::optional<int> owner_account_id;
 	PermissionObjectBase* parent_object;
 };
+} // namespace FuzeHttp
 #endif

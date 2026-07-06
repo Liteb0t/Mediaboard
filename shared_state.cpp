@@ -21,13 +21,19 @@ using namespace FuzeHttp;
 
 // shared_state::shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
 //		: State(fuze_database_interface, std::move(busted_target_to_target), std::move(files_generated_from_templates)),
-shared_state::shared_state(FuzeHttp::Server* server, StateConfig config)
+shared_state::shared_state(FuzeHttp::Server* server, StateConfig config, bool create_owner_account)
 		: State(server),
 		config(config),
 		fuze_dbi(server->db),
 		media_location(server->media_location) {
 	// std::println("Assigned document_root: {}", document_root.string());
 	this->setAdditionalImageFormatsFromConfig(config);
+	if (create_owner_account) {
+		std::string invite_key = this->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
+		std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << this->server->server_port << "/invite/" << invite_key << std::endl;
+	}
+	else if (!this->ownerExists())
+		std::println("\nERROR: No owner found. Restart the application with --create_owner");
 	// this->document_root = document_root;
 
 	// this->options.push_back({
@@ -75,16 +81,6 @@ void shared_state::start() {
 	this->boards.at(0).cacheAllThreads();
 }
 
-void shared_state::join(WebsocketSession* session) {
-	std::lock_guard<std::mutex> lock(mutex_);
-	WebsocketSessions.insert(session);
-}
-
-void shared_state::leave(WebsocketSession* session) {
-	std::lock_guard<std::mutex> lock(mutex_);
-	WebsocketSessions.erase(session);
-}
-
 // Broadcast a message to all websocket client sessions
 void shared_state::sendToThread(std::string message, int thread_id) {
 	// Put the message in a shared pointer so we can re-use it for each client
@@ -93,7 +89,7 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	// Make a local list of all the weak pointers representing
 	// the sessions, so we can do the actual sending without
 	// holding the mutex:
-	std::vector<boost::weak_ptr<WebsocketSession>> v;
+	std::vector<boost::weak_ptr<FuzeHttp::WebsocketSession>> v;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
 		v.reserve(WebsocketSessions.size());
@@ -118,7 +114,7 @@ void shared_state::sendToWebRTC(std::string message) {
 	// Make a local list of all the weak pointers representing
 	// the sessions, so we can do the actual sending without
 	// holding the mutex:
-	std::vector<boost::weak_ptr<WebsocketSession>> v;
+	std::vector<boost::weak_ptr<FuzeHttp::WebsocketSession>> v;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
 		v.reserve(WebsocketSessions.size());

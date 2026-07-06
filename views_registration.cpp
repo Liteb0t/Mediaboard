@@ -8,6 +8,8 @@
 #include <boost/beast/http/status.hpp>
 #include <iostream>
 
+using namespace FuzeHttp;
+
 FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Request req) {
 	boost::json::object req_json;
 	boost::json::string username_j;

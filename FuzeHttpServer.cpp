@@ -1,6 +1,6 @@
 #include "FuzeHttpServer.hpp"
 #include "FuzeHttp.hpp"
-#include "migrations.hpp"
+#include "Migrations.hpp"
 #include <fstream>
 #include <iostream>
 
@@ -105,7 +105,7 @@ FuzeHttp::Server::Server() {
 	}
 }
 
-int FuzeHttp::Server::processOptions(int argc, char* argv[], std::vector<FuzeHttp::TemplateMacro*> additional_options) {
+int FuzeHttp::Server::processOptions(int argc, char* argv[], std::vector<FuzeHttp::TemplateMacro*> additional_options, const std::string& current_version) {
 	std::error_code ec;
 	std::filesystem::path program_location = boost::dll::program_location().parent_path();
 	if (ec)
@@ -157,20 +157,20 @@ int FuzeHttp::Server::processOptions(int argc, char* argv[], std::vector<FuzeHtt
 	command_line_options.add(command_line_specific_options).add(universal_options);
 	std::filesystem::path config_file_path;
 
-	boost::program_options::variables_map variable_map;
+	// boost::program_options::variables_map this->variable_map;
 	try {
-		store(boost::program_options::parse_command_line(argc, argv, command_line_options), variable_map);
-		boost::program_options::notify(variable_map);
+		store(boost::program_options::parse_command_line(argc, argv, command_line_options), this->variable_map);
+		boost::program_options::notify(this->variable_map);
 
-		if (variable_map.count("config"))
+		if (this->variable_map.count("config"))
 			config_file = config_file_str;
 		config_file_path = getConfigDirectory(program_location, config_file, data_directory_config);
 		// Load config.ini
 		std::ifstream config_file_ifstream(config_file_path.string());
 		if (config_file_ifstream) {
 			std::cout << "Loaded config file " << config_file_path << std::endl;
-			store(parse_config_file(config_file_ifstream, universal_options), variable_map);
-			boost::program_options::notify(variable_map);
+			store(parse_config_file(config_file_ifstream, universal_options), this->variable_map);
+			boost::program_options::notify(this->variable_map);
 		}
 		else {
 			std::cout << "Could not find config.ini file. Default options will be used." << std::endl;
@@ -181,23 +181,23 @@ int FuzeHttp::Server::processOptions(int argc, char* argv[], std::vector<FuzeHtt
 		return 1;
 	}
 
-	if (variable_map.count("help")) {
+	if (this->variable_map.count("help")) {
 		std::cout << command_line_options << std::endl;
 		return 2;
 	}
-	if (variable_map.count("version")) {
+	if (this->variable_map.count("version")) {
 		std::cout << current_version << std::endl;
 		return 2;
 	}
-	if (variable_map.count("data_directory"))
+	if (this->variable_map.count("data_directory"))
 		data_directory_config = data_directory_str;
-	if (variable_map.count("media_directory")) {
+	if (this->variable_map.count("media_directory")) {
 		std::println("media_directory config option found");
 		media_directory_config = media_directory_str;
 	}
 	else
 		std::println("media_directory config option not found");
-	if (variable_map.count("sqlite_database_file"))
+	if (this->variable_map.count("sqlite_database_file"))
 		sqlite_database_file_config = sqlite_database_file_str;
 	ProgramDirectories program_directories;
 	std::optional<ProgramDirectories> program_directories_opt = getProgramDirectories(program_location, data_directory_config, media_directory_config, sqlite_database_file_config);
@@ -235,13 +235,13 @@ int FuzeHttp::Server::processOptions(int argc, char* argv[], std::vector<FuzeHtt
 		}
 		if (version_string_found && version_string) {
 			// std::cout << "Version " <<	version_string.value() << std::endl;
-			Migrations::makeMigrations(this->db, version_string.value());
+			Migrations::makeMigrations(this->db, version_string.value(), current_version);
 		}
 		else {
 			// std::filesystem::path template_path = std::filesystem::absolute("database_template.sql", database_location);
 			// if (!std::filesystem::exists(template_path))
 			// 	throw std::runtime_error(std::format("Database template file {} not found.", template_path.string()));
-			Migrations::firstTimeSetup(this->db, program_directories.data / "database_template.sql", program_directories.sqlite_file.string());
+			Migrations::firstTimeSetup(this->db, program_directories.data / "database_template.sql", program_directories.sqlite_file.string(), current_version);
 		}
 		std::cout << "Set port: " << server_port << std::endl;
 	}

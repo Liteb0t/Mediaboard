@@ -22,22 +22,20 @@
 #include <string>
 #include <vector>
 
-// Forward declaration
-// class shared_state;
-// class shared_state : public PermissionManager;
+namespace FuzeHttp {
 
 /** Represents an active WebSocket connection to the server
 */
 // template<typename StateType>
 class WebsocketSession : public boost::enable_shared_from_this<WebsocketSession> {
 public:
-	WebsocketSession(boost::asio::ip::tcp::socket&& socket, shared_state* state)
+	WebsocketSession(boost::asio::ip::tcp::socket&& socket, State* state)
 			: ws_(std::move(socket)) , state_(state) {
 	}
 	~WebsocketSession() {
 		// Remove this session from the list of active sessions
-		state_->leave(this);
-		state_->main_board()->removeListenerFromThread(this, this->tracking_thread);
+		state_->websocketLeave(this);
+		// state_->main_board()->removeListenerFromThread(this, this->tracking_thread);
 	}
 
 	template<class Body, class Allocator>
@@ -66,7 +64,7 @@ private:
 	int tracking_thread;
 	beast::flat_buffer buffer_;
 	websocket::stream<beast::tcp_stream> ws_;
-	shared_state* state_;
+	State* state_;
 	std::optional<Client> client;
 	std::vector<boost::shared_ptr<std::string const>> queue_;
 
@@ -84,7 +82,7 @@ private:
 			return fail(ec, "accept");
 
 		// Add this session to the list of active sessions
-		state_->join(this);
+		state_->websocketJoin(this);
 
 		// db_test();
 
@@ -102,6 +100,8 @@ private:
 		if(ec)
 			return fail(ec, "read");
 
+		state_->websocketRead(this);
+		/*
 		try {
 			std::string buffer_data = beast::buffers_to_string(buffer_.data());
 			std::cout << buffer_data << std::endl;
@@ -126,16 +126,14 @@ private:
 					std::cout << "Warning: thread is not an integer" << std::endl;
 				}
 			}
-			/*
-			else if (request_type == "connect_to_channel") {
-				std::println("DUMMY added ws to channel");
-				is_webrtc = true;
-			}
-			else if (request_type == "webrtc_signal") {
-				std::println("received webrtc_signal WS message");
-				state_->sendToWebRTC(buffer_data);
-			}
-			*/
+			// else if (request_type == "connect_to_channel") {
+			// 	std::println("DUMMY added ws to channel");
+			// 	is_webrtc = true;
+			// }
+			// else if (request_type == "webrtc_signal") {
+			// 	std::println("received webrtc_signal WS message");
+			// 	state_->sendToWebRTC(buffer_data);
+			// }
 			else {
 				// TODO send error message back to requester
 				throw std::runtime_error("request_type " + request_type + " not recognised");
@@ -144,6 +142,7 @@ private:
 		catch (const std::exception& e) {
 			std::println(std::cerr, "[WebsocketSession] {}", e.what());
 		}
+		*/
 
 		// Clear the buffer
 		buffer_.consume(buffer_.size());
@@ -193,7 +192,7 @@ private:
 			)
 		);
 	}
-};
+}; // class WebsocketSession
 
 template<class Body, class Allocator>
 void WebsocketSession::run(http::request<Body, http::basic_fields<Allocator>> req) {
@@ -250,6 +249,7 @@ void WebsocketSession::run(http::request<Body, http::basic_fields<Allocator>> re
 			shared_from_this()
 		)
 	);
-}
+} // WebsocketSession::run
 
+} // namespace FuzeHttp
 #endif

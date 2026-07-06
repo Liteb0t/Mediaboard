@@ -3,11 +3,19 @@
 #include <unordered_set>
 #include <boost/json.hpp>
 
+namespace FuzeHttp {
 enum GroupLockPosition { NONE, LOCK_TO_TOP, LOCK_TO_BOTTOM };
 
 class Group {
 public:
-	Group(int id, std::string name);
+	Group(int id, std::string name)
+			: id(id),
+			name(name) {
+		this->group_as_json["id"] = this->id;
+		this->group_as_json["name"] = this->name;
+		// std::cout << "[Group] Constructed with ID " << this->id << std::endl;
+	}
+
 	boost::json::object asJson() const { return this->group_as_json; };
 	int getId() const { return this->id; };
 	GroupLockPosition getLockPosition() const { return this->lock_position; };
@@ -26,3 +34,4 @@ private:
 	boost::json::object group_as_json;
 	GroupLockPosition lock_position;
 };
+} // namespace FuzeHttp

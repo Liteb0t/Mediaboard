@@ -21,48 +21,13 @@
 #include <cstdlib>
 #include <memory>
 
+namespace FuzeHttp {
 // Represents an established HTTP connection
 
 // Return a response for the given request.
 //
 // The concrete type of the response message (which depends on the
 // request), is type-erased in message_generator.
-
-template<class StateType>
-http::message_generator handle_request(
-		StateType* state,
-		FuzeHttp::Controller<StateType*>* controller,
-		http::request<http::string_body, http::basic_fields<std::allocator<char>>>&& req) {
-	// Matches paths in urls.cpp
-	FuzeHttp::Response basic_res;
-	try {
-		basic_res = controller->matchPathAndExecute(state, req);
-		std::cout << "[http_session] basic_res.status: " << basic_res.status << std::endl;
-		if (basic_res.json || basic_res.body)
-			return FuzeHttp::buildResponse<http::string_body>(basic_res, req);
-		else if (basic_res.file) {
-			// if (!std::filesystem::is_regular_file(basic_res.file.value()))
-			// 	basic_res.file = basic_res.file.value() / "index.html";
-			std::println("Checking if file exists: {}", basic_res.file.value().string());
-			if (!std::filesystem::exists(basic_res.file.value()))
-				return FuzeHttp::buildResponse<http::empty_body>(FuzeHttp::Response{.status=http::status::bad_request, .error_message="File not found"}, req);
-			else
-				return FuzeHttp::buildResponse<http::file_body>(basic_res, req);
-		}
-		else
-			return FuzeHttp::buildResponse<http::empty_body>(basic_res, req);
-	}
-	catch(const std::exception& e) {
-		std::string error_text = std::format("[http_session] {}", e.what());
-		std::cerr << error_text << std::endl;
-		basic_res = FuzeHttp::Response{
-			.status = http::status::internal_server_error,
-			.error_message = error_text
-		};
-		return FuzeHttp::buildResponse<http::empty_body>(basic_res, req);
-	}
-}
-
 template<class StateType>
 class http_session : public boost::enable_shared_from_this<http_session<StateType>> {
 public:
@@ -87,6 +52,10 @@ private:
 	boost::optional<http::request_parser<http::string_body>> parser_;
 
 	struct send_lambda;
+	static http::message_generator handle_request(
+		StateType* state,
+		FuzeHttp::Controller<StateType*>* controller,
+		http::request<http::string_body, http::basic_fields<std::allocator<char>>>&& req);
 
 	void fail(beast::error_code ec, char const* what) {
 		// Don't report on canceled operations
@@ -170,4 +139,39 @@ private:
 	}
 };
 
+template<class StateType>
+http::message_generator http_session<StateType>::handle_request(
+		StateType* state,
+		FuzeHttp::Controller<StateType*>* controller,
+		http::request<http::string_body, http::basic_fields<std::allocator<char>>>&& req) {
+	// Matches paths in urls.cpp
+	FuzeHttp::Response basic_res;
+	try {
+		basic_res = controller->matchPathAndExecute(state, req);
+		std::cout << "[http_session] basic_res.status: " << basic_res.status << std::endl;
+		if (basic_res.json || basic_res.body)
+			return FuzeHttp::buildResponse<http::string_body>(basic_res, req);
+		else if (basic_res.file) {
+			// if (!std::filesystem::is_regular_file(basic_res.file.value()))
+			// 	basic_res.file = basic_res.file.value() / "index.html";
+			std::println("Checking if file exists: {}", basic_res.file.value().string());
+			if (!std::filesystem::exists(basic_res.file.value()))
+				return FuzeHttp::buildResponse<http::empty_body>(FuzeHttp::Response{.status=http::status::bad_request, .error_message="File not found"}, req);
+			else
+				return FuzeHttp::buildResponse<http::file_body>(basic_res, req);
+		}
+		else
+			return FuzeHttp::buildResponse<http::empty_body>(basic_res, req);
+	}
+	catch(const std::exception& e) {
+		std::string error_text = std::format("[http_session] {}", e.what());
+		std::cerr << error_text << std::endl;
+		basic_res = FuzeHttp::Response{
+			.status = http::status::internal_server_error,
+			.error_message = error_text
+		};
+		return FuzeHttp::buildResponse<http::empty_body>(basic_res, req);
+	}
+}
+} // namespace FuzeHttp
 #endif
