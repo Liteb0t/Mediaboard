@@ -3,8 +3,7 @@
 
 #include "FuzeDBI.hpp"
 #include "Group.hpp"
-#include "permission_collection.hpp"
-#include <algorithm>
+#include "PermissionCollection.hpp"
 #include <boost/json/object.hpp>
 #include <iostream>
 #include <print>

@@ -7,13 +7,11 @@
 // Official repository: https://github.com/vinniefalco/CppCon2018
 //
 
-#include "listener.hpp"
-#include "http_session.hpp"
-#include "shared_state.hpp"
+#include "Listener.hpp"
 #include "urls.hpp"
 #include <iostream>
 
-listener::listener(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint, shared_state* state)
+Listener::Listener(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint, shared_state* state)
 		: io_context_(io_context) , acceptor_(io_context) , state_(state), controller(new FuzeHttp::Controller<shared_state*>()) {
 	addURLsToController(this->controller);
 	beast::error_code ec;
@@ -48,19 +46,19 @@ listener::listener(boost::asio::io_context& io_context, boost::asio::ip::tcp::en
 	}
 }
 
-void listener::run() {
+void Listener::run() {
 	// The new connection gets its own strand
 	acceptor_.async_accept(
 		boost::asio::make_strand(io_context_),
 		beast::bind_front_handler(
-			&listener::on_accept,
+			&Listener::on_accept,
 			shared_from_this()
 		)
 	);
 }
 
 // Report a failure
-void listener::fail(beast::error_code ec, char const* what) {
+void Listener::fail(beast::error_code ec, char const* what) {
 	// Don't report on canceled operations
 	if (ec == boost::asio::error::operation_aborted)
 		return;
@@ -68,7 +66,7 @@ void listener::fail(beast::error_code ec, char const* what) {
 }
 
 // Handle a connection
-void listener::on_accept(beast::error_code ec, boost::asio::ip::tcp::socket socket) {
+void Listener::on_accept(beast::error_code ec, boost::asio::ip::tcp::socket socket) {
 	if (ec)
 		return fail(ec, "accept");
 	else {
@@ -83,7 +81,7 @@ void listener::on_accept(beast::error_code ec, boost::asio::ip::tcp::socket sock
 	acceptor_.async_accept(
 		boost::asio::make_strand(io_context_),
 		beast::bind_front_handler(
-			&listener::on_accept,
+			&Listener::on_accept,
 			shared_from_this()
 		)
 	);

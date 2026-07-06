@@ -108,7 +108,7 @@ std::string Board::dumpAllThreads(const std::optional<Client>& client) const {
 	});
 }
 
-void Board::addListenerToThread(websocket_session* listener, int thread_id) {
+void Board::addListenerToThread(WebsocketSession* listener, int thread_id) {
 	if (threadExists(thread_id)) {
 		this->threads.at(thread_id).addListener(listener);
 		std::cout << "[Board] Listener added to thread " << thread_id << std::endl;
@@ -117,7 +117,7 @@ void Board::addListenerToThread(websocket_session* listener, int thread_id) {
 		std::cout << "[Board] Warning: could not add listener to thread " << thread_id << " because the thread does not exist." << std::endl;
 }
 
-void Board::removeListenerFromThread(websocket_session* listener, int thread_id) {
+void Board::removeListenerFromThread(WebsocketSession* listener, int thread_id) {
 	if (threadExists(thread_id)) {
 		this->threads.at(thread_id).removeListener(listener);
 		std::cout << "[Board] Listener removed from thread " << thread_id << std::endl;

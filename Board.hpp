@@ -5,7 +5,7 @@
 #include <set>
 #include <utility>
 
-class websocket_session; // Forward declaration
+class WebsocketSession; // Forward declaration
 
 class Board : public PermissionManagedObject {
 public:
@@ -23,12 +23,12 @@ public:
 	boost::json::object getThreadPermissionsAsJson(int thread_id, const std::optional<Client>& client) const;
 	bool threadExists(int thread_id) const { std::unordered_map<int, Thread>::const_iterator it = threads.find(thread_id); return it != threads.end(); };
 	bool messageExistsInThread(int message_id, int thread_id) const { return this->threads.at(thread_id).messageExists(message_id); }
-	void addListenerToThread(websocket_session* listener, int thread_id);
-	void removeListenerFromThread(websocket_session* listener, int thread_id);
+	void addListenerToThread(WebsocketSession* listener, int thread_id);
+	void removeListenerFromThread(WebsocketSession* listener, int thread_id);
 	void removeUnauthorizedListenersFromThread(int thread_id) {
 		this->threads.at(thread_id).removeUnauthorizedListeners();
 	}
-	std::unordered_set<websocket_session*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id).getListeners(); };
+	std::unordered_set<WebsocketSession*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id).getListeners(); };
 	std::string dumpMessage(int thread_id, int message_id) const;
 	struct thread_order_comparator {
 		bool operator() (std::pair<std::time_t, int> left, std::pair<std::time_t, int> right) const {

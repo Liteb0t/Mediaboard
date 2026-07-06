@@ -3,7 +3,7 @@
 #pragma once
 #include "FuzeDBI.hpp"
 #include "beast.hpp"
-#include "permission_managed_object.hpp"
+#include "PermissionObject.hpp"
 #include <boost/beast/http/status.hpp>
 #include <sodium.h>
 #include <charconv>

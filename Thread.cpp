@@ -1,7 +1,7 @@
 #include "Thread.hpp"
-#include "permission_managed_object.hpp"
+#include "PermissionObject.hpp"
 #include <boost/json/serialize.hpp>
-#include "websocket_session.hpp"
+#include "WebsocketSession.hpp"
 #include <string>
 #include <iostream>
 #include <cstring>
@@ -145,11 +145,11 @@ void Thread::markAsDeleted() {
 	fuze_dbi->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1", this->id);
 }
 
-void Thread::addListener(websocket_session* listener) {
+void Thread::addListener(WebsocketSession* listener) {
 	listeners.insert(listener);
 }
 
-void Thread::removeListener(websocket_session* listener) {
+void Thread::removeListener(WebsocketSession* listener) {
 	listeners.erase(listener);
 }
 
@@ -166,12 +166,12 @@ boost::json::object Thread::getPermissionsAsJson(const std::optional<Client>& cl
 	};
 }
 
-std::unordered_set<websocket_session*> Thread::getListeners() const {
+std::unordered_set<WebsocketSession*> Thread::getListeners() const {
 	return this->listeners;
 };
 
 void Thread::removeUnauthorizedListeners() {
-	std::erase_if(this->listeners, [this](const websocket_session* ws)->bool{
+	std::erase_if(this->listeners, [this](const WebsocketSession* ws)->bool{
 		return !this->clientHasPermission(ws->getClient(), PERMISSION::VIEW_THREAD);
 	});
 }

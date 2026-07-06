@@ -1,10 +1,11 @@
 #pragma once
 #include "FuzeDBI.hpp"
 #include "FuzeHttp.hpp"
-#include "FuzeHttpServer.hpp"
+// #include "FuzeHttpServer.hpp"
 #include "FuzeHttpUtils.hpp"
 
 namespace FuzeHttp {
+class Server;
 class State : public PermissionManager {
 public:
 	// State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
@@ -19,7 +20,7 @@ public:
 	const std::filesystem::path& getDocumentRoot() const { return document_root; }
 	// const std::unordered_map<std::string, std::string> busted_target_to_target;
 	// const std::unordered_set<std::string> files_generated_from_templates;
-	virtual void start() {};
+	// virtual void start() {};
 	FuzeHttp::Server* server;
 protected:
 	const std::optional<Client> getClientFromSession(const std::string& session_id_base64) const;

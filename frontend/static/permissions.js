@@ -703,7 +703,7 @@ class PermissionCollection {
 		this.enabled_permissions = enabled_permissions; // There are different permissions available to be set for boards, threads, and server. Eg. setting the "create thread" permission within a thread would be pointless.
 		permission_collection_container.textContent = "Select a group or user to view or modify its permission settings.";
 	}
-	static permissions = { // Mirrors PERMISSION enum in permission_setting.hpp
+	static permissions = { // Mirrors PERMISSION enum in PermissionSetting.hpp
 		0: "Manage permissions",
 		1: "View thread",
 		2: "Create thread",

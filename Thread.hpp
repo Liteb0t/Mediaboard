@@ -1,5 +1,5 @@
 #pragma once
-#include "permission_managed_object.hpp"
+#include "PermissionObject.hpp"
 #include "Message.hpp"
 #include <ctime>
 #include <string>
@@ -7,7 +7,7 @@
 #include <unordered_set>
 #include <boost/json.hpp>
 
-class websocket_session;
+class WebsocketSession;
 
 class Thread : public PermissionManagedObject {
 public:
@@ -28,9 +28,9 @@ public:
 	// bool keyMatchesMessage(std::string key, int message_id) const;
 	bool messageExists(int message_id_in_thread) const { return this->messages.contains(message_id_in_thread); }
 	int getId() const { return this->id; };
-	void addListener(websocket_session* listener);
-	void removeListener(websocket_session* listener);
-	std::unordered_set<websocket_session*> getListeners() const;
+	void addListener(WebsocketSession* listener);
+	void removeListener(WebsocketSession* listener);
+	std::unordered_set<WebsocketSession*> getListeners() const;
 	void removeUnauthorizedListeners();
 	boost::json::array getMessagesAsJson() const;
 	std::string dumpMessage(int message_id) const;
@@ -47,7 +47,7 @@ private:
 	// std::vector<Post> posts;
 	std::map<int, Message> messages;
 	int reply_count = 0;
-	std::unordered_set<websocket_session*> listeners;
+	std::unordered_set<WebsocketSession*> listeners;
 	// char subject[256];
 	boost::json::object thread_as_json;
 	bool deleted = false; // It is assumed new Thread object are not marked as deleted, because deleted threads are not retrieved from the database, nor can they be created through the API.

@@ -7,24 +7,24 @@
 // Official repository: https://github.com/vinniefalco/CppCon2018
 //
 
-#include "websocket_session.hpp"
+#include "WebsocketSession.hpp"
 // #include "db_interface.h"
 // #include "post.hpp"
 #include <iostream>
 #include <boost/json.hpp>
 #include <print>
 
-websocket_session::websocket_session(boost::asio::ip::tcp::socket&& socket, shared_state* state)
+WebsocketSession::WebsocketSession(boost::asio::ip::tcp::socket&& socket, shared_state* state)
 		: ws_(std::move(socket)) , state_(state) {
 }
 
-websocket_session::~websocket_session() {
+WebsocketSession::~WebsocketSession() {
 	// Remove this session from the list of active sessions
 	state_->leave(this);
 	state_->main_board()->removeListenerFromThread(this, this->tracking_thread);
 }
 
-void websocket_session::fail(beast::error_code ec, char const* what) {
+void WebsocketSession::fail(beast::error_code ec, char const* what) {
 	// Don't report these
 	if( ec == boost::asio::error::operation_aborted ||
 		ec == websocket::error::closed)
@@ -33,7 +33,7 @@ void websocket_session::fail(beast::error_code ec, char const* what) {
 	std::cerr << what << ": " << ec.message() << "\n";
 }
 
-void websocket_session::on_accept(beast::error_code ec) {
+void WebsocketSession::on_accept(beast::error_code ec) {
 	// Handle the error, if any
 	if(ec)
 		return fail(ec, "accept");
@@ -47,13 +47,13 @@ void websocket_session::on_accept(beast::error_code ec) {
 	ws_.async_read(
 		buffer_,
 		beast::bind_front_handler(
-			&websocket_session::on_read,
+			&WebsocketSession::on_read,
 			shared_from_this()
 		)
 	);
 }
 
-void websocket_session::on_read(beast::error_code ec, std::size_t) {
+void WebsocketSession::on_read(beast::error_code ec, std::size_t) {
 	// Handle the error, if any
 	if(ec)
 		return fail(ec, "read");
@@ -98,7 +98,7 @@ void websocket_session::on_read(beast::error_code ec, std::size_t) {
 		}
 	}
 	catch (const std::exception& e) {
-		std::println(std::cerr, "[websocket_session] {}", e.what());
+		std::println(std::cerr, "[WebsocketSession] {}", e.what());
 	}
 
 	// Clear the buffer
@@ -108,13 +108,13 @@ void websocket_session::on_read(beast::error_code ec, std::size_t) {
 	ws_.async_read(
 		buffer_,
 		beast::bind_front_handler(
-			&websocket_session::on_read,
+			&WebsocketSession::on_read,
 			shared_from_this()
 		)
 	);
 }
 
-void websocket_session::send(boost::shared_ptr<std::string const> const& ss) {
+void WebsocketSession::send(boost::shared_ptr<std::string const> const& ss) {
 	// Post our work to the strand, this ensures
 	// that the members of `this` will not be
 	// accessed concurrently.
@@ -122,14 +122,14 @@ void websocket_session::send(boost::shared_ptr<std::string const> const& ss) {
 	boost::asio::post(
 		ws_.get_executor(),
 		beast::bind_front_handler(
-			&websocket_session::on_send,
+			&WebsocketSession::on_send,
 			shared_from_this(),
 			ss
 		)
 	);
 }
 
-void websocket_session::on_send(boost::shared_ptr<std::string const> const& ss) {
+void WebsocketSession::on_send(boost::shared_ptr<std::string const> const& ss) {
 	// Always add to queue
 	queue_.push_back(ss);
 
@@ -141,13 +141,13 @@ void websocket_session::on_send(boost::shared_ptr<std::string const> const& ss) 
 	ws_.async_write(
 		boost::asio::buffer(*queue_.front()),
 		beast::bind_front_handler(
-			&websocket_session::on_write,
+			&WebsocketSession::on_write,
 			shared_from_this()
 		)
 	);
 }
 
-void websocket_session::on_write(beast::error_code ec, std::size_t) {
+void WebsocketSession::on_write(beast::error_code ec, std::size_t) {
 	// Handle the error, if any
 	if(ec)
 		return fail(ec, "write");
@@ -160,7 +160,7 @@ void websocket_session::on_write(beast::error_code ec, std::size_t) {
 		ws_.async_write(
 			boost::asio::buffer(*queue_.front()),
 			beast::bind_front_handler(
-				&websocket_session::on_write,
+				&WebsocketSession::on_write,
 				shared_from_this()
 			)
 		);

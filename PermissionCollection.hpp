@@ -1,6 +1,6 @@
 #pragma once
 #include "FuzeDBI.hpp"
-#include "permission_setting.hpp"
+#include "PermissionSetting.hpp"
 #include <unordered_map>
 
 enum struct ACCOUNT_OR_GROUP {ACCOUNT, GROUP};

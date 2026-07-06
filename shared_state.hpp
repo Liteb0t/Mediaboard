@@ -10,19 +10,22 @@
 #ifndef BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 
-#include "FuzeHttpServer.hpp"
 #include "beast.hpp"
 #include "Board.hpp"
 #include "FuzeDBI.hpp"
 #include "FuzeHttpState.hpp"
-#include "permission_managed_object.hpp"
+#include "PermissionObject.hpp"
 #include <boost/smart_ptr.hpp>
 #include <mutex>
 #include <string>
 #include <unordered_set>
 
 // Forward declaration
-class websocket_session;
+class WebsocketSession;
+namespace FuzeHttp{
+	// class State;
+	class Server;
+};
 
 struct StateConfig {
 	std::string thumbnail_file_extension;
@@ -44,7 +47,7 @@ public:
 	shared_state(FuzeHttp::Server* server, StateConfig config);
 	// shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
 	const StateConfig config;
-	virtual void start() override;
+	void start();
 	void setAdditionalImageFormatsFromConfig(const StateConfig& config);
 	bool canCreateThumbnailForImageFormat(const std::string_view mime_type) const;
 	bool canCreateThumbnailForVideoFormat(const std::string_view mime_type) const;
@@ -72,8 +75,8 @@ public:
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
 	// BasicResponse addUserToGroups(const Client& client, int user_id, std::vector<int> groups_by_id);
 
-	void join  (websocket_session* session);
-	void leave (websocket_session* session);
+	void join  (WebsocketSession* session);
+	void leave (WebsocketSession* session);
 	void sendToThread (std::string message, int thread_id);
 	void sendToWebRTC(std::string message);
 	void clearWebsockets();
@@ -93,7 +96,7 @@ private:
 	std::mutex mutex_;
 
 	// Keep a list of all the websocket-connected clients
-	std::unordered_set<websocket_session*> websocket_sessions;
+	std::unordered_set<WebsocketSession*> WebsocketSessions;
 
 	// std::unordered_map<int, Board> boards;
 	std::unordered_map<int, Board> boards;

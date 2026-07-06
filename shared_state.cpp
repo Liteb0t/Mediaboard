@@ -7,9 +7,10 @@
 // Official repository: https://github.com/vinniefalco/CppCon2018
 //
 
-#include "permission_managed_object.hpp"
+#include "FuzeHttpServer.hpp"
+#include "PermissionObject.hpp"
 #include "shared_state.hpp"
-#include "websocket_session.hpp"
+#include "WebsocketSession.hpp"
 #include <boost/json/serialize.hpp>
 #include <boost/dll.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
@@ -74,14 +75,14 @@ void shared_state::start() {
 	this->boards.at(0).cacheAllThreads();
 }
 
-void shared_state::join(websocket_session* session) {
+void shared_state::join(WebsocketSession* session) {
 	std::lock_guard<std::mutex> lock(mutex_);
-	websocket_sessions.insert(session);
+	WebsocketSessions.insert(session);
 }
 
-void shared_state::leave(websocket_session* session) {
+void shared_state::leave(WebsocketSession* session) {
 	std::lock_guard<std::mutex> lock(mutex_);
-	websocket_sessions.erase(session);
+	WebsocketSessions.erase(session);
 }
 
 // Broadcast a message to all websocket client sessions
@@ -92,10 +93,10 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	// Make a local list of all the weak pointers representing
 	// the sessions, so we can do the actual sending without
 	// holding the mutex:
-	std::vector<boost::weak_ptr<websocket_session>> v;
+	std::vector<boost::weak_ptr<WebsocketSession>> v;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-		v.reserve(websocket_sessions.size());
+		v.reserve(WebsocketSessions.size());
 		this->main_board()->removeUnauthorizedListenersFromThread(thread_id);
 		for(auto p : this->main_board()->getListenersFromThread(thread_id))
 			v.emplace_back(p->weak_from_this());
@@ -117,11 +118,11 @@ void shared_state::sendToWebRTC(std::string message) {
 	// Make a local list of all the weak pointers representing
 	// the sessions, so we can do the actual sending without
 	// holding the mutex:
-	std::vector<boost::weak_ptr<websocket_session>> v;
+	std::vector<boost::weak_ptr<WebsocketSession>> v;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-		v.reserve(websocket_sessions.size());
-		for(auto p : this->websocket_sessions) {
+		v.reserve(WebsocketSessions.size());
+		for(auto p : this->WebsocketSessions) {
 			if (p->is_webrtc)
 				v.emplace_back(p->weak_from_this());
 		}

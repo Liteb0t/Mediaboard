@@ -1,3 +1,4 @@
+#pragma once
 //
 // Copyright (c) 2016-2019 Vinnie Falco (vinnie dot falco at gmail dot com)
 //
@@ -10,7 +11,7 @@
 #include "FuzeHttp.hpp"
 #include "http_session.hpp"
 #include "shared_state.hpp"
-#include "websocket_session.hpp"
+#include "WebsocketSession.hpp"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/beast/http/status.hpp>
 #include <boost/beast/http/string_body_fwd.hpp>
@@ -115,31 +116,10 @@ void http_session::on_read(beast::error_code ec, std::size_t) {
 
 	// See if it is a WebSocket Upgrade
 	if(websocket::is_upgrade(parser_->get())) {
-		/*
-		const http::request<http::string_body, http::basic_fields<std::allocator<char>>>& req = parser_->release();
-		std::optional<Client> client = state_->getClientIfExists(req);
-		if (!client) {
-			auto basic_res = FuzeHttp::Response{
-				.status = http::status::unauthorized,
-				.error_message = "Websocket connection requires an HTTP session."
-			};
-			http::message_generator msg = FuzeHttp::buildResponse<http::empty_body>(basic_res, req);
-			bool keep_alive = msg.keep_alive();
-			auto self = shared_from_this();
-			beast::async_write(
-				stream_, std::move(msg),
-				[self, keep_alive](beast::error_code ec, std::size_t bytes) {
-					self->on_write(ec, bytes, keep_alive);
-				}
-			);
-		}
-		else {
-			*/
-			// Create a websocket session, transferring ownership
-			// of both the socket and the HTTP request.
-			boost::make_shared<websocket_session>(stream_.release_socket(), state_)->run(parser_->release());
-			return;
-		// }
+		// Create a websocket session, transferring ownership
+		// of both the socket and the HTTP request.
+		boost::make_shared<WebsocketSession>(stream_.release_socket(), state_)->run(parser_->release());
+		return;
 	}
 	else {
 		// Handle request

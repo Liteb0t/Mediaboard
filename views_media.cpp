@@ -2,7 +2,7 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views.hpp"
 #include "FuzeHttp.hpp"
-#include "permission_managed_object.hpp"
+#include "PermissionObject.hpp"
 #include "shared_state.hpp"
 #include <boost/beast/http/status.hpp>
 // #include <boost/uuid/uuid.hpp>

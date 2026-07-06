@@ -1,5 +1,5 @@
 #pragma once
-#include "listener.hpp"
+#include "Listener.hpp"
 #define BOOST_DLL_USE_STD_FS
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/program_options.hpp>
@@ -17,7 +17,7 @@ public:
 		boost::asio::io_context io_context;
 			// Create and launch a listening port
 		std::cout << "Creating a listening port..." << std::endl;
-		boost::make_shared<listener>(
+		boost::make_shared<Listener<StateType>>(
 			io_context,
 			boost::asio::ip::tcp::endpoint{address, server_port},
 			state

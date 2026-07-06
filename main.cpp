@@ -5,9 +5,8 @@
 
 #include "FuzeHttpUtils.hpp"
 #include "FuzeHttpServer.hpp"
-#include "listener.hpp"
 #include "migrations.hpp"
-#include "permission_managed_object.hpp"
+#include "PermissionObject.hpp"
 #include "shared_state.hpp"
 #include <boost/asio/signal_set.hpp>
 #include <boost/json/object.hpp>
@@ -20,13 +19,10 @@
 #include <boost/program_options/options_description.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/make_shared_array.hpp>
-#include <memory>
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
-#include <filesystem>
 #include <cstdlib>
-#include <fstream>
 #include <iostream>
 #include <print>
 #include <string>
