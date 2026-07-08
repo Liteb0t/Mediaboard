@@ -31,7 +31,7 @@ class Listener : public boost::enable_shared_from_this<Listener<StateType>> {
 public:
 	Listener(boost::asio::io_context& io_context, boost::asio::ip::tcp::endpoint endpoint, StateType* state)
 			: io_context_(io_context) , acceptor_(io_context) , state_(state), controller(new FuzeHttp::Controller<StateType*>()) {
-		addURLsToController(this->controller);
+		addURLsToController<StateType>(this->controller);
 		beast::error_code ec;
 
 		// Open the acceptor

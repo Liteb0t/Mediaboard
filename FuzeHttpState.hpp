@@ -24,6 +24,7 @@ public:
 	// const std::unordered_set<std::string> files_generated_from_templates;
 	// virtual void start() {};
 	FuzeHttp::Server* server;
+	FuzeDBI::Connection* db;
 protected:
 	const std::optional<Client> getClientFromSession(const std::string& session_id_base64) const;
 

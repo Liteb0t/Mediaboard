@@ -67,8 +67,6 @@ target_sources(MediaboardServer
     FuzeHttpState.cpp
     FuzeHttpServer.cpp
     FuzeHttpUtils.cpp
-    # http_session.cpp
-    # Listener.cpp
     main.cpp
     Message.cpp
     Migrations.cpp
@@ -79,7 +77,6 @@ target_sources(MediaboardServer
     views.cpp
     views_media.cpp
     views_registration.cpp
-    # WebsocketSession.cpp
 )
 configure_file(config.ini ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/config.ini COPYONLY)
 configure_file(database_template.sql ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/database_template.sql COPYONLY)

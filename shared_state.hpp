@@ -86,7 +86,7 @@ private:
 	const std::filesystem::path media_location;
 	// const std::filesystem::path program_location;
 	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
-	FuzeDBI::Connection* fuze_dbi;
+	// FuzeDBI::Connection* fuze_dbi;
 	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png"};
 	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;
 

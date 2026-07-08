@@ -376,27 +376,6 @@ else {
 	registration_link.style["display"] = "inherit";
 }
 
-document.body.onclick = (event) => {
-	let target = event.target;
-	console.log(target);
-	if (target.classList.contains("EmbedThumbnail"))
-		expandEmbedFigure(target.parentNode);
-	else if (target.classList.contains("EmbedImage"))
-		contractEmbedFigure(target.parentNode);
-}
-
-const FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
-const FIGURE_THUMBNAIL = 1;
-function expandEmbedFigure(figure_element) {
-	figure_element.children[FIGURE_EMBED].setAttribute("src", media_url + figure_element.getAttribute("filename"));
-	figure_element.children[FIGURE_EMBED].style["display"] = "inherit";
-	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "none";
-}
-function contractEmbedFigure(figure_element) {
-	figure_element.children[FIGURE_EMBED].style["display"] = "none";
-	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "inherit";
-}
-
 function displayClientAsLoggedIn() {
 	let account_username = localStorage.getItem("account_username");
 	logged_in_as_username.textContent = account_username;
@@ -428,6 +407,28 @@ async function logoutAction() {
 		console.error("Couldn't log out for one reason or another");
 	}
 }
+
+document.body.onclick = (event) => {
+	let target = event.target;
+	console.log(target);
+	if (target.classList.contains("EmbedThumbnail"))
+		expandEmbedFigure(target.parentNode);
+	else if (target.classList.contains("EmbedImage"))
+		contractEmbedFigure(target.parentNode);
+}
+
+const FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
+const FIGURE_THUMBNAIL = 1;
+function expandEmbedFigure(figure_element) {
+	figure_element.children[FIGURE_EMBED].setAttribute("src", media_url + figure_element.getAttribute("filename"));
+	figure_element.children[FIGURE_EMBED].style["display"] = "inherit";
+	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "none";
+}
+function contractEmbedFigure(figure_element) {
+	figure_element.children[FIGURE_EMBED].style["display"] = "none";
+	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "inherit";
+}
+
 
 function openThreadList() {
 	state.selected_thread.id = -1;

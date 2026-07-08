@@ -5,7 +5,7 @@ using namespace FuzeHttp;
 // FuzeHttp::State::State(FuzeDBI::Connection* fuze_dbi, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates)
 // 		: PermissionManager(0, fuze_dbi), fuze_dbi(fuze_dbi), busted_target_to_target(busted_target_to_target), files_generated_from_templates(files_generated_from_templates) {
 FuzeHttp::State::State(FuzeHttp::Server* server)
-		: PermissionManager(0, server->db), server(server), document_root(server->document_root) {
+		: PermissionManager(0, server->db), server(server), document_root(server->document_root), db(server->db) {
 	this->loadSessions();
 	this->loadClients();
 	// Link accounts to clients

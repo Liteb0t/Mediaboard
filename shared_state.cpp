@@ -24,7 +24,7 @@ using namespace FuzeHttp;
 shared_state::shared_state(FuzeHttp::Server* server, StateConfig config, bool create_owner_account)
 		: State(server),
 		config(config),
-		fuze_dbi(server->db),
+		// fuze_dbi(server->db),
 		media_location(server->media_location) {
 	// std::println("Assigned document_root: {}", document_root.string());
 	this->setAdditionalImageFormatsFromConfig(config);
@@ -76,7 +76,7 @@ bool shared_state::canCreateThumbnailForVideoFormat(const std::string_view mime_
 // hence a seperate start() function is used
 // UPDATE 0.0.6: permission-managed objects no longer use shared pointers
 void shared_state::start() {
-	Board main_board(this, fuze_dbi);
+	Board main_board(this, db);
 	this->boards.emplace(0, main_board);
 	this->boards.at(0).cacheAllThreads();
 }
@@ -141,7 +141,7 @@ int shared_state::createMessage(int board_id, boost::json::object message_json, 
 }
 
 std::string shared_state::getIntermediateSaltFromAccount(int account_id) {
-	return fuze_dbi->query<std::string>("SELECT intermediate_salt_base64 FROM account WHERE id = $1", account_id);
+	return db->query<std::string>("SELECT intermediate_salt_base64 FROM account WHERE id = $1", account_id);
 }
 
 const Client& shared_state::getClientFromAccountId(int account_id) const { // We assume the account with the ID is already checked
