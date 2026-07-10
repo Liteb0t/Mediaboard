@@ -1,3 +1,6 @@
 [submodule "dependencies/libsodium-cmake"]
 	path = dependencies/libsodium-cmake
 	url = https://github.com/robinlinden/libsodium-cmake.git
+[submodule "dependencies/FuzeHttp"]
+	path = dependencies/FuzeHttp
+	url = https://github.com/Liteb0t/FuzeHttp

@@ -1,3 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
 
-add_subdirectory(libsodium-cmake)
+option(FUZEHTTP_EXAMPLE "" OFF)
+add_subdirectory(FuzeHttp)
+# add_subdirectory(libsodium-cmake)

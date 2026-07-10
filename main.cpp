@@ -68,7 +68,7 @@ int main(int argc, char* argv[]) {
 	template_macros.push_back(new TemplateOptionPtr("convert_heic_to_jpg", &state_config.convert_heic_to_jpg, {.default_value=false, .description="Converts HEIC images into JPG on upload.", .include_in_frontend=false}));
 	template_macros.push_back(new TemplateOptionPtr("strip_metadata", &state_config.strip_metadata, {.default_value=false, .description="Remove metadata from newly-uploaded images.", .include_in_frontend=false}));
 	FuzeHttp::Server server;
-	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros, current_version)) != -1)
+	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros, current_version, "FuzeMediaboard")) != -1)
 		return return_code;
 	std::cout << "Initialising shared state..." << std::endl;
 	shared_state* state;

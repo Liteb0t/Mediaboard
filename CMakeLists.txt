@@ -59,18 +59,13 @@ target_link_libraries(MediaboardServer
     Boost::json
     Boost::program_options
     sodium
+    FuzeHttp
 )
 target_sources(MediaboardServer
   PRIVATE
     Board.cpp
-    FuzeHttp.cpp
-    FuzeHttpState.cpp
-    FuzeHttpServer.cpp
-    FuzeHttpUtils.cpp
     main.cpp
     Message.cpp
-    Migrations.cpp
-    PermissionObject.cpp
     shared_state.cpp
     Thread.cpp
     urls.cpp
