@@ -15,20 +15,41 @@ FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
 	// 	std::println("{} : {}", std::string(header.name_string()), std::string(header.value()));
 	// }
 	std::println("Serving from document root");
-	// TODO move logic to FuzeHttp internal
-	// TODO send etag header
+	std::unordered_map<std::string, std::string> return_headers;
+	// TODO handle cache control in FuzeHttp
 	std::string target = std::string(FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target())).substr(1));
 	// If cache busted target found, get the path without the hash
 	if (target.empty() || target.ends_with('/'))
 		target += "index.html";
-	if (auto it = state->server->busted_target_to_target.find(target); it != state->server->busted_target_to_target.end())
+	// Is static asset
+	if (auto it = state->server->busted_target_to_target.find(target); it != state->server->busted_target_to_target.end()) {
 		target = it->second;
+		return_headers.emplace("Cache-Control", "max-age=7750000, immutable");
+	}
 	// If path leads to target of .GENERATED file, add the filename extension
-	else if (auto it = state->server->files_generated_from_templates.find(target); it != state->server->files_generated_from_templates.end())
+	else if (auto it = state->server->files_generated_from_templates.find(target); it != state->server->files_generated_from_templates.end()) {
 		target = FuzeHttp::insertExtensionToFileName(*it, ".GENERATED");
+		return_headers.emplace("Cache-Control", "no-cache");
+	}
 	std::println("[showMainPage] will serve {}", target);
+	std::string etag;
+	if (auto it = state->server->manifest_frontend_etags.find(target); it != state->server->manifest_frontend_etags.end())
+		etag = it->second;
+	else
+		etag = state->server->frontend_etag;
+
+	if (auto if_none_match_header = req.find("If-None-Match"); if_none_match_header != req.end()) {
+		std::string if_none_match_header_value = if_none_match_header->value();
+		if (etag == if_none_match_header_value) {
+			return {.status=http::status::not_modified};
+		}
+	}
+	return_headers.emplace("ETag", etag);
+
+
 	return {
 		.status = http::status::ok,
+		.headers = {return_headers},
 		.file = std::format("{}/{}", state->getDocumentRoot().string(), target) // TODO change this because it sucks
 	};
 }

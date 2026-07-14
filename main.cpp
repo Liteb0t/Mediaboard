@@ -32,7 +32,7 @@ const std::string current_version = "0.1.4";
 using namespace FuzeHttp;
 
 std::vector<FuzeHttp::TemplateMacro*> template_macros{
-	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
+	new TemplateOption<std::string>("site_name", "Fuze MediaboardTEST", "Website name shown on tabs and headers."),
 	new TemplateOption<std::string>("favicon_url", "https://fuze.page/favicon.ico"),
 	new TemplateOption("show_watermarks", true),
 	new TemplateConstant("post_max_name", static_cast<int>(MESSAGE_FIELDS::MAX_NAME)),
