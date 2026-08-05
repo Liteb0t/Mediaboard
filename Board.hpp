@@ -1,13 +1,19 @@
 #pragma once
 #include "Thread.hpp"
-#include <ctime>
 #include <boost/json.hpp>
+#include <rtc/rtc.hpp>
+#include <ctime>
 #include <set>
 #include <utility>
 
 namespace FuzeHttp {
 class WebsocketSession; // Forward declaration
 }
+
+struct Receiver {
+	std::shared_ptr<rtc::PeerConnection> conn;
+	std::shared_ptr<rtc::Track> track;
+};
 
 class Board : public FuzeHttp::PermissionManagedObject {
 public:
@@ -57,4 +63,5 @@ private:
 	FuzeDBI::Connection* fuze_dbi;
 	std::unordered_map<int, Thread> threads;
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
+	std::unordered_set<std::shared_ptr<Receiver>> receivers;
 };

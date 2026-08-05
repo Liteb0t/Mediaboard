@@ -92,7 +92,7 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 	std::vector<boost::weak_ptr<FuzeHttp::WebsocketSession>> v;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-		v.reserve(WebsocketSessions.size());
+		v.reserve(websocket_sessions.size());
 		this->main_board()->removeUnauthorizedListenersFromThread(thread_id);
 		for(auto p : this->main_board()->getListenersFromThread(thread_id))
 			v.emplace_back(p->weak_from_this());
@@ -117,8 +117,8 @@ void shared_state::sendToWebRTC(std::string message) {
 	std::vector<boost::weak_ptr<FuzeHttp::WebsocketSession>> v;
 	{
 		std::lock_guard<std::mutex> lock(mutex_);
-		v.reserve(WebsocketSessions.size());
-		for(auto p : this->WebsocketSessions) {
+		v.reserve(websocket_sessions.size());
+		for(auto p : this->websocket_sessions) {
 			if (p->is_webrtc)
 				v.emplace_back(p->weak_from_this());
 		}

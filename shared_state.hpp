@@ -75,6 +75,7 @@ public:
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
 	// BasicResponse addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id);
 
+	// void websocketRead (FuzeHttp::WebsocketSession* session) override;
 	void sendToThread (std::string message, int thread_id);
 	void sendToWebRTC(std::string message);
 	void clearWebsockets();

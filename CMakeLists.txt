@@ -15,6 +15,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(SODIUM_DISABLE_TESTS ON)
 option(FUZEDBI_USE_POSTGRES "Use PostgreSQL interface instead of SQLite" OFF)
 option(WITH_MAGICK "Compile with ImageMagick support" ON)
+option(WITH_WEBRTC "Compile with libdatachannel" ON)
 include(GNUInstallDirs)
 
 # Find dependencies sneeded by the project
@@ -53,6 +54,9 @@ else()
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_SQLITE)
   target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="sqlite")
   target_link_libraries(MediaboardServer PRIVATE SQLite3::SQLite3)
+endif()
+if(WITH_WEBRTC)
+  target_link_libraries(MediaboardServer PRIVATE datachannel)
 endif()
 target_link_libraries(MediaboardServer
   PRIVATE

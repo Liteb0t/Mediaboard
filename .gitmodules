@@ -4,3 +4,6 @@
 [submodule "dependencies/FuzeHttp"]
 	path = dependencies/FuzeHttp
 	url = https://github.com/Liteb0t/FuzeHttp
+[submodule "dependencies/libdatachannel"]
+	path = dependencies/libdatachannel
+	url = https://github.com/paullouisageneau/libdatachannel

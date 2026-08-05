@@ -7,6 +7,7 @@
 #include "FuzeHttpServer.hpp"
 #include "PermissionObject.hpp"
 #include "shared_state.hpp"
+#include "WebsocketSession.hpp"
 #include <boost/asio/signal_set.hpp>
 #include <boost/json/object.hpp>
 #include <boost/json/serialize.hpp>
@@ -83,7 +84,7 @@ int main(int argc, char* argv[]) {
 		std::cerr << "[shared_state] " << exception.what() << std::endl;
 		return 1;
 	}
-	server.run(state);
+	server.run<shared_state, Mediaboard::WebsocketSession>(state);
 
 
 	return EXIT_SUCCESS;
