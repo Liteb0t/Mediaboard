@@ -84,7 +84,7 @@ void shared_state::start() {
 // Broadcast a message to all websocket client sessions
 void shared_state::sendToThread(std::string message, int thread_id) {
 	// Put the message in a shared pointer so we can re-use it for each client
-	auto const ss = boost::make_shared<std::string const>(std::move(message));
+	auto const ss = std::make_shared<std::string const>(std::move(message));
 
 	// Make a local list of all the weak pointers representing
 	// the sessions, so we can do the actual sending without
@@ -109,7 +109,7 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 
 void shared_state::sendToWebRTC(std::string message) {
 	// Put the message in a shared pointer so we can re-use it for each client
-	auto const ss = boost::make_shared<std::string const>(std::move(message));
+	auto const ss = std::make_shared<std::string const>(std::move(message));
 
 	// Make a local list of all the weak pointers representing
 	// the sessions, so we can do the actual sending without
@@ -184,68 +184,6 @@ std::string shared_state::dumpAllGroups(const std::optional<Client>& client) con
 		{"group_heirarchy", group_heirarchy_json}
 	});
 }
-/*
-std::string shared_state::dumpMembersInGroup(int group_id) const {
-	const std::unordered_set<int> members = this->getGroup(group_id)->getMembers();
-	boost::json::object members_json;
-	for (int member_id : members) {
-		boost::json::object member_json{
-			{"id", member_id},
-			{"username", this->getUsernameFromAccount(member_id)}
-		};
-		members_json.emplace(std::to_string(member_id), member_json);
-	}
-	return boost::json::serialize(boost::json::object{
-		{"members", members_json},
-	});
-}
-
-// Return non-zero when action is rejected. An error is returned to the user from http_session
-BasicResponse shared_state::setGroupHeirarchy(const Client& client, std::vector<int> ordered_groups) {
-	int user_rank;
-	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
-		return BasicResponse(http::status::bad_request, std::string("Cannot change group heirarchy; permission denied."));
-	else
-		user_rank = this->getClientRank(client);
-
-	if (ordered_groups.size() != this->getOrderedGroups()->size()) {
-		return BasicResponse(http::status::bad_request, std::string("Number of groups does not match."));
-	}
-
-	std::unordered_set<int> new_group_order_set;
-	// for (const int group_id : *(this->getOrderedGroups())) {
-	for (int group_rank = 0; group_rank < ordered_groups.size(); group_rank++) {
-		int group_id = ordered_groups[group_rank];
-		std::cout << group_id << "G : ";
-		// Check for duplicates
-		std::unordered_set<int>::const_iterator duplicate_check_it = new_group_order_set.find(group_id); 
-		if (duplicate_check_it != new_group_order_set.end())
-			return BasicResponse(http::status::bad_request, "Duplicate group " + std::to_string(group_id) + " detected");
-		else
-			new_group_order_set.insert(group_id);
-
-		// Check if all groups exist
-		if (!this->groupExists(group_id)) {
-			return BasicResponse(http::status::bad_request, "Group " + std::to_string(group_id) + " does not exist."); // Group does not exist
-		}
-		// Check if user rank is high enough to change this group's rank
-		int existing_group_at_this_rank = (*(this->getOrderedGroups()))[group_rank];
-		std::cout << existing_group_at_this_rank << std::endl;
-		if (group_rank <= user_rank && group_id != existing_group_at_this_rank)
-			return BasicResponse(http::status::bad_request, std::string("Permission denied; attempted to change order of groups greater than or equal to your rank.") );
-	}
-	if (ordered_groups[0] != static_cast<int>(BUILTIN_GROUPS::OWNER) ||
-			ordered_groups[ordered_groups.size()-2] != static_cast<int>(BUILTIN_GROUPS::USERS) ||
-			ordered_groups[ordered_groups.size()-1] != static_cast<int>(BUILTIN_GROUPS::PUBLIC)) {
-		return BasicResponse(http::status::bad_request, std::string("Attempted to change heirarchy of locked groups"));
-	}
-
-	// this->ordered_groups_vec = ordered_groups;
-	this->setOrderedGroups(ordered_groups);
-
-	return BasicResponse(http::status::ok, std::string("Updated group heirarchy")); // Success
-}
-*/
 
 std::string shared_state::dumpAllUsers(const std::optional<Client>& client) const {
 	boost::json::object users_json;
@@ -278,32 +216,7 @@ std::string shared_state::dumpAllUsers(const std::optional<Client>& client) cons
 		{"users", users_json}
 	});
 }
-/*
-BasicResponse shared_state::addUserToGroups(const Client& client, int account_id, std::vector<int> groups_by_id) {
-	int client_rank;
-	if (!this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
-		return BasicResponse(http::status::forbidden, std::string("Cannot change group heirarchy; permission denied."));
-	else
-		client_rank = this->getClientRank(client);
-	std::cout << "User has permission. ";
-	for (int group_id : groups_by_id) {
-		if (	static_cast<BUILTIN_GROUPS>(group_id) == BUILTIN_GROUPS::USERS
-			||  static_cast<BUILTIN_GROUPS>(group_id) == BUILTIN_GROUPS::PUBLIC) {
-			return BasicResponse(http::status::bad_request, std::string("Attempted to add user to one or more groups to which no user can be added, namely, the \"USERS\" and \"PUBLIC\" groups."));
-		}
-	}
-	for (int group_id : groups_by_id) {
-		// const Group* group = this->getGroup(group_id);
-		if (client_rank < this->getGroupRank(group_id)) {
-			this->addAccountToGroup(account_id, group_id);
-		}
-		else {
-			return BasicResponse(http::status::forbidden, std::string("Permission denied; Attempted to add user to group with a rank greater than or equal to your own."));
-		}
-	}
-	return BasicResponse(http::status::ok, std::string("Added user to groups")); // Success
-}
-*/
+
 /* I was unable to generate a key here that would work with the frontend WASM module.
 void shared_state::createOwnerAccount(DatabaseConnection* db, const std::string& username, const std::string& password) {
 	unsigned char intermediate_salt[crypto_pwhash_SALTBYTES];

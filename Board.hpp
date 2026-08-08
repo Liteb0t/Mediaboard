@@ -1,10 +1,11 @@
 #pragma once
 #include "Thread.hpp"
+#include "rtc/peerconnection.hpp"
+#include "rtc/track.hpp"
 #include <boost/json.hpp>
 #include <rtc/rtc.hpp>
 #include <ctime>
 #include <set>
-#include <utility>
 
 namespace FuzeHttp {
 class WebsocketSession; // Forward declaration
@@ -59,9 +60,15 @@ public:
 	void setAccountPermissionForThread(int account_id, FuzeHttp::PERMISSION permission, FuzeHttp::THREE_STATE_SETTING setting, int thread_id) { this->threads.at(thread_id).setAccountPermission(account_id, permission, setting); }
 	void removeGroupPermissionCollectionFromThread(int group_id, int thread_id) { this->threads.at(thread_id).removeGroupPermissionCollection(group_id); }
 	void removeAccountPermissionCollectionFromThread(int account_id, int thread_id) { this->threads.at(thread_id).removeAccountPermissionCollection(account_id); }
+	struct {
+		std::unordered_map<int, std::shared_ptr<Receiver>> receivers;
+		std::shared_ptr<rtc::PeerConnection> peer_connection;
+		// rtc::Description::Video media;
+		std::shared_ptr<rtc::Track> track; // Advice from Claude: 'if you ever support multiple concurrent sharers, webrtc_room.track as a single shared field won't scale — you'd want to look up the specific sharer's track associated with whatever stream the watcher is requesting, but for your current single-sharer/multi-watcher model this is fine as-is.'
+		int connection_id_counter = 0;
+	} webrtc_room;
 private:
 	FuzeDBI::Connection* fuze_dbi;
 	std::unordered_map<int, Thread> threads;
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
-	std::unordered_set<std::shared_ptr<Receiver>> receivers;
 };

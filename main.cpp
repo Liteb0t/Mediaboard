@@ -28,12 +28,12 @@
 #include <string>
 #include <vector>
 
-const std::string current_version = "0.1.4";
+const std::string current_version = "0.2";
 
 using namespace FuzeHttp;
 
 std::vector<FuzeHttp::TemplateMacro*> template_macros{
-	new TemplateOption<std::string>("site_name", "Fuze MediaboardTEST", "Website name shown on tabs and headers."),
+	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
 	new TemplateOption<std::string>("favicon_url", "https://fuze.page/favicon.ico"),
 	new TemplateOption("show_watermarks", true),
 	new TemplateConstant("post_max_name", static_cast<int>(MESSAGE_FIELDS::MAX_NAME)),
@@ -56,6 +56,7 @@ int main(int argc, char* argv[]) {
 #else
 	std::println("Fuze Mediaboard was compiled without ImageMagick support. Certain features such as thumbnail creation will not work.");
 #endif
+	rtc::InitLogger(rtc::LogLevel::Info);
 	StateConfig state_config;	// Macros which link to state_config
 	template_macros.push_back(new TemplateOptionPtr("thumbnail_file_extension", &state_config.thumbnail_file_extension, {.default_value=std::string("jpg")}));
 	template_macros.push_back(new TemplateOptionPtr("thumbnail_size", &state_config.thumbnail_size, {.default_value=static_cast<unsigned int>(150)}));

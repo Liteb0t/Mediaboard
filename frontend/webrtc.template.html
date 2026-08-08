@@ -18,7 +18,7 @@
 		<button onclick="makeCall()">Ring telephone</button>
 		<fieldset>
 		<legend>Controller</legend>
-		<label for="channel_number">Channel: </label><input id="channel_number" type="number" min="0"><br>
+		<label for="channel_number">Channel: </label><input id="channel_number" type="number" min="0" value="1"><br>
 		<button onclick="connectToChannel()">Connect</button>
 		<span id="connection_status_text">Not connected</span>
 		</fieldset>
@@ -98,6 +98,7 @@ async function makeCall() {
     const configuration = {'iceServers': [{'urls': 'stun:stun.l.google.com:19302'}]}
     const peerConnection = new RTCPeerConnection(configuration);
     stream_sock.addEventListener('message', async message => {
+		console.log("Received message: " + message.data)
 		const message_json = JSON.parse(message.data);
         if (message_json.answer) {
             const remoteDesc = new RTCSessionDescription(message_json.answer);

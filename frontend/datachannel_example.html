@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>libdatachannel media SFU example (with WebSocket added)</title>
+</head>
+<body>
+<h2>SENDER</h2>
+<input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
+<button id="share_button" onclick="shareMedia()">Share media</button>
+<h2>RECEIVER</h2>
+<button id="watch_button" onclick="watchStream()">Watch stream</button>
+<div id="video_container">
+</div>
+<script>
+const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
+let pc;
+let listening_connections = [];
+sock = new WebSocket(websocket_url);
+sock.onopen = (event) => {
+    console.log("Websocket connected 🙂.");
+}
+sock.onmessage = (event) => {
+    let message_json = JSON.parse(event.data);
+    if (message_json.type === "webrtc_offer") {
+        console.log("calling onReceiveOffer");
+        onReceiveOffer(message_json.payload);
+    }
+    else if (message_json.type === "webrtc_watch_stream") {
+        console.log("calling onReceiveWatchStream");
+        onReceiveWatchStream(message_json.payload);
+    }
+    else {
+        console.error("message_json type " + message_json.type + " not recognised.");
+    }
+}
+
+function shareMedia() {
+    pc = new RTCPeerConnection({
+        // Recommended for libdatachannel
+        bundlePolicy: 'max-bundle',
+    });
+    sock.send(JSON.stringify({
+        type: "webrtc_request_offer"
+    }))
+}
+
+async function onReceiveOffer(payload) {
+    pc.onicegatheringstatechange = (state) => {
+        console.log("[sender] ICE gathering state: " + pc.iceGatheringState);
+        if (pc.iceGatheringState === 'complete') {
+            // We only want to provide an answer once all of our candidates have been added to the SDP.
+            const answer = pc.localDescription;
+            sock.send(JSON.stringify({
+                type: "webrtc_sender_answer",
+                payload: {
+                    type: answer.type,
+                    sdp: answer.sdp
+                }
+            }))
+        }
+    }
+    pc.onicecandidateerror = (event) => {
+        console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
+    };
+    await pc.setRemoteDescription(payload);
+
+    let media
+    if (share_screen_checkbox.checked) {
+        media = await navigator.mediaDevices.getDisplayMedia();
+    }
+    else {
+        // TODO check if error thrown, likely caused by source being in use already
+        media = await navigator.mediaDevices.getUserMedia({
+            video: {
+                width: 1280,
+                height: 720
+            }
+        });
+    }
+    media.getTracks().forEach(track => pc.addTrack(track, media));
+
+    console.log("[onReceiveOffer] creating answer...");
+    const answer = await pc.createAnswer();
+    console.log("[onReceiveOffer] done. Setting local description...");
+    await pc.setLocalDescription(answer);
+    console.log("[onReceiveOffer] Finished setting local description");
+}
+
+function watchStream() {
+    sock.send(JSON.stringify({
+        type: "webrtc_watch_stream_request"
+    }))
+}
+
+async function onReceiveWatchStream(payload) {
+    let conn = new RTCPeerConnection({
+        // Recommended for libdatachannel
+        bundlePolicy: 'max-bundle',
+    });
+    listening_connections[payload.connection_id] = conn;
+    conn.onicegatheringstatechange = (state) => {
+        console.log("[sender] ICE gathering state: " + conn.iceGatheringState);
+        if (conn.iceGatheringState === 'complete') {
+            // We only want to provide an answer once all of our candidates have been added to the SDP.
+            const answer = conn.localDescription;
+            sock.send(JSON.stringify({
+                type: "webrtc_watch_stream_answer",
+                payload: {
+                    connection_id: payload.connection_id,
+                    description: {
+                        type: answer.type,
+                        sdp: answer.sdp
+                    }
+                }
+            }))
+        }
+    }
+    conn.onicecandidateerror = (event) => {
+        console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
+    };
+
+    let trackCount = 0;
+    conn.ontrack = (event) => {
+        const video_element = document.createElement("video");
+        video_element.autoplay = true;
+        video_element.playsInline = true;
+        video_element.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+        video_container.appendChild(video_element);
+        video_element.play();
+    };
+    try {
+        console.log("Setting remote description...");
+        await conn.setRemoteDescription(payload.description);
+        console.log("Done. Creating answer...");
+        const answer = await conn.createAnswer();
+        console.log("Done. Setting local description...");
+        await conn.setLocalDescription(answer);
+        console.log("Finished setting local description");
+    }
+    catch (err) {
+        console.error("watch stream negotiation failed:", err);
+    }
+}
+</script>
+</body>
+</html>
