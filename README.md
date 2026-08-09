@@ -17,11 +17,11 @@
 First ensure that submodules are downloaded. Use this command:\
 `git submodule update --init --recursive`\
 Now, to build with the default SQLite interface:
-`cmake -B build -D WITH_MAGICK=OFF`\
+`cmake -G Ninja -B build -D WITH_MAGICK=OFF`\
 If you have ImageMagick on your system, use this command, which will enable features such as thumbnails:\
-`cmake -B build`\
+`cmake -G Ninja -B build`\
 Alternatively, you can build with the PostgreSQL interface instead. Refer to the [deployment guide](https://fuze.page/software/mediaboard/documentation/#postgresql-as-the-database); a database needs to be configured.\
-`cmake -B build -D FUZEDBI_USE_POSTGRES=ON`
+`cmake -G Ninja -B build -D FUZEDBI_USE_POSTGRES=ON`
 ### Installing
 After building, you use this command:\
 `cmake --install build --prefix install`\

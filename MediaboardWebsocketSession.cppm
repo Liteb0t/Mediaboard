@@ -1,4 +1,4 @@
-#pragma once
+module;
 #include "Board.hpp"
 #include "rtc/peerconnection.hpp"
 #include "rtc/track.hpp"
@@ -7,8 +7,9 @@
 #include <boost/json/serialize.hpp>
 #include <memory>
 #include <stdexcept>
+export module MediaboardWebsocketSession;
 
-namespace Mediaboard {
+export namespace Mediaboard {
 class WebsocketSession : public FuzeHttp::WebsocketSession {
 public:
 	WebsocketSession(boost::asio::ip::tcp::socket&& socket, FuzeHttp::State* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
@@ -48,7 +49,6 @@ private:
 				std::println("Creating WebRTC offer...");
 				auto pc = std::make_shared<rtc::PeerConnection>();
 				getState()->main_board()->webrtc_room.peer_connection = pc;
-				is_webrtc = true;
 				pc->onStateChange(
 					[](rtc::PeerConnection::State state) { std::cout << "State: " << state << std::endl; });
 				pc->onGatheringStateChange([this, pc](rtc::PeerConnection::GatheringState state) {
@@ -112,7 +112,8 @@ private:
 								}}
 							}}
 						};
-						this->send(std::make_shared<const std::string>(boost::json::serialize(message)));
+						const std::shared_ptr<const std::string> ss = std::make_shared<const std::string>(boost::json::serialize(message));
+						this->send(ss);
 					}
 				});
 				rtc::Description::Video media("video", rtc::Description::Direction::SendOnly);
@@ -122,9 +123,6 @@ private:
 
 				webrtc_receiver->track = webrtc_receiver->conn->addTrack(media);
 
-				// webrtc_receiver->track->onOpen([webrtc_receiver]() {
-				// 	webrtc_receiver->track->requestKeyframe(); // So the receiver can start playing immediately
-				// });
 				webrtc_receiver->track->onMessage([](rtc::binary var) {}, nullptr);
 
 				webrtc_receiver->conn->setLocalDescription();

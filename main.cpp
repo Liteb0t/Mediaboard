@@ -7,7 +7,7 @@
 #include "FuzeHttpServer.hpp"
 #include "PermissionObject.hpp"
 #include "shared_state.hpp"
-#include "WebsocketSession.hpp"
+// #include "WebsocketSession.hpp"
 #include <boost/asio/signal_set.hpp>
 #include <boost/json/object.hpp>
 #include <boost/json/serialize.hpp>
@@ -27,6 +27,7 @@
 #include <print>
 #include <string>
 #include <vector>
+import MediaboardWebsocketSession;
 
 const std::string current_version = "0.2";
 

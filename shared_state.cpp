@@ -10,12 +10,13 @@
 #include "FuzeHttpServer.hpp"
 #include "PermissionObject.hpp"
 #include "shared_state.hpp"
-#include "WebsocketSession.hpp"
+// #include "WebsocketSession.hpp"
 #include <boost/json/serialize.hpp>
 #include <boost/dll.hpp>
 #include <boost/dll/runtime_symbol_info.hpp>
 #include <boost/program_options.hpp>
 #include <iostream>
+import MediaboardWebsocketSession;
 
 using namespace FuzeHttp;
 
@@ -96,32 +97,6 @@ void shared_state::sendToThread(std::string message, int thread_id) {
 		this->main_board()->removeUnauthorizedListenersFromThread(thread_id);
 		for(auto p : this->main_board()->getListenersFromThread(thread_id))
 			v.emplace_back(p->weak_from_this());
-	}
-
-	// For each session in our local list, try to acquire a strong
-	// pointer. If successful, then send the message on that session.
-	for(auto const&wp : v) {
-		if(auto sp = wp.lock())
-			sp->send(ss);
-	}
-}
-
-
-void shared_state::sendToWebRTC(std::string message) {
-	// Put the message in a shared pointer so we can re-use it for each client
-	auto const ss = std::make_shared<std::string const>(std::move(message));
-
-	// Make a local list of all the weak pointers representing
-	// the sessions, so we can do the actual sending without
-	// holding the mutex:
-	std::vector<boost::weak_ptr<FuzeHttp::WebsocketSession>> v;
-	{
-		std::lock_guard<std::mutex> lock(mutex_);
-		v.reserve(websocket_sessions.size());
-		for(auto p : this->websocket_sessions) {
-			if (p->is_webrtc)
-				v.emplace_back(p->weak_from_this());
-		}
 	}
 
 	// For each session in our local list, try to acquire a strong

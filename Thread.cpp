@@ -1,10 +1,11 @@
 #include "Thread.hpp"
 #include "PermissionObject.hpp"
 #include <boost/json/serialize.hpp>
-#include "WebsocketSession.hpp"
+// #include "WebsocketSession.hpp"
 #include <string>
 #include <iostream>
 #include <cstring>
+import MediaboardWebsocketSession;
 
 Thread::Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi, int id, int permission_object_id)
 		: PermissionManagedObject(permission_parent, permission_object_id, fuze_dbi),

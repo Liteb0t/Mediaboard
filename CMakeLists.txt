@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.23 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.28 FATAL_ERROR)
 
 project(Mediaboard
   VERSION 0.1.4
@@ -76,6 +76,9 @@ target_sources(MediaboardServer
     views.cpp
     views_media.cpp
     views_registration.cpp
+  PUBLIC
+    FILE_SET CXX_MODULES FILES
+      MediaboardWebsocketSession.cppm
 )
 configure_file(config.ini ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/config.ini COPYONLY)
 configure_file(database_template.sql ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/database_template.sql COPYONLY)
