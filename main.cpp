@@ -5,7 +5,6 @@
 
 #include "FuzeHttpUtils.hpp"
 #include "FuzeHttpServer.hpp"
-#include "shared_state.hpp"
 // #include "WebsocketSession.hpp"
 #include <boost/asio/signal_set.hpp>
 #include <boost/json/object.hpp>
@@ -30,6 +29,8 @@
 import MediaboardWebsocketSession;
 import FuzeHttp.PermissionObject;
 import Mediaboard.Migrations;
+import Mediaboard.State;
+import Mediaboard.Message;
 
 const std::string current_version = "0.2";
 
@@ -39,9 +40,9 @@ std::vector<FuzeHttp::TemplateMacro*> template_macros{
 	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
 	new TemplateOption<std::string>("favicon_url", "https://fuze.page/favicon.ico"),
 	new TemplateOption("show_watermarks", true),
-	new TemplateConstant("post_max_name", static_cast<int>(MESSAGE_FIELDS::MAX_NAME)),
-	new TemplateConstant("post_max_file_name", static_cast<int>(MESSAGE_FIELDS::MAX_FILE_NAME)),
-	new TemplateConstant("post_max_content", static_cast<int>(MESSAGE_FIELDS::MAX_CONTENT)),
+	new TemplateConstant("post_max_name", static_cast<int>(Mediaboard::MESSAGE_FIELDS::MAX_NAME)),
+	new TemplateConstant("post_max_file_name", static_cast<int>(Mediaboard::MESSAGE_FIELDS::MAX_FILE_NAME)),
+	new TemplateConstant("post_max_content", static_cast<int>(Mediaboard::MESSAGE_FIELDS::MAX_CONTENT)),
 	new TemplateConstant("group_max_name", static_cast<int>(Group::MAX_NAME)),
 	new TemplateConstant("account_max_username", static_cast<int>(Account::MAX_USERNAME)),
 	new TemplateConstant("mediaboard_version", current_version)
@@ -60,7 +61,7 @@ int main(int argc, char* argv[]) {
 	std::println("Fuze Mediaboard was compiled without ImageMagick support. Certain features such as thumbnail creation will not work.");
 #endif
 	rtc::InitLogger(rtc::LogLevel::Info);
-	StateConfig state_config;	// Macros which link to state_config
+	Mediaboard::StateConfig state_config;	// Macros which link to state_config
 	template_macros.push_back(new TemplateOptionPtr("thumbnail_file_extension", &state_config.thumbnail_file_extension, {.default_value=std::string("jpg")}));
 	template_macros.push_back(new TemplateOptionPtr("thumbnail_size", &state_config.thumbnail_size, {.default_value=static_cast<unsigned int>(150)}));
 	template_macros.push_back(new TemplateOptionPtr("file_size_limit_mb", &state_config.file_size_limit_mb, {.default_value=static_cast<unsigned int>(25)}));
@@ -76,11 +77,11 @@ int main(int argc, char* argv[]) {
 	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros, "FuzeMediaboard")) != -1)
 		return return_code;
 	std::cout << "Initialising shared state..." << std::endl;
-	shared_state* state;
+	Mediaboard::State* state;
 	try {
 		bool create_owner_account = server.variable_map.count("create_owner");
 		std::cout << std::flush;
-		state = new shared_state(&server, state_config, create_owner_account);
+		state = new Mediaboard::State(&server, state_config, create_owner_account);
 		// state = new shared_state(server.db, server.document_root, server.media_location, state_config, std::move(busted_target_to_target), std::move(files_generated_from_templates));
 		state->start();
 	}

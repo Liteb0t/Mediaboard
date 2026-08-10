@@ -2,7 +2,6 @@ module;
 #include <rtc/rtcpreceivingsession.hpp>
 #include <rtc/peerconnection.hpp>
 #include <rtc/track.hpp>
-#include "shared_state.hpp"
 #include "FuzeHttpServer.hpp"
 #include <boost/json/serialize.hpp>
 #include <memory>
@@ -10,6 +9,7 @@ module;
 export module MediaboardWebsocketSession;
 
 import Mediaboard.Board;
+import Mediaboard.State;
 
 export namespace Mediaboard {
 class WebsocketSession : public FuzeHttp::WebsocketSession {
@@ -20,8 +20,8 @@ private:
 	int tracking_thread;
 	static const rtc::SSRC targetSSRC = 42;
 
-	shared_state* getState() const {
-		return (shared_state*)this->state_;
+	State* getState() const {
+		return (State*)this->state_;
 	}
 	void readEvent(std::string buffer_data) override {
 		try {

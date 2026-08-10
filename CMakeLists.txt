@@ -68,7 +68,6 @@ target_link_libraries(MediaboardServer
 target_sources(MediaboardServer
   PRIVATE
     main.cpp
-    shared_state.cpp
     urls.cpp
     views.cpp
     views_media.cpp
@@ -79,6 +78,7 @@ target_sources(MediaboardServer
       MediaboardWebsocketSession.cppm
       Message.cppm
       migrations.cppm
+      State.cppm
       Thread.cppm
 )
 configure_file(config.ini ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/config.ini COPYONLY)

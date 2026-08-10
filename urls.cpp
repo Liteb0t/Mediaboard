@@ -1,16 +1,16 @@
 // FUZE.page 2026
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "urls.hpp"
-#include "shared_state.hpp"
 #include "views.hpp"
 #include "views_media.hpp"
 #include "views_registration.hpp"
+import Mediaboard.State;
 
 using namespace FuzeHttp;
 using namespace http;
 
 template<>
-void addURLsToController<shared_state>(FuzeHttp::Controller<shared_state*>* controller) {
+void addURLsToController<Mediaboard::State>(FuzeHttp::Controller<Mediaboard::State*>* controller) {
 	// C-style strings are immutable parts of the URL, and strings/ints are variables passed into the view.
 	// Client{} is used when the function needs to identify the user via a cookie.
 	controller->addPattern(verb::get, showMainPage						,"*");

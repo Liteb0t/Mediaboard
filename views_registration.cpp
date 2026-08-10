@@ -2,15 +2,15 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views_registration.hpp"
 #include "FuzeHttp.hpp"
-#include "shared_state.hpp"
 #include "sodium/crypto_generichash.h"
 #include <boost/beast/http/status.hpp>
 #include <iostream>
 import FuzeHttp.PermissionObject;
+import Mediaboard.State;
 
 using namespace FuzeHttp;
 
-FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Request req) {
+FuzeHttp::Response requestNewAccountParameters(Mediaboard::State* state, FuzeHttp::Request req) {
 	boost::json::object req_json;
 	boost::json::string username_j;
 	std::optional<std::string> invite_key;
@@ -74,7 +74,7 @@ FuzeHttp::Response requestNewAccountParameters(shared_state* state, FuzeHttp::Re
 	};
 }
 
-FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) {
+FuzeHttp::Response createNewAccount(Mediaboard::State* state, FuzeHttp::Request req) {
 	boost::json::object req_json;
 	boost::json::string username_j, password_hash_base64, intermediate_salt_base64;
 	std::optional<std::string> invite_key;
@@ -141,7 +141,7 @@ FuzeHttp::Response createNewAccount(shared_state* state, FuzeHttp::Request req) 
 	};
 }
 
-FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request req) {
+FuzeHttp::Response requestLoginParameters(Mediaboard::State* state, FuzeHttp::Request req) {
 	boost::json::value req_json;
 	boost::json::string username_j;
 	try {
@@ -169,7 +169,7 @@ FuzeHttp::Response requestLoginParameters(shared_state* state, FuzeHttp::Request
 	return FuzeHttp::Response{.status = http::status::ok, .json = std::move(json)};
 }
 
-FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
+FuzeHttp::Response login(Mediaboard::State* state, FuzeHttp::Request req) {
 	boost::json::value req_json;
 	boost::json::string username_j, password_hash_base64;
 	bool stay_logged_in;
@@ -220,7 +220,7 @@ FuzeHttp::Response login(shared_state* state, FuzeHttp::Request req) {
 	}
 }
 
-FuzeHttp::Response logout(shared_state* state, FuzeHttp::Request req) {
+FuzeHttp::Response logout(Mediaboard::State* state, FuzeHttp::Request req) {
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
 		return {};
@@ -233,7 +233,7 @@ FuzeHttp::Response logout(shared_state* state, FuzeHttp::Request req) {
 	};
 }
 
-FuzeHttp::Response changePassword(shared_state* state, FuzeHttp::Request req) {
+FuzeHttp::Response changePassword(Mediaboard::State* state, FuzeHttp::Request req) {
 	boost::json::object req_json;
 	boost::json::string username_j, new_password_hash_base64, intermediate_salt_base64, old_password_hash_base64;
 	std::optional<std::string> invite_key;

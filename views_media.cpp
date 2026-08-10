@@ -2,7 +2,6 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views.hpp"
 #include "FuzeHttp.hpp"
-#include "shared_state.hpp"
 #include <boost/beast/http/status.hpp>
 // #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -14,8 +13,12 @@
 #include <iostream>
 #include <print>
 import FuzeHttp.PermissionObject;
+import Mediaboard.State;
+import Mediaboard.Message;
 
-FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
+using namespace Mediaboard;
+
+FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
 	// TODO have UPLOAD_FILE permission modifiable for threads and boards.
 	if (!state->clientHasPermission(client, PERMISSION::UPLOAD_FILE))
@@ -200,7 +203,7 @@ FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 }
 
 // TODO find a way to handle multiple directories under one view
-FuzeHttp::Response getMedia(shared_state* state, FuzeHttp::Request req, std::string location) {
+FuzeHttp::Response getMedia(Mediaboard::State* state, FuzeHttp::Request req, std::string location) {
 	std::cout << "Showing thru getMedia" << std::endl;
 	std::string file_name = location;
 	int filename_extension_index;
@@ -226,7 +229,7 @@ FuzeHttp::Response getMedia(shared_state* state, FuzeHttp::Request req, std::str
 	};
 }
 
-FuzeHttp::Response getThumbnail(shared_state* state, FuzeHttp::Request req, std::string file_path) {
+FuzeHttp::Response getThumbnail(Mediaboard::State* state, FuzeHttp::Request req, std::string file_path) {
 	std::cout << "Showing thru getMedia" << std::endl;
 	std::string file_name = file_path;
 	int filename_extension_index;
