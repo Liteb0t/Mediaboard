@@ -2,11 +2,11 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views_registration.hpp"
 #include "FuzeHttp.hpp"
-#include "PermissionObject.hpp"
 #include "shared_state.hpp"
 #include "sodium/crypto_generichash.h"
 #include <boost/beast/http/status.hpp>
 #include <iostream>
+import FuzeHttp.PermissionObject;
 
 using namespace FuzeHttp;
 

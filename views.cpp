@@ -4,11 +4,11 @@
 #include "FuzeHttp.hpp"
 #include "FuzeHttpServer.hpp"
 #include "FuzeHttpUtils.hpp"
-#include "PermissionObject.hpp"
 #include "shared_state.hpp"
 #include <boost/beast/http/status.hpp>
 #include <iostream>
 #include <print>
+import FuzeHttp.PermissionObject;
 
 FuzeHttp::Response showMainPage(shared_state* state, FuzeHttp::Request req) {
 	// for (const auto& header : req) {

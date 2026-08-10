@@ -13,7 +13,9 @@ CREATE TABLE session(client_id INTEGER, key TEXT, created_at INTEGER);
 CREATE TABLE message(id INTEGER PRIMARY KEY, thread_id INTEGER, id_in_thread INTEGER, author_client_id INTEGER, author_username TEXT, created_at INTEGER, content TEXT, deleted BOOLEAN DEFAULT FALSE);
 CREATE TABLE message_file(message_id INTEGER, file_name TEXT, width INTEGER, height INTEGER, thumbnail_file_extension TEXT);
 CREATE TABLE thread(id INTEGER PRIMARY KEY, deleted BOOLEAN DEFAULT FALSE, message_id_seq INTEGER DEFAULT 0, permission_object_id INTEGER);
+CREATE TABLE board(id INTEGER PRIMARY KEY, slug TEXT, title TEXT);
 
+INSERT INTO board(id, slug, title) VALUES (0, 'g', 'Technology');
 INSERT INTO permission_group(id, name) VALUES (0, 'Owner');
 INSERT INTO permission_group(id, name) VALUES (1, 'Accounts');
 INSERT INTO permission_group(id, name) VALUES (2, 'Public');

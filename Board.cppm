@@ -1,16 +1,22 @@
-#pragma once
-#include "Thread.hpp"
+module;
+#include "FuzeDBI.hpp"
+#include "WebsocketSession.hpp"
 #include "rtc/peerconnection.hpp"
 #include "rtc/track.hpp"
 #include <boost/json.hpp>
 #include <rtc/rtc.hpp>
 #include <ctime>
 #include <set>
+#include <unordered_set>
+export module Mediaboard.Board;
+import FuzeHttp.PermissionObject;
+export import Mediaboard.Thread;
 
-namespace FuzeHttp {
-class WebsocketSession; // Forward declaration
-}
+// namespace FuzeHttp {
+// class WebsocketSession; // Forward declaration
+// }
 
+export namespace Mediaboard {
 struct Receiver {
 	std::shared_ptr<rtc::PeerConnection> conn;
 	std::shared_ptr<rtc::Track> track;
@@ -71,4 +77,5 @@ private:
 	FuzeDBI::Connection* fuze_dbi;
 	std::unordered_map<int, Thread> threads;
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
-};
+}; // class Board
+} // namespace Mediaboard

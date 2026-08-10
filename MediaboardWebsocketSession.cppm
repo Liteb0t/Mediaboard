@@ -1,13 +1,15 @@
 module;
-#include "Board.hpp"
-#include "rtc/peerconnection.hpp"
-#include "rtc/track.hpp"
+#include <rtc/rtcpreceivingsession.hpp>
+#include <rtc/peerconnection.hpp>
+#include <rtc/track.hpp>
 #include "shared_state.hpp"
 #include "FuzeHttpServer.hpp"
 #include <boost/json/serialize.hpp>
 #include <memory>
 #include <stdexcept>
 export module MediaboardWebsocketSession;
+
+import Mediaboard.Board;
 
 export namespace Mediaboard {
 class WebsocketSession : public FuzeHttp::WebsocketSession {

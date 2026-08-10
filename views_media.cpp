@@ -2,7 +2,6 @@
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views.hpp"
 #include "FuzeHttp.hpp"
-#include "PermissionObject.hpp"
 #include "shared_state.hpp"
 #include <boost/beast/http/status.hpp>
 // #include <boost/uuid/uuid.hpp>
@@ -14,6 +13,7 @@
 #include <fstream>
 #include <iostream>
 #include <print>
+import FuzeHttp.PermissionObject;
 
 FuzeHttp::Response uploadFile(shared_state* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);

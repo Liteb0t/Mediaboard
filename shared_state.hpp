@@ -11,14 +11,16 @@
 #define BOOST_BEAST_EXAMPLE_WEBSOCKET_CHAT_MULTI_SHARED_STATE_HPP
 
 #include "beast.hpp"
-#include "Board.hpp"
 #include "FuzeDBI.hpp"
 #include "FuzeHttpState.hpp"
-#include "PermissionObject.hpp"
 #include <boost/smart_ptr.hpp>
 #include <mutex>
 #include <string>
 #include <unordered_set>
+import FuzeHttp.PermissionObject;
+import Mediaboard.Board;
+
+using namespace Mediaboard;
 
 // Forward declaration
 class WebsocketSession;
@@ -96,7 +98,7 @@ private:
 
 
 	// std::unordered_map<int, Board> boards;
-	std::unordered_map<int, Board> boards;
+	std::unordered_map<int, Mediaboard::Board> boards;
 	// std::vector<int> ordered_boards;
 	// HTTP sessions. Client validates using a cookie
 };

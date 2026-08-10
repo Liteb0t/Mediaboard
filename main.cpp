@@ -5,7 +5,6 @@
 
 #include "FuzeHttpUtils.hpp"
 #include "FuzeHttpServer.hpp"
-#include "PermissionObject.hpp"
 #include "shared_state.hpp"
 // #include "WebsocketSession.hpp"
 #include <boost/asio/signal_set.hpp>
@@ -22,12 +21,15 @@
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
+#include <rtc/global.hpp>
 #include <cstdlib>
 #include <iostream>
 #include <print>
 #include <string>
 #include <vector>
 import MediaboardWebsocketSession;
+import FuzeHttp.PermissionObject;
+import Mediaboard.Migrations;
 
 const std::string current_version = "0.2";
 
@@ -70,8 +72,8 @@ int main(int argc, char* argv[]) {
 	template_macros.push_back(new TemplateOptionPtr("webm_thumbnails", &state_config.webm_thumbnails, {.default_value=false, .include_in_frontend=false}));
 	template_macros.push_back(new TemplateOptionPtr("convert_heic_to_jpg", &state_config.convert_heic_to_jpg, {.default_value=false, .description="Converts HEIC images into JPG on upload.", .include_in_frontend=false}));
 	template_macros.push_back(new TemplateOptionPtr("strip_metadata", &state_config.strip_metadata, {.default_value=false, .description="Remove metadata from newly-uploaded images.", .include_in_frontend=false}));
-	FuzeHttp::Server server;
-	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros, current_version, "FuzeMediaboard")) != -1)
+	FuzeHttp::Server server(current_version);
+	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros, "FuzeMediaboard")) != -1)
 		return return_code;
 	std::cout << "Initialising shared state..." << std::endl;
 	shared_state* state;
@@ -86,7 +88,9 @@ int main(int argc, char* argv[]) {
 		std::cerr << "[shared_state] " << exception.what() << std::endl;
 		return 1;
 	}
-	server.run<shared_state, Mediaboard::WebsocketSession>(state);
+	auto migrations = addMigrations(state);
+	server.run(state, std::move(migrations));
+	// server.run<shared_state, Mediaboard::WebsocketSession>(state);
 
 
 	return EXIT_SUCCESS;
