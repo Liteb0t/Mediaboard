@@ -77,7 +77,6 @@ target_sources(MediaboardServer
       Board.cppm
       MediaboardWebsocketSession.cppm
       Message.cppm
-      migrations.cppm
       State.cppm
       Thread.cppm
 )

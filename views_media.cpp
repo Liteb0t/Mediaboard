@@ -1,7 +1,6 @@
 // FUZE.page 2026
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views.hpp"
-#include "FuzeHttp.hpp"
 #include <boost/beast/http/status.hpp>
 // #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -9,9 +8,11 @@
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <print>
+import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
 import Mediaboard.State;
 import Mediaboard.Message;

@@ -1,10 +1,12 @@
 module;
-#include <string>
 #include <ctime>
 #include <boost/json.hpp>
-#include "FuzeDBI.hpp"
-#include "FuzeHttp.hpp"
+#include <iostream>
+#include <string>
 export module Mediaboard.Message;
+
+import FuzeDBI;
+import FuzeHttp.Core;
 
 export namespace Mediaboard {
 enum class MESSAGE_FIELDS : size_t { MAX_NAME = 32, MAX_CONTENT = 5000, MAX_FILE_NAME = 205, MAX_FILE_NAME_WITH_UUID = 205+36 };

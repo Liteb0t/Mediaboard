@@ -1,7 +1,8 @@
 // FUZE.page 2026
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #pragma once
-#include "FuzeHttp.hpp"
+#include "Request.hpp"
+import FuzeHttp.Core;
 import Mediaboard.State;
 
 FuzeHttp::Response requestNewAccountParameters(Mediaboard::State* state, FuzeHttp::Request req);

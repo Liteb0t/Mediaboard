@@ -3,32 +3,18 @@
 // Fuze Mediaboard was built on top of an example project by Vinnie Falco.
 // https://github.com/vinniefalco/CppCon2018
 
-#include "FuzeHttpUtils.hpp"
-#include "FuzeHttpServer.hpp"
 // #include "WebsocketSession.hpp"
-#include <boost/asio/signal_set.hpp>
-#include <boost/json/object.hpp>
-#include <boost/json/serialize.hpp>
-#define BOOST_DLL_USE_STD_FS
-#include <boost/dll.hpp>
-#include <boost/dll/runtime_symbol_info.hpp>
-#include <boost/hash2/md5.hpp>
-#include <boost/program_options.hpp>
-#include <boost/program_options/options_description.hpp>
-#include <boost/smart_ptr.hpp>
-#include <boost/smart_ptr/make_shared_array.hpp>
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
 #include <rtc/global.hpp>
-#include <cstdlib>
-#include <iostream>
 #include <print>
 #include <string>
 #include <vector>
 import MediaboardWebsocketSession;
 import FuzeHttp.PermissionObject;
-import Mediaboard.Migrations;
+import FuzeHttp.Server;
+import FuzeHttp.Utils;
 import Mediaboard.State;
 import Mediaboard.Message;
 
@@ -73,26 +59,19 @@ int main(int argc, char* argv[]) {
 	template_macros.push_back(new TemplateOptionPtr("webm_thumbnails", &state_config.webm_thumbnails, {.default_value=false, .include_in_frontend=false}));
 	template_macros.push_back(new TemplateOptionPtr("convert_heic_to_jpg", &state_config.convert_heic_to_jpg, {.default_value=false, .description="Converts HEIC images into JPG on upload.", .include_in_frontend=false}));
 	template_macros.push_back(new TemplateOptionPtr("strip_metadata", &state_config.strip_metadata, {.default_value=false, .description="Remove metadata from newly-uploaded images.", .include_in_frontend=false}));
-	FuzeHttp::Server server(current_version);
+
+	std::println("Initialising server...");
+	// shared_state state(state_config);
+	// state.start();
+
+	FuzeHttp::Server<Mediaboard::State, Mediaboard::WebsocketSession> server(current_version);
+	std::println("Finished Initialising server...");
 	if (int return_code; (return_code = server.processOptions(argc, argv, template_macros, "FuzeMediaboard")) != -1)
 		return return_code;
-	std::cout << "Initialising shared state..." << std::endl;
-	Mediaboard::State* state;
-	try {
-		bool create_owner_account = server.variable_map.count("create_owner");
-		std::cout << std::flush;
-		state = new Mediaboard::State(&server, state_config, create_owner_account);
-		// state = new shared_state(server.db, server.document_root, server.media_location, state_config, std::move(busted_target_to_target), std::move(files_generated_from_templates));
-		state->start();
-	}
-	catch (const std::exception& exception) {
-		std::cerr << "[shared_state] " << exception.what() << std::endl;
-		return 1;
-	}
-	auto migrations = addMigrations(state);
-	server.run(state, std::move(migrations));
-	// server.run<shared_state, Mediaboard::WebsocketSession>(state);
-
+	std::println("Finished processing options... adding confuig...");
+	server.state->config = state_config;
+	std::println("Running server...");
+	server.run();
 
 	return EXIT_SUCCESS;
 }

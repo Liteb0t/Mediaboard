@@ -1,17 +1,25 @@
 module;
 #include "beast.hpp"
-#include "FuzeDBI.hpp"
-#include "FuzeHttpState.hpp"
-#include "FuzeHttpServer.hpp"
+#include <boost/json.hpp>
 #include <boost/smart_ptr.hpp>
+#include <sodium.h>
+#include <filesystem>
+#include <iostream>
+#include <list>
 #include <mutex>
+#include <print>
 #include <string>
 #include <unordered_set>
 export module Mediaboard.State;
+
+import FuzeDBI;
+import FuzeHttp.Migrations;
 import FuzeHttp.PermissionObject;
+import FuzeHttp.State;
 import Mediaboard.Board;
 
 using namespace FuzeHttp;
+using namespace FuzeHttp::Migrations;
 
 // Forward declaration
 // class WebsocketSession;
@@ -37,26 +45,26 @@ struct StateConfig {
 // Represents the shared server state
 class State : public FuzeHttp::State {
 public:
-	State(FuzeHttp::Server* server, StateConfig config, bool create_owner_account)
-			: FuzeHttp::State(server),
-			config(config),
-			// fuze_dbi(server->db),
-			media_location(server->program_directories.media) {
-		// std::println("Assigned document_root: {}", document_root.string());
-		this->setAdditionalImageFormatsFromConfig(config);
-		if (create_owner_account) {
-			std::string invite_key = this->createInvite(static_cast<int>(BUILTIN_GROUPS::OWNER));
-			std::cout << std::endl << "Use this link to register the owner account: http://localhost:" << this->server->server_port << "/invite/" << invite_key << std::endl;
-		}
-		else if (!this->ownerExists())
-			std::println("\nERROR: No owner found. Restart the application with --create_owner");
-	}
+	State(FuzeDBI::Connection* db) : FuzeHttp::State(db) {}
 	// shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
-	const StateConfig config;
-	void start() {
+	StateConfig config;
+	void start() override {
+		this->setAdditionalImageFormatsFromConfig(this->config);
 		Mediaboard::Board main_board(this, db);
 		this->boards.emplace(0, main_board);
 		this->boards.at(0).cacheAllThreads();
+	}
+	std::list<std::unique_ptr<Migration>> addMigrations() override {
+		std::list<std::unique_ptr<Migration>> migrations;
+		migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.1.1", "ALTER TABLE message_file ADD COLUMN width INTEGER;"
+		"ALTER TABLE message_file ADD COLUMN height INTEGER;")));
+		migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.1.2", "ALTER TABLE message_file ADD COLUMN thumbnail_file_extension TEXT;"
+		"ALTER TABLE thread ADD COLUMN message_id_seq INTEGER DEFAULT 0;"
+		"UPDATE thread SET message_id_seq = 1000")));
+		// migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2.2", "CREATE TABLE sql_test(ting TEXT)")));
+		migrations.push_back(std::unique_ptr<Migration>(new SmartMigration("0.2", this,
+			[](FuzeDBI::Connection* db, Mediaboard::State* state){std::println("This is the lambda and document_root is {}", state->getDocumentRoot().string()); })));
+		return migrations;
 	}
 	void setAdditionalImageFormatsFromConfig(const StateConfig& config) {
 		if (config.avif_thumbnails)
@@ -160,18 +168,7 @@ public:
 	}
 	// std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
 	const Thread* getThread(int board_id, int thread_id) const { return this->boards.at(board_id).getThread(thread_id); }
-	std::string getIntermediateSaltFromAccount(int account_id) {
-		return db->query<std::string>("SELECT intermediate_salt_base64 FROM account WHERE id = $1", account_id);
-	}
-	const FuzeHttp::Client& getClientFromAccountId(int account_id) const { // We assume the account with the ID is already checked
-		if (!this->accounts.at(account_id).client_id)
-			throw std::runtime_error(std::format("[getClientFromAccountId] No client ID assigned to account {}", account_id));
-		int client_id = this->accounts.at(account_id).client_id.value();
-		auto it = this->clients.find(client_id);
-		if (it == this->clients.end())
-			throw std::runtime_error(std::format("Account {} refers to Client {} which does not exist", account_id, client_id));
-		return it->second;
-	}
+
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
 	// BasicResponse addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id);
 
@@ -204,11 +201,11 @@ public:
 
 	const std::filesystem::path& getMediaLocation() const { return media_location; }
 	// const std::filesystem::path& getProgramLocation() const { return program_location; }
-	const char* getSecret() const { return this->secret_base64; }
+	// const char* getSecret() const { return this->secret_base64; }
 private:
-	const std::filesystem::path media_location;
+	// const std::filesystem::path media_location;
 	// const std::filesystem::path program_location;
-	char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
+	// char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
 	// FuzeDBI::Connection* fuze_dbi;
 	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png"};
 	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;

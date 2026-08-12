@@ -1,13 +1,14 @@
 // FUZE.page 2026
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "views.hpp"
-#include "FuzeHttp.hpp"
-#include "FuzeHttpServer.hpp"
-#include "FuzeHttpUtils.hpp"
 #include <boost/beast/http/status.hpp>
+#include <boost/json.hpp>
 #include <iostream>
 #include <print>
+#include <unordered_set>
+import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
+import FuzeHttp.Utils;
 import Mediaboard.State;
 import Mediaboard.Thread;
 
@@ -25,21 +26,21 @@ FuzeHttp::Response showMainPage(Mediaboard::State* state, FuzeHttp::Request req)
 	if (target.empty() || target.ends_with('/'))
 		target += "index.html";
 	// Is static asset
-	if (auto it = state->server->busted_target_to_target.find(target); it != state->server->busted_target_to_target.end()) {
+	if (auto it = state->busted_target_to_target.find(target); it != state->busted_target_to_target.end()) {
 		target = it->second;
 		return_headers.emplace("Cache-Control", "max-age=7750000, immutable");
 	}
 	// If path leads to target of .GENERATED file, add the filename extension
-	else if (auto it = state->server->files_generated_from_templates.find(target); it != state->server->files_generated_from_templates.end()) {
+	else if (auto it = state->files_generated_from_templates.find(target); it != state->files_generated_from_templates.end()) {
 		target = FuzeHttp::insertExtensionToFileName(*it, ".GENERATED");
 		return_headers.emplace("Cache-Control", "no-cache");
 	}
 	std::println("[showMainPage] will serve {}", target);
 	std::string etag;
-	if (auto it = state->server->manifest_frontend_etags.find(target); it != state->server->manifest_frontend_etags.end())
+	if (auto it = state->manifest_frontend_etags.find(target); it != state->manifest_frontend_etags.end())
 		etag = it->second;
 	else
-		etag = state->server->frontend_etag;
+		etag = state->frontend_etag;
 
 	if (auto if_none_match_header = req.find("If-None-Match"); if_none_match_header != req.end()) {
 		std::string if_none_match_header_value = if_none_match_header->value();
