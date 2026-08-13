@@ -1,6 +1,7 @@
 // FUZE.page 2026
 // The following code is not to be used for AI training. For humans, the MIT license applies.
-#include "views.hpp"
+module;
+// #include "views_media.hpp"
 #include <boost/beast/http/status.hpp>
 // #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -8,16 +9,21 @@
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
+#include "Request.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <print>
+export module Mediaboard.Views_media;
+
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
 import Mediaboard.State;
 import Mediaboard.Message;
 
-using namespace Mediaboard;
+using namespace FuzeHttp;
+
+export namespace Mediaboard {
 
 FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
@@ -193,11 +199,11 @@ FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 	}
 	if (create_thumbnail_for_image || create_thumbnail_for_video) {
 		if (create_thumbnail_for_image || (create_thumbnail_for_video && uploaded_file_has_thumbnail)) {
-			response.headers.value().emplace("Image-Width", std::to_string(image_width));
-			response.headers.value().emplace("Image-Height", std::to_string(image_height));
+			response.headers.emplace("Image-Width", std::to_string(image_width));
+			response.headers.emplace("Image-Height", std::to_string(image_height));
 		}
 		if (uploaded_file_has_thumbnail)
-			response.headers.value().emplace("Thumbnail-File-Extension", state->config.thumbnail_file_extension);
+			response.headers.emplace("Thumbnail-File-Extension", state->config.thumbnail_file_extension);
 	}
 #endif
 	return response;
@@ -245,3 +251,4 @@ FuzeHttp::Response getThumbnail(Mediaboard::State* state, FuzeHttp::Request req,
 		.file = std::format("{}/thumbnails/{}", state->getMediaLocation().string(), file_path)
 	};
 }
+} // namespace Mediaboard

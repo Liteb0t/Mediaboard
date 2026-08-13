@@ -1,10 +1,11 @@
 module;
+#include <boost/json.hpp>
 #include <ctime>
-#include <string>
 #include <iostream>
 #include <map>
+#include <print>
+#include <string>
 #include <unordered_set>
-#include <boost/json.hpp>
 export module Mediaboard.Thread;
 
 export import Mediaboard.Message;
@@ -15,32 +16,56 @@ import FuzeHttp.State;
 export namespace Mediaboard {
 class Thread : public FuzeHttp::PermissionManagedObject {
 public:
-	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi, int id, int permission_object_id)
-			: PermissionManagedObject(permission_parent, permission_object_id, fuze_dbi),
+	// On startup load from database
+	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int board_id, int permission_object_id)
+			: PermissionManagedObject(permission_parent, permission_object_id, db),
 			id(id),
-			fuze_dbi(fuze_dbi) {
+			board_id(board_id) {
 		this->cacheAllPermissions();
 		this->thread_as_json = {
 			{"id", id},
 			{"reply_count", 0}
 		};
+
+		std::print("[Thread] ID: {} \tRetrieving messages from database... ", id);
+		for (auto message_tuple : db->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE thread_id = $1 AND deleted = FALSE", id)) {
+			int message_id = std::get<0>(message_tuple);
+			int thread_id = std::get<1>(message_tuple);
+			int id_in_thread = std::get<2>(message_tuple);
+			std::print("#{}/{}", thread_id, id_in_thread);
+			int seconds_since_epoch = std::get<3>(message_tuple); // TODO use long instead of int
+			std::chrono::seconds sec(seconds_since_epoch);
+			std::chrono::time_point<std::chrono::system_clock> created_at(sec);
+			std::vector<File> message_files;
+			for (auto file_tuple : db->queryRows<std::tuple<std::string, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT file_name, width, height, thumbnail_file_extension FROM message_file WHERE message_id = $1", message_id)) {
+				message_files.push_back(File{
+					.filename = std::get<0>(file_tuple),
+					.width = std::get<1>(file_tuple),
+					.height = std::get<2>(file_tuple),
+					.thumbnail_file_extension = std::get<3>(file_tuple)
+				});
+			}
+			Message message(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), message_files);
+			this->cacheMessage(std::move(message));
+			std::print(", ");
+		}
+		std::cout << "done." << std::endl;
 	}
 	// Save thread when JSON is received
-	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* fuze_dbi)
-			: PermissionManagedObject(permission_parent, fuze_dbi),
-			fuze_dbi(fuze_dbi) {
+	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* db)
+			: PermissionManagedObject(permission_parent, db) {
 		boost::json::object post_zero = thread_json.at("post_zero").as_object();
 		this->thread_as_json = thread_json;
-		this->id = fuze_dbi->query<int>("SELECT thread_id FROM _sequences");
-		fuze_dbi->query<void>("UPDATE _sequences SET thread_id = $1", this->id+1);
-		fuze_dbi->query<void>("INSERT INTO thread(id, permission_object_id) VALUES ($1, $2)", this->id, this->getPermissionObjectId());
+		this->id = db->query<int>("SELECT thread_id FROM _sequences");
+		db->query<void>("UPDATE _sequences SET thread_id = $1", this->id+1);
+		db->query<void>("INSERT INTO thread(id, permission_object_id) VALUES ($1, $2)", this->id, this->getPermissionObjectId());
 		this->thread_as_json["id"] = this->id;
 		post_zero.emplace("thread_id", this->id);
 		int new_message_id = this->createMessageFromJson(std::move(post_zero), author_client_id);
 		this->thread_as_json["post_zero"] = this->messages.at(new_message_id).asJson();
 		this->thread_as_json["reply_count"] = 0;
 	}
-	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* fuze_dbi);
+	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* db);
 	// std::string dumpThread() const;
 	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::object thread_json = this->thread_as_json;
@@ -66,10 +91,10 @@ public:
 		this->last_message_created_at = message.createdAt();
 	}
 	int createMessageFromJson(boost::json::object message_json, int author_client_id) {
-		int new_message_id_in_thread = fuze_dbi->query<int>("SELECT message_id_seq FROM thread WHERE id = $1", this->id);
-		fuze_dbi->query<void>("UPDATE thread SET message_id_seq = $1 WHERE id = $2", new_message_id_in_thread+1, this->id);
+		int new_message_id_in_thread = db->query<int>("SELECT message_id_seq FROM thread WHERE id = $1", this->id);
+		db->query<void>("UPDATE thread SET message_id_seq = $1 WHERE id = $2", new_message_id_in_thread+1, this->id);
 		message_json.emplace("id_in_thread", (size_t)new_message_id_in_thread);
-		Message message(message_json, author_client_id, fuze_dbi); // Key is deleted from message_json in its constructor
+		Message message(message_json, author_client_id, db); // Key is deleted from message_json in its constructor
 		if (this->messages.empty())
 			this->thread_as_json["post_zero"] = message.asJson();
 		else {
@@ -84,7 +109,7 @@ public:
 	// int addPost(json post_json, bool save_to_database);
 	void deleteMessage(int id_in_thread) {
 		this->messages.at(id_in_thread).markAsDeleted();
-		fuze_dbi->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $2", this->id, id_in_thread);
+		db->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $2", this->id, id_in_thread);
 		this->reply_count--;
 		this->thread_as_json["reply_count"] = this->reply_count;
 		std::cout << "Erased message " << id_in_thread << " from thread " << this->id << std::endl;
@@ -125,8 +150,8 @@ public:
 	// std::string dumpPermissions(int client_id) const;
 	void markAsDeleted() {
 		this->deleted = true;
-		fuze_dbi->query<void>("UPDATE thread SET deleted = TRUE WHERE id = $1", this->id);
-		fuze_dbi->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1", this->id);
+		db->query<void>("UPDATE thread SET deleted = TRUE WHERE id = $1", this->id);
+		db->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1", this->id);
 	}
 	std::chrono::time_point<std::chrono::system_clock> getLastMessageTime() const { return this->last_message_created_at; }
 	bool isDeleted() const { return this->deleted; }
@@ -139,8 +164,8 @@ public:
 		};
 	}
 	const Message* getMessage(int message_id_in_thread) const { return &this->messages.at(message_id_in_thread); }
+	int board_id;
 private:
-	FuzeDBI::Connection* fuze_dbi;
 	int id;
 	std::chrono::time_point<std::chrono::system_clock> last_message_created_at;
 	// std::vector<Post> posts;

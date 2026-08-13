@@ -43,9 +43,9 @@ struct StateConfig {
 	bool strip_metadata;
 };
 // Represents the shared server state
-class State : public FuzeHttp::State {
+class State : public FuzeHttp::StateBase {
 public:
-	State(FuzeDBI::Connection* db) : FuzeHttp::State(db) {}
+	State(FuzeDBI::Connection* db) : FuzeHttp::StateBase(db) {}
 	// shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
 	StateConfig config;
 	void start() override {
@@ -54,18 +54,7 @@ public:
 		this->boards.emplace(0, main_board);
 		this->boards.at(0).cacheAllThreads();
 	}
-	std::list<std::unique_ptr<Migration>> addMigrations() override {
-		std::list<std::unique_ptr<Migration>> migrations;
-		migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.1.1", "ALTER TABLE message_file ADD COLUMN width INTEGER;"
-		"ALTER TABLE message_file ADD COLUMN height INTEGER;")));
-		migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.1.2", "ALTER TABLE message_file ADD COLUMN thumbnail_file_extension TEXT;"
-		"ALTER TABLE thread ADD COLUMN message_id_seq INTEGER DEFAULT 0;"
-		"UPDATE thread SET message_id_seq = 1000")));
-		// migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2.2", "CREATE TABLE sql_test(ting TEXT)")));
-		migrations.push_back(std::unique_ptr<Migration>(new SmartMigration("0.2", this,
-			[](FuzeDBI::Connection* db, Mediaboard::State* state){std::println("This is the lambda and document_root is {}", state->getDocumentRoot().string()); })));
-		return migrations;
-	}
+	std::list<std::unique_ptr<Migration>> addMigrations() override;
 	void setAdditionalImageFormatsFromConfig(const StateConfig& config) {
 		if (config.avif_thumbnails)
 			this->image_formats_to_create_thumbnails_for.emplace("image/avif");

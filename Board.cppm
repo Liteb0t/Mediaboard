@@ -1,8 +1,10 @@
 module;
+#ifdef WITH_WEBRTC
 #include "rtc/peerconnection.hpp"
-#include "rtc/track.hpp"
-#include <boost/json.hpp>
 #include <rtc/rtc.hpp>
+#include "rtc/track.hpp"
+#endif
+#include <boost/json.hpp>
 #include <ctime>
 #include <iostream>
 #include <print>
@@ -16,47 +18,24 @@ import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 
 export namespace Mediaboard {
+#ifdef WITH_WEBRTC
 struct Receiver {
 	std::shared_ptr<rtc::PeerConnection> conn;
 	std::shared_ptr<rtc::Track> track;
 };
+#endif
 
 class Board : public FuzeHttp::PermissionManagedObject {
 public:
-	Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* fuze_dbi)
-			: PermissionManagedObject(permission_parent, 1, fuze_dbi),
-			fuze_dbi(fuze_dbi) {
+	Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db)
+			: PermissionManagedObject(permission_parent, 1, db), id(0) {
 	}
 	void cacheAllThreads() {
 		std::cout << "[Board] Retrieving threads from database..." << std::endl;
-		for (auto thread_tuple : fuze_dbi->queryRows<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = FALSE")) {
-			Thread thread(this, fuze_dbi, std::get<0>(thread_tuple), std::get<1>(thread_tuple));
+		for (auto thread_tuple : db->queryRows<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = FALSE AND board_id = $1", this->id)) {
+			Thread thread(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), this->id);
 			std::cout << thread.getId() << ", ";
 			this->threads.insert(std::make_pair(thread.getId(), thread));
-		}
-		std::cout << "done." << std::endl;
-
-		std::cout << "[Board] Retrieving messages from database..." << std::endl;
-		for (auto message_tuple : fuze_dbi->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE deleted = FALSE")) {
-			int message_id = std::get<0>(message_tuple);
-			int thread_id = std::get<1>(message_tuple);
-			int id_in_thread = std::get<2>(message_tuple);
-			std::print("#{}/{}", thread_id, id_in_thread);
-			int seconds_since_epoch = std::get<3>(message_tuple); // TODO use long instead of int
-			std::chrono::seconds sec(seconds_since_epoch);
-			std::chrono::time_point<std::chrono::system_clock> created_at(sec);
-			std::vector<File> message_files;
-			for (auto file_tuple : fuze_dbi->queryRows<std::tuple<std::string, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT file_name, width, height, thumbnail_file_extension FROM message_file WHERE message_id = $1", message_id)) {
-				message_files.push_back(File{
-					.filename = std::get<0>(file_tuple),
-					.width = std::get<1>(file_tuple),
-					.height = std::get<2>(file_tuple),
-					.thumbnail_file_extension = std::get<3>(file_tuple)
-				});
-			}
-			Message message(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), message_files);
-			this->threads.at(thread_id).cacheMessage(std::move(message));
-			std::print(", ");
 		}
 		std::cout << "done." << std::endl;
 
@@ -74,7 +53,7 @@ public:
 		std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 	}
 	int createThread(boost::json::object thread_json, int author_client_id) {
-		Thread thread(this, thread_json, author_client_id, fuze_dbi);
+		Thread thread(this, thread_json, author_client_id, db);
 		this->threads.emplace(thread.getId(), thread);
 		this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread.getLastMessageTime().time_since_epoch()).count(), thread.getId()));
 		return thread.getId();
@@ -169,6 +148,7 @@ public:
 	void setAccountPermissionForThread(int account_id, FuzeHttp::PERMISSION permission, FuzeHttp::THREE_STATE_SETTING setting, int thread_id) { this->threads.at(thread_id).setAccountPermission(account_id, permission, setting); }
 	void removeGroupPermissionCollectionFromThread(int group_id, int thread_id) { this->threads.at(thread_id).removeGroupPermissionCollection(group_id); }
 	void removeAccountPermissionCollectionFromThread(int account_id, int thread_id) { this->threads.at(thread_id).removeAccountPermissionCollection(account_id); }
+#ifdef WITH_WEBRTC
 	struct {
 		std::unordered_map<int, std::shared_ptr<Receiver>> receivers;
 		std::shared_ptr<rtc::PeerConnection> peer_connection;
@@ -176,8 +156,9 @@ public:
 		std::shared_ptr<rtc::Track> track; // Advice from Claude: 'if you ever support multiple concurrent sharers, webrtc_room.track as a single shared field won't scale — you'd want to look up the specific sharer's track associated with whatever stream the watcher is requesting, but for your current single-sharer/multi-watcher model this is fine as-is.'
 		int connection_id_counter = 0;
 	} webrtc_room;
+#endif
 private:
-	FuzeDBI::Connection* fuze_dbi;
+	int id;
 	std::unordered_map<int, Thread> threads;
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
 }; // class Board

@@ -1,19 +1,23 @@
 // FUZE.page 2026
 // The following code is not to be used for AI training. For humans, the MIT license applies.
 #include "urls.hpp"
-#include "views.hpp"
-#include "views_media.hpp"
-#include "views_registration.hpp"
+// #include "views.hpp"
+// #include "views_media.hpp"
+// #include "views_registration.hpp"
 import Mediaboard.State;
+import Mediaboard.Views;
+import Mediaboard.Views_media;
+import Mediaboard.Views_registration;
 
 using namespace FuzeHttp;
 using namespace http;
+using namespace Mediaboard;
 
 template<>
-void addURLsToController<Mediaboard::State>(FuzeHttp::Controller<Mediaboard::State*>* controller) {
+void addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
 	// C-style strings are immutable parts of the URL, and strings/ints are variables passed into the view.
 	// Client{} is used when the function needs to identify the user via a cookie.
-	controller->addPattern(verb::get, showMainPage						,"*");
+	controller->addPattern(verb::get, showMainPage,						"*");
 	controller->addPattern(verb::post, createGroup,						"api", "create_group"); // TODO move to server/permissions
 	controller->addPattern(verb::delete_, deleteGroup,					"api", "group", int());
 	controller->addPattern(verb::delete_, removeMemberFromGroup,		"api", "group", int(), "member", int());

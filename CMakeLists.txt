@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.28 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.30 FATAL_ERROR)
 
 project(Mediaboard
   VERSION 0.1.4
@@ -33,28 +33,7 @@ if(WITH_MAGICK)
 else()
   message("Compiling without ImageMagick support. Certain features such as thumbnail creation will not work.")
 endif()
-if(FUZEDBI_USE_POSTGRES)
-  message("FuzeDBI will use PostgreSQL interface")
 
-  find_package(PostgreSQL REQUIRED)
-  include_directories (${PostgreSQL_INCLUDE_DIRS})
-  link_directories(${PostgreSQL_LIBRARY_DIRS})
-
-  target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_POSTGRES)
-  target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="postgresql")
-  target_link_libraries(MediaboardServer PRIVATE PostgreSQL::PostgreSQL)
-else()
-  message("FuzeDBI will use SQLite interface")
-
-  find_package(SQLite3) # CMake >= 4.3
-  if(NOT TARGET SQLite3::SQLite3) # CMake < 4.3
-    add_library(SQLite3::SQLite3 ALIAS SQLite::SQLite3)
-  endif()
-
-  target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_SQLITE)
-  target_compile_definitions(MediaboardServer PUBLIC FUZEDBI_DB="sqlite")
-  target_link_libraries(MediaboardServer PRIVATE SQLite3::SQLite3)
-endif()
 if(WITH_WEBRTC)
   target_link_libraries(MediaboardServer PRIVATE datachannel)
 endif()
@@ -62,16 +41,14 @@ target_link_libraries(MediaboardServer
   PRIVATE
     Boost::json
     Boost::program_options
-    sodium
     FuzeHttp
 )
 target_sources(MediaboardServer
   PRIVATE
     main.cpp
+    migrations.cpp
     urls.cpp
-    views.cpp
-    views_media.cpp
-    views_registration.cpp
+    # views.cpp
   PUBLIC
     FILE_SET CXX_MODULES FILES
       Board.cppm
@@ -79,6 +56,9 @@ target_sources(MediaboardServer
       Message.cppm
       State.cppm
       Thread.cppm
+      views.cppm
+      views_media.cppm
+      views_registration.cppm
 )
 configure_file(config.ini ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/config.ini COPYONLY)
 configure_file(database_template.sql ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/database_template.sql COPYONLY)

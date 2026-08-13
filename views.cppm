@@ -1,60 +1,31 @@
 // FUZE.page 2026
 // The following code is not to be used for AI training. For humans, the MIT license applies.
-#include "views.hpp"
+module;
+// #include "views.hpp"
 #include <boost/beast/http/status.hpp>
 #include <boost/json.hpp>
 #include <iostream>
 #include <print>
+#include "Request.hpp"
 #include <unordered_set>
+export module Mediaboard.Views;
+
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.Utils;
 import Mediaboard.State;
 import Mediaboard.Thread;
 
-using namespace Mediaboard;
+using namespace FuzeHttp;
+export namespace Mediaboard {
 
 FuzeHttp::Response showMainPage(Mediaboard::State* state, FuzeHttp::Request req) {
-	// for (const auto& header : req) {
-	// 	std::println("{} : {}", std::string(header.name_string()), std::string(header.value()));
-	// }
-	std::println("Serving from document root");
-	std::unordered_map<std::string, std::string> return_headers;
-	// TODO handle cache control in FuzeHttp
+	// TODO handle target decoding in FuzeHttp
 	std::string target = std::string(FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target())).substr(1));
-	// If cache busted target found, get the path without the hash
-	if (target.empty() || target.ends_with('/'))
-		target += "index.html";
-	// Is static asset
-	if (auto it = state->busted_target_to_target.find(target); it != state->busted_target_to_target.end()) {
-		target = it->second;
-		return_headers.emplace("Cache-Control", "max-age=7750000, immutable");
-	}
-	// If path leads to target of .GENERATED file, add the filename extension
-	else if (auto it = state->files_generated_from_templates.find(target); it != state->files_generated_from_templates.end()) {
-		target = FuzeHttp::insertExtensionToFileName(*it, ".GENERATED");
-		return_headers.emplace("Cache-Control", "no-cache");
-	}
-	std::println("[showMainPage] will serve {}", target);
-	std::string etag;
-	if (auto it = state->manifest_frontend_etags.find(target); it != state->manifest_frontend_etags.end())
-		etag = it->second;
-	else
-		etag = state->frontend_etag;
-
-	if (auto if_none_match_header = req.find("If-None-Match"); if_none_match_header != req.end()) {
-		std::string if_none_match_header_value = if_none_match_header->value();
-		if (etag == if_none_match_header_value) {
-			return {.status=http::status::not_modified};
-		}
-	}
-	return_headers.emplace("ETag", etag);
-
-
 	return {
 		.status = http::status::ok,
-		.headers = {return_headers},
-		.file = std::format("{}/{}", state->getDocumentRoot().string(), target) // TODO change this because it sucks
+		// .headers = {return_headers},
+		.file = state->getDocumentRoot() / target
 	};
 }
 
@@ -573,3 +544,4 @@ FuzeHttp::Response acceptInvite(Mediaboard::State* state, FuzeHttp::Request req,
 		}}
 	};
 }
+} // namespace Mediaboard

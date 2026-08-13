@@ -1,9 +1,12 @@
 module;
+#ifdef WITH_WEBRTC
 #include <rtc/rtcpreceivingsession.hpp>
 #include <rtc/peerconnection.hpp>
 #include <rtc/track.hpp>
+#endif
 #include <boost/asio.hpp>
 #include <boost/json.hpp>
+#include <iostream>
 #include <memory>
 #include <print>
 #include <stdexcept>
@@ -17,11 +20,13 @@ import Mediaboard.State;
 export namespace Mediaboard {
 class WebsocketSession : public FuzeHttp::WebsocketSession {
 public:
-	WebsocketSession(boost::asio::ip::tcp::socket&& socket, FuzeHttp::State* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
+	WebsocketSession(boost::asio::ip::tcp::socket&& socket, FuzeHttp::StateBase* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
 private:
 	// std::optional<std::shared_ptr<Receiver>> webrtc_receiver;
 	int tracking_thread;
+#ifdef WITH_WEBRTC
 	static const rtc::SSRC targetSSRC = 42;
+#endif
 
 	State* getState() const {
 		return (State*)this->state_;
@@ -50,6 +55,7 @@ private:
 					std::cout << "Warning: thread is not an integer" << std::endl;
 				}
 			}
+#ifdef WITH_WEBRTC
 			else if (request_type == "webrtc_request_offer") {
 				std::println("Creating WebRTC offer...");
 				auto pc = std::make_shared<rtc::PeerConnection>();
@@ -147,6 +153,7 @@ private:
 				this->send(message);
 				// state_->sendToWebRTC(buffer_data);
 			}
+#endif
 			else {
 				// TODO send error message back to requester
 				throw std::runtime_error("request_type " + request_type + " not recognised");

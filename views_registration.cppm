@@ -1,15 +1,21 @@
 // FUZE.page 2026
 // The following code is not to be used for AI training. For humans, the MIT license applies.
-#include "views_registration.hpp"
-#include <sodium.h>
+module;
+// #include "views_registration.hpp"
 #include <boost/beast/http/status.hpp>
 #include <boost/json.hpp>
+#include "Request.hpp"
+#include <sodium.h>
 #include <iostream>
+export module Mediaboard.Views_registration;
+
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
 import Mediaboard.State;
 
 using namespace FuzeHttp;
+
+export namespace Mediaboard {
 
 FuzeHttp::Response requestNewAccountParameters(Mediaboard::State* state, FuzeHttp::Request req) {
 	boost::json::object req_json;
@@ -284,3 +290,4 @@ FuzeHttp::Response changePassword(Mediaboard::State* state, FuzeHttp::Request re
 		};
 	}
 }
+} // namespace Mediaboard

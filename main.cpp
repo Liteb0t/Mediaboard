@@ -7,7 +7,9 @@
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
+#ifdef WITH_WEBRTC
 #include <rtc/global.hpp>
+#endif
 #include <print>
 #include <string>
 #include <vector>
@@ -46,7 +48,9 @@ int main(int argc, char* argv[]) {
 #else
 	std::println("Fuze Mediaboard was compiled without ImageMagick support. Certain features such as thumbnail creation will not work.");
 #endif
+#ifdef WITH_WEBRTC
 	rtc::InitLogger(rtc::LogLevel::Info);
+#endif
 	Mediaboard::StateConfig state_config;	// Macros which link to state_config
 	template_macros.push_back(new TemplateOptionPtr("thumbnail_file_extension", &state_config.thumbnail_file_extension, {.default_value=std::string("jpg")}));
 	template_macros.push_back(new TemplateOptionPtr("thumbnail_size", &state_config.thumbnail_size, {.default_value=static_cast<unsigned int>(150)}));
