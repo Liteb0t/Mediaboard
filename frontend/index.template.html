@@ -303,6 +303,9 @@ const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 const flex_separator = document.createElement("div");
 flex_separator.classList.add("FlexSeparator");
 let state = {
+	selected_board: {
+		slug: null
+	},
 	selected_thread: {
 		id: null,
 		client_permissions: {}
@@ -327,6 +330,7 @@ if (url_params.get("display") === "embed") {
 else url_params_display_as_embed = false;
 if (CONFIG_show_watermarks && !url_params_display_as_embed) header_bar_mediaboard_link.style["display"] = "inherit";
 if (CONFIG_show_watermarks && url_params_display_as_embed) watermark.style["display"] = "inherit";
+state.selected_board.slug = url_params.get("board") ? url_params.get("board") : -1;
 state.selected_thread.id = url_params.get("thread") ? Number(url_params.get("thread")) : -1;
 
 window.onpopstate = function(event) {
@@ -451,13 +455,18 @@ async function refresh_send() {
 }
 
 async function getAllThreads() {
-	let response = await fetch("./api/threads");
+	let response = await fetch(`./api/board/${state.selected_board.slug}/threads`);
 	console.log(response);
 	if (response.ok) {
 		await response.json().then(response_obj => {
 			console.log(response_obj);
 			showAllThreads(response_obj);
 		});
+	}
+	else {
+		const error_message = response.headers.get("message");
+		generic_error_dialog_message.innerText = error_message ? error_message : "An unknown error occured when attempting to fetch threads.";
+		generic_error_dialog.showModal();
 	}
 }
 
@@ -518,7 +527,7 @@ function showAllThreads(message_json) {
 function openThread(thread_id) {
 	state.selected_thread.id = thread_id;
 	// TODO use url_params.toString() if need bee
-	history.pushState(state, "", window.location.pathname + "?thread=" + state.selected_thread.id);
+	history.pushState(state, "", window.location.pathname + `?board=${state.selected_board.slug}&thread=${state.selected_thread.id}`);
 	getThread();
 }
 
@@ -552,7 +561,7 @@ function showThread(thread_json) {
 }
 
 function createPost(data, client_permissions) {
-	// console.log(data);
+	console.log(data);
 	let post_box_element = document.createElement("article");
 	post_box_element.classList.add("Post");
 
@@ -592,7 +601,7 @@ function createPost(data, client_permissions) {
 			let delete_button_element = document.createElement("button");
 			delete_button_element.textContent = "\u{1F5D1} Delete";
 			delete_button_element.onclick = async() => {
-				let server_response = await deleteMessage(data.thread_id, data.id_in_thread);
+				let server_response = await deleteMessage(state.selected_board.slug, data.thread_id, data.id_in_thread);
 				console.log(server_response);
 				if (server_response.ok) {
 					post_box_element.classList.add("Deleted");
@@ -1125,7 +1134,7 @@ async function postMessage() {
 		}
 	};
 	console.log(data);
-	const fetch_response = await fetch("api/message", {method: "POST", body: JSON.stringify(data)});
+	const fetch_response = await fetch(`api/board/${state.selected_board.slug}/message`, {method: "POST", body: JSON.stringify(data)});
 
 	/*
 	const fetch_response = await fetch(window.location.pathname + "api/" + "create_message/", {
@@ -1137,13 +1146,9 @@ async function postMessage() {
 	return fetch_response;
 }
 
-async function deleteMessage(thread_id, message_id) {
+async function deleteMessage(board_slug, thread_id, message_id) {
 	console.log("deleting message...");
-	const data = {
-		thread_id: thread_id,
-		id_in_thread: message_id
-	};
-	const fetch_response = await fetch(`api/post/${thread_id}/${message_id}`, {method: "DELETE"});
+	const fetch_response = await fetch(`api/board/${board_slug}/thread/${thread_id}/message/${message_id}`, {method: "DELETE"});
 	return fetch_response;
 }
 
@@ -1160,7 +1165,7 @@ async function postThread() {
 		}
 	};
 	console.log(data)
-	const fetch_response = await fetch("api/thread", {method: "POST", body: JSON.stringify(data)});
+	const fetch_response = await fetch(`api/board/${state.selected_board.slug}/thread`, {method: "POST", body: JSON.stringify(data)});
 	return fetch_response;
 }
 

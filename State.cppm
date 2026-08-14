@@ -50,9 +50,10 @@ public:
 	StateConfig config;
 	void start() override {
 		this->setAdditionalImageFormatsFromConfig(this->config);
-		Mediaboard::Board main_board(this, db);
-		this->boards.emplace(0, main_board);
-		this->boards.at(0).cacheAllThreads();
+		this->cacheAllBoards();
+		// Mediaboard::Board main_board(this, db);
+		// this->boards.emplace(0, main_board);
+		// this->boards.at(0).cacheAllThreads();
 	}
 	std::list<std::unique_ptr<Migration>> addMigrations() override;
 	void setAdditionalImageFormatsFromConfig(const StateConfig& config) {
@@ -76,19 +77,43 @@ public:
 		return this->video_formats_to_create_thumbnails_for.contains(std::string(mime_type));
 	}
 
-	// FuzeDBI::Connection* fuze_dbi;
+	void cacheAllBoards() {
+		std::print("[State] Retrieving boards from database...");
+		for (auto thread_tuple : db->queryRows<std::tuple<int, int, std::string, std::string>>("SELECT id, permission_object_id, slug, title FROM board")) {
+			// Board board(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), std::get<2>(thread_tuple), std::get<3>(thread_tuple));
+			auto board = std::make_unique<Board>(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), std::get<2>(thread_tuple), std::get<3>(thread_tuple));
+			std::print("{}, ", board->getId());
+			board->cacheAllThreads();
+			this->slug_to_board_id.emplace(std::get<2>(thread_tuple), board->getId());
+			this->boards.insert(std::make_pair(board->getId(), std::move(board)));
+		}
+		std::println("done. final list of boards:");
+		for (const std::pair<std::string, int>& slug_board_id : slug_to_board_id)
+			std::println("{} : {}", slug_board_id.first, slug_board_id.second);
+	}
 
 	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
 	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
 
 	// Board main_board;
-	Board* main_board() { return &(this->boards.at(0)); }
-	int createThread(int board_id, boost::json::object thread_json, int author_client_id) {
-		return this->boards.at(board_id).createThread(thread_json, author_client_id);
+	Board* main_board() { return this->boards.at(0).get(); }
+	std::optional<Board*> getBoardIfExists(int board_id) {
+		auto it = boards.find(board_id);
+		if (it != boards.end()) return it->second.get(); else return {};
+		// return &(this->boards.at(board_id));
 	}
-	int createMessage(int board_id, boost::json::object message_json, int author_client_id) {
-		return this->boards.at(board_id).createMessage(message_json, author_client_id);
+	// Board* getBoard(const std::string& slug) { return &(this->boards.at(this->slug_to_board_id.at(slug))); }
+	std::optional<Board*> getBoardIfExists(const std::string& slug) {
+		auto it = slug_to_board_id.find(slug);
+		if (it == slug_to_board_id.end()) return {}; else return getBoardIfExists(it->second);
+		// return &(this->boards.at(this->slug_to_board_id.at(slug)));
 	}
+	// int createThread(int board_id, boost::json::object thread_json, int author_client_id) {
+	// 	return this->boards.at(board_id).createThread(thread_json, author_client_id);
+	// }
+	// int createMessage(int board_id, boost::json::object message_json, int author_client_id) {
+	// 	return this->boards.at(board_id).createMessage(message_json, author_client_id);
+	// }
 
 	std::string dumpAllGroups(const std::optional<FuzeHttp::Client>& client) const {
 		std::cout << "Dumping from ordered_groups_vec: ";
@@ -156,13 +181,13 @@ public:
 		});
 	}
 	// std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
-	const Thread* getThread(int board_id, int thread_id) const { return this->boards.at(board_id).getThread(thread_id); }
+	const Thread* getThread(int board_id, int thread_id) const { return this->boards.at(board_id)->getThread(thread_id); }
 
 	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
 	// BasicResponse addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id);
 
 	// void websocketRead (FuzeHttp::WebsocketSession* session) override;
-	void sendToThread (std::string message, int thread_id) {
+	void sendToThread (std::string message, Board* board, int thread_id) { // TODO move to Board
 		// Put the message in a shared pointer so we can re-use it for each client
 		auto const ss = std::make_shared<std::string const>(std::move(message));
 
@@ -173,8 +198,8 @@ public:
 		{
 			std::lock_guard<std::mutex> lock(mutex_);
 			v.reserve(websocket_sessions.size());
-			this->main_board()->removeUnauthorizedListenersFromThread(thread_id);
-			for(auto p : this->main_board()->getListenersFromThread(thread_id))
+			board->removeUnauthorizedListenersFromThread(thread_id);
+			for(auto p : board->getListenersFromThread(thread_id))
 				v.emplace_back(p->weak_from_this());
 		}
 
@@ -204,7 +229,8 @@ private:
 
 
 	// std::unordered_map<int, Board> boards;
-	std::unordered_map<int, Mediaboard::Board> boards;
+	std::unordered_map<int, std::unique_ptr<Board>> boards;
+	std::unordered_map<std::string, int> slug_to_board_id; // when slug changes, old assosiation is not removed until reboot
 	// std::vector<int> ordered_boards;
 	// HTTP sessions. Client validates using a cookie
 }; // class State

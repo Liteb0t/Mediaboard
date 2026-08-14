@@ -13,13 +13,14 @@ export module Mediaboard.Views;
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.Utils;
+import Mediaboard.Board;
 import Mediaboard.State;
 import Mediaboard.Thread;
 
 using namespace FuzeHttp;
 export namespace Mediaboard {
 
-FuzeHttp::Response showMainPage(Mediaboard::State* state, FuzeHttp::Request req) {
+FuzeHttp::Response showDocument(Mediaboard::State* state, FuzeHttp::Request req) {
 	// TODO handle target decoding in FuzeHttp
 	std::string target = std::string(FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target())).substr(1));
 	return {
@@ -28,6 +29,15 @@ FuzeHttp::Response showMainPage(Mediaboard::State* state, FuzeHttp::Request req)
 		.file = state->getDocumentRoot() / target
 	};
 }
+
+// FuzeHttp::Response showBoardPage(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug) {
+// 	std::string target = std::string(FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target())).substr(1));
+// 	return {
+// 		.status = http::status::ok,
+// 		// .headers = {return_headers},
+// 		.file = state->getDocumentRoot() / "index.html"
+// 	};
+// }
 
 FuzeHttp::Response createGroup(Mediaboard::State* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
@@ -152,7 +162,7 @@ FuzeHttp::Response setGroupHeirarchy(Mediaboard::State* state, FuzeHttp::Request
 	};
 }
 
-FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req, Client client) {
+FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
 	boost::json::object thread_json;
 	try {
 		thread_json = boost::json::parse(req.body()).at("thread").as_object();
@@ -167,7 +177,10 @@ FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req,
 			.error_message = std::string("Client lacks permission CREATE_THREAD.")
 		};
 	}
-	int new_thread_id = state->createThread(0, thread_json, client.id);
+	std::optional<Board*> board = state->getBoardIfExists(board_slug);
+	if (!board)
+		return Response{.status = http::status::not_found, .error_message = std::format("Board {} not found", board_slug)};
+	int new_thread_id = board.value()->createThread(thread_json, client.id);
 
 	return FuzeHttp::Response{
 		.status = http::status::created,
@@ -178,7 +191,7 @@ FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req,
 	};
 }
 
-FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client) {
+FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
 	boost::json::object message_json;
 	int thread_id;
 	try {
@@ -189,30 +202,36 @@ FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req
 		std::cerr << "JSON error " << e.what() << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[createMessage] {}", e.what())};
 	}
-	if (!state->main_board()->threadExists(thread_id))
+	std::optional<Board*> board = state->getBoardIfExists(board_slug);
+	if (!board)
+		return Response{.status = http::status::not_found, .error_message = std::format("Board {} not found", board_slug)};
+	if (!board.value()->threadExists(thread_id))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
-	if (!state->main_board()->getThread(thread_id)->clientHasPermission(client, PERMISSION::SEND_MESSAGE))
+	if (!board.value()->getThread(thread_id)->clientHasPermission(client, PERMISSION::SEND_MESSAGE))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "User lacks permission SEND_MESSAGE within this thread"};
-	int new_message_id = state->createMessage(0, message_json, client.id);
-	std::string new_message_dump = state->main_board()->dumpMessage(thread_id, new_message_id);
-	state->sendToThread(new_message_dump, thread_id);
+	int new_message_id = board.value()->createMessage(message_json, client.id);
+	std::string new_message_dump = board.value()->dumpMessage(thread_id, new_message_id);
+	state->sendToThread(new_message_dump, board.value(), thread_id);
 	return FuzeHttp::Response{
 		.status = http::status::created
 	};
 }
 
-FuzeHttp::Response deletePost(Mediaboard::State* state, FuzeHttp::Request req, Client client, int thread_id, int message_id_in_thread) {
-	if (!state->main_board()->threadExists(thread_id))
+FuzeHttp::Response deleteMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug, int thread_id, int message_id_in_thread) {
+	std::optional<Board*> board = state->getBoardIfExists(board_slug);
+	if (!board)
+		return Response{.status = http::status::not_found, .error_message = std::format("Board {} not found", board_slug)};
+	if (!board.value()->threadExists(thread_id))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
-	const Thread* thread = state->getThread(0, thread_id);
+	const Thread* thread = board.value()->getThread(thread_id);
 	if (!thread->messageExists(message_id_in_thread))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "No such message found in this thread."};
 	if (!thread->clientHasPermission(client, PERMISSION::DELETE_POST) && !thread->getMessage(message_id_in_thread)->clientIsAuthor(client))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this message."};
 	if (message_id_in_thread == 0)
-		state->main_board()->deleteThread(thread_id);
+		board.value()->deleteThread(thread_id);
 	else
-		state->main_board()->deleteMessageFromThread(message_id_in_thread, thread_id);
+		board.value()->deleteMessageFromThread(message_id_in_thread, thread_id);
 	return FuzeHttp::Response{
 		.status = http::status::ok
 	};
@@ -351,12 +370,15 @@ FuzeHttp::Response deleteThreadUserPermission(Mediaboard::State* state, FuzeHttp
 	};
 }
 
-FuzeHttp::Response getThreads(Mediaboard::State* state, FuzeHttp::Request req) {
+FuzeHttp::Response getThreads(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug) {
 	std::optional<Client> client = state->getClientIfExists(req);
 	std::println("called getThreads");
-	return FuzeHttp::Response{
+	std::optional<Board*> board = state->getBoardIfExists(board_slug);
+	if (!board)
+		return Response{.status = http::status::not_found, .error_message = std::format("Board {} not found", board_slug)};
+	return Response{
 		.status = http::status::ok,
-		.body = state->main_board()->dumpAllThreads(client)
+		.body = board.value()->dumpAllThreads(client)
 	};
 }
 

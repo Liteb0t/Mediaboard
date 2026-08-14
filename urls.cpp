@@ -17,16 +17,17 @@ template<>
 void addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
 	// C-style strings are immutable parts of the URL, and strings/ints are variables passed into the view.
 	// Client{} is used when the function needs to identify the user via a cookie.
-	controller->addPattern(verb::get, showMainPage,						"*");
+	controller->addPattern(verb::get, showDocument,						"*");
+	// controller->addPattern(verb::get, showBoardPage,					"board", std::string{}); // maybe use with SSR in futre
 	controller->addPattern(verb::post, createGroup,						"api", "create_group"); // TODO move to server/permissions
 	controller->addPattern(verb::delete_, deleteGroup,					"api", "group", int());
 	controller->addPattern(verb::delete_, removeMemberFromGroup,		"api", "group", int(), "member", int());
 	controller->addPattern(verb::get, getGroupMembers,					"api", "group", int(), "members");
 	controller->addPattern(verb::get, getGroups,						"api", "groups");
 	controller->addPattern(verb::put, setGroupHeirarchy,				"api", "group_heirarchy");
-	controller->addPattern(verb::post, createMessage, Client{},			"api", "message");
-	controller->addPattern(verb::delete_, deletePost, Client{},			"api", "post", int(), int());
-	controller->addPattern(verb::post, createThread, Client{},			"api", "thread");
+	controller->addPattern(verb::post, createMessage, Client{},			"api", "board", std::string{}, "message");
+	controller->addPattern(verb::delete_, deleteMessage, Client{},		"api", "board", std::string{}, "thread", int(), "message", int());
+	controller->addPattern(verb::post, createThread, Client{},			"api", "board", std::string{}, "thread");
 	controller->addPattern(verb::get, getThread, 						"api", "thread", int());
 	controller->addPattern(verb::get, getThreadPermissions,				"api", "thread", int(), "permissions");
 	controller->addPattern(verb::post, addThreadGroupPermission,		"api", "thread", int(), "permissions", "group", int());
@@ -35,7 +36,7 @@ void addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
 	controller->addPattern(verb::post, addThreadUserPermission,			"api", "thread", int(), "permissions", "user", int());
 	controller->addPattern(verb::put, updateThreadUserPermissions,		"api", "thread", int(), "permissions", "user", int());
 	controller->addPattern(verb::delete_, deleteThreadUserPermission,	"api", "thread", int(), "permissions", "user", int());
-	controller->addPattern(verb::get, getThreads, 						"api", "threads");
+	controller->addPattern(verb::get, getThreads, 						"api", "board", std::string{}, "threads");
 	controller->addPattern(verb::get, getServerPermissions,				"api", "server", "permissions");
 	controller->addPattern(verb::post, addServerGroupPermission,		"api", "server", "permissions", "group", int());
 	controller->addPattern(verb::put, updateServerGroupPermissions,		"api", "server", "permissions", "group", int());
