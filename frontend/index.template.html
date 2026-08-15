@@ -29,10 +29,8 @@
 				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard CONFIG_mediaboard_version</a>
 			</div>
 			<h3 id="location_indicator">List of boards</h3>
-			<noscript>
-				<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
-			</noscript>
 			<div id="board_list_container"></div>
+			<a id="create_board_button" href="create_board.html" style="display: none">Create board</a>
 		</main>
 		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="error_dialog" closedby="any">
@@ -40,6 +38,9 @@
 			<p id="error_message">Something happened.</p>
 			<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
+		<noscript>
+			<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
+		</noscript>
 	</body>
 <style>
 #header_bar {
@@ -143,7 +144,10 @@ async function getAllBoards() {
 	}
 }
 
-function showAllBoards(message_json) {
+function showAllBoards(response_json) {
+	if (response_json["client_permissions"]["create_board"]) {
+		create_board_button.style["display"] = "initial";
+	}
 	const fragment = new DocumentFragment();
 	const table_element = document.createElement("table");
 	const headers_element = document.createElement("tr");
@@ -153,7 +157,7 @@ function showAllBoards(message_json) {
 		headers_element.append(header);
 	});
 	table_element.append(headers_element);
-	for (let board of message_json.boards) {
+	for (let board of response_json.boards) {
 		console.log(board);
 		const board_element = document.createElement("tr");
 		["slug", "title"].forEach((column_name) => {
@@ -167,7 +171,7 @@ function showAllBoards(message_json) {
 			const manage_permissions_link = document.createElement("a");
 			manage_permissions_link.href = `manage_permissions.html?location=/board/${board.slug}`;
 			manage_permissions_link.textContent = "Manage permissions";
-			col.appendChild(manage_permissions_link);
+			col.append(manage_permissions_link, document.createTextNode(" :: "));
 		}
 		const board_link = document.createElement("a");
 		board_link.href = `board.html?board=${board.slug}`;

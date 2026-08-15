@@ -26,6 +26,14 @@ std::list<std::unique_ptr<Migration>> State::addMigrations() {
 		"INSERT INTO board(id, slug, title, permission_object_id) VALUES (0, 'board', 'Board', 1);")));
 	migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",
 		"ALTER TABLE thread ADD COLUMN board_id INTEGER DEFAULT 0;")));
+	migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",
+		"ALTER TABLE _sequences ADD COLUMN board_id INTEGER DEFAULT 1;")));
+	// migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",
+	// 	"ALTER TABLE thread ADD COLUMN id_in_board INTEGER DEFAULT 0;")));
+	// migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",
+	// 	"UPDATE thread SET id_in_board = id;")));
+	// migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",
+	// 	"ALTER TABLE message ADD COLUMN board_id INTEGER DEFAULT 0;")));
 	return migrations;
 }
 }

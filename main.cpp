@@ -17,6 +17,7 @@ import MediaboardWebsocketSession;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.Server;
 import FuzeHttp.Utils;
+import Mediaboard.Board;
 import Mediaboard.State;
 import Mediaboard.Message;
 
@@ -33,6 +34,8 @@ std::vector<FuzeHttp::TemplateMacro*> template_macros{
 	new TemplateConstant("post_max_content", static_cast<int>(Mediaboard::MESSAGE_FIELDS::MAX_CONTENT)),
 	new TemplateConstant("group_max_name", static_cast<int>(Group::MAX_NAME)),
 	new TemplateConstant("account_max_username", static_cast<int>(Account::MAX_USERNAME)),
+	new TemplateConstant("board_max_slug", static_cast<int>(Mediaboard::Board::MAX_SLUG)),
+	new TemplateConstant("board_max_title", static_cast<int>(Mediaboard::Board::MAX_TITLE)),
 	new TemplateConstant("mediaboard_version", current_version)
 };
 

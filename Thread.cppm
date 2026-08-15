@@ -5,6 +5,7 @@ module;
 #include <map>
 #include <print>
 #include <string>
+#include <bits/unique_ptr.h>
 #include <unordered_set>
 export module Mediaboard.Thread;
 
@@ -18,7 +19,7 @@ export namespace Mediaboard {
 class Thread : public FuzeHttp::PermissionManagedObject {
 public:
 	// On startup load from database
-	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int board_id, int permission_object_id)
+	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int permission_object_id, int board_id)
 			: PermissionManagedObject(permission_parent, permission_object_id, db),
 			id(id),
 			board_id(board_id) {
@@ -46,24 +47,26 @@ public:
 					.thumbnail_file_extension = std::get<3>(file_tuple)
 				});
 			}
-			Message message(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), message_files);
+			auto message = std::make_unique<Message>(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), message_files);
 			this->cacheMessage(std::move(message));
 			std::print(", ");
 		}
 		std::cout << "done." << std::endl;
 	}
 	// Save thread when JSON is received
-	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* db)
-			: PermissionManagedObject(permission_parent, db) {
+	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* db, int board_id/*, int id_in_board*/)
+			: PermissionManagedObject(permission_parent, db), board_id(board_id)/*, id_in_board(id_in_board)*/ {
 		boost::json::object post_zero = thread_json.at("post_zero").as_object();
 		this->thread_as_json = thread_json;
 		this->id = db->query<int>("SELECT thread_id FROM _sequences");
 		db->query<void>("UPDATE _sequences SET thread_id = $1", this->id+1);
-		db->query<void>("INSERT INTO thread(id, permission_object_id) VALUES ($1, $2)", this->id, this->getPermissionObjectId());
+		db->query<void>("INSERT INTO thread(id, permission_object_id, board_id) VALUES ($1, $2, $3)", this->id, this->getPermissionObjectId(), this->board_id);
 		this->thread_as_json["id"] = this->id;
+		// this->thread_as_json["id_in_board"] = id_in_board;
 		post_zero.emplace("thread_id", this->id);
+		// post_zero.emplace("thread_id_in_board", id_in_board);
 		int new_message_id = this->createMessageFromJson(std::move(post_zero), author_client_id);
-		this->thread_as_json["post_zero"] = this->messages.at(new_message_id).asJson();
+		this->thread_as_json["post_zero"] = this->messages.at(new_message_id)->asJson();
 		this->thread_as_json["reply_count"] = 0;
 	}
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* db);
@@ -81,35 +84,35 @@ public:
 	// int getNumberOfPosts() const { return this->posts.size(); };
 	// void addInitialPost(json post_json, bool save_to_database);
 	// void createPostFromStruct(struct db_post_struct* post_struct);
-	void cacheMessage(Message&& message) {
-		if (message.getIdInThread() == 0)
-			this->thread_as_json["post_zero"] = message.asJson();
-		else if (!message.isDeleted()) {
+	void cacheMessage(std::unique_ptr<Message>&& message) {
+		if (message->getIdInThread() == 0)
+			this->thread_as_json["post_zero"] = message->asJson();
+		else if (!message->isDeleted()) {
 			this->reply_count++;
 			this->thread_as_json["reply_count"] = this->reply_count;
 		}
-		this->messages.emplace(message.getIdInThread(), message);
-		this->last_message_created_at = message.createdAt();
+		this->last_message_created_at = message->createdAt();
+		this->messages.emplace(message->getIdInThread(), std::move(message));
 	}
 	int createMessageFromJson(boost::json::object message_json, int author_client_id) {
 		int new_message_id_in_thread = db->query<int>("SELECT message_id_seq FROM thread WHERE id = $1", this->id);
 		db->query<void>("UPDATE thread SET message_id_seq = $1 WHERE id = $2", new_message_id_in_thread+1, this->id);
 		message_json.emplace("id_in_thread", (size_t)new_message_id_in_thread);
-		Message message(message_json, author_client_id, db); // Key is deleted from message_json in its constructor
+		auto message = std::make_unique<Message>(message_json, author_client_id, db); // Key is deleted from message_json in its constructor
 		if (this->messages.empty())
-			this->thread_as_json["post_zero"] = message.asJson();
+			this->thread_as_json["post_zero"] = message->asJson();
 		else {
 			this->reply_count++;
 			this->thread_as_json["reply_count"] = this->reply_count;
 		}
-		this->messages.emplace(message.getIdInThread(), message);
-		this->last_message_created_at = message.createdAt();
-		return message.getIdInThread();
+		this->last_message_created_at = message->createdAt();
+		this->messages.emplace(message->getIdInThread(), std::move(message));
+		return new_message_id_in_thread;
 	}
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
 	void deleteMessage(int id_in_thread) {
-		this->messages.at(id_in_thread).markAsDeleted();
+		this->messages.at(id_in_thread)->markAsDeleted();
 		db->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $2", this->id, id_in_thread);
 		this->reply_count--;
 		this->thread_as_json["reply_count"] = this->reply_count;
@@ -135,9 +138,9 @@ public:
 	boost::json::array getMessagesAsJson() const {
 		boost::json::array multiple_post_json = boost::json::array();
 		for (auto it = this->messages.begin(); it != this->messages.end(); ++it) {
-			if (!it->second.isDeleted()) {
+			if (!it->second->isDeleted()) {
 				// std::cout << "Dumping post " << this->id << "/" << it->second.getIdInThread() << std::endl;
-				boost::json::object post_json = it->second.asJson();
+				boost::json::object post_json = it->second->asJson();
 				// post_json["is_author"] = keyMatchesMessage(key, it->first);
 				multiple_post_json.push_back(post_json);
 			}
@@ -145,7 +148,7 @@ public:
 		return multiple_post_json;
 	}
 	std::string dumpMessage(int message_id) const  {
-		boost::json::object message_json = this->messages.at(message_id).asJson();
+		boost::json::object message_json = this->messages.at(message_id)->asJson();
 		return boost::json::serialize(message_json);
 	}
 	// std::string dumpPermissions(int client_id) const;
@@ -164,13 +167,14 @@ public:
 			{"upload_file", this->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))},
 		};
 	}
-	const Message* getMessage(int message_id_in_thread) const { return &this->messages.at(message_id_in_thread); }
+	const Message* getMessage(int message_id_in_thread) const { return this->messages.at(message_id_in_thread).get(); }
 	int board_id;
 private:
 	int id;
+	// int id_in_board;
 	std::chrono::time_point<std::chrono::system_clock> last_message_created_at;
 	// std::vector<Post> posts;
-	std::map<int, Message> messages;
+	std::map<int, std::unique_ptr<Message>> messages;
 	int reply_count = 0;
 	std::unordered_set<FuzeHttp::WebsocketSession*> listeners;
 	// char subject[256];

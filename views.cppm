@@ -40,6 +40,39 @@ FuzeHttp::Response showDocument(Mediaboard::State* state, FuzeHttp::Request req)
 // 	};
 // }
 
+FuzeHttp::Response createBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client) {
+	bool make_public;
+	boost::json::object board_json;
+	try {
+		boost::json::object req_json = boost::json::parse(req.body()).as_object();
+		board_json = req_json.at("board").as_object();
+		make_public = req_json.at("make_public").as_bool();
+	}
+	catch(const std::exception& e) {
+		std::cerr << "JSON error " << e.what() << std::endl;
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[createBoard] {}", e.what())};
+	}
+	if (!state->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_BOARD))) {
+		return FuzeHttp::Response{
+			.status = http::status::forbidden,
+			.error_message = std::string("Client lacks permission CREATE_BOARD.")
+		};
+	}
+	Board* board = state->createBoard(board_json);
+	if (make_public && !board->clientHasPermission({}, static_cast<int>(PERMISSION::VIEW_BOARD)))
+		board->setGroupPermission(static_cast<int>(BUILTIN_GROUPS::PUBLIC), static_cast<int>(PERMISSION::VIEW_BOARD), THREE_STATE_SETTING::ALLOW);
+	else if (!make_public && board->clientHasPermission({}, static_cast<int>(PERMISSION::VIEW_BOARD)))
+		board->setGroupPermission(static_cast<int>(BUILTIN_GROUPS::PUBLIC), static_cast<int>(PERMISSION::VIEW_BOARD), THREE_STATE_SETTING::DENY);
+
+	return FuzeHttp::Response{
+		.status = http::status::created
+		// .headers = {{
+		// 	{"New-Thread-Id", std::to_string(new_thread_id)}
+		// 	// ,{"Location", std::format("/thread/{}/", new_thread_id)}
+		// }}
+	};
+}
+
 FuzeHttp::Response getBoards(Mediaboard::State* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
 	std::println("called getBoards");
@@ -435,7 +468,7 @@ FuzeHttp::Response getThreads(Mediaboard::State* state, FuzeHttp::Request req, s
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to view this board."};
 	return Response{
 		.status = http::status::ok,
-		.body = board.value()->dumpAllThreads(client)
+		.json = board.value()->getThreadsAsJson(client)
 	};
 }
 

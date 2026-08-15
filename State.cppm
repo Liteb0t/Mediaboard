@@ -117,6 +117,14 @@ public:
 	// int createMessage(int board_id, boost::json::object message_json, int author_client_id) {
 	// 	return this->boards.at(board_id).createMessage(message_json, author_client_id);
 	// }
+	Board* createBoard(boost::json::object board_json) {
+		// boost::json::object board_json = request_json.at("board").as_object();
+		auto board = std::make_unique<Board>(this, db, board_json);
+		int new_board_id = board->getId();
+		this->slug_to_board_id.emplace(board->getSlug(), new_board_id);
+		this->boards.emplace(new_board_id, std::move(board));
+		return this->boards.at(new_board_id).get();
+	}
 
 	std::string dumpAllGroups(const std::optional<FuzeHttp::Client>& client) const {
 		std::cout << "Dumping from ordered_groups_vec: ";
@@ -193,7 +201,10 @@ public:
 		std::println("[State] Finished assembling boards list into JSON");
 		return {
 			{"type", "board_list"},
-			{"boards", boards_json}
+			{"boards", boards_json},
+			{"client_permissions", {
+				{"create_board", this->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_BOARD))},
+			}}
 		};
 	}
 	// std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }

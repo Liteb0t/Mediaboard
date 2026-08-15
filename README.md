@@ -1,5 +1,5 @@
 # ![FUZE](https://fuze.page/static/fuze-min-hover.png) Mediaboard
-[Fuze Mediaboard](https://fuze.page/software/mediaboard/) is a self-hosted multimedia messaging platform.\
+[Fuze Mediaboard](https://fuze.page/software/mediaboard/) is a self-hosted multimedia messaging platform, running on the [FuzeHttp](https://github.com/Liteb0t/FuzeHttp) framework.\
 [Read the deployment guide here](https://fuze.page/software/mediaboard/documentation/)
 ### Dependencies
 **CMake**, **Boost::program_options**, **Boost::json**, **SQLite3** OR **PostgreSQL**.

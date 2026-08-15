@@ -35,6 +35,15 @@ public:
 			slug(slug),
 			title(title) {
 	}
+	// Save board when JSON is received
+	Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, boost::json::object board_json)
+			: PermissionManagedObject(permission_parent, db) {
+		this->id = db->query<int>("SELECT board_id FROM _sequences");
+		this->slug = board_json.at("slug").as_string();
+		this->title = board_json.at("title").as_string();
+		db->query<void>("UPDATE _sequences SET board_id = $1", this->id+1);
+		db->query<void>("INSERT INTO board(id, permission_object_id, slug, title) VALUES ($1, $2, $3, $4)", id, this->getPermissionObjectId(), slug, title);
+	}
 	void cacheAllThreads() {
 		std::cout << "[Board] Retrieving threads from database..." << std::endl;
 		for (auto thread_tuple : db->queryRows<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = FALSE AND board_id = $1", this->id)) {
@@ -75,9 +84,12 @@ public:
 		return board_json;
 	}
 	int createThread(boost::json::object thread_json, int author_client_id) {
-		// Thread thread(this, thread_json, author_client_id, db);
-		auto thread = std::make_unique<Thread>(this, thread_json, author_client_id, db);
-		int new_thread_id = thread->getId();
+		// int new_thread_id_in_board = db->query<int>("SELECT thread_id_seq FROM board WHERE id = $1", this->id);
+		// db->query<void>("UPDATE board SET thread_id_seq = $1 WHERE id = $2", new_thread_id_in_board+1, this->id);
+		int new_thread_id = db->query<int>("SELECT thread_id FROM _sequences");
+		db->query<void>("UPDATE _sequences SET thread_id = $1", new_thread_id+1);
+		auto thread = std::make_unique<Thread>(this, thread_json, author_client_id, db, this->id);
+		// int new_thread_id = thread->getId();
 		this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count(), new_thread_id));
 		this->threads.emplace(new_thread_id, std::move(thread));
 		return new_thread_id;
@@ -105,7 +117,7 @@ public:
 	}
 	// std::string dumpLastThread() const;
 	// bool keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const;
-	std::string dumpAllThreads(const std::optional<FuzeHttp::Client>& client) const {
+	boost::json::object getThreadsAsJson(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::array threads_json = boost::json::array();
 		for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
 			if (!this->threads.at(it->second)->isDeleted() && this->threads.at(it->second)->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_THREAD))) {
@@ -114,10 +126,10 @@ public:
 			}
 		}
 		std::println("[Board] Finished assembling threads list into JSON");
-		return boost::json::serialize(boost::json::value{
+		return {
 			{"type", "thread_catalog"},
 			{"threads", threads_json}
-		});
+		};
 	}
 
 	// std::string dumpThread(int thread_id, int client_id, std::string key) const;
@@ -181,7 +193,10 @@ public:
 	} webrtc_room;
 #endif
 	int getId() const { return this->id; }
+	const std::string& getSlug() const { return this->slug; }
 	// int getTitle() const { return this->title; }
+	inline static const size_t MAX_SLUG = 32;
+	inline static const size_t MAX_TITLE = 64;
 private:
 	int id;
 	std::string slug;
