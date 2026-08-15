@@ -14,6 +14,7 @@ module;
 export module Mediaboard.Board;
 
 export import Mediaboard.Thread;
+import Mediaboard.Permission;
 import FuzeDBI;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
@@ -57,6 +58,22 @@ public:
 
 		std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 	}
+	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
+		// boost::json::object board_json = this->board_as_json;
+		boost::json::object board_json = {
+			{"id", id},
+			{"slug", slug},
+			{"title", title},
+			{"client_permissions", {
+				{"manage_permissions", this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))},
+				{"create_thread", this->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_THREAD))},
+				{"send_message", this->clientHasPermission(client, static_cast<int>(PERMISSION::SEND_MESSAGE))},
+				{"delete_post", this->clientHasPermission(client, static_cast<int>(PERMISSION::DELETE_POST))},
+				{"upload_file", this->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))},
+			}}
+		};
+		return board_json;
+	}
 	int createThread(boost::json::object thread_json, int author_client_id) {
 		// Thread thread(this, thread_json, author_client_id, db);
 		auto thread = std::make_unique<Thread>(this, thread_json, author_client_id, db);
@@ -91,7 +108,7 @@ public:
 	std::string dumpAllThreads(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::array threads_json = boost::json::array();
 		for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
-			if (!this->threads.at(it->second)->isDeleted() && this->threads.at(it->second)->clientHasPermission(client, FuzeHttp::PERMISSION::VIEW_THREAD)) {
+			if (!this->threads.at(it->second)->isDeleted() && this->threads.at(it->second)->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_THREAD))) {
 				boost::json::object thread_json = this->threads.at(it->second)->asJson(client);
 				threads_json.emplace_back(thread_json);
 			}
@@ -150,8 +167,8 @@ public:
 	Thread* getThread(int thread_id) const { return this->threads.at(thread_id).get(); }
 	void addGroupPermissionCollectionToThread(int group_id, int thread_id) { this->threads.at(thread_id)->addGroupPermissionCollection(group_id); }
 	void addAccountPermissionCollectionToThread(int account_id, int thread_id) { this->threads.at(thread_id)->addAccountPermissionCollection(account_id); }
-	void setGroupPermissionForThread(int group_id, FuzeHttp::PERMISSION permission, FuzeHttp::THREE_STATE_SETTING setting, int thread_id) { this->threads.at(thread_id)->setGroupPermission(group_id, permission, setting); }
-	void setAccountPermissionForThread(int account_id, FuzeHttp::PERMISSION permission, FuzeHttp::THREE_STATE_SETTING setting, int thread_id) { this->threads.at(thread_id)->setAccountPermission(account_id, permission, setting); }
+	void setGroupPermissionForThread(int group_id, int permission_number, FuzeHttp::THREE_STATE_SETTING setting, int thread_id) { this->threads.at(thread_id)->setGroupPermission(group_id, permission_number, setting); }
+	void setAccountPermissionForThread(int account_id, int permission_number, FuzeHttp::THREE_STATE_SETTING setting, int thread_id) { this->threads.at(thread_id)->setAccountPermission(account_id, permission_number, setting); }
 	void removeGroupPermissionCollectionFromThread(int group_id, int thread_id) { this->threads.at(thread_id)->removeGroupPermissionCollection(group_id); }
 	void removeAccountPermissionCollectionFromThread(int account_id, int thread_id) { this->threads.at(thread_id)->removeAccountPermissionCollection(account_id); }
 #ifdef WITH_WEBRTC
@@ -171,5 +188,6 @@ private:
 	std::string title;
 	std::unordered_map<int, std::unique_ptr<Thread>> threads;
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
+	boost::json::object board_as_json;
 }; // class Board
 } // namespace Mediaboard

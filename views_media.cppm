@@ -18,8 +18,9 @@ export module Mediaboard.Views_media;
 
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
-import Mediaboard.State;
 import Mediaboard.Message;
+import Mediaboard.Permission;
+import Mediaboard.State;
 
 using namespace FuzeHttp;
 
@@ -28,7 +29,7 @@ export namespace Mediaboard {
 FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
 	// TODO have UPLOAD_FILE permission modifiable for threads and boards.
-	if (!state->clientHasPermission(client, PERMISSION::UPLOAD_FILE))
+	if (!state->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE)))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files."};
 	std::istringstream req_stream(req.body());
 	std::string req_line;

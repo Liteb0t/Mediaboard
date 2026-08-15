@@ -871,8 +871,9 @@ class PermissionSettings {
 			*/
 		}
 		else {
-			console.log(response);
-			console.error("Response is not ok");
+			let response_error_message = response.headers.get("message");
+			response_error_message ??= `${response.status}\n${response.statusText}`;
+			throw new Error(response_error_message);
 		}
 	}
 }

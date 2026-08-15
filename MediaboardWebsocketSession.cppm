@@ -15,6 +15,7 @@ export module MediaboardWebsocketSession;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 import Mediaboard.Board;
+import Mediaboard.Permission;
 import Mediaboard.State;
 
 export namespace Mediaboard {
@@ -43,7 +44,7 @@ private:
 				if (buffer_as_json["thread_id"].is_int64()) {
 					int thread_id = buffer_as_json["thread_id"].as_int64();
 					if (getState()->main_board()->threadExists(thread_id)) {
-						if (!getState()->main_board()->getThread(thread_id)->clientHasPermission(this->getClient(), FuzeHttp::PERMISSION::VIEW_THREAD))
+						if (!getState()->main_board()->getThread(thread_id)->clientHasPermission(this->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD)))
 							throw std::runtime_error("Client does not have VIEW_THREAD permission");
 						this->tracking_thread = thread_id;
 						getState()->main_board()->addListenerToThread(this, thread_id);

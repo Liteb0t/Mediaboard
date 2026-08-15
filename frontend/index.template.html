@@ -304,7 +304,8 @@ const flex_separator = document.createElement("div");
 flex_separator.classList.add("FlexSeparator");
 let state = {
 	selected_board: {
-		slug: null
+		slug: null,
+		permissions: {}
 	},
 	selected_thread: {
 		id: null,
@@ -436,7 +437,7 @@ function contractEmbedFigure(figure_element) {
 
 function openThreadList() {
 	state.selected_thread.id = -1;
-	history.pushState(state, "", window.location.pathname);
+	history.pushState(state, "", window.location.pathname + `?board=${state.selected_board.slug}`);
 	refresh_send();
 }
 
@@ -471,17 +472,17 @@ async function getAllThreads() {
 }
 
 function showAllThreads(message_json) {
-	location_indicator.textContent = "Threads";
+	location_indicator.textContent = "Threads in board " + state.selected_board.slug;
 	threads_button.disabled = true;
-	if (state.server_permissions) {
-		updateReplyContainer(state.selected_thread.id, state.server_permissions);
+	if (state.selected_board.permissions) {
+		updateReplyContainer(state.selected_thread.id, state.selected_board.permissions);
 	}
 
 	const fragment = new DocumentFragment();
 	for (let thread of message_json.threads) {
 		// console.log(thread.id);
 		// console.log(thread.post_zero);
-		let post_zero_element = createPost(thread.post_zero, {...state.server_permissions, ...thread.client_permissions});
+		let post_zero_element = createPost(thread.post_zero, {...state.selected_board.permissions, ...thread.client_permissions});
 		if (url_params_display_as_embed) {
 			fragment.appendChild(post_zero_element);
 		}
@@ -504,7 +505,7 @@ function showAllThreads(message_json) {
 				let manage_thread_permissions_button = document.createElement("a");
 				manage_thread_permissions_button.classList.add("Button", "ToolBarButton");
 				manage_thread_permissions_button.textContent = "Manage permissions";
-				manage_thread_permissions_button.setAttribute("href", `./manage_permissions.html?location=/thread/${thread.id}/`);
+				manage_thread_permissions_button.setAttribute("href", `./manage_permissions.html?location=/board/${state.selected_board.slug}/thread/${thread.id}/`);
 				thread_toolbar.append(manage_thread_permissions_button);
 			}
 
@@ -532,7 +533,7 @@ function openThread(thread_id) {
 }
 
 async function getThread() {
-	let response = await fetch(`./api/thread/${state.selected_thread.id}`);
+	let response = await fetch(`./api/board/${state.selected_board.slug}/thread/${state.selected_thread.id}`);
 	if (response.ok) {
 		await response.json().then(response_obj => {
 			console.log(response_obj);
@@ -1183,14 +1184,32 @@ async function getClientInfo() {
 			window.history.replaceState(state, null, ""); // Initial state
 			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
 			console.log(state);
+			// if (!(state.selected_thread.id >= 0)) {
+			// 	updateReplyContainer(state.selected_thread.id, state.server_permissions);
+			// }
+			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
+		});
+	}
+}
+async function getBoardInfo() {
+	const response = await fetch(`api/board/${state.selected_board.slug}`);
+	console.log(response);
+	if (response.ok) {
+		await response.json().then(response_json => {
+			console.log(response_json);
+			state.selected_board.permissions = response_json["client_permissions"];
+			window.history.replaceState(state, null, ""); // Initial state
+			// manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
+			console.log(state);
 			if (!(state.selected_thread.id >= 0)) {
-				updateReplyContainer(state.selected_thread.id, state.server_permissions);
+				updateReplyContainer(state.selected_thread.id, state.selected_board.permissions);
 			}
 			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
 		});
 	}
 }
-getClientInfo();
+getClientInfo(); // runs asynchronously
+getBoardInfo();
 refresh_send().then(() => {
 	loading_dialog.close();
 	scrolled_to_bottom_observer.observe(bottom_marker);

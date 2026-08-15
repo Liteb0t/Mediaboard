@@ -9,6 +9,7 @@ module;
 export module Mediaboard.Thread;
 
 export import Mediaboard.Message;
+import Mediaboard.Permission;
 import FuzeDBI;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
@@ -128,7 +129,7 @@ public:
 	}
 	void removeUnauthorizedListeners() {
 		std::erase_if(this->listeners, [this](const FuzeHttp::WebsocketSession* ws)->bool{
-			return !this->clientHasPermission(ws->getClient(), FuzeHttp::PERMISSION::VIEW_THREAD);
+			return !this->clientHasPermission(ws->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD));
 		});
 	}
 	boost::json::array getMessagesAsJson() const {
@@ -157,10 +158,10 @@ public:
 	bool isDeleted() const { return this->deleted; }
 	boost::json::object getPermissionsAsJson(const std::optional<FuzeHttp::Client>& client) const {
 		return {
-			{"manage_permissions", this->clientHasPermission(client, FuzeHttp::PERMISSION::MANAGE_PERMISSIONS)},
-			{"send_message", this->clientHasPermission(client, FuzeHttp::PERMISSION::SEND_MESSAGE)},
-			{"delete_post", this->clientHasPermission(client, FuzeHttp::PERMISSION::DELETE_POST)},
-			{"upload_file", this->clientHasPermission(client, FuzeHttp::PERMISSION::UPLOAD_FILE)},
+			{"manage_permissions", this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))},
+			{"send_message", this->clientHasPermission(client, static_cast<int>(PERMISSION::SEND_MESSAGE))},
+			{"delete_post", this->clientHasPermission(client, static_cast<int>(PERMISSION::DELETE_POST))},
+			{"upload_file", this->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))},
 		};
 	}
 	const Message* getMessage(int message_id_in_thread) const { return &this->messages.at(message_id_in_thread); }

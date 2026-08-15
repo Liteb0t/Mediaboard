@@ -68,10 +68,17 @@ else {
 let permission_settings = new PermissionSettings(permission_settings_user_list_element, permission_settings_group_list_element, permission_settings_permission_list_element, selected_permission_user_or_group_indicator, api_location.substring(1));
 
 async function initialLoad() {
-	await permission_settings.refreshPermissions();
-	await user_list_factory.refreshUsers();
-	// user list and permission settings must be loaded before groups
-	await group_list_factory.refreshGroups();
+	try {
+		await permission_settings.refreshPermissions();
+		await user_list_factory.refreshUsers();
+		// user list and permission settings must be loaded before groups
+		await group_list_factory.refreshGroups();
+	}
+	catch(error) {
+		console.error(error);
+		error_message.innerHTML = error.message ? error.message : "An unknown error occured.";
+		error_dialog.showModal();
+	}
 	loading_dialog.close();
 }
 initialLoad();

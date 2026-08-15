@@ -17,6 +17,7 @@ import FuzeHttp.Migrations;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 import Mediaboard.Board;
+import Mediaboard.Permission;
 
 using namespace FuzeHttp;
 using namespace FuzeHttp::Migrations;
@@ -121,7 +122,7 @@ public:
 		boost::json::object groups_json;
 		boost::json::array group_heirarchy_json;
 		int group_editable_threshold;
-		if (this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS))
+		if (this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS)))
 			group_editable_threshold = this->getClientRank(client) + 1;
 		else
 			group_editable_threshold = this->getOrderedGroups()->size();
@@ -152,7 +153,7 @@ public:
 	std::string dumpAllUsers(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::object users_json;
 		int client_rank = this->getClientRank(client);
-		bool client_has_manage_permissions_permission = this->clientHasPermission(client, PERMISSION::MANAGE_PERMISSIONS);
+		bool client_has_manage_permissions_permission = this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS));
 		for (auto& account : this->accounts) {
 			int account_id = account.first;
 			std::cout << account_id << ", ";
@@ -178,6 +179,19 @@ public:
 
 		return boost::json::serialize(boost::json::object{
 			{"users", users_json}
+		});
+	}
+	std::string dumpAllBoards(const std::optional<FuzeHttp::Client>& client) const {
+		boost::json::array boards_json = boost::json::array();
+		for (auto& [board_id, board] : this->boards) {
+			if (board->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD))) {
+				boards_json.emplace_back(board->asJson(client));
+			}
+		}
+		std::println("[State] Finished assembling boards list into JSON");
+		return boost::json::serialize(boost::json::value{
+			{"type", "thread_catalog"},
+			{"threads", boards_json}
 		});
 	}
 	// std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
