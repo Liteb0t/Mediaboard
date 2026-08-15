@@ -46,7 +46,9 @@ struct StateConfig {
 // Represents the shared server state
 class State : public FuzeHttp::StateBase {
 public:
-	State(FuzeDBI::Connection* db) : FuzeHttp::StateBase(db) {}
+	State(FuzeDBI::Connection* db) : FuzeHttp::StateBase(db) {
+		this->grantOwnerPrivileges(static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS));
+	}
 	// shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
 	StateConfig config;
 	void start() override {
@@ -181,7 +183,7 @@ public:
 			{"users", users_json}
 		});
 	}
-	std::string dumpAllBoards(const std::optional<FuzeHttp::Client>& client) const {
+	boost::json::object getBoardsAsJson(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::array boards_json = boost::json::array();
 		for (auto& [board_id, board] : this->boards) {
 			if (board->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD))) {
@@ -189,10 +191,10 @@ public:
 			}
 		}
 		std::println("[State] Finished assembling boards list into JSON");
-		return boost::json::serialize(boost::json::value{
-			{"type", "thread_catalog"},
-			{"threads", boards_json}
-		});
+		return {
+			{"type", "board_list"},
+			{"boards", boards_json}
+		};
 	}
 	// std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
 	const Thread* getThread(int board_id, int thread_id) const { return this->boards.at(board_id)->getThread(thread_id); }

@@ -21,6 +21,13 @@ void addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
 	// controller->addPattern(verb::get, showBoardPage,					"board", std::string{}); // maybe use with SSR in futre
 	controller->addPattern(verb::get, getBoards, 						"api", "boards");
 	controller->addPattern(verb::get, getBoard, 						"api", "board", std::string{});
+	controller->addPattern(verb::get, getBoardPermissions,				"api", "board", std::string{}, "permissions");
+	controller->addPattern(verb::post, addBoardGroupPermission,			"api", "board", std::string{}, "permissions", "group", int());
+	controller->addPattern(verb::put, updateBoardGroupPermissions,		"api", "board", std::string{}, "permissions", "group", int());
+	controller->addPattern(verb::delete_, deleteBoardGroupPermission,	"api", "board", std::string{}, "permissions", "group", int());
+	controller->addPattern(verb::post, addBoardUserPermission,			"api", "board", std::string{}, "permissions", "user", int());
+	controller->addPattern(verb::put, updateBoardUserPermissions,		"api", "board", std::string{}, "permissions", "user", int());
+	controller->addPattern(verb::delete_, deleteBoardUserPermission,	"api", "board", std::string{}, "permissions", "user", int());
 	controller->addPattern(verb::post, createMessage, Client{},			"api", "board", std::string{}, "message");
 	controller->addPattern(verb::delete_, deleteMessage, Client{},		"api", "board", std::string{}, "thread", int(), "message", int());
 	controller->addPattern(verb::post, createThread, Client{},			"api", "board", std::string{}, "thread");
