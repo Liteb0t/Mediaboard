@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Edit board - CONFIG_site_name</title>
+		<meta name="description" content="Fuze Mediaboard is a fast, modern messageboard.">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta charset="utf-8">
+		<link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
+		<link rel="stylesheet" href=FILE_"static/styles.css">
+	</head>
+	<body>
+		<!--Navbar can go here-->
+		<main>
+			<h2>Edit board <span id="board_slug_indicator"></span> - CONFIG_site_name</h2>
+			<p id="has_permission_indicator">Loading...</p>
+			<form action="" method="POST" autocomplete="off">
+				<div class="FormGrid">
+				<label for="board_slug_input">Slug</label>
+				<input id="board_slug_input" type="text" name="board_slug" maxlength="CONFIG_board_max_slug" required><span></span>
+				<label for="board_title_input">Title</label>
+				<input id="board_title_input" type="text" name="board_title" maxlength="CONFIG_board_max_title" required><span></span>
+				</div>
+				<!--<div class="FullWidth">
+				<label for="remain_logged_in">Remain logged in</label>
+				<input id="remain_logged_in" type="checkbox" name="remain_logged_in">
+				</div>-->
+				<!--JSON is used instead of standard HTTP so this is not used
+				<input type="submit">-->
+				<input id="apply_button" type="button" value="Apply"  onclick="applyAction()">
+				<!--<a class="Button RightAligned" href=window.location.pathname>Return</a>-->
+			</form>
+			<p>
+			<a id="manage_permissions_link" style="display: none">Manage board permissions</a></p>
+			<div id="error_messages" style="color: var(--fail-text)"></div>
+		</main>
+		<dialog id="status_dialog"><p id="status_dialog_body">Loading...</p></dialog>
+		<dialog id="success_dialog" closedby="any">
+			<h2>Success</h2>
+			<p>Modified board <i id="dialog_new_board_slug"></i> - <i id="dialog_new_board_title"></i></p>
+			<div class="ToolBar"><a class="Button" href="./">Boards</a><button onclick="success_dialog.close()">Close</button></div>
+		</dialog>
+	</body>
+<script>
+const url_params = new URLSearchParams(location.search);
+let state = {};
+/*
+let state = {
+	selected_board: {
+		slug: null,
+		permissions: {}
+	}
+};
+window.onpopstate = function(event) {
+	if (event.state) {
+		state = event.state;
+	}
+	refresh_send();
+}
+*/
+async function applyAction() {
+	try {
+		if (url_params.get("board") === null)
+			throw "URL parameter 'board' is required (example: ?board=qa).";
+		const slug_input = board_slug_input.value;
+		const title_input = board_title_input.value;
+		status_dialog_body.textContent = "Sending updated board info to server...";
+		status_dialog.showModal();
+		const api_response = await fetch(`./api/board/${url_params.get("board")}`, {
+			method: "PUT",
+			body: JSON.stringify({
+				board: {
+					slug: slug_input,
+					title: title_input
+				}
+			})
+		});
+		if (!(api_response && api_response.ok)) {
+			let header_error_message = api_response.headers.get("message");
+			if (header_error_message == null)
+				throw(`ERROR ${api_response.status}\n${api_response.statusText}`);
+			else
+				throw(header_error_message);
+		}
+		url_params.set("board", slug_input);
+		history.replaceState(state, "", `${window.location.pathname}?${url_params.toString()}`);
+		status_dialog.close();
+		dialog_new_board_slug.textContent = slug_input;
+		dialog_new_board_title.textContent = title_input;
+		success_dialog.showModal();
+	}
+	catch (error) {
+		status_dialog.close();
+		const error_message = error;
+		error_message ??= "An unknown error occured";
+		error_messages.innerText = error_message;
+	}
+}
+function setPermissionIndicators(board) {
+	if (board.client_permissions["create_board"]) {
+		has_permission_indicator.textContent = "You have permission to edit this board.";
+		has_permission_indicator.style["color"] = "var(--success-text)";
+	}
+	else {
+		has_permission_indicator.textContent = "You do not have permission to edit this board.";
+		has_permission_indicator.style["color"] = "var(--fail-text)";
+	}
+	if (board.client_permissions["manage_permissions"]) {
+		manage_permissions_link.href = `manage_permissions.html?location=/board/${board.slug}`;
+		manage_permissions_link.style["display"] = "initial";
+	}
+}
+async function getBoardInfo() {
+	status_dialog_body.textContent = "Fetching board info...";
+	status_dialog.showModal();
+	try {
+		const board_slug_from_url = url_params.get("board");
+		if (board_slug_from_url === null)
+			throw "URL parameter 'board' is required (example: ?board=qa).";
+		board_slug_indicator.textContent = board_slug_from_url;
+		const response = await fetch(`api/board/${board_slug_from_url}`);
+		console.log(response);
+		if (response.ok) {
+			// if codeflow reaches here, client has permission to view board
+			await response.json().then(response_json => {
+				console.log(response_json);
+				// board_slug_indicator.textContent = response_json["slug"];
+				setPermissionIndicators(response_json);
+				board_slug_input.value  = response_json["slug"];
+				board_title_input.value = response_json["title"];
+				status_dialog.close();
+			});
+		}
+		else {
+			const error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch board info.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		status_dialog.close();
+		console.error(error);
+		error_messages.textContent = error;
+		// error_dialog.showModal();
+	}
+}
+getBoardInfo();
+</script>
+</html>

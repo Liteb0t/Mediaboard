@@ -75,6 +75,7 @@ public:
 			{"title", title},
 			{"client_permissions", {
 				{"manage_permissions", this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))},
+				{"create_board", this->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_BOARD))},
 				{"create_thread", this->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_THREAD))},
 				{"send_message", this->clientHasPermission(client, static_cast<int>(PERMISSION::SEND_MESSAGE))},
 				{"delete_post", this->clientHasPermission(client, static_cast<int>(PERMISSION::DELETE_POST))},
@@ -194,6 +195,18 @@ public:
 #endif
 	int getId() const { return this->id; }
 	const std::string& getSlug() const { return this->slug; }
+	void setSlug(const std::string& new_slug) {
+		if (new_slug != slug) {
+			this->slug = new_slug;
+			db->query<void>("UPDATE board SET slug = $1 WHERE id = $2", new_slug, id);
+		}
+	}
+	void setTitle(const std::string& new_title) {
+		if (new_title != title) {
+			this->title = new_title;
+			db->query<void>("UPDATE board SET title = $1 WHERE id = $2", new_title, id);
+		}
+	}
 	// int getTitle() const { return this->title; }
 	inline static const size_t MAX_SLUG = 32;
 	inline static const size_t MAX_TITLE = 64;

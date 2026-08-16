@@ -95,6 +95,41 @@ FuzeHttp::Response getBoard(Mediaboard::State* state, FuzeHttp::Request req, std
 	};
 }
 
+// TODO update etag of index.html on edit to refresh cache
+FuzeHttp::Response editBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
+	bool make_public;
+	boost::json::object board_json;
+	std::string new_slug, new_title;
+	try {
+		boost::json::object req_json = boost::json::parse(req.body()).as_object();
+		board_json = req_json.at("board").as_object();
+		new_slug = board_json.at("slug").as_string();
+		new_title = board_json.at("title").as_string();
+	}
+	catch(const std::exception& e) {
+		std::string error_message = std::format("JSON error: {}", e.what());
+		std::cerr << error_message << std::endl;
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
+	}
+	std::optional<Board*> board = state->getBoardIfExists(board_slug);
+	if (!board)
+		return Response{.status = http::status::not_found, .error_message = std::format("Board {} not found", board_slug)};
+	if (!board.value()->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_BOARD))) {
+		return FuzeHttp::Response{
+			.status = http::status::forbidden,
+			.error_message = std::string("Client lacks permission CREATE_BOARD.")
+		};
+	}
+	if (!isValidURLParameter(new_slug)) {
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Slug can only contain alphanumeric characters, '_', or '-'."};
+	}
+	board.value()->setSlug(new_slug);
+	board.value()->setTitle(new_title);
+	return FuzeHttp::Response{
+		.status = http::status::created
+	};
+}
+
 FuzeHttp::Response getBoardPermissions(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug) {
 	std::optional<Client> client = state->getClientIfExists(req);
 	std::optional<Board*> board = state->getBoardIfExists(board_slug);

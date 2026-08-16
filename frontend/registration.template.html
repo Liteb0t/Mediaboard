@@ -12,7 +12,7 @@
 		<!--Navbar can go here-->
 		<main>
 			<h2>Authentication - CONFIG_site_name</h2>
-			<p id="invite_information" style="display: none">You have been invited to join this server.</p>
+			<p id="invite_information" style="display: none; color: var(--information-text)">You have been invited to join this server.</p>
 			<form action="" method="POST" autocomplete="account">
 				<div class="FormGrid">
 				<label for="account_username_input">Username</label>
@@ -33,7 +33,7 @@
 				<input type="button" value="Register" onclick="registerAction()">
 				<!--<a class="Button RightAligned" href=window.location.pathname>Return</a>-->
 			</form>
-			<div id="error_messages"></div>
+			<div id="error_messages" style="color: var(--fail-text)"></div>
 		</main>
 		<dialog id="status_dialog"><p id="status_dialog_body">Loading...</p></dialog>
 		<dialog id="login_success_dialog" closedby="any">
@@ -47,11 +47,6 @@
 			<div class="ToolBar"><a class="Button" href="./">Proceed</a><button onclick="registration_success_dialog.close()">Close</button></div>
 		</dialog>
 	</body>
-<style>
-#invite_information {
-	color: #228;
-}
-</style>
 <script type="module" src="static/argon2.umd.min.js"></script>
 <script src="./static/UserAuthentication.js"></script>
 <script>
@@ -68,7 +63,7 @@ if (url_params.get("invite")) {
 
 async function registerAction() {
 	try {
-		const new_account_username = account_username_input.value;
+		const new_account_username = account_username_input.value.trim();
 		let auth_user = new UserAuthentication(new_account_username, account_password_input.value);
 
 		status_dialog_body.textContent = "Requesting new account parameters...";
@@ -115,7 +110,7 @@ async function registerAction() {
 
 async function loginAction() {
 	try {
-		const username_input = account_username_input.value;
+		const username_input = account_username_input.value.trim();
 		let auth_user = new UserAuthentication(username_input, account_password_input.value);
 		status_dialog_body.textContent = "Requesting login parameters...";
 		status_dialog.showModal();

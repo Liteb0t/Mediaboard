@@ -145,9 +145,7 @@ async function getAllBoards() {
 }
 
 function showAllBoards(response_json) {
-	if (response_json["client_permissions"]["create_board"]) {
-		create_board_button.style["display"] = "initial";
-	}
+	create_board_button.style["display"] = response_json["client_permissions"]["create_board"] ? "initial" : "none";
 	const fragment = new DocumentFragment();
 	const table_element = document.createElement("table");
 	const headers_element = document.createElement("tr");
@@ -167,11 +165,17 @@ function showAllBoards(response_json) {
 		});
 		board_element.append(flex_separator.cloneNode());
 		let col = document.createElement("td");
-		if (board.client_permissions.manage_permissions) {
-			const manage_permissions_link = document.createElement("a");
-			manage_permissions_link.href = `manage_permissions.html?location=/board/${board.slug}`;
-			manage_permissions_link.textContent = "Manage permissions";
-			col.append(manage_permissions_link, document.createTextNode(" :: "));
+		// if (board.client_permissions.manage_permissions) {
+		// 	const manage_permissions_link = document.createElement("a");
+		// 	manage_permissions_link.href = `manage_permissions.html?location=/board/${board.slug}`;
+		// 	manage_permissions_link.textContent = "Manage permissions";
+		// 	col.append(manage_permissions_link, document.createTextNode(" :: "));
+		// }
+		if (board["client_permissions"]["create_board"]) {
+			const edit_board_link = document.createElement("a");
+			edit_board_link.href = `edit_board.html?board=${board.slug}`;
+			edit_board_link.textContent = "Edit";
+			col.append(edit_board_link, document.createTextNode(" :: "));
 		}
 		const board_link = document.createElement("a");
 		board_link.href = `board.html?board=${board.slug}`;
@@ -189,23 +193,35 @@ function showAllBoards(response_json) {
 
 // websocket = connectToServer();
 async function getClientInfo() {
-	const response = await fetch("api/user/client");
-	console.log(response);
-	if (response.ok) {
-		await response.json().then(response_json => {
-			console.log(response_json);
-			if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
-				displayClientAsLoggedOut();
-			}
-			state.server_permissions = response_json["server_permissions"];
-			window.history.replaceState(state, null, ""); // Initial state
-			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
-			console.log(state);
-			// if (!(state.selected_thread.id >= 0)) {
-			// 	updateReplyContainer(state.selected_thread.id, state.server_permissions);
-			// }
-			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
-		});
+	try {
+		const response = await fetch("api/user/client");
+		console.log(response);
+		if (response.ok) {
+			await response.json().then(response_json => {
+				console.log(response_json);
+				if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
+					displayClientAsLoggedOut();
+				}
+				state.server_permissions = response_json["server_permissions"];
+				window.history.replaceState(state, null, ""); // Initial state
+				manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
+				console.log(state);
+				// if (!(state.selected_thread.id >= 0)) {
+				// 	updateReplyContainer(state.selected_thread.id, state.server_permissions);
+				// }
+				// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
+			});
+		}
+		else {
+			const error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch client.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
 	}
 }
 getClientInfo(); // runs asynchronously

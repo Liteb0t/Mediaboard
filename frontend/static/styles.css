@@ -3,6 +3,10 @@
 	--name-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
 	--interactive-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
 	--content-font: DejaVu Serif, Cambria, Lucida Bright, Liberation Serif, serif;
+
+	--information-text: #008;
+	--success-text: #080;
+	--fail-text: #800;
 }
 
 body {
@@ -132,10 +136,6 @@ dialog {
 		}
 	}
 }
-
-#error_messages { /* Used in _change_password.html and _registration.html */
-	color: #800;
-}
 .FormGrid {
 	display: grid;
 	grid-template-columns: auto auto auto;
@@ -144,5 +144,8 @@ dialog {
 	width: fit-content;
 	.FullWidth {
 		grid-column: 1 / 4;
+	}
+	>* {
+		align-self: center;
 	}
 }

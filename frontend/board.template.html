@@ -91,10 +91,10 @@
 			<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attachments.</p>
 			<div class="ToolBar"><button onclick="post_file_upload_not_complete_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
-		<dialog id="generic_error_dialog" closedby="any">
+		<dialog id="error_dialog" closedby="any">
 			<h2>Error</h2>
-			<p id="generic_error_dialog_message">Something happened.</p>
-			<div class="ToolBar"><button onclick="generic_error_dialog.close()">&#x1F5D9; Close</button></div>
+			<p id="error_message">Something happened.</p>
+			<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
 		</dialog>
 		<dialog id="file_upload_error_dialog" closedby="any">
 			<h2>Error: could not upload file</h2>
@@ -446,12 +446,20 @@ async function refresh_send() {
 	if (typeof websocket !== "undefined") {
 		websocket.close();
 	}
-	if (state.selected_thread.id === -1) {
-		await getAllThreads(); // TODO scroll to previously viewed thread
+	try {
+		if (state.selected_thread.id === -1) {
+			await getAllThreads(); // TODO scroll to previously viewed thread
+		}
+		else {
+			await getThread();
+			lock_scroll_to_bottom = true;
+		}
 	}
-	else {
-		await getThread();
-		lock_scroll_to_bottom = true;
+	catch (error) {
+		loading_dialog.close();
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
 	}
 }
 
@@ -466,8 +474,8 @@ async function getAllThreads() {
 	}
 	else {
 		const error_message = response.headers.get("message");
-		generic_error_dialog_message.innerText = error_message ? error_message : "An unknown error occured when attempting to fetch threads.";
-		generic_error_dialog.showModal();
+		error_message ??= "An unknown error occured when attempting to fetch threads.";
+		throw error_message;
 	}
 }
 
@@ -543,8 +551,8 @@ async function getThread() {
 	}
 	else {
 		const error_message = response.headers.get("message");
-		generic_error_dialog_message.innerText = error_message ? error_message : "An unknown error occured when attempting to load thread.";
-		generic_error_dialog.showModal();
+		error_message ??= "An unknown error occured when attempting to load thread.";
+		throw error_message;
 	}
 }
 
@@ -851,8 +859,8 @@ function decode_utf8(s) {
 file_upload.onchange = (event) => {
 	console.log("file changed.");
 	if (file_upload.files.length + file_post_list.childNodes.length > 4) {
-		generic_error_dialog_message.innerText = "Cannot attach more than 4 files.";
-		generic_error_dialog.showModal();
+		error_message.textContent = "Cannot attach more than 4 files.";
+		error_dialog.showModal();
 		file_upload.value = "";
 	}
 	else {
@@ -864,8 +872,8 @@ file_upload.onchange = (event) => {
 			}
 			catch (error) {
 				console.error(error);
-				generic_error_dialog_message.innerHTML = error.message ? error.message : "An unknown error occured when attempting to upload file.";
-				generic_error_dialog.showModal();
+				error_message.innerHTML = error.message ? error.message : "An unknown error occured when attempting to upload file.";
+				error_dialog.showModal();
 			}
 		}
 	}
@@ -1172,40 +1180,62 @@ async function postThread() {
 
 // websocket = connectToServer();
 async function getClientInfo() {
-	const response = await fetch("api/user/client");
-	console.log(response);
-	if (response.ok) {
-		await response.json().then(response_json => {
-			console.log(response_json);
-			if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
-				displayClientAsLoggedOut();
-			}
-			state.server_permissions = response_json["server_permissions"];
-			window.history.replaceState(state, null, ""); // Initial state
-			manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
-			console.log(state);
-			// if (!(state.selected_thread.id >= 0)) {
-			// 	updateReplyContainer(state.selected_thread.id, state.server_permissions);
-			// }
-			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
-		});
+	try {
+		const response = await fetch("api/user/client");
+		console.log(response);
+		if (response.ok) {
+			await response.json().then(response_json => {
+				console.log(response_json);
+				if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
+					displayClientAsLoggedOut();
+				}
+				state.server_permissions = response_json["server_permissions"];
+				window.history.replaceState(state, null, ""); // Initial state
+				manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
+				console.log(state);
+				// if (!(state.selected_thread.id >= 0)) {
+				// 	updateReplyContainer(state.selected_thread.id, state.server_permissions);
+				// }
+				// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
+			});
+		}
+		else {
+			const error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch client.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
 	}
 }
 async function getBoardInfo() {
-	const response = await fetch(`api/board/${state.selected_board.slug}`);
-	console.log(response);
-	if (response.ok) {
-		await response.json().then(response_json => {
-			console.log(response_json);
-			state.selected_board.permissions = response_json["client_permissions"];
-			window.history.replaceState(state, null, ""); // Initial state
-			// manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
-			console.log(state);
-			if (!(state.selected_thread.id >= 0)) {
-				updateReplyContainer(state.selected_thread.id, state.selected_board.permissions);
-			}
-			// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
-		});
+	try {
+		const response = await fetch(`api/board/${state.selected_board.slug}`);
+		console.log(response);
+		if (response.ok) {
+			await response.json().then(response_json => {
+				console.log(response_json);
+				state.selected_board.permissions = response_json["client_permissions"];
+				window.history.replaceState(state, null, ""); // Initial state
+				console.log(state);
+				if (!(state.selected_thread.id >= 0)) {
+					updateReplyContainer(state.selected_thread.id, state.selected_board.permissions);
+				}
+			});
+		}
+		else {
+			const error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch board info.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
 	}
 }
 getClientInfo(); // runs asynchronously

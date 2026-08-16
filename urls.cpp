@@ -22,6 +22,7 @@ void addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
 	controller->addPattern(verb::post, createBoard, Client{},			"api", "board");
 	controller->addPattern(verb::get, getBoards,						"api", "boards");
 	controller->addPattern(verb::get, getBoard, 						"api", "board", std::string{});
+	controller->addPattern(verb::put, editBoard, Client{},				"api", "board", std::string{});
 	controller->addPattern(verb::get, getBoardPermissions,				"api", "board", std::string{}, "permissions");
 	controller->addPattern(verb::post, addBoardGroupPermission,			"api", "board", std::string{}, "permissions", "group", int());
 	controller->addPattern(verb::put, updateBoardGroupPermissions,		"api", "board", std::string{}, "permissions", "group", int());

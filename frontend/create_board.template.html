@@ -30,7 +30,7 @@
 				<input id="create_button" type="button" value="Create"  onclick="createAction()">
 				<!--<a class="Button RightAligned" href=window.location.pathname>Return</a>-->
 			</form>
-			<div id="error_messages"></div>
+			<div id="error_messages" style="color: var(--fail-text)"></div>
 		</main>
 		<dialog id="status_dialog"><p id="status_dialog_body">Loading...</p></dialog>
 		<dialog id="success_dialog" closedby="any">
@@ -46,7 +46,7 @@ async function createAction() {
 		const slug_input = board_slug_input.value;
 		const title_input = board_title_input.value;
 		status_dialog.showModal();
-		const login_response = await fetch("./api/board", {
+		const api_response = await fetch("./api/board", {
 			method: "POST",
 			body: JSON.stringify({
 				board: {
@@ -56,10 +56,10 @@ async function createAction() {
 				make_public: public_checkbox.checked
 			})
 		});
-		if (!(login_response && login_response.ok)) {
-			let header_error_message = login_response.headers.get("message");
+		if (!(api_response && api_response.ok)) {
+			let header_error_message = api_response.headers.get("message");
 			if (header_error_message == null)
-				throw(`ERROR ${login_response.status}\n${login_response.statusText}`);
+				throw(`ERROR ${api_response.status}\n${api_response.statusText}`);
 			else
 				throw(header_error_message);
 		}

@@ -711,7 +711,7 @@ class PermissionCollection {
 		4: "Delete post",
 		5: "Upload file",
 		6: "View board",
-		7: "Create board"
+		7: "Create/edit board"
 	};
 	static three_state_settings = {
 		0: "Deny",
@@ -782,7 +782,7 @@ class PermissionSettings {
 			enabled_permissions = [0, 1, 2, 3, 4, 5, 6, 7];
 		}
 		else if (slash_count === 2) { // board/g/
-			enabled_permissions = [0, 1, 2, 3, 4, 5, 6];
+			enabled_permissions = [1, 2, 3, 4, 5, 6, 7]; // TODO: allow "manage permissions" on board but disallow setting allow on permissions client lacks
 		}
 		else { // This is a thread
 			enabled_permissions = [1, 3, 4, 5];
