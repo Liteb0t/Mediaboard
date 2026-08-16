@@ -123,10 +123,24 @@ FuzeHttp::Response editBoard(Mediaboard::State* state, FuzeHttp::Request req, Cl
 	if (!isValidURLParameter(new_slug)) {
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Slug can only contain alphanumeric characters, '_', or '-'."};
 	}
-	board.value()->setSlug(new_slug);
+	if (state->getBoardIfExists(new_slug))
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("Board {} already exists. Slug must be unique. Note: old slug associations are cleared on reboot.", new_slug)};
+	state->setBoardSlug(board.value()->getId(), new_slug);
 	board.value()->setTitle(new_title);
 	return FuzeHttp::Response{
 		.status = http::status::created
+	};
+}
+
+FuzeHttp::Response deleteBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
+	std::optional<Board*> board = state->getBoardIfExists(board_slug);
+	if (!board)
+		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' not found", board_slug)};
+	if (!board.value()->clientHasPermission(client, static_cast<int>(PERMISSION::DELETE_BOARD)))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this board."};
+	board.value()->markAsDeleted();
+	return Response{
+		.status = http::status::no_content
 	};
 }
 

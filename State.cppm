@@ -82,7 +82,7 @@ public:
 
 	void cacheAllBoards() {
 		std::print("[State] Retrieving boards from database...");
-		for (auto thread_tuple : db->queryRows<std::tuple<int, int, std::string, std::string>>("SELECT id, permission_object_id, slug, title FROM board")) {
+		for (auto thread_tuple : db->queryRows<std::tuple<int, int, std::string, std::string>>("SELECT id, permission_object_id, slug, title FROM board WHERE deleted = FALSE")) {
 			// Board board(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), std::get<2>(thread_tuple), std::get<3>(thread_tuple));
 			auto board = std::make_unique<Board>(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), std::get<2>(thread_tuple), std::get<3>(thread_tuple));
 			std::print("{}, ", board->getId());
@@ -102,14 +102,14 @@ public:
 	Board* main_board() { return this->boards.at(0).get(); }
 	std::optional<Board*> getBoardIfExists(int board_id) {
 		auto it = boards.find(board_id);
-		if (it != boards.end()) return it->second.get(); else return {};
-		// return &(this->boards.at(board_id));
+		if (it != boards.end() && !(it->second.get()->isDeleted()))
+			return it->second.get();
+		else
+			return {};
 	}
 	// Board* getBoard(const std::string& slug) { return &(this->boards.at(this->slug_to_board_id.at(slug))); }
 	std::optional<Board*> getBoardIfExists(const std::string& slug) {
-		auto it = slug_to_board_id.find(slug);
-		if (it == slug_to_board_id.end()) return {}; else return getBoardIfExists(it->second);
-		// return &(this->boards.at(this->slug_to_board_id.at(slug)));
+		if (auto it = slug_to_board_id.find(slug); it == slug_to_board_id.end()) return {}; else return getBoardIfExists(it->second);
 	}
 	// int createThread(int board_id, boost::json::object thread_json, int author_client_id) {
 	// 	return this->boards.at(board_id).createThread(thread_json, author_client_id);
@@ -194,7 +194,7 @@ public:
 	boost::json::object getBoardsAsJson(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::array boards_json = boost::json::array();
 		for (auto& [board_id, board] : this->boards) {
-			if (board->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD))) {
+			if (board->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD)) && !board->isDeleted()) {
 				boards_json.emplace_back(board->asJson(client));
 			}
 		}
@@ -239,6 +239,10 @@ public:
 	}
 	void sendToWebRTC(std::string message);
 	void clearWebsockets();
+	void setBoardSlug(int board_id, const std::string& new_slug) {
+		this->boards.at(board_id)->setSlug(new_slug);
+		this->slug_to_board_id.emplace(new_slug, board_id);
+	}
 
 	const std::filesystem::path& getMediaLocation() const { return media_location; }
 	// const std::filesystem::path& getProgramLocation() const { return program_location; }

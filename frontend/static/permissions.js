@@ -711,7 +711,8 @@ class PermissionCollection {
 		4: "Delete post",
 		5: "Upload file",
 		6: "View board",
-		7: "Create/edit board"
+		7: "Create/edit board",
+		8: "Delete board"
 	};
 	static three_state_settings = {
 		0: "Deny",
@@ -779,10 +780,10 @@ class PermissionSettings {
 			api_location += '/';
 		const slash_count = (api_location.match(/\//g) || []).length;
 		if (slash_count === 1) { // server/
-			enabled_permissions = [0, 1, 2, 3, 4, 5, 6, 7];
+			enabled_permissions = [0, 1, 2, 3, 4, 5, 6, 7, 8];
 		}
 		else if (slash_count === 2) { // board/g/
-			enabled_permissions = [1, 2, 3, 4, 5, 6, 7]; // TODO: allow "manage permissions" on board but disallow setting allow on permissions client lacks
+			enabled_permissions = [1, 2, 3, 4, 5, 6, 7, 8]; // TODO: allow "manage permissions" on board but disallow setting allow on permissions client lacks
 		}
 		else { // This is a thread
 			enabled_permissions = [1, 3, 4, 5];

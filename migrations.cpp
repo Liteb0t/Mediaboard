@@ -21,7 +21,7 @@ std::list<std::unique_ptr<Migration>> State::addMigrations() {
 	// migrations.push_back(std::unique_ptr<Migration>(new SmartMigration("0.2", this, [](FuzeDBI::Connection* db, Mediaboard::State* state){
 	// 	std::println("This is the lambda and document_root is {}", state->getDocumentRoot().string()); })));
 	migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",
-		"CREATE TABLE board(id INTEGER PRIMARY KEY, slug TEXT, title TEXT, thread_id_seq INTEGER DEFAULT 0, permission_object_id INTEGER);")));
+		"CREATE TABLE board(id INTEGER PRIMARY KEY, slug TEXT, title TEXT, thread_id_seq INTEGER DEFAULT 0, permission_object_id INTEGER, deleted BOOLEAN DEFAULT FALSE);")));
 	migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",
 		"INSERT INTO board(id, slug, title, permission_object_id) VALUES (0, 'board', 'Board', 1);")));
 	migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",

@@ -193,6 +193,11 @@ public:
 		int connection_id_counter = 0;
 	} webrtc_room;
 #endif
+	void markAsDeleted() {
+		this->deleted = true;
+		db->query<void>("UPDATE board SET deleted = TRUE WHERE id = $1", this->id);
+		// db->query<void>("UPDATE thread SET deleted = TRUE WHERE board_id = $1", this->id);
+	}
 	int getId() const { return this->id; }
 	const std::string& getSlug() const { return this->slug; }
 	void setSlug(const std::string& new_slug) {
@@ -207,6 +212,7 @@ public:
 			db->query<void>("UPDATE board SET title = $1 WHERE id = $2", new_title, id);
 		}
 	}
+	inline bool isDeleted() const { return this->deleted; }
 	// int getTitle() const { return this->title; }
 	inline static const size_t MAX_SLUG = 32;
 	inline static const size_t MAX_TITLE = 64;
@@ -217,5 +223,6 @@ private:
 	std::unordered_map<int, std::unique_ptr<Thread>> threads;
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
 	boost::json::object board_as_json;
+	bool deleted = false; // It is assumed new Board objects are not marked as deleted, because deleted threads are not retrieved from the database, nor can they be created through the API.
 }; // class Board
 } // namespace Mediaboard

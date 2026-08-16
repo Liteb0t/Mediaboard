@@ -11,8 +11,8 @@
 	<body>
 		<!--Navbar can go here-->
 		<main>
-			<h2>Edit board <span id="board_slug_indicator"></span> - CONFIG_site_name</h2>
-			<p id="has_permission_indicator">Loading...</p>
+			<h2>Edit board <span id="board_slug_indicator"></span> - <span id="board_title_indicator"></span></h2>
+			<p id="has_permission_indicator">&nbsp;</p>
 			<form action="" method="POST" autocomplete="off">
 				<div class="FormGrid">
 				<label for="board_slug_input">Slug</label>
@@ -27,6 +27,8 @@
 				<!--JSON is used instead of standard HTTP so this is not used
 				<input type="submit">-->
 				<input id="apply_button" type="button" value="Apply"  onclick="applyAction()">
+				&emsp;
+				<input id="delete_button" type="button" value="Delete board" onclick="confirm_delete_board_dialog.showModal()">
 				<!--<a class="Button RightAligned" href=window.location.pathname>Return</a>-->
 			</form>
 			<p>
@@ -39,10 +41,37 @@
 			<p>Modified board <i id="dialog_new_board_slug"></i> - <i id="dialog_new_board_title"></i></p>
 			<div class="ToolBar"><a class="Button" href="./">Boards</a><button onclick="success_dialog.close()">Close</button></div>
 		</dialog>
+		<dialog id="success_dialog" closedby="any">
+			<h2>Success</h2>
+			<p>Modified board <i id="dialog_new_board_slug"></i> - <i id="dialog_new_board_title"></i></p>
+			<div class="ToolBar"><a class="Button" href="./">Boards</a><button onclick="success_dialog.close()">Close</button></div>
+		</dialog>
+		<dialog id="confirm_delete_board_dialog" closedby="any">
+			<h2>Confirm delete</h2>
+			<p>Are you sure you want to mark board <i id="dialog_confirm_delete_board_slug"></i> - <i id="dialog_confirm_delete_board_title"></i> as deleted?<br>Note: as of now, the board's contents are kept on the database - marking as deleted simply hides it. This may change in a future version.</p>
+			<div class="ToolBar"><button onclick="deleteBoardAction();confirm_delete_board_dialog.close()">Delete board</button><button onclick="confirm_delete_board_dialog.close()">Cancel</button></div>
+		</dialog>
+		<dialog id="deleted_board_dialog" closedby="any">
+			<h2>Information</h2>
+			<p>Marked board <i id="dialog_deleted_board_slug"></i> - <i id="dialog_deleted_board_title"></i> as deleted.<br>It can still be restored through the database.</p>
+			<div class="ToolBar"><a class="Button" href="./">Boards</a><!--<button onclick="success_dialog.close()">Close</button>--></div>
+		</dialog>
 	</body>
 <script>
 const url_params = new URLSearchParams(location.search);
 let state = {};
+const board_slug_listeners = [
+	board_slug_indicator,
+	dialog_new_board_slug,
+	dialog_confirm_delete_board_slug,
+	dialog_deleted_board_slug
+];
+const board_title_listeners = [
+	board_title_indicator,
+	dialog_new_board_title,
+	dialog_confirm_delete_board_title,
+	dialog_deleted_board_title
+];
 /*
 let state = {
 	selected_board: {
@@ -57,6 +86,32 @@ window.onpopstate = function(event) {
 	refresh_send();
 }
 */
+async function deleteBoardAction() {
+	try {
+		status_dialog_body.textContent = "Sending delete request to server...";
+		status_dialog.showModal();
+		if (url_params.get("board") === null)
+			throw "URL parameter 'board' is required (example: ?board=qa).";
+		const api_response = await fetch(`./api/board/${url_params.get("board")}`, {
+			method: "DELETE"
+		});
+		if (!(api_response && api_response.ok)) {
+			let header_error_message = api_response.headers.get("message");
+			if (header_error_message == null)
+				throw(`ERROR ${api_response.status}\n${api_response.statusText}`);
+			else
+				throw(header_error_message);
+		}
+		status_dialog.close();
+		// success_dialog.showModal();
+	}
+	catch (error) {
+		status_dialog.close();
+		const error_message = error;
+		error_message ??= "An unknown error occured";
+		error_messages.innerText = error_message;
+	}
+}
 async function applyAction() {
 	try {
 		if (url_params.get("board") === null)
@@ -84,8 +139,14 @@ async function applyAction() {
 		url_params.set("board", slug_input);
 		history.replaceState(state, "", `${window.location.pathname}?${url_params.toString()}`);
 		status_dialog.close();
-		dialog_new_board_slug.textContent = slug_input;
-		dialog_new_board_title.textContent = title_input;
+		board_slug_listeners.forEach(element => {
+			element.textContent = slug_input;
+		})
+		board_title_listeners.forEach(element => {
+			element.textContent = title_input;
+		})
+		// dialog_new_board_slug.textContent = slug_input;
+		// dialog_new_board_title.textContent = title_input;
 		success_dialog.showModal();
 	}
 	catch (error) {
@@ -128,6 +189,16 @@ async function getBoardInfo() {
 				board_slug_input.value  = response_json["slug"];
 				board_title_input.value = response_json["title"];
 				status_dialog.close();
+				board_slug_listeners.forEach(element => { // lets see if this works
+					element.textContent = response_json["slug"];
+				})
+				board_title_listeners.forEach(element => {
+					element.textContent = response_json["title"];
+				})
+				// dialog_confirm_delete_board_slug = response_json["slug"];
+				// dialog_deleted_board_slug = response_json["slug"];
+				// dialog_confirm_delete_board_title = response_json["title"];
+				// dialog_deleted_board_title = response_json["title"];
 			});
 		}
 		else {
