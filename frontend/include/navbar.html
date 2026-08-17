@@ -1,0 +1,46 @@
+<div id="header_bar" class="ToolBar WithBorders HeaderBar">
+	<div id="WebsiteName" class="WebsiteName"><b>CONFIG_site_name</b></div>
+	<a class="Button ToolBarButton" href="index.html">Boards</a>
+	<button id="threads_button" class="ToolBarButton" onclick="openThreadList()">&#x1F5D0; Threads</button>
+	<button id="refresh_button" class="ToolBarButton" onclick="loading_dialog.showModal();refresh_send().then(() => {loading_dialog.close();});">&#x2B6E; Refresh</button>
+	<a id="manage_server_button" class="Button ToolBarButton" href="manage_server.html" style="display: none;">Manage server</a>
+	<div class="FlexSeparator"></div>
+	<div id="warning_outdated_browser" style="color: #D00; display: none">Warning: outdated browser</div>
+	<!--
+	<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
+	-->
+	<a id="registration_link" class="Button ToolBarButton RightAligned" href="registration.html" style="display: none">Log-in or Register</a>
+	<div id="logged_in_indicator" style="display: none" class="RightAligned">
+		Logged in as&nbsp;<b id="logged_in_as_username">Someone</b>
+	</div>
+	<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
+	<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
+
+	<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard CONFIG_mediaboard_version</a>
+</div>
+<script>
+if (localStorage.getItem("logged_in") === "true") {
+	displayClientAsLoggedIn();
+}
+else {
+	registration_link.style["display"] = "inherit";
+}
+
+function displayClientAsLoggedIn() {
+	let account_username = localStorage.getItem("account_username");
+	logged_in_as_username.textContent = account_username;
+	logout_button.style["display"] = "inherit";
+	logged_in_indicator.style["display"] = "inherit";
+	change_password_link.style["display"] = "inherit";
+}
+
+function displayClientAsLoggedOut() {
+	logout_button.style["display"] = "none";
+	logged_in_indicator.style["display"] = "none";
+	registration_link.style["display"] = "inherit";
+	change_password_link.style["display"] = "none";
+	localStorage.removeItem("account_username");
+	localStorage.setItem("logged_in", "false");
+}
+
+</script>

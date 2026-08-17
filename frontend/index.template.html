@@ -11,23 +11,8 @@
 	<body>
 		<!--Navbar can go here-->
 		<main>
-			<div id="header_bar" class="ToolBar WithBorders">
-				<div id="WebsiteName"><b>CONFIG_site_name</b></div>
-				<button id="refresh_button" class="ToolBarButton" onclick="loading_dialog.showModal();getAllBoards().then(() => {loading_dialog.close();});">&#x2B6E; Refresh</button>
-				<a id="manage_server_button" class="Button ToolBarButton" href="manage_server.html" style="display: none;">Manage server</a>
-				<div class="FlexSeparator"></div>
-				<div id="warning_outdated_browser" style="color: #D00">Warning: outdated browser</div>
-				<!--
-				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
-				-->
-				<a id="registration_link" class="Button ToolBarButton RightAligned" href="registration.html" style="display: none">Log-in or Register</a>
-				<div id="logged_in_indicator" style="display: none" class="RightAligned">
-					Logged in as&nbsp;<b id="logged_in_as_username">Someone</b>
-				</div>
-				<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
-				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
-				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard CONFIG_mediaboard_version</a>
-			</div>
+#include "include/navbar.html"
+#include "include/test.html"
 			<h3 id="location_indicator">List of boards</h3>
 			<div id="board_list_container"></div>
 			<a id="create_board_button" href="create_board.html" style="display: none">Create board</a>
@@ -43,13 +28,6 @@
 		</noscript>
 	</body>
 <style>
-#header_bar {
-	border-top: 1px solid #888;
-	border-bottom: 1px solid #888;
-	#warning_outdated_browser {
-		display: none;
-	}
-}
 </style>
 <script>
 "use strict";
@@ -79,31 +57,6 @@ window.onpopstate = function(event) {
 		state = event.state;
 	}
 	getAllBoards();
-}
-
-// The value in the name field is set to the name used in the most recent post, if any.
-if (localStorage.getItem("logged_in") === "true") {
-	displayClientAsLoggedIn();
-}
-else {
-	registration_link.style["display"] = "inherit";
-}
-
-function displayClientAsLoggedIn() {
-	let account_username = localStorage.getItem("account_username");
-	logged_in_as_username.textContent = account_username;
-	logout_button.style["display"] = "inherit";
-	logged_in_indicator.style["display"] = "inherit";
-	change_password_link.style["display"] = "inherit";
-}
-
-function displayClientAsLoggedOut() {
-	logout_button.style["display"] = "none";
-	logged_in_indicator.style["display"] = "none";
-	registration_link.style["display"] = "inherit";
-	change_password_link.style["display"] = "none";
-	localStorage.removeItem("account_username");
-	localStorage.setItem("logged_in", "false");
 }
 
 async function logoutAction() {

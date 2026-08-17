@@ -14,6 +14,13 @@
 </div>
 <script>
 const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
+const url_params = new URLSearchParams(location.search);
+let state = {
+	selected_board: {
+		slug: null,
+		permissions: {}
+	}
+};
 let pc;
 let listening_connections = [];
 sock = new WebSocket(websocket_url);
@@ -41,7 +48,8 @@ function shareMedia() {
         bundlePolicy: 'max-bundle',
     });
     sock.send(JSON.stringify({
-        type: "webrtc_request_offer"
+        type: "webrtc_share_request",
+        board: state.selected_board.slug
     }))
 }
 
@@ -52,7 +60,7 @@ async function onReceiveOffer(payload) {
             // We only want to provide an answer once all of our candidates have been added to the SDP.
             const answer = pc.localDescription;
             sock.send(JSON.stringify({
-                type: "webrtc_sender_answer",
+                type: "webrtc_share_answer",
                 payload: {
                     type: answer.type,
                     sdp: answer.sdp
@@ -89,7 +97,8 @@ async function onReceiveOffer(payload) {
 
 function watchStream() {
     sock.send(JSON.stringify({
-        type: "webrtc_watch_stream_request"
+        type: "webrtc_watch_stream_request",
+        board: state.selected_board.slug
     }))
 }
 
@@ -142,6 +151,70 @@ async function onReceiveWatchStream(payload) {
         console.error("watch stream negotiation failed:", err);
     }
 }
+/*
+async function getClientInfo() {
+	try {
+		const response = await fetch("api/user/client");
+		console.log(response);
+		if (response.ok) {
+			await response.json().then(response_json => {
+				console.log(response_json);
+				if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
+					displayClientAsLoggedOut();
+				}
+				// state.server_permissions = response_json["server_permissions"];
+				// window.history.replaceState(state, null, ""); // Initial state
+				manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
+				// console.log(state);
+				// if (!(state.selected_thread.id >= 0)) {
+				// 	updateReplyContainer(state.selected_thread.id, state.server_permissions);
+				// }
+				// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
+			});
+		}
+		else {
+			let error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch client.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+}
+*/
+async function getBoardInfo() {
+	try {
+		const board_slug_from_url = url_params.get("board");
+		if (board_slug_from_url === null)
+			throw "URL parameter 'board' is required (example: ?board=qa).";
+        state.selected_board.slug = board_slug_from_url;
+		const response = await fetch(`api/board/${state.selected_board.slug}`);
+		console.log(response);
+		if (response.ok) {
+			await response.json().then(response_json => {
+				console.log(response_json);
+				state.selected_board.permissions = response_json["client_permissions"];
+				window.history.replaceState(state, null, ""); // Initial state
+				// console.log(state);
+			});
+		}
+		else {
+			let error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch board info.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+}
+// getClientInfo(); // runs asynchronously
+getBoardInfo();
 </script>
 </body>
 </html>

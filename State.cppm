@@ -98,14 +98,15 @@ public:
 	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
 	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
 
-	// Board main_board;
-	Board* main_board() { return this->boards.at(0).get(); }
 	std::optional<Board*> getBoardIfExists(int board_id) {
 		auto it = boards.find(board_id);
 		if (it != boards.end() && !(it->second.get()->isDeleted()))
 			return it->second.get();
 		else
 			return {};
+	}
+	std::optional<Board*> getBoardIfExists(const std::string& slug) {
+		if (auto it = slug_to_board_id.find(slug); it == slug_to_board_id.end()) return {}; else return getBoardIfExists(it->second);
 	}
 	std::optional<Board*> getBoardIfExistsAndClientHasReadPermission(const std::string& slug, const std::optional<FuzeHttp::Client>& client) {
 		std::optional<Board*> board = getBoardIfExists(slug);
@@ -114,9 +115,12 @@ public:
 		else
 			return {};
 	}
-	// Board* getBoard(const std::string& slug) { return &(this->boards.at(this->slug_to_board_id.at(slug))); }
-	std::optional<Board*> getBoardIfExists(const std::string& slug) {
-		if (auto it = slug_to_board_id.find(slug); it == slug_to_board_id.end()) return {}; else return getBoardIfExists(it->second);
+	std::optional<Board*> getBoardIfExistsAndClientHasReadPermission(int board_id, const std::optional<FuzeHttp::Client>& client) {
+		std::optional<Board*> board = getBoardIfExists(board_id);
+		if (board && board.value()->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD)))
+			return board;
+		else
+			return {};
 	}
 	// int createThread(int board_id, boost::json::object thread_json, int author_client_id) {
 	// 	return this->boards.at(board_id).createThread(thread_json, author_client_id);

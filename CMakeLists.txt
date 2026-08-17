@@ -70,17 +70,52 @@ install(
   DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard
 )
 set(frontend_list "") ## its a list which will be used as DEPENDS on add_custom_target
+set(FRONTEND_SOURCE_DIR ${CMAKE_SOURCE_DIR}/frontend)
 # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend)
-file(GLOB_RECURSE frontend_files CONFIGURE_DEPENDS RELATIVE ${CMAKE_SOURCE_DIR}/frontend ${CMAKE_SOURCE_DIR}/frontend/*)
+file(GLOB_RECURSE frontend_files CONFIGURE_DEPENDS RELATIVE ${FRONTEND_SOURCE_DIR} ${FRONTEND_SOURCE_DIR}/*)
+# \.template\.[^\\\/]+$
 foreach(file ${frontend_files})
-  set(destination ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/${file})
-  add_custom_command(
-    OUTPUT ${destination}
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_SOURCE_DIR}/frontend/${file} ${destination}
-    DEPENDS ${CMAKE_SOURCE_DIR}/frontend/${file}
-    COMMENT "Copying ${CMAKE_SOURCE_DIR}/frontend/${file}"
-  )
-  list(APPEND frontend_list ${destination})
+  message("Checking file ${file}")
+  if(file MATCHES "^include/") # macro sources aint included in final doctree
+    message("----skipping (is in include directory)")
+    continue()
+  elseif (file MATCHES "\.template\.[^\\\/]+$")
+    message("----is template")
+    # [AI glasnost] this section assisted by Claude Sonnet 5
+    set(qualified_source ${FRONTEND_SOURCE_DIR}/${file})
+    set(qualified_destination ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/${file})
+    set(depfile ${CMAKE_BINARY_DIR}/frontend_deps/${file}.d)
+
+    get_filename_component(destination_dir ${qualified_destination} DIRECTORY)
+    get_filename_component(depfile_dir ${depfile} DIRECTORY)
+    file(MAKE_DIRECTORY ${destination_dir})
+    file(MAKE_DIRECTORY ${depfile_dir})
+
+    add_custom_command(
+      OUTPUT ${qualified_destination}
+      COMMAND ${CMAKE_C_COMPILER} # runs C preprocessor
+              -E -P -CC -undef -nostdinc -x c
+              -I ${FRONTEND_SOURCE_DIR} -I ${FRONTEND_SOURCE_DIR}/include
+              -MMD -MF ${depfile} -MT ${qualified_destination}
+              ${qualified_source} -o ${qualified_destination}
+      DEPENDS ${qualified_source}
+      DEPFILE ${depfile}
+      COMMENT "Preprocessing ${file}"
+      VERBATIM
+    )
+    list(APPEND frontend_list ${qualified_destination})
+    # [AI glasnost] end AI-assisted section
+  else()
+    message("----is regular file")
+    set(qualified_destination ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/${file})
+    add_custom_command(
+      OUTPUT ${qualified_destination}
+      COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FRONTEND_SOURCE_DIR}/${file} ${qualified_destination}
+      DEPENDS ${FRONTEND_SOURCE_DIR}/${file}
+      COMMENT "Copying ${FRONTEND_SOURCE_DIR}/${file}"
+    )
+    list(APPEND frontend_list ${qualified_destination})
+  endif()
 endforeach()
 
 add_custom_target(frontend ALL
@@ -88,7 +123,7 @@ add_custom_target(frontend ALL
     ${frontend_list}
 )
 install(
-  DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/frontend
+  DIRECTORY ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend
   DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard/
 )
 add_dependencies(MediaboardServer

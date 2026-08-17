@@ -24,13 +24,13 @@ public:
 	WebsocketSession(boost::asio::ip::tcp::socket&& socket, FuzeHttp::StateBase* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
 private:
 	// std::optional<std::shared_ptr<Receiver>> webrtc_receiver;
-	int tracking_thread;
+	int tracking_board = -1; // using pointer could segfault bringing down the whole server, so we avoid raw pointers unless its lifetime is within a function
+	int tracking_thread = -1;
 #ifdef WITH_WEBRTC
 	static const rtc::SSRC targetSSRC = 42;
 #endif
-
 	State* getState() const {
-		return (State*)this->state_;
+		return (State*)this->state_; // base FuzeHttp state must be casted to Mediaboard state
 	}
 	void readEvent(std::string buffer_data) override {
 		try {
@@ -41,26 +41,29 @@ private:
 				throw std::runtime_error("'type' field is missing");
 			std::string request_type = buffer_as_json["type"].as_string().c_str();
 			if (request_type == "listen_to_thread") {
-				if (buffer_as_json["thread_id"].is_int64()) {
-					int thread_id = buffer_as_json["thread_id"].as_int64();
-					if (getState()->main_board()->threadExists(thread_id)) {
-						if (!getState()->main_board()->getThread(thread_id)->clientHasPermission(this->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD)))
-							throw std::runtime_error("Client does not have VIEW_THREAD permission");
-						this->tracking_thread = thread_id;
-						getState()->main_board()->addListenerToThread(this, thread_id);
-					}
-					else
-						std::cout << "Warning: thread " << thread_id << " does not exist" << std::endl;
-				}
-				else {
-					std::cout << "Warning: thread is not an integer" << std::endl;
-				}
+				int thread_id = buffer_as_json.at("thread_id").as_int64();
+				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
+				if (!board)
+					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
+				this->tracking_board = board.value()->getId();
+				if (!board.value()->threadExists(thread_id))
+					std::cout << "Warning: thread " << thread_id << " does not exist" << std::endl;
+				if (!board.value()->getThread(thread_id)->clientHasPermission(this->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD)))
+					throw std::runtime_error("Client does not have VIEW_THREAD permission");
+				this->tracking_thread = thread_id;
+				board.value()->addListenerToThread(this, thread_id);
 			}
 #ifdef WITH_WEBRTC
-			else if (request_type == "webrtc_request_offer") {
+			else if (request_type == "webrtc_share_request") {
 				std::println("Creating WebRTC offer...");
+				std::string board_slug = buffer_as_json["board"].as_string().c_str();
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
+				if (!board)
+					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
+				this->tracking_board = board.value()->getId();
 				auto pc = std::make_shared<rtc::PeerConnection>();
-				getState()->main_board()->webrtc_room.peer_connection = pc;
+				board.value()->webrtc_room.peer_connection = pc;
 				pc->onStateChange(
 					[](rtc::PeerConnection::State state) { std::cout << "State: " << state << std::endl; });
 				pc->onGatheringStateChange([this, pc](rtc::PeerConnection::GatheringState state) {
@@ -97,14 +100,22 @@ private:
 					nullptr);
 				pc->setLocalDescription();
 			}
-			else if (request_type == "webrtc_sender_answer") {
+			else if (request_type == "webrtc_share_answer") {
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, client);
+				if (!board)
+					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
 				std::string sdp  = buffer_as_json.at("payload").at("sdp" ).as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("type").as_string().c_str();
 				rtc::Description answer(sdp, type);
 				getState()->main_board()->webrtc_room.peer_connection->setRemoteDescription(answer);
 			}
 			else if (request_type == "webrtc_watch_stream_request") {
-				int new_connection_id = getState()->main_board()->webrtc_room.connection_id_counter++;
+				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
+				if (!board)
+					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
+				this->tracking_board = board.value()->getId();
+				int new_connection_id = board.value()->webrtc_room.connection_id_counter++;
 				auto webrtc_receiver = std::make_shared<Receiver>();
 				webrtc_receiver->conn = std::make_shared<rtc::PeerConnection>();
 				webrtc_receiver->conn->onStateChange([](rtc::PeerConnection::State state) {
@@ -141,6 +152,9 @@ private:
 				getState()->main_board()->webrtc_room.receivers.emplace(new_connection_id, webrtc_receiver);
 			}
 			else if (request_type == "webrtc_watch_stream_answer") { // TODO check if sender is still there
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, client);
+				if (!board)
+					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
 				int connection_id = buffer_as_json.at("payload").at("connection_id").as_int64();
 				std::string sdp  = buffer_as_json.at("payload").at("description").at("sdp" ).as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
@@ -148,12 +162,12 @@ private:
 				getState()->main_board()->webrtc_room.receivers.at(connection_id)->conn->setRemoteDescription(answer);
 				getState()->main_board()->webrtc_room.track->requestKeyframe();
 			}
-			else if (request_type == "webrtc_signal") {
-				std::println("received webrtc_signal WS message");
-				const auto message = std::make_shared<const std::string>("This is a response");
-				this->send(message);
-				// state_->sendToWebRTC(buffer_data);
-			}
+			// else if (request_type == "webrtc_signal") {
+			// 	std::println("received webrtc_signal WS message");
+			// 	const auto message = std::make_shared<const std::string>("This is a response");
+			// 	this->send(message);
+			// 	// state_->sendToWebRTC(buffer_data);
+			// }
 #endif
 			else {
 				// TODO send error message back to requester
@@ -161,7 +175,13 @@ private:
 			}
 		}
 		catch (const std::exception& e) {
-			std::println(std::cerr, "[WebsocketSession] {}", e.what());
+			std::println(std::cerr, "[MediaboardWebsocketSession] {}", e.what());
+		}
+		catch (const char* message) {
+			std::println(std::cerr, "[MediaboardWebsocketSession] {}", message);
+		}
+		catch (const std::string& message) {
+			std::println(std::cerr, "[MediaboardWebsocketSession] {}", message);
 		}
 	}
 };

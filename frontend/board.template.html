@@ -11,50 +11,31 @@
 	<body>
 		<!--Navbar can go here-->
 		<main>
-			<div id="header_bar" class="ToolBar WithBorders">
-				<div id="WebsiteName"><b>CONFIG_site_name</b></div>
-				<a class="Button ToolBarButton" href="index.html">Boards</a>
-				<button id="threads_button" class="ToolBarButton" onclick="openThreadList()">&#x1F5D0; Threads</button>
-				<button id="refresh_button" class="ToolBarButton" onclick="loading_dialog.showModal();refresh_send().then(() => {loading_dialog.close();});">&#x2B6E; Refresh</button>
-				<a id="manage_server_button" class="Button ToolBarButton" href="manage_server.html" style="display: none;">Manage server</a>
-				<div class="FlexSeparator"></div>
-				<div id="warning_outdated_browser" style="color: #D00">Warning: outdated browser</div>
-				<!--
-				<div id="connection_status_container">Websocket:&nbsp;<span id="connection_status">Not connected &#x1F634;</span></div>
-				-->
-				<a id="registration_link" class="Button ToolBarButton RightAligned" href="registration.html" style="display: none">Log-in or Register</a>
-				<div id="logged_in_indicator" style="display: none" class="RightAligned">
-					Logged in as&nbsp;<b id="logged_in_as_username">Someone</b>
-				</div>
-				<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
-				<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
-
-				<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard CONFIG_mediaboard_version</a>
-			</div>
+#include "navbar.html"
 			<h3 id="location_indicator"></h3>
 			<noscript>
 				<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
 			</noscript>
-			<div id="post_container"></div>
+			<div id="post_container" style="border-bottom: 2px solid #000;"></div>
 		</main>
 		<div id="body_separator" class="FlexSeparator"></div>
-		<details id="reply_container" style="display: none" open="">
-			<summary><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator"></span></div></summary>
+		<details id="reply_container" class="ReplyContainer" style="display: none" open="">
+			<summary><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator" class="ContentLengthIndicator"></span></div></summary>
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
-			<input type="text" id="name_field" tabindex="1" name="username" placeholder="Username" maxlength="CONFIG_post_max_name" />
+			<input type="text" id="name_field" class="Username" tabindex="1" name="username" placeholder="Username" maxlength="CONFIG_post_max_name" />
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned Button" onclick="postAction()">
 			</div>
-			<div contenteditable="plaintext-only" id="content_field" tabindex="1" placeholder="Content"></div>
+			<div contenteditable="plaintext-only" id="content_field" class="Content" tabindex="1" placeholder="Content"></div>
 			<fieldset id="file_upload_fieldset" style="display: none;">
 				<legend>Upload up to four files</legend>
 				<input type="file" id="file_upload" tabindex="1" autocomplete="off" multiple>
-				<div id="file_post_list"></div>
+				<div id="file_post_list" class="FilePostList"></div>
 			</fieldset>
 			</form>
 		</details>
 		<div id="bottom_marker"></div>
-		<a id="watermark" style="display: none" href="https://fuze.page/software/mediaboard/">Fuze Mediaboard CONFIG_mediaboard_version</a>
+		<a id="watermark" class="Watermark" style="display: none" href="https://fuze.page/software/mediaboard/">Fuze Mediaboard CONFIG_mediaboard_version</a>
 		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="thread_posted_dialog" closedby="any">
 			<h2>Thread posted!</h2>
@@ -111,18 +92,6 @@ main {
 	margin: 0;
 	overflow: auto;
 	flex: 0 0 auto;
-}
-
-#WebsiteName {
-	font-family: var(--name-font);
-}
-
-#header_bar {
-	border-top: 1px solid #888;
-	border-bottom: 1px solid #888;
-	#warning_outdated_browser {
-		display: none;
-	}
 }
 
 .Thread {
@@ -185,11 +154,7 @@ main {
 	}
 }
 
-#post_container {
-	border-bottom: 2px solid #000;
-}
-
-#reply_container {
+.ReplyContainer {
 	position: sticky;
 	bottom: 0;
 	background: #fffA;
@@ -207,63 +172,61 @@ main {
 			display: inline-flex;
 		}
 	}
-	#content_length_indicator {
+	>.ContentLengthIndicator {
 		color: #880;
 		&.LimitExceeded {
 			color: #B00;
 		}
 	}
-}
+	>form {
+		max-height: 60vh;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-gutter: stable;
+		word-wrap: anywhere;
+		>.Username {
+			font-family: var(--name-font);
+		}
+		input[type=text], div[contenteditable] {
+			background: #FFF8;
+			backdrop-filter: blur(10px);
+			padding: 0 4px;
 
-#post_form {
-	max-height: 60vh;
-	overflow-y: auto;
-	overscroll-behavior: contain;
-	scrollbar-gutter: stable;
-	word-wrap: anywhere;
-	#name_field {
-		font-family: var(--name-font);
-	}
-	input[type=text], div[contenteditable] {
-		background: #FFF8;
-		backdrop-filter: blur(10px);
-		padding: 0 4px;
-
-		&#content_field {
-			min-height: 4em;
-			margin-bottom: 4px;
-			white-space: -moz-pre-space;
-			&:empty:before {
-				content: attr(placeholder);
-				cursor: text;
-				color: #0008;
-				display: block;
+			&.Content {
+				min-height: 4em;
+				margin-bottom: 4px;
+				white-space: -moz-pre-space;
+				&:empty:before {
+					content: attr(placeholder);
+					cursor: text;
+					color: #0008;
+					display: block;
+				}
 			}
 		}
-	}
-	>* {
-		margin: 2px 2px 4px;
-		margin-inline: 2px;
-	}
-	>fieldset {
-		min-width: 0;
-		input[type="file"] {
-			max-width: 100%;
+		>* {
+			margin: 2px 2px 4px;
+			margin-inline: 2px;
 		}
-	}
-}
-
-#file_post_list {
-	>* {
-		display: flex;
-		.UploadCompleteIndicator {
-			color: green;
+		>fieldset {
+			min-width: 0;
+			input[type="file"] {
+				max-width: 100%;
+			}
 		}
-		.UploadFailedIndicator {
-			color: red;
-		}
-		&.Errored {
-			image-rendering: pixelated;
+		.FilePostList {
+			>* {
+				display: flex;
+				.UploadCompleteIndicator {
+					color: green;
+				}
+				.UploadFailedIndicator {
+					color: red;
+				}
+				&.Errored {
+					image-rendering: pixelated;
+				}
+			}
 		}
 	}
 }
@@ -276,7 +239,7 @@ main {
 	background: #22D;
 }
 
-#watermark {
+.Watermark {
 	position: fixed;
 	bottom: 0;
 	right: 0;
@@ -374,29 +337,6 @@ class Format {
 
 // The value in the name field is set to the name used in the most recent post, if any.
 name_field.value = localStorage.getItem("name");
-if (localStorage.getItem("logged_in") === "true") {
-	displayClientAsLoggedIn();
-}
-else {
-	registration_link.style["display"] = "inherit";
-}
-
-function displayClientAsLoggedIn() {
-	let account_username = localStorage.getItem("account_username");
-	logged_in_as_username.textContent = account_username;
-	logout_button.style["display"] = "inherit";
-	logged_in_indicator.style["display"] = "inherit";
-	change_password_link.style["display"] = "inherit";
-}
-
-function displayClientAsLoggedOut() {
-	logout_button.style["display"] = "none";
-	logged_in_indicator.style["display"] = "none";
-	registration_link.style["display"] = "inherit";
-	change_password_link.style["display"] = "none";
-	localStorage.removeItem("account_username");
-	localStorage.setItem("logged_in", "false");
-}
 
 async function logoutAction() {
 	displayClientAsLoggedOut();
