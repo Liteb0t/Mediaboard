@@ -473,7 +473,7 @@ async function getAllThreads() {
 		});
 	}
 	else {
-		const error_message = response.headers.get("message");
+		let error_message = response.headers.get("message");
 		error_message ??= "An unknown error occured when attempting to fetch threads.";
 		throw error_message;
 	}
@@ -530,7 +530,10 @@ function showAllThreads(message_json) {
 			fragment.appendChild(thread_element);
 		}
 	}
-	post_container.replaceChildren(fragment);
+	if (fragment.children.length === 0)
+		post_container.replaceChildren(document.createTextNode("None."));
+	else
+		post_container.replaceChildren(fragment);
 }
 
 function openThread(thread_id) {
@@ -550,7 +553,7 @@ async function getThread() {
 		websocket = connectToServer();
 	}
 	else {
-		const error_message = response.headers.get("message");
+		let error_message = response.headers.get("message");
 		error_message ??= "An unknown error occured when attempting to load thread.";
 		throw error_message;
 	}
@@ -1200,7 +1203,7 @@ async function getClientInfo() {
 			});
 		}
 		else {
-			const error_message = response.headers.get("message");
+			let error_message = response.headers.get("message");
 			error_message ??= "An unknown error occured when attempting to fetch client.";
 			throw error_message;
 		}
@@ -1227,7 +1230,7 @@ async function getBoardInfo() {
 			});
 		}
 		else {
-			const error_message = response.headers.get("message");
+			let error_message = response.headers.get("message");
 			error_message ??= "An unknown error occured when attempting to fetch board info.";
 			throw error_message;
 		}

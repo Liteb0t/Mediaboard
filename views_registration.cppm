@@ -96,8 +96,9 @@ FuzeHttp::Response createNewAccount(Mediaboard::State* state, FuzeHttp::Request 
 			invite_key = req_json.at("invite").as_string().c_str();
 	}
 	catch(const std::exception& e) {
-		std::cerr << "JSON error" << std::endl;
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[registerAccount] {}", e.what())};
+		std::string error_message = std::format("[createNewAccount] JSON error: {}", e.what());
+		std::cerr << error_message << std::endl;
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
 	std::string username = std::string(username_j);
 	if (username.length() > Account::MAX_USERNAME)
@@ -188,8 +189,9 @@ FuzeHttp::Response login(Mediaboard::State* state, FuzeHttp::Request req) {
 		stay_logged_in = req_json.at("stay_logged_in").as_bool();
 	}
 	catch(const std::exception& e) {
-		std::cout << "JSON error" << std::endl;
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[login] {}", e.what())};
+		std::string error_message = std::format("[login] JSON error: {}", e.what());
+		std::cerr << error_message << std::endl;
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
 	std::string username = std::string(username_j);
 	if (username.length() >  Account::MAX_USERNAME)
@@ -254,8 +256,9 @@ FuzeHttp::Response changePassword(Mediaboard::State* state, FuzeHttp::Request re
 		old_password_hash_base64 = req_json.at("old_password_hash_base64").as_string();
 	}
 	catch(const std::exception& e) {
-		std::cerr << "JSON error" << std::endl;
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("[registerAccount] {}", e.what())};
+		std::string error_message = std::format("[changePassword] JSON error: {}", e.what());
+		std::cerr << error_message << std::endl;
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
 	std::string username = std::string(username_j);
 	if (username.length() > Account::MAX_USERNAME)

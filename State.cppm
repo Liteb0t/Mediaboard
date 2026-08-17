@@ -107,6 +107,13 @@ public:
 		else
 			return {};
 	}
+	std::optional<Board*> getBoardIfExistsAndClientHasReadPermission(const std::string& slug, const std::optional<FuzeHttp::Client>& client) {
+		std::optional<Board*> board = getBoardIfExists(slug);
+		if (board && board.value()->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD)))
+			return board;
+		else
+			return {};
+	}
 	// Board* getBoard(const std::string& slug) { return &(this->boards.at(this->slug_to_board_id.at(slug))); }
 	std::optional<Board*> getBoardIfExists(const std::string& slug) {
 		if (auto it = slug_to_board_id.find(slug); it == slug_to_board_id.end()) return {}; else return getBoardIfExists(it->second);
@@ -207,12 +214,6 @@ public:
 			}}
 		};
 	}
-	// std::string dumpPermissions(int client_id) const { return this->getPermissionCollectionsAsJson(client_id).dump(); }
-	const Thread* getThread(int board_id, int thread_id) const { return this->boards.at(board_id)->getThread(thread_id); }
-
-	// bool usernameExists(std::string username) const { std::unordered_map<std::string, int>::const_iterator it = username_to_id_map.find(username); return it != username_to_id_map.end(); };
-	// BasicResponse addUserToGroups(const FuzeHttp::Client& client, int user_id, std::vector<int> groups_by_id);
-
 	// void websocketRead (FuzeHttp::WebsocketSession* session) override;
 	void sendToThread (std::string message, Board* board, int thread_id) { // TODO move to Board
 		// Put the message in a shared pointer so we can re-use it for each client

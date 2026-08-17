@@ -27,7 +27,6 @@
 				<!--JSON is used instead of standard HTTP so this is not used
 				<input type="submit">-->
 				<input id="apply_button" type="button" value="Apply"  onclick="applyAction()">
-				&emsp;
 				<input id="delete_button" type="button" value="Delete board" onclick="confirm_delete_board_dialog.showModal()">
 				<!--<a class="Button RightAligned" href=window.location.pathname>Return</a>-->
 			</form>
@@ -38,13 +37,8 @@
 		<dialog id="status_dialog"><p id="status_dialog_body">Loading...</p></dialog>
 		<dialog id="success_dialog" closedby="any">
 			<h2>Success</h2>
-			<p>Modified board <i id="dialog_new_board_slug"></i> - <i id="dialog_new_board_title"></i></p>
-			<div class="ToolBar"><a class="Button" href="./">Boards</a><button onclick="success_dialog.close()">Close</button></div>
-		</dialog>
-		<dialog id="success_dialog" closedby="any">
-			<h2>Success</h2>
-			<p>Modified board <i id="dialog_new_board_slug"></i> - <i id="dialog_new_board_title"></i></p>
-			<div class="ToolBar"><a class="Button" href="./">Boards</a><button onclick="success_dialog.close()">Close</button></div>
+			<p>Modified board <i id="dialog_success_board_slug"></i> - <i id="dialog_success_board_title"></i></p>
+			<div class="ToolBar"><a class="Button" id="edited_board_button" href="./board.html?board=unknown">Go to board</a><a class="Button" href="./">Boards</a><button onclick="success_dialog.close()">Close</button></div>
 		</dialog>
 		<dialog id="confirm_delete_board_dialog" closedby="any">
 			<h2>Confirm delete</h2>
@@ -60,32 +54,19 @@
 <script>
 const url_params = new URLSearchParams(location.search);
 let state = {};
-const board_slug_listeners = [
+const board_slug_listeners = [ // ayo nigga dis is how we state manage round here yo
 	board_slug_indicator,
-	dialog_new_board_slug,
+	dialog_success_board_slug,
 	dialog_confirm_delete_board_slug,
 	dialog_deleted_board_slug
 ];
 const board_title_listeners = [
 	board_title_indicator,
-	dialog_new_board_title,
+	dialog_success_board_title,
 	dialog_confirm_delete_board_title,
 	dialog_deleted_board_title
 ];
-/*
-let state = {
-	selected_board: {
-		slug: null,
-		permissions: {}
-	}
-};
-window.onpopstate = function(event) {
-	if (event.state) {
-		state = event.state;
-	}
-	refresh_send();
-}
-*/
+
 async function deleteBoardAction() {
 	try {
 		status_dialog_body.textContent = "Sending delete request to server...";
@@ -103,7 +84,7 @@ async function deleteBoardAction() {
 				throw(header_error_message);
 		}
 		status_dialog.close();
-		// success_dialog.showModal();
+		deleted_board_dialog.showModal();
 	}
 	catch (error) {
 		status_dialog.close();
@@ -141,12 +122,11 @@ async function applyAction() {
 		status_dialog.close();
 		board_slug_listeners.forEach(element => {
 			element.textContent = slug_input;
-		})
+		});
 		board_title_listeners.forEach(element => {
 			element.textContent = title_input;
-		})
-		// dialog_new_board_slug.textContent = slug_input;
-		// dialog_new_board_title.textContent = title_input;
+		});
+		edited_board_button.href = `./board.html?board=${slug_input}`;
 		success_dialog.showModal();
 	}
 	catch (error) {
@@ -202,7 +182,7 @@ async function getBoardInfo() {
 			});
 		}
 		else {
-			const error_message = response.headers.get("message");
+			let error_message = response.headers.get("message");
 			error_message ??= "An unknown error occured when attempting to fetch board info.";
 			throw error_message;
 		}

@@ -35,8 +35,8 @@
 		<dialog id="status_dialog"><p id="status_dialog_body">Loading...</p></dialog>
 		<dialog id="success_dialog" closedby="any">
 			<h2>Success</h2>
-			<p>Create new board '<i id="dialog_new_board_title"></i>'</p>
-			<div class="ToolBar"><a class="Button" href="./">Boards</a><button onclick="success_dialog.close()">Close</button></div>
+			<p>Create new board <i id="dialog_new_board_slug"></i> - <i id="dialog_new_board_title"></i></p>
+			<div class="ToolBar"><a class="Button" id="new_board_button" href="./board.html?board=unknown">Go to board</a><a class="Button" href="./">Boards</a><button onclick="success_dialog.close()">Close</button></div>
 		</dialog>
 	</body>
 <script>
@@ -64,7 +64,9 @@ async function createAction() {
 				throw(header_error_message);
 		}
 		status_dialog.close();
-		dialog_new_board_title = title_input;
+		new_board_button.href = `./board.html?board=${slug_input}`;
+		dialog_new_board_slug.textContent = slug_input;
+		dialog_new_board_title.textContent = title_input;
 		success_dialog.showModal();
 	}
 	catch (error) {

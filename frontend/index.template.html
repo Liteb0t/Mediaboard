@@ -132,7 +132,7 @@ async function getAllBoards() {
 			});
 		}
 		else {
-			const error_message = response.headers.get("message");
+			let error_message = response.headers.get("message");
 			error_message ??= "An unknown error occured when attempting to fetch boards.";
 			throw error_message;
 		}
@@ -213,7 +213,7 @@ async function getClientInfo() {
 			});
 		}
 		else {
-			const error_message = response.headers.get("message");
+			let error_message = response.headers.get("message");
 			error_message ??= "An unknown error occured when attempting to fetch client.";
 			throw error_message;
 		}
