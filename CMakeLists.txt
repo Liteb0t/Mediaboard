@@ -96,16 +96,23 @@ foreach(file ${frontend_files})
     file(MAKE_DIRECTORY ${destination_dir})
     file(MAKE_DIRECTORY ${depfile_dir})
 
+    # Extract template name without .template.* suffix
+    string(REGEX REPLACE "\.template\.[^\\\/]+$" "" template_basename "${file}")
+    # Convert to uppercase token: index.html → INDEX
+    string(TOUPPER "${template_basename}" template_token)
+    string(REGEX REPLACE "[^A-Z0-9_]" "_" template_token "${template_token}")
+
     add_custom_command(
       OUTPUT ${qualified_destination}
       COMMAND ${CMAKE_C_COMPILER} # runs C preprocessor
-              -E -P -CC -undef -nostdinc -x c -Wno-trigraphs -Wno-c23-extensions ${frontend_definitions}
+              -E -P -CC -undef -nostdinc -x c -Wno-trigraphs -Wno-c23-extensions
+              -D${template_token} ${frontend_definitions}
               -I ${FRONTEND_SOURCE_DIR} -I ${FRONTEND_SOURCE_DIR}/include
               -MMD -MF ${depfile} -MT ${qualified_destination}
               ${qualified_source} -o ${qualified_destination}
       DEPENDS ${qualified_source}
       DEPFILE ${depfile}
-      COMMENT "Preprocessing ${file}"
+      COMMENT "Preprocessing ${file} :: ${template_token}"
       VERBATIM
     )
     list(APPEND frontend_list ${qualified_destination})

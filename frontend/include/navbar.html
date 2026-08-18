@@ -1,14 +1,19 @@
 <div id="header_bar" class="ToolBar WithBorders HeaderBar">
-	<div id="WebsiteName" class="WebsiteName"><b>CONFIG_site_name</b></div>
-#ifndef SERVER_LEVEL
+	<div id="WebsiteName" class="WebsiteName"><b>PREPROCESSOR_ORIGIN - CONFIG_site_name</b></div>
+
 	<a class="Button ToolBarButton" href="index.html">Boards</a>
+#ifdef BOARD
 	<button id="threads_button" class="ToolBarButton">Threads</button>
+#else
+	<a id="navlink_threads" class="Button ToolBarButton" href="board.html" style="display: none;">Threads</a>
 #endif
 	<button id="refresh_button" class="ToolBarButton">Refresh</button>
 #ifdef SERVER_LEVEL
 	<a id="manage_server_button" class="Button ToolBarButton" href="manage_server.html" style="display: none;">Manage server</a>
 #elifdef WITH_WEBRTC
+#ifndef LIVE
 	<a id="navlink_live" class="Button ToolBarButton" href="live.html" style="display: none;">Live</a>
+#endif
 #endif
 	<div class="FlexSeparator"></div>
 	<div id="warning_outdated_browser" style="color: #D00; display: none">Warning: outdated browser</div>
@@ -25,6 +30,7 @@
 	<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard CONFIG_mediaboard_version</a>
 </div>
 <script>
+"use strict";
 // depends on getClient to fire displayClientAsLoggedIn()
 
 // exposes "logout" event

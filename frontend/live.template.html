@@ -29,34 +29,46 @@
 		<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
 	</dialog>
 </body>
-
 <script>
-const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
-const url_params = new URLSearchParams(location.search);
+"use strict";
 let state = {
 	selected_board: {
 		slug: null,
 		permissions: {}
 	}
 };
+const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
+const url_params = new URLSearchParams(location.search);
+if (url_params.get("board")) {
+	state.selected_board.slug =  url_params.get("board");
+	navlink_threads.href = `board.html?board=${state.selected_board.slug}`;
+	navlink_threads.style["display"] = "inherit";
+}
 let pc;
 let listening_connections = [];
-sock = new WebSocket(websocket_url);
+let sock = new WebSocket(websocket_url);
 sock.onopen = (event) => {
 	console.log("Websocket connected 🙂.");
 }
 sock.onmessage = (event) => {
-	let message_json = JSON.parse(event.data);
-	if (message_json.type === "webrtc_offer") {
-		console.log("calling onReceiveOffer");
-		onReceiveOffer(message_json.payload);
+	try {
+		let message_json = JSON.parse(event.data);
+		if (message_json.type === "webrtc_offer") {
+			console.log("calling onReceiveOffer");
+			onReceiveOffer(message_json.payload);
+		}
+		else if (message_json.type === "webrtc_watch_stream") {
+			console.log("calling onReceiveWatchStream");
+			onReceiveWatchStream(message_json.payload);
+		}
+		else {
+			throw `message_json type ${message_json.type} not recognised.`;
+		}
 	}
-	else if (message_json.type === "webrtc_watch_stream") {
-		console.log("calling onReceiveWatchStream");
-		onReceiveWatchStream(message_json.payload);
-	}
-	else {
-		console.error("message_json type " + message_json.type + " not recognised.");
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
 	}
 }
 
@@ -148,13 +160,13 @@ async function onReceiveWatchStream(payload) {
 	};
 
 	let trackCount = 0;
-	conn.ontrack = async(event) => {
+	conn.ontrack = (event) => {
 		const video_element = document.createElement("video");
-		video_container.appendChild(video_element);
 		video_element.autoplay = true;
 		video_element.playsInline = true;
 		video_element.srcObject = event.streams[0] ?? new MediaStream([event.track]);
-		await video_element.play();
+		video_container.appendChild(video_element);
+		video_element.play();
 	};
 	try {
 		console.log("Setting remote description...");

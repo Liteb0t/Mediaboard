@@ -81,7 +81,10 @@ private:
 					}
 				});
 				rtc::Description::Video media("video", rtc::Description::Direction::RecvOnly);
-				media.addH264Codec(96);
+
+				// Idealy H264 would be used because it's the superior codec [source: it just is, ok?]
+				// but, for compatibility reasons (god damn it Firefox) Vp8 is used instead
+				media.addVP8Codec(96);
 				media.setBitrate(3000); // Request 3Mbps (Browsers do not encode more than 2.5MBps from a webcam)
 				std::shared_ptr<rtc::Track> track = pc->addTrack(media);
 				board.value()->webrtc_room.track = track;
@@ -143,7 +146,7 @@ private:
 					}
 				});
 				rtc::Description::Video media("video", rtc::Description::Direction::SendOnly);
-				media.addH264Codec(96);
+				media.addVP8Codec(96);
 				media.setBitrate(3000);
 				media.addSSRC(targetSSRC, "video-send", "video-send", "video-send");
 
