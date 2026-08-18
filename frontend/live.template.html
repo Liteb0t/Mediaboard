@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>CONFIG_site_name</title>
+    <meta name="description" content="Fuze Mediaboard is an imageboard engine with advanced permissions.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="utf-8">
+    <link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
+    <link rel="stylesheet" href=FILE_"static/styles.css">
+</head>
+<body>
+	<main>
+#include "navbar.html"
+		<h3 id="location_indicator"></h3>
+		<h2>SENDER</h2>
+		<input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
+		<button id="share_button" onclick="shareMedia()">Share media</button>
+		<h2>RECEIVER</h2>
+		<button id="watch_button" onclick="watchStream()">Watch stream</button>
+		<div id="video_container">
+		</div>
+	</main>
+	<noscript>
+		<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
+	</noscript>
+	<dialog id="error_dialog" closedby="any">
+		<h2>Error</h2>
+		<p id="error_message">Something happened.</p>
+		<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
+	</dialog>
+</body>
+
+<script>
+const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
+const url_params = new URLSearchParams(location.search);
+let state = {
+	selected_board: {
+		slug: null,
+		permissions: {}
+	}
+};
+let pc;
+let listening_connections = [];
+sock = new WebSocket(websocket_url);
+sock.onopen = (event) => {
+	console.log("Websocket connected 🙂.");
+}
+sock.onmessage = (event) => {
+	let message_json = JSON.parse(event.data);
+	if (message_json.type === "webrtc_offer") {
+		console.log("calling onReceiveOffer");
+		onReceiveOffer(message_json.payload);
+	}
+	else if (message_json.type === "webrtc_watch_stream") {
+		console.log("calling onReceiveWatchStream");
+		onReceiveWatchStream(message_json.payload);
+	}
+	else {
+		console.error("message_json type " + message_json.type + " not recognised.");
+	}
+}
+
+function shareMedia() {
+	pc = new RTCPeerConnection({
+		// Recommended for libdatachannel
+		bundlePolicy: 'max-bundle',
+	});
+	sock.send(JSON.stringify({
+		type: "webrtc_share_request",
+		board: state.selected_board.slug
+	}))
+}
+
+async function onReceiveOffer(payload) {
+	pc.onicegatheringstatechange = (state) => {
+		console.log("[sender] ICE gathering state: " + pc.iceGatheringState);
+		if (pc.iceGatheringState === 'complete') {
+			// We only want to provide an answer once all of our candidates have been added to the SDP.
+			const answer = pc.localDescription;
+			sock.send(JSON.stringify({
+				type: "webrtc_share_answer",
+				payload: {
+					type: answer.type,
+					sdp: answer.sdp
+				}
+			}))
+		}
+	}
+	pc.onicecandidateerror = (event) => {
+		console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
+	};
+	await pc.setRemoteDescription(payload);
+
+	let media
+	if (share_screen_checkbox.checked) {
+		media = await navigator.mediaDevices.getDisplayMedia();
+	}
+	else {
+		// TODO check if error thrown, likely caused by source being in use already
+		media = await navigator.mediaDevices.getUserMedia({
+			video: {
+				width: 1280,
+				height: 720
+			}
+		});
+	}
+	media.getTracks().forEach(track => pc.addTrack(track, media));
+
+	console.log("[onReceiveOffer] creating answer...");
+	const answer = await pc.createAnswer();
+	console.log("[onReceiveOffer] done. Setting local description...");
+	await pc.setLocalDescription(answer);
+	console.log("[onReceiveOffer] Finished setting local description");
+}
+
+function watchStream() {
+	sock.send(JSON.stringify({
+		type: "webrtc_watch_stream_request",
+		board: state.selected_board.slug
+	}))
+}
+
+async function onReceiveWatchStream(payload) {
+	let conn = new RTCPeerConnection({
+		// Recommended for libdatachannel
+		bundlePolicy: 'max-bundle',
+	});
+	listening_connections[payload.connection_id] = conn;
+	conn.onicegatheringstatechange = (state) => {
+		console.log("[sender] ICE gathering state: " + conn.iceGatheringState);
+		if (conn.iceGatheringState === 'complete') {
+			// We only want to provide an answer once all of our candidates have been added to the SDP.
+			const answer = conn.localDescription;
+			sock.send(JSON.stringify({
+				type: "webrtc_watch_stream_answer",
+				payload: {
+					connection_id: payload.connection_id,
+					description: {
+						type: answer.type,
+						sdp: answer.sdp
+					}
+				}
+			}))
+		}
+	}
+	conn.onicecandidateerror = (event) => {
+		console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
+	};
+
+	let trackCount = 0;
+	conn.ontrack = async(event) => {
+		const video_element = document.createElement("video");
+		video_container.appendChild(video_element);
+		video_element.autoplay = true;
+		video_element.playsInline = true;
+		video_element.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+		await video_element.play();
+	};
+	try {
+		console.log("Setting remote description...");
+		await conn.setRemoteDescription(payload.description);
+		console.log("Done. Creating answer...");
+		const answer = await conn.createAnswer();
+		console.log("Done. Setting local description...");
+		await conn.setLocalDescription(answer);
+		console.log("Finished setting local description");
+	}
+	catch (err) {
+		console.error("watch stream negotiation failed:", err);
+	}
+}
+
+async function getClientInfo() {
+	try {
+		const response = await fetch("api/user/client");
+		console.log(response);
+		if (response.ok) {
+			await response.json().then(response_json => {
+				console.log(response_json);
+				if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
+					displayClientAsLoggedOut();
+				}
+				state.server_permissions = response_json["server_permissions"];
+				window.history.replaceState(state, null, ""); // Initial state
+				// manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
+			});
+		}
+		else {
+			let error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch client.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+}
+
+async function getBoardInfo() {
+	try {
+		const board_slug_from_url = url_params.get("board");
+		if (board_slug_from_url === null)
+			throw "URL parameter 'board' is required (example: ?board=qa).";
+		state.selected_board.slug = board_slug_from_url;
+		const response = await fetch(`api/board/${state.selected_board.slug}`);
+		console.log(response);
+		if (response.ok) {
+			await response.json().then(response_json => {
+				console.log(response_json);
+				state.selected_board.permissions = response_json["client_permissions"];
+				window.history.replaceState(state, null, ""); // Initial state
+			});
+		}
+		else {
+			let error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch board info.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+}
+getClientInfo(); // runs asynchronously
+getBoardInfo();
+</script>
+</body>
+</html>

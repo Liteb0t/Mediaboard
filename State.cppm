@@ -92,7 +92,7 @@ public:
 		}
 		std::println("done. final list of boards:");
 		for (const std::pair<std::string, int>& slug_board_id : slug_to_board_id)
-			std::println("{} : {}", slug_board_id.first, slug_board_id.second);
+			std::println("{} - {}", slug_board_id.first, slug_board_id.second);
 	}
 
 	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.

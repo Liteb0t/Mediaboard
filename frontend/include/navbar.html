@@ -1,9 +1,15 @@
 <div id="header_bar" class="ToolBar WithBorders HeaderBar">
 	<div id="WebsiteName" class="WebsiteName"><b>CONFIG_site_name</b></div>
+#ifndef SERVER_LEVEL
 	<a class="Button ToolBarButton" href="index.html">Boards</a>
-	<button id="threads_button" class="ToolBarButton" onclick="openThreadList()">&#x1F5D0; Threads</button>
-	<button id="refresh_button" class="ToolBarButton" onclick="loading_dialog.showModal();refresh_send().then(() => {loading_dialog.close();});">&#x2B6E; Refresh</button>
+	<button id="threads_button" class="ToolBarButton">Threads</button>
+#endif
+	<button id="refresh_button" class="ToolBarButton">Refresh</button>
+#ifdef SERVER_LEVEL
 	<a id="manage_server_button" class="Button ToolBarButton" href="manage_server.html" style="display: none;">Manage server</a>
+#elifdef WITH_WEBRTC
+	<a id="navlink_live" class="Button ToolBarButton" href="live.html" style="display: none;">Live</a>
+#endif
 	<div class="FlexSeparator"></div>
 	<div id="warning_outdated_browser" style="color: #D00; display: none">Warning: outdated browser</div>
 	<!--
@@ -19,6 +25,24 @@
 	<a id="header_bar_mediaboard_link" href="https://fuze.page/software/mediaboard/" style="display: none">Fuze Mediaboard CONFIG_mediaboard_version</a>
 </div>
 <script>
+// depends on getClient to fire displayClientAsLoggedIn()
+
+// exposes "logout" event
+const logout_event = new Event("logout");
+
+async function logoutAction() {
+	displayClientAsLoggedOut();
+	// manage_server_button.style["display"] = "none";
+	// localStorage.removeItem("server_permissions");
+	const fetch_response = await fetch("./registration/logout", {method: "POST"});
+	if (fetch_response && fetch_response.ok) {
+		document.dispatchEvent(logout_event);
+	}
+	else {
+		console.error("Couldn't log out for one reason or another");
+	}
+}
+
 if (localStorage.getItem("logged_in") === "true") {
 	displayClientAsLoggedIn();
 }

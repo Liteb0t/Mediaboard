@@ -9,7 +9,6 @@
 		<link rel="stylesheet" href=FILE_"static/styles.css">
 	</head>
 	<body>
-		<!--Navbar can go here-->
 		<main>
 #include "navbar.html"
 			<h3 id="location_indicator"></h3>
@@ -296,7 +295,10 @@ if (CONFIG_show_watermarks && !url_params_display_as_embed) header_bar_mediaboar
 if (CONFIG_show_watermarks && url_params_display_as_embed) watermark.style["display"] = "inherit";
 state.selected_board.slug = url_params.get("board") ? url_params.get("board") : -1;
 state.selected_thread.id = url_params.get("thread") ? Number(url_params.get("thread")) : -1;
-
+#ifdef WITH_WEBRTC
+navlink_live.href = `live.html?board=${state.selected_board.slug}`;
+navlink_live.style["display"] = "inherit";
+#endif
 window.onpopstate = function(event) {
 	if (event.state) {
 		state = event.state;
@@ -338,20 +340,11 @@ class Format {
 // The value in the name field is set to the name used in the most recent post, if any.
 name_field.value = localStorage.getItem("name");
 
-async function logoutAction() {
-	displayClientAsLoggedOut();
-	// manage_server_button.style["display"] = "none";
-	// localStorage.removeItem("server_permissions");
+document.addEventListener("logout", () => {
 	state.server_permissions = undefined;
-	const fetch_response = await fetch("./registration/logout", {method: "POST"});
-	if (fetch_response && fetch_response.ok) {
-		refresh_send();
-		getClientInfo();
-	}
-	else {
-		console.error("Couldn't log out for one reason or another");
-	}
-}
+	refresh_send();
+	getClientInfo();
+})
 
 document.body.onclick = (event) => {
 	let target = event.target;
@@ -374,14 +367,16 @@ function contractEmbedFigure(figure_element) {
 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "inherit";
 }
 
-
+threads_button.onclick = () => {"openThreadList()"} // included in navbar.html
 function openThreadList() {
 	state.selected_thread.id = -1;
 	history.pushState(state, "", window.location.pathname + `?board=${state.selected_board.slug}`);
 	refresh_send();
 }
 
+refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
 async function refresh_send() {
+	loading_dialog.showModal();
 	lock_scroll_to_bottom = false;
 	if (typeof websocket !== "undefined") {
 		websocket.close();
@@ -394,6 +389,7 @@ async function refresh_send() {
 			await getThread();
 			lock_scroll_to_bottom = true;
 		}
+		loading_dialog.close();
 	}
 	catch (error) {
 		loading_dialog.close();
@@ -722,7 +718,7 @@ function updateReplyContainer(selected_thread_id, permissions) {
 	if (selected_thread_id >= 0) {
 		if (permissions["send_message"] ) {
 			reply_heading_text.textContent = "Leave a reply";
-			reply_container.style["display"] = "initial";
+			reply_container.style["display"] = "inherit";
 		}
 		else {
 			reply_container.style["display"] = "none";
@@ -731,7 +727,7 @@ function updateReplyContainer(selected_thread_id, permissions) {
 	else {
 		if (permissions["create_thread"]) {
 			reply_heading_text.textContent = "Create a thread";
-			reply_container.style["display"] = "initial";
+			reply_container.style["display"] = "inherit";
 		}
 		else {
 			reply_container.style["display"] = "none";
@@ -1134,7 +1130,7 @@ async function getClientInfo() {
 				}
 				state.server_permissions = response_json["server_permissions"];
 				window.history.replaceState(state, null, ""); // Initial state
-				manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
+				// manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
 				console.log(state);
 				// if (!(state.selected_thread.id >= 0)) {
 				// 	updateReplyContainer(state.selected_thread.id, state.server_permissions);

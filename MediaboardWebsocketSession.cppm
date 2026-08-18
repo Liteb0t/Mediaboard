@@ -58,7 +58,7 @@ private:
 			else if (request_type == "webrtc_share_request") {
 				std::println("Creating WebRTC offer...");
 				std::string board_slug = buffer_as_json["board"].as_string().c_str();
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
 				if (!board)
 					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
 				this->tracking_board = board.value()->getId();
@@ -84,14 +84,17 @@ private:
 				media.addH264Codec(96);
 				media.setBitrate(3000); // Request 3Mbps (Browsers do not encode more than 2.5MBps from a webcam)
 				std::shared_ptr<rtc::Track> track = pc->addTrack(media);
-				getState()->main_board()->webrtc_room.track = track;
+				board.value()->webrtc_room.track = track;
 				track->setMediaHandler(std::make_shared<rtc::RtcpReceivingSession>());
 				track->onMessage(
 					[this](rtc::binary message) {
 						// This is an RTP packet
 						auto rtp = reinterpret_cast<rtc::RtpHeader *>(message.data());
 						rtp->setSsrc(targetSSRC);
-						for (auto pc : this->getState()->main_board()->webrtc_room.receivers) {
+						auto board = this->getState()->getBoardIfExists(this->tracking_board);
+						if (!board)
+							throw "board no longer exists";
+						for (auto pc : board.value()->webrtc_room.receivers) {
 							if (pc.second->track != nullptr && pc.second->track->isOpen()) {
 								pc.second->track->send(message);
 							}
@@ -101,17 +104,17 @@ private:
 				pc->setLocalDescription();
 			}
 			else if (request_type == "webrtc_share_answer") {
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, client);
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, getClient());
 				if (!board)
-					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
+					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", tracking_board);
 				std::string sdp  = buffer_as_json.at("payload").at("sdp" ).as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("type").as_string().c_str();
 				rtc::Description answer(sdp, type);
-				getState()->main_board()->webrtc_room.peer_connection->setRemoteDescription(answer);
+				board.value()->webrtc_room.peer_connection->setRemoteDescription(answer);
 			}
 			else if (request_type == "webrtc_watch_stream_request") {
 				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
 				if (!board)
 					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
 				this->tracking_board = board.value()->getId();
@@ -149,18 +152,18 @@ private:
 				webrtc_receiver->track->onMessage([](rtc::binary var) {}, nullptr);
 
 				webrtc_receiver->conn->setLocalDescription();
-				getState()->main_board()->webrtc_room.receivers.emplace(new_connection_id, webrtc_receiver);
+				board.value()->webrtc_room.receivers.emplace(new_connection_id, webrtc_receiver);
 			}
 			else if (request_type == "webrtc_watch_stream_answer") { // TODO check if sender is still there
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, client);
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, getClient());
 				if (!board)
-					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
+					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", tracking_board);
 				int connection_id = buffer_as_json.at("payload").at("connection_id").as_int64();
 				std::string sdp  = buffer_as_json.at("payload").at("description").at("sdp" ).as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
 				rtc::Description answer(sdp, type);
-				getState()->main_board()->webrtc_room.receivers.at(connection_id)->conn->setRemoteDescription(answer);
-				getState()->main_board()->webrtc_room.track->requestKeyframe();
+				board.value()->webrtc_room.receivers.at(connection_id)->conn->setRemoteDescription(answer);
+				board.value()->webrtc_room.track->requestKeyframe();
 			}
 			// else if (request_type == "webrtc_signal") {
 			// 	std::println("received webrtc_signal WS message");

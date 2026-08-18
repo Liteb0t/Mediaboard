@@ -88,7 +88,6 @@ FuzeHttp::Response createBoard(Mediaboard::State* state, FuzeHttp::Request req, 
 
 FuzeHttp::Response getBoards(Mediaboard::State* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::println("called getBoards");
 	return Response{
 		.status = http::status::ok,
 		.json = state->getBoardsAsJson(client)

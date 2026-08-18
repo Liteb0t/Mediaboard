@@ -28,13 +28,14 @@ if(WITH_MAGICK)
   add_compile_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
   add_compile_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
   include_directories(${ImageMagick_INCLUDE_DIRS})
-  target_compile_definitions(MediaboardServer PUBLIC WITH_MAGICK)
+  target_compile_definitions(MediaboardServer PRIVATE WITH_MAGICK)
   target_link_libraries(MediaboardServer PRIVATE ${ImageMagick_LIBRARIES})
 else()
   message("Compiling without ImageMagick support. Certain features such as thumbnail creation will not work.")
 endif()
 
 if(WITH_WEBRTC)
+  target_compile_definitions(MediaboardServer PRIVATE WITH_WEBRTC)
   target_link_libraries(MediaboardServer PRIVATE datachannel)
 endif()
 target_link_libraries(MediaboardServer
@@ -81,6 +82,10 @@ foreach(file ${frontend_files})
     continue()
   elseif (file MATCHES "\.template\.[^\\\/]+$")
     message("----is template")
+    set(frontend_definitions "")
+    if (WITH_WEBRTC)
+      set(frontend_definitions "-DWITH_WEBRTC=1")
+    endif()
     # [AI glasnost] this section assisted by Claude Sonnet 5
     set(qualified_source ${FRONTEND_SOURCE_DIR}/${file})
     set(qualified_destination ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend/${file})
@@ -94,7 +99,7 @@ foreach(file ${frontend_files})
     add_custom_command(
       OUTPUT ${qualified_destination}
       COMMAND ${CMAKE_C_COMPILER} # runs C preprocessor
-              -E -P -CC -undef -nostdinc -x c
+              -E -P -CC -undef -nostdinc -x c -Wno-trigraphs -Wno-c23-extensions ${frontend_definitions}
               -I ${FRONTEND_SOURCE_DIR} -I ${FRONTEND_SOURCE_DIR}/include
               -MMD -MF ${depfile} -MT ${qualified_destination}
               ${qualified_source} -o ${qualified_destination}
