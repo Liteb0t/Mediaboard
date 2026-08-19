@@ -13,7 +13,7 @@
 #include <print>
 #include <string>
 #include <vector>
-import MediaboardWebsocketSession;
+import Mediaboard.MediaboardWebsocketSession;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.Server;
 import FuzeHttp.Utils;

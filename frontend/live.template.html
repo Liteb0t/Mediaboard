@@ -12,12 +12,15 @@
 	<main>
 #include "navbar.html"
 		<h3 id="location_indicator"></h3>
+		<button id="create_room_button">Create room</button>
+		<button id="show_rooms_button">Show rooms</button><br>
+		<div id="room_list_container">
 		<h2>SENDER</h2>
 		<input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
 		<button id="share_button" onclick="shareMedia()">Share media</button>
 		<h2>RECEIVER</h2>
-		<button id="watch_button" onclick="watchStream()">Watch stream</button>
-		<div id="video_container">
+		<button id="watch_button" onclick="watchStream()">Watch stream</button><br>
+		<div id="video_container" class="LiveVideoContainer">
 		</div>
 	</main>
 	<noscript>
@@ -29,12 +32,21 @@
 		<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
 	</dialog>
 </body>
+<style>
+.LiveVideoContainer &>video {
+	border: 2px solid #000;
+	margin: 4px;
+}
+</style>
 <script>
 "use strict";
 let state = {
 	selected_board: {
 		slug: null,
 		permissions: {}
+	},
+	selected_room: {
+		id: null
 	}
 };
 const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
@@ -44,8 +56,8 @@ if (url_params.get("board")) {
 	navlink_threads.href = `board.html?board=${state.selected_board.slug}`;
 	navlink_threads.style["display"] = "inherit";
 }
-let pc;
-let listening_connections = [];
+// let pc;
+// let listening_connections = [];
 let sock = new WebSocket(websocket_url);
 sock.onopen = (event) => {
 	console.log("Websocket connected 🙂.");
@@ -73,10 +85,6 @@ sock.onmessage = (event) => {
 }
 
 function shareMedia() {
-	pc = new RTCPeerConnection({
-		// Recommended for libdatachannel
-		bundlePolicy: 'max-bundle',
-	});
 	sock.send(JSON.stringify({
 		type: "webrtc_share_request",
 		board: state.selected_board.slug
@@ -84,6 +92,10 @@ function shareMedia() {
 }
 
 async function onReceiveOffer(payload) {
+	const pc = new RTCPeerConnection({
+		// Recommended for libdatachannel
+		bundlePolicy: 'max-bundle',
+	});
 	pc.onicegatheringstatechange = (state) => {
 		console.log("[sender] ICE gathering state: " + pc.iceGatheringState);
 		if (pc.iceGatheringState === 'complete') {
@@ -92,8 +104,11 @@ async function onReceiveOffer(payload) {
 			sock.send(JSON.stringify({
 				type: "webrtc_share_answer",
 				payload: {
-					type: answer.type,
-					sdp: answer.sdp
+					connection_id: payload.connection_id,
+					description: {
+						type: answer.type,
+						sdp: answer.sdp
+					}
 				}
 			}))
 		}
@@ -101,28 +116,33 @@ async function onReceiveOffer(payload) {
 	pc.onicecandidateerror = (event) => {
 		console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
 	};
-	await pc.setRemoteDescription(payload);
+	try {
+		await pc.setRemoteDescription(payload.description);
 
-	let media
-	if (share_screen_checkbox.checked) {
-		media = await navigator.mediaDevices.getDisplayMedia();
-	}
-	else {
-		// TODO check if error thrown, likely caused by source being in use already
-		media = await navigator.mediaDevices.getUserMedia({
-			video: {
-				width: 1280,
-				height: 720
-			}
-		});
-	}
-	media.getTracks().forEach(track => pc.addTrack(track, media));
+		let media
+		if (share_screen_checkbox.checked) {
+			media = await navigator.mediaDevices.getDisplayMedia();
+		}
+		else {
+			// TODO check if error thrown, likely caused by source being in use already
+			media = await navigator.mediaDevices.getUserMedia({
+				video: {
+					width: 1280,
+					height: 720
+				}
+			});
+		}
+		media.getTracks().forEach(track => pc.addTrack(track, media));
 
-	console.log("[onReceiveOffer] creating answer...");
-	const answer = await pc.createAnswer();
-	console.log("[onReceiveOffer] done. Setting local description...");
-	await pc.setLocalDescription(answer);
-	console.log("[onReceiveOffer] Finished setting local description");
+		console.log("[onReceiveOffer] creating answer...");
+		const answer = await pc.createAnswer();
+		console.log("[onReceiveOffer] done. Setting local description...");
+		await pc.setLocalDescription(answer);
+		console.log("[onReceiveOffer] Finished setting local description");
+	}
+	catch(error) {
+		handleMediaError(error);
+	}
 }
 
 function watchStream() {
@@ -137,7 +157,7 @@ async function onReceiveWatchStream(payload) {
 		// Recommended for libdatachannel
 		bundlePolicy: 'max-bundle',
 	});
-	listening_connections[payload.connection_id] = conn;
+	// listening_connections[payload.connection_id] = conn;
 	conn.onicegatheringstatechange = (state) => {
 		console.log("[sender] ICE gathering state: " + conn.iceGatheringState);
 		if (conn.iceGatheringState === 'complete') {
@@ -147,6 +167,7 @@ async function onReceiveWatchStream(payload) {
 				type: "webrtc_watch_stream_answer",
 				payload: {
 					connection_id: payload.connection_id,
+					sender_connection_id: 0,
 					description: {
 						type: answer.type,
 						sdp: answer.sdp
@@ -158,6 +179,7 @@ async function onReceiveWatchStream(payload) {
 	conn.onicecandidateerror = (event) => {
 		console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
 	};
+	try {
 
 	let trackCount = 0;
 	conn.ontrack = (event) => {
@@ -168,7 +190,6 @@ async function onReceiveWatchStream(payload) {
 		video_container.appendChild(video_element);
 		video_element.play();
 	};
-	try {
 		console.log("Setting remote description...");
 		await conn.setRemoteDescription(payload.description);
 		console.log("Done. Creating answer...");
@@ -178,8 +199,80 @@ async function onReceiveWatchStream(payload) {
 		console.log("Finished setting local description");
 	}
 	catch (err) {
-		console.error("watch stream negotiation failed:", err);
+		handleMediaError(err, conn);
 	}
+}
+function handleMediaError(error, pc) {
+	let error_content;
+	switch (error.name) {
+		case "NotAllowedError":
+			error_content = "Client denied permission to access screen or camera.";
+			break;
+		case "NotFoundError":
+			error_content = "Media device not found.";
+			break;
+		case "NotReadableError":
+			error_content = "Media device not readable. Maybe it's being used by another application?";
+			break;
+		default:
+			error_content = error.message ?? String(error);
+	}
+	// error_message ??= error.message ?? String(error);
+
+	console.error(error);
+	error_message.textContent = error_content;
+	error_dialog.showModal();
+
+	pc?.close();
+}
+create_room_button.onclick = () => { createRoom(); }
+async function createRoom() {
+	console.log("sending create room request...");
+	const fetch_response = await fetch(`api/board/${state.selected_board.slug}/room`, {method: "POST"});
+	if (!fetch_response.ok) {
+		let error_message = response.headers.get("message");
+		error_message ??= "An unknown error occured when attempting to create room.";
+		throw error_message;
+	}
+	return fetch_response;
+}
+show_rooms_button.onclick = () => { getAllRooms(); }
+async function getAllRooms() {
+	let response = await fetch(`./api/board/${state.selected_board.slug}/rooms`);
+	console.log(response);
+	if (response.ok) {
+		await response.json().then(response_obj => {
+			console.log(response_obj);
+			showAllRooms(response_obj);
+		});
+	}
+	else {
+		let error_message = response.headers.get("message");
+		error_message ??= "An unknown error occured when attempting to fetch rooms.";
+		throw error_message;
+	}
+}
+
+function showAllRooms(message_json) {
+	location_indicator.textContent = "Rooms in board " + state.selected_board.slug;
+	//threads_button.disabled = true;
+
+	const fragment = new DocumentFragment();
+	for (let room of message_json.rooms) {
+		// console.log(thread.id);
+		// console.log(thread.post_zero);
+			let room_element = document.createElement("div");
+			room_element.classList.add("Room");
+			// Toolbar at the bottom of each thread
+			const id_indicator = document.createElement("span");
+			room_element.append(id_indicator);
+
+			fragment.appendChild(room_element);
+	}
+	if (fragment.children.length === 0)
+		room_list_container.replaceChildren(document.createTextNode("None."));
+	else
+		room_list_container.replaceChildren(fragment);
 }
 
 async function getClientInfo() {

@@ -56,6 +56,7 @@ target_sources(MediaboardServer
       MediaboardWebsocketSession.cppm
       Message.cppm
       Permission.cppm
+      Room.cppm;
       State.cppm
       Thread.cppm
       views.cppm

@@ -7,6 +7,7 @@ export module Mediaboard.Message;
 
 import FuzeDBI;
 import FuzeHttp.Core;
+// import FuzeHttp.ValidatedOrError;
 
 export namespace Mediaboard {
 enum class MESSAGE_FIELDS : size_t { MAX_NAME = 32, MAX_CONTENT = 5000, MAX_FILE_NAME = 205, MAX_FILE_NAME_WITH_UUID = 205+36 };
@@ -19,6 +20,12 @@ struct File {
 
 class Message {
 public:
+	// struct ValidatedInput {
+	// 	int board_id;
+	// };
+	// static FuzeHttp::ValidatedOrError<ValidatedInput> validateInput(const boost::json::object json) {
+ //
+	// }
 	// Cache message from database
 	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::string content, std::vector<File> files, bool deleted = false)
 			: id(id),
