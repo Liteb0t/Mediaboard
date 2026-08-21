@@ -1,0 +1,216 @@
+<div id="connection_information_container" style="display: none">
+	<h4>Connected</h4>
+	<button id="connection_information_disconnect_button">Exit room</button>
+</div>
+<h2>SENDER</h2>
+<input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
+<button id="room_share_button">Share media</button>
+<h2>RECEIVER</h2>
+<button id="room_watch_button">Watch stream</button><br>
+<div id="video_container" class="LiveVideoContainer"></div>
+<script>
+class RoomConnection {
+	constructor() {
+		room_share_button.onclick = () => { this.shareMedia(); }
+		room_watch_button.onclick = () => { this.watchStream(); }
+		connection_information_disconnect_button.onclick = () => { this.disconnectFromRoom(); }
+		this.sock = new WebSocket(websocket_url);
+		this.sock.onopen = (event) => {
+			console.log("Websocket connected 🙂.");
+		}
+		this.sock.onmessage = (event) => {
+			try {
+				let message_json = JSON.parse(event.data);
+				if (message_json.type === "webrtc_offer") {
+					console.log("calling onReceiveOffer");
+					this.onReceiveOffer(message_json.payload);
+				}
+				else if (message_json.type === "webrtc_watch_stream") {
+					console.log("calling onReceiveWatchStream");
+					this.onReceiveWatchStream(message_json.payload);
+				}
+				else if (message_json.type === "connect_to_room_response") {
+					this.onConnectRoom(message_json.payload);
+				}
+				else {
+					throw `message_json type ${message_json.type} not recognised.`;
+				}
+			}
+			catch (error) {
+				console.error(error);
+				error_message.textContent = error;
+				error_dialog.showModal();
+			}
+		}
+	}
+
+	connectToRoom(room_id) {
+		this.sock.send(JSON.stringify({
+			type: "connect_to_room",
+			board: state.selected_board.slug,
+			room: room_id
+		}));
+	}
+
+	onConnectRoom(payload) {
+		if (payload.ok) {
+			selected_room_id = payload.room;
+			connection_information_container.style["display"] = "inherit";
+			// document.getElementById(`room_${selected_room_id}`).classList.add("Connected");
+		}
+	}
+
+	disconnectFromRoom(room_id) {
+		this.sock.send(JSON.stringify({
+			type: "disconnect_from_room"
+		}));
+	}
+
+	onDisconnectFromRoom(payload) {
+		selected_room_id = -1;
+		connection_information_container.style["display"] = "none";
+		// document.getElementById(`room_${selected_room_id}`).classList.add("Connected");
+	}
+	shareMedia() {
+		this.sock.send(JSON.stringify({
+			type: "webrtc_share_request",
+			board: state.selected_board.slug
+		}))
+	}
+
+	async onReceiveOffer(payload) {
+		const pc = new RTCPeerConnection({
+			// Recommended for libdatachannel
+			bundlePolicy: 'max-bundle',
+		});
+		pc.onicegatheringstatechange = (state) => {
+			console.log("[sender] ICE gathering state: " + pc.iceGatheringState);
+			if (pc.iceGatheringState === 'complete') {
+				// We only want to provide an answer once all of our candidates have been added to the SDP.
+				const answer = pc.localDescription;
+				this.sock.send(JSON.stringify({
+					type: "webrtc_share_answer",
+					payload: {
+						connection_id: payload.connection_id,
+						description: {
+							type: answer.type,
+							sdp: answer.sdp
+						}
+					}
+				}))
+			}
+		}
+		pc.onicecandidateerror = (event) => {
+			console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
+		};
+		try {
+			await pc.setRemoteDescription(payload.description);
+
+			let media
+			if (share_screen_checkbox.checked) {
+				media = await navigator.mediaDevices.getDisplayMedia();
+			}
+			else {
+				// TODO check if error thrown, likely caused by source being in use already
+				media = await navigator.mediaDevices.getUserMedia({
+					video: {
+						width: 1280,
+						height: 720
+					}
+				});
+			}
+			media.getTracks().forEach(track => pc.addTrack(track, media));
+
+			console.log("[onReceiveOffer] creating answer...");
+			const answer = await pc.createAnswer();
+			console.log("[onReceiveOffer] done. Setting local description...");
+			await pc.setLocalDescription(answer);
+			console.log("[onReceiveOffer] Finished setting local description");
+		}
+		catch(error) {
+			RoomConnection.handleMediaError(error);
+		}
+	}
+
+	watchStream() {
+		this.sock.send(JSON.stringify({
+			type: "webrtc_watch_stream_request",
+			board: state.selected_board.slug
+		}))
+	}
+
+	async onReceiveWatchStream(payload) {
+		let conn = new RTCPeerConnection({
+			// Recommended for libdatachannel
+			bundlePolicy: 'max-bundle',
+		});
+		// listening_connections[payload.connection_id] = conn;
+		conn.onicegatheringstatechange = (state) => {
+			console.log("[sender] ICE gathering state: " + conn.iceGatheringState);
+			if (conn.iceGatheringState === 'complete') {
+				// We only want to provide an answer once all of our candidates have been added to the SDP.
+				const answer = conn.localDescription;
+				this.sock.send(JSON.stringify({
+					type: "webrtc_watch_stream_answer",
+					payload: {
+						connection_id: payload.connection_id,
+						sender_connection_id: 0,
+						description: {
+							type: answer.type,
+							sdp: answer.sdp
+						}
+					}
+				}))
+			}
+		}
+		conn.onicecandidateerror = (event) => {
+			console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
+		};
+		try {
+
+			let trackCount = 0;
+			conn.ontrack = (event) => {
+				const video_element = document.createElement("video");
+				video_element.autoplay = true;
+				video_element.playsInline = true;
+				video_element.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+				video_container.appendChild(video_element);
+				video_element.play();
+			};
+			console.log("Setting remote description...");
+			await conn.setRemoteDescription(payload.description);
+			console.log("Done. Creating answer...");
+			const answer = await conn.createAnswer();
+			console.log("Done. Setting local description...");
+			await conn.setLocalDescription(answer);
+			console.log("Finished setting local description");
+		}
+		catch (err) {
+			RoomConnection.handleMediaError(err, conn);
+		}
+	}
+	static handleMediaError(error, pc) {
+		let error_content;
+		switch (error.name) {
+			case "NotAllowedError":
+				error_content = "Client denied permission to access screen or camera.";
+				break;
+			case "NotFoundError":
+				error_content = "Media device not found.";
+				break;
+			case "NotReadableError":
+				error_content = "Media device not readable. Maybe it's being used by another application?";
+				break;
+			default:
+				error_content = error.message ?? String(error);
+		}
+		// error_message ??= error.message ?? String(error);
+
+		console.error(error);
+		error_message.textContent = error_content;
+		error_dialog.showModal();
+
+		pc?.close();
+	}
+}
+</script>

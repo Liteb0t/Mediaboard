@@ -63,8 +63,19 @@ private:
 				if (!board)
 					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
 				this->tracking_room_ptr = board.value()->getSharedRoomIfExists(room_id); // TODO check client permission
-				if (tracking_room_ptr)
+				if (!tracking_room_ptr)
 					throw std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id);
+				this->send({
+					{"type", "connect_to_room_response"},
+					{"payload", {
+						{"ok", true},
+						{"room", room_id}
+					}}
+				});
+			}
+			else if (request_type == "disconnect_from_room") {
+				if (!tracking_room_ptr)
+					throw "Client is not connected to any room";
 			}
 			else if (request_type == "webrtc_share_request") {
 				std::println("Creating WebRTC offer...");
