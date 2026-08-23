@@ -1,22 +1,29 @@
 <div id="connection_information_container" style="display: none">
-	<h4>Connected</h4>
+	<h4 id="connection_status_indicator">Connected</h4>
 	<button id="connection_information_disconnect_button">Exit room</button>
 </div>
+<div id="room_container" style="display: none">
 <h2>SENDER</h2>
 <input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
 <button id="room_share_button">Share media</button>
 <h2>RECEIVER</h2>
 <button id="room_watch_button">Watch stream</button><br>
 <div id="video_container" class="LiveVideoContainer"></div>
+</div>
 <script>
 class RoomConnection {
-	constructor() {
+	constructor(room_id) {
 		room_share_button.onclick = () => { this.shareMedia(); }
 		room_watch_button.onclick = () => { this.watchStream(); }
 		connection_information_disconnect_button.onclick = () => { this.disconnectFromRoom(); }
+		connection_status_indicator.textContent = "Connecting...";
+		connection_information_container.style["display"] = "inherit";
+		this.on_call = true;
+		// const websocket_connect_event = new Event("on_websocket_connect");
 		this.sock = new WebSocket(websocket_url);
 		this.sock.onopen = (event) => {
 			console.log("Websocket connected 🙂.");
+			this.connectToRoom(room_id); // connect on open because websocket session is tied to room call. Maybe change in future
 		}
 		this.sock.onmessage = (event) => {
 			try {
@@ -42,6 +49,10 @@ class RoomConnection {
 				error_dialog.showModal();
 			}
 		}
+		this.sock.onclose = (event) => {
+			this.onDisconnectFromRoom();
+			this.on_call = false;
+		}
 	}
 
 	connectToRoom(room_id) {
@@ -55,20 +66,24 @@ class RoomConnection {
 	onConnectRoom(payload) {
 		if (payload.ok) {
 			selected_room_id = payload.room;
-			connection_information_container.style["display"] = "inherit";
+			room_container.style["display"] = "inherit";
+			connection_status_indicator.textContent = "Connected.";
 			// document.getElementById(`room_${selected_room_id}`).classList.add("Connected");
 		}
 	}
 
 	disconnectFromRoom(room_id) {
-		this.sock.send(JSON.stringify({
-			type: "disconnect_from_room"
-		}));
+		this.sock.close();
+		// this.sock.send(JSON.stringify({
+		// 	type: "disconnect_from_room"
+		// }));
+		// connection_status_indicator.textContent = "Disconnecting...";
 	}
 
 	onDisconnectFromRoom(payload) {
 		selected_room_id = -1;
 		connection_information_container.style["display"] = "none";
+		room_container.style["display"] = "none";
 		// document.getElementById(`room_${selected_room_id}`).classList.add("Connected");
 	}
 	shareMedia() {
@@ -111,7 +126,6 @@ class RoomConnection {
 				media = await navigator.mediaDevices.getDisplayMedia();
 			}
 			else {
-				// TODO check if error thrown, likely caused by source being in use already
 				media = await navigator.mediaDevices.getUserMedia({
 					video: {
 						width: 1280,

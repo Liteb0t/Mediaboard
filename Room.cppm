@@ -35,7 +35,7 @@ public:
 	int id;
 	int board_id;
 	int connection_id_counter = 0;
-	std::unordered_map<int, std::shared_ptr<RtcPeer>> senders;
-	std::unordered_map<int, std::shared_ptr<RtcPeer>> receivers;
+	std::unordered_map<int, std::weak_ptr<RtcPeer>> senders;
+	std::unordered_map<int, std::weak_ptr<RtcPeer>> receivers;
 };
 }

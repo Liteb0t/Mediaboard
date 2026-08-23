@@ -348,7 +348,7 @@ document.addEventListener("logout", () => {
 
 document.body.onclick = (event) => {
 	let target = event.target;
-	console.log(target);
+	// console.log(target);
 	if (target.classList.contains("EmbedThumbnail"))
 		expandEmbedFigure(target.parentNode);
 	else if (target.classList.contains("EmbedImage"))
@@ -367,7 +367,7 @@ function contractEmbedFigure(figure_element) {
 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "inherit";
 }
 
-threads_button.onclick = () => {"openThreadList()"} // included in navbar.html
+threads_button.onclick = () => { openThreadList(); } // included in navbar.html
 function openThreadList() {
 	state.selected_thread.id = -1;
 	history.pushState(state, "", window.location.pathname + `?board=${state.selected_board.slug}`);
@@ -964,6 +964,7 @@ function connectToServer() {
 		if (state.selected_thread.id > -1) {
 			sock.send(JSON.stringify({
 				"type": "listen_to_thread",
+				"board": state.selected_board.slug,
 				"thread_id": state.selected_thread.id
 			}));
 		}

@@ -22,10 +22,32 @@ export namespace Mediaboard {
 class WebsocketSession : public FuzeHttp::WebsocketSession {
 public:
 	WebsocketSession(boost::asio::ip::tcp::socket&& socket, FuzeHttp::StateBase* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
+	~WebsocketSession() {
+		auto closePeer = [](RtcPeer* peer) {
+			if (peer->track) {
+				peer->track->onMessage(nullptr, nullptr); // detach callback before closing
+				peer->track->close();
+			}
+			if (peer->connection)
+				peer->connection->close();
+		};
+			// C++26 can use std::ranges::concat_view instead, but this is c++ 23
+		for (auto& [id, peer] : own_senders)   closePeer(peer.get());
+		for (auto& [id, peer] : own_receivers) closePeer(peer.get());
+
+		if (tracking_room_ptr) {
+			for (auto& [id, _] : own_senders) tracking_room_ptr.value()->senders.erase(id);
+			for (auto& [id, _] : own_receivers) tracking_room_ptr.value()->receivers.erase(id);
+		}
+		own_receivers.clear();
+		own_senders.clear();
+	}
 private:
 	// std::optional<std::shared_ptr<Receiver>> webrtc_receiver;
 	int tracking_board = -1; // using pointer could segfault bringing down the whole server, so we avoid raw pointers unless its lifetime is within a function
 	std::optional<std::shared_ptr<Room>> tracking_room_ptr;
+	std::unordered_map<int, std::shared_ptr<RtcPeer>> own_senders;
+	std::unordered_map<int, std::shared_ptr<RtcPeer>> own_receivers;
 	int tracking_thread = -1;
 #ifdef WITH_WEBRTC
 	static const rtc::SSRC targetSSRC = 42;
@@ -128,14 +150,17 @@ private:
 						if (!board)
 							throw "board no longer exists";
 						for (auto peer : this->tracking_room_ptr.value()->receivers) {
-							if (peer.second->track != nullptr && peer.second->track->isOpen()) {
-								peer.second->track->send(message);
+							if (auto peer_ptr = peer.second.lock()) {
+								if (peer_ptr->track != nullptr && peer_ptr->track->isOpen()) {
+									peer_ptr->track->send(message);
+								}
 							}
 						}
 					},
 					nullptr);
 				sender->connection->setLocalDescription();
 				std::println("Adding new sender with ID {}", new_connection_id);
+				this->own_senders.emplace(new_connection_id, sender);
 				this->tracking_room_ptr.value()->senders.emplace(new_connection_id, sender);
 			}
 			else if (request_type == "webrtc_share_answer") {
@@ -149,7 +174,10 @@ private:
 				int connection_id = buffer_as_json.at("payload").at("connection_id").as_int64();
 				rtc::Description answer(sdp, type);
 				std::println("Setting remote description for sender {}", connection_id);
-				this->tracking_room_ptr.value()->senders.at(connection_id)->connection->setRemoteDescription(answer);
+				if (auto it = this->own_senders.find(connection_id); it != own_senders.end())
+					it->second->connection->setRemoteDescription(answer);
+				else
+					throw "Couldn't find owned sender";
 			}
 			else if (request_type == "webrtc_watch_stream_request") {
 				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
@@ -194,6 +222,7 @@ private:
 
 				receiver->connection->setLocalDescription();
 				this->tracking_room_ptr.value()->receivers.emplace(new_connection_id, receiver);
+				this->own_receivers.emplace(new_connection_id, receiver);
 			}
 			else if (request_type == "webrtc_watch_stream_answer") { // TODO check if sender is still there
 				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, getClient());
@@ -206,8 +235,9 @@ private:
 				std::string sdp  = buffer_as_json.at("payload").at("description").at("sdp" ).as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
 				rtc::Description answer(sdp, type);
-				this->tracking_room_ptr.value()->receivers.at(connection_id)->connection->setRemoteDescription(answer);
-				this->tracking_room_ptr.value()->senders.at(sender_connection_id)->track->requestKeyframe();
+				this->own_receivers.at(connection_id)->connection->setRemoteDescription(answer);
+				if (auto sender_ptr = this->tracking_room_ptr.value()->senders.at(sender_connection_id).lock())
+					sender_ptr->track->requestKeyframe();
 			}
 			// else if (request_type == "webrtc_signal") {
 			// 	std::println("received webrtc_signal WS message");

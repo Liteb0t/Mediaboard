@@ -55,7 +55,10 @@ if (url_params.get("board")) {
 	navlink_threads.style["display"] = "inherit";
 }
 
-const room_connection = new RoomConnection();
+let room_connection = null;
+function connectClientToRoom(room_id) {
+	room_connection = new RoomConnection(room_id);
+}
 // let pc;
 // let listening_connections = [];
 
@@ -104,7 +107,7 @@ function showAllRooms(message_json) {
 			const connect_button = document.createElement("button");
 			connect_button.textContent = "Connect";
 			connect_button.onclick = () => {
-				room_connection.connectToRoom(room.id);
+				connectClientToRoom(room.id);
 			}
 			room_element.append(id_indicator, connect_button);
 
