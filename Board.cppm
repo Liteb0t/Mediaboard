@@ -14,7 +14,7 @@ module;
 export module Mediaboard.Board;
 
 export import Mediaboard.Thread;
-export import Mediaboard.Room;
+import Mediaboard.Room;
 import Mediaboard.Permission;
 import FuzeDBI;
 import FuzeHttp.PermissionObject;

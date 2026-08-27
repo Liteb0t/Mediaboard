@@ -8,6 +8,7 @@ module;
 #include <list>
 #include <mutex>
 #include <print>
+#include <ranges>
 #include <string>
 #include <unordered_set>
 export module Mediaboard.State;
@@ -226,7 +227,7 @@ public:
 		// Make a local list of all the weak pointers representing
 		// the sessions, so we can do the actual sending without
 		// holding the mutex:
-		std::vector<boost::weak_ptr<FuzeHttp::WebsocketSession>> v;
+		std::vector<std::weak_ptr<FuzeHttp::WebsocketSession>> v;
 		{
 			std::lock_guard<std::mutex> lock(mutex_);
 			v.reserve(websocket_sessions.size());

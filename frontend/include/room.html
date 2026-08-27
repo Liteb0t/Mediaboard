@@ -4,17 +4,20 @@
 </div>
 <div id="room_container" style="display: none">
 <h2>SENDER</h2>
+<button id="mic_toggle_button">Share microphone audio</button><br>
 <input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
-<button id="room_share_button">Share media</button>
+<input id="share_desktop_audio_checkbox" type="checkbox" checked="true"><label for="share_desktop_audio_checkbox">Share desktop audio</label><br>
+<button id="room_share_button">Share video</button>
 <h2>RECEIVER</h2>
-<button id="room_watch_button">Watch stream</button><br>
+<div id="peers_list_container"><table><thead><tr><th>connection_id</th><th>client_id</th><th>mic</th><th>video</th></tr></thead><tbody id="peers_list">Not loaded.</tbody></table></div>
+<div id="voice_chat_container"></div>
 <div id="video_container" class="LiveVideoContainer"></div>
 </div>
 <script>
 class RoomConnection {
 	constructor(room_id) {
-		room_share_button.onclick = () => { this.shareMedia(); }
-		room_watch_button.onclick = () => { this.watchStream(); }
+		room_share_button.onclick = () => { this.enableShareVideo(); }
+		mic_toggle_button.onclick = () => { this.enableMic(); }
 		connection_information_disconnect_button.onclick = () => { this.disconnectFromRoom(); }
 		connection_status_indicator.textContent = "Connecting...";
 		connection_information_container.style["display"] = "inherit";
@@ -23,7 +26,7 @@ class RoomConnection {
 		this.sock = new WebSocket(websocket_url);
 		this.sock.onopen = (event) => {
 			console.log("Websocket connected 🙂.");
-			this.connectToRoom(room_id); // connect on open because websocket session is tied to room call. Maybe change in future
+			this.makeRtcConnection(room_id); // connect on open because websocket session is tied to room call. Maybe change in future
 		}
 		this.sock.onmessage = (event) => {
 			try {
@@ -32,12 +35,18 @@ class RoomConnection {
 					console.log("calling onReceiveOffer");
 					this.onReceiveOffer(message_json.payload);
 				}
-				else if (message_json.type === "webrtc_watch_stream") {
-					console.log("calling onReceiveWatchStream");
-					this.onReceiveWatchStream(message_json.payload);
+				else if (message_json.type === "webrtc_room_connect") {
+					this.onReceiveMakeRtcConnection(message_json.payload);
 				}
-				else if (message_json.type === "connect_to_room_response") {
-					this.onConnectRoom(message_json.payload);
+				else if (message_json.type === "peers_updated") {
+					this.showPeers(message_json.payload.peers);
+				}
+				else if (message_json.type === "error") {
+					error_message.textContent = message_json.error_message;
+					error_dialog.showModal();
+				}
+				else if (message_json.type === "webrtc_audio_added") {
+					this.onAudioSlotAdded(message_json.payload);
 				}
 				else {
 					throw `message_json type ${message_json.type} not recognised.`;
@@ -55,23 +64,47 @@ class RoomConnection {
 		}
 	}
 
-	connectToRoom(room_id) {
-		this.sock.send(JSON.stringify({
-			type: "connect_to_room",
-			board: state.selected_board.slug,
-			room: room_id
-		}));
-	}
-
-	onConnectRoom(payload) {
-		if (payload.ok) {
-			selected_room_id = payload.room;
-			room_container.style["display"] = "inherit";
-			connection_status_indicator.textContent = "Connected.";
-			// document.getElementById(`room_${selected_room_id}`).classList.add("Connected");
+	showPeers(peers) {
+		const fragment = new DocumentFragment();
+		for (const peer of peers) {
+			let row_element = document.createElement("tr");
+			["connection_id", "client_id", "mic_sharing_enabled", "video_sharing_enabled"].forEach(column_name => {
+				const cell_element = document.createElement("td");
+				cell_element.textContent = peer[column_name];
+				row_element.appendChild(cell_element);
+			});
+			fragment.appendChild(row_element);
 		}
+		if (fragment.children.length === 0)
+			peers_list.replaceChildren(document.createTextNode("None."));
+		else
+			peers_list.replaceChildren(fragment);
+	}
+	async enableMic() {
+		if (this.mic_audio_track)
+			return;
+		mic_toggle_button.disabled = true;
+		const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+		this.mic_audio_track = mic.getAudioTracks()[0];
+		await this.mic_audio_transceiver.sender.replaceTrack(this.mic_audio_track);
+		mic_toggle_button.textContent = "Stop sharing microphone audio";
+		mic_toggle_button.onclick = () => { this.disableMic(); }
+		mic_toggle_button.disabled = false;
+		this.syncSharingStatus();
 	}
 
+	async disableMic() {
+		if (!this.mic_audio_track)
+			return;
+		mic_toggle_button.disabled = true;
+		await this.mic_audio_transceiver.sender.replaceTrack(null);
+		this.mic_audio_track.stop(); // releases the device — OS indicator goes away
+		this.mic_audio_track = null;
+		mic_toggle_button.textContent = "Share microphone audio";
+		mic_toggle_button.onclick = () => { this.enableMic(); }
+		mic_toggle_button.disabled = false;
+		this.syncSharingStatus();
+	}
 	disconnectFromRoom(room_id) {
 		this.sock.close();
 		// this.sock.send(JSON.stringify({
@@ -86,89 +119,80 @@ class RoomConnection {
 		room_container.style["display"] = "none";
 		// document.getElementById(`room_${selected_room_id}`).classList.add("Connected");
 	}
-	shareMedia() {
-		this.sock.send(JSON.stringify({
-			type: "webrtc_share_request",
-			board: state.selected_board.slug
-		}))
-	}
-
-	async onReceiveOffer(payload) {
-		const pc = new RTCPeerConnection({
-			// Recommended for libdatachannel
-			bundlePolicy: 'max-bundle',
-		});
-		pc.onicegatheringstatechange = (state) => {
-			console.log("[sender] ICE gathering state: " + pc.iceGatheringState);
-			if (pc.iceGatheringState === 'complete') {
-				// We only want to provide an answer once all of our candidates have been added to the SDP.
-				const answer = pc.localDescription;
-				this.sock.send(JSON.stringify({
-					type: "webrtc_share_answer",
-					payload: {
-						connection_id: payload.connection_id,
-						description: {
-							type: answer.type,
-							sdp: answer.sdp
-						}
-					}
-				}))
-			}
-		}
-		pc.onicecandidateerror = (event) => {
-			console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
-		};
+	async enableShareVideo() {
+		room_share_button.disabled = true;
 		try {
-			await pc.setRemoteDescription(payload.description);
-
-			let media
 			if (share_screen_checkbox.checked) {
-				media = await navigator.mediaDevices.getDisplayMedia();
+				const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+				this.video_sending_track = display.getVideoTracks()[0];
+				if (share_desktop_audio_checkbox.checked)
+					this.desktop_audio_track = display.getAudioTracks()[0]; // undefined if the OS/browser doesn't support system audio capture
+				else
+					this.desktop_audio_track = null;
 			}
 			else {
-				media = await navigator.mediaDevices.getUserMedia({
-					video: {
-						width: 1280,
-						height: 720
-					}
-				});
+				// probably webcam
+				const cam = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+				this.video_sending_track = cam.getVideoTracks()[0];
+				this.desktop_audio_track = null;
 			}
-			media.getTracks().forEach(track => pc.addTrack(track, media));
-
-			console.log("[onReceiveOffer] creating answer...");
-			const answer = await pc.createAnswer();
-			console.log("[onReceiveOffer] done. Setting local description...");
-			await pc.setLocalDescription(answer);
-			console.log("[onReceiveOffer] Finished setting local description");
+			await this.video_sending_transceiver.sender.replaceTrack(this.video_sending_track);
+			await this.desktop_audio_transceiver.sender.replaceTrack(this.desktop_audio_track);
+			this.syncSharingStatus();
+			room_share_button.textContent = "Stop sharing video";
+			room_share_button.onclick = () => { this.disableShareVideo(); }
 		}
-		catch(error) {
+		catch (error) {
 			RoomConnection.handleMediaError(error);
 		}
+		finally {
+			room_share_button.disabled = false;
+		}
+	}
+	async disableShareVideo() {
+		room_share_button.disabled = true;
+		await this.video_sending_transceiver.sender.replaceTrack(null);
+		await this.desktop_audio_transceiver.sender.replaceTrack(null);
+		this.video_sending_track?.stop();
+		this.desktop_audio_track?.stop();
+		this.video_sending_track = null;
+		this.desktop_audio_track = null;
+		room_share_button.textContent = "Share video";
+		room_share_button.onclick = () => { this.enableShareVideo(); }
+		room_share_button.disabled = false;
+		this.syncSharingStatus();
 	}
 
-	watchStream() {
+	makeRtcConnection(room_id) {
 		this.sock.send(JSON.stringify({
-			type: "webrtc_watch_stream_request",
-			board: state.selected_board.slug
+			type: "webrtc_room_connect_request",
+			board: state.selected_board.slug,
+			room: room_id
 		}))
 	}
 
-	async onReceiveWatchStream(payload) {
+	async onReceiveMakeRtcConnection(payload) {
+		selected_room_id = payload.room;
+		room_container.style["display"] = "inherit";
+		video_container.innerHTML = "";
+		connection_status_indicator.textContent = "Connected.";
 		let conn = new RTCPeerConnection({
 			// Recommended for libdatachannel
 			bundlePolicy: 'max-bundle',
 		});
+		this.conn = conn;
+		console.log("[onReceiveWatchStream] audio_senders: " + JSON.stringify(payload.audio_senders));
 		// listening_connections[payload.connection_id] = conn;
+		conn.ontrack = (event) => { this.handleIncomingTrack(event); } // must be set before setRemoteDescription
 		conn.onicegatheringstatechange = (state) => {
 			console.log("[sender] ICE gathering state: " + conn.iceGatheringState);
 			if (conn.iceGatheringState === 'complete') {
-				// We only want to provide an answer once all of our candidates have been added to the SDP.
 				const answer = conn.localDescription;
 				this.sock.send(JSON.stringify({
-					type: "webrtc_watch_stream_answer",
+					type: "webrtc_room_connect_answer",
 					payload: {
 						connection_id: payload.connection_id,
-						sender_connection_id: 0,
+						// sender_connection_id: Number(sender_connection_input.value), // keyframe will be requested from this peer
 						description: {
 							type: answer.type,
 							sdp: answer.sdp
@@ -181,19 +205,22 @@ class RoomConnection {
 			console.error("ICE candidate error:", event.errorCode, event.errorText, event.url);
 		};
 		try {
-
-			let trackCount = 0;
-			conn.ontrack = (event) => {
-				const video_element = document.createElement("video");
-				video_element.autoplay = true;
-				video_element.playsInline = true;
-				video_element.srcObject = event.streams[0] ?? new MediaStream([event.track]);
-				video_container.appendChild(video_element);
-				video_element.play();
-			};
-			console.log("Setting remote description...");
 			await conn.setRemoteDescription(payload.description);
 			console.log("Done. Creating answer...");
+
+			/////// Sending //////
+			const transceivers = conn.getTransceivers();
+			console.log("Transceivers: ", transceivers);
+			this.video_sending_transceiver =  conn.getTransceivers().find(t => t.mid === "video_sending");
+			this.video_sending_track = null;
+			this.mic_audio_transceiver =  conn.getTransceivers().find(t => t.mid === "mic_audio");
+			this.mic_audio_track = null;
+			this.desktop_audio_transceiver =  conn.getTransceivers().find(t => t.mid === "desktop_audio");
+			this.desktop_audio_track = null;
+			this.video_sending_transceiver.direction = "sendonly";
+			this.mic_audio_transceiver.direction = "sendonly";
+			this.desktop_audio_transceiver.direction = "sendonly";
+
 			const answer = await conn.createAnswer();
 			console.log("Done. Setting local description...");
 			await conn.setLocalDescription(answer);
@@ -202,6 +229,48 @@ class RoomConnection {
 		catch (err) {
 			RoomConnection.handleMediaError(err, conn);
 		}
+	}
+	handleIncomingTrack(event) {
+		const mid = event.transceiver.mid;
+		console.log("Incoming track MID " + mid);
+		if (mid === "video_relay") {
+			const video_element = document.createElement("video");
+			video_element.autoplay = true;
+			video_element.playsInline = true;
+			video_element.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+			video_container.appendChild(video_element);
+		}
+		else if (mid && mid.startsWith("audio_relay_")) {
+			const sender_id = mid.slice("audio_relay_".length);
+			const audio_element = document.createElement("audio");
+			audio_element.autoplay = true;
+			audio_element.controls = true; // element is hidden otherwise
+			audio_element.srcObject = new MediaStream([event.track]);
+			audio_element.dataset.senderConnectionId = sender_id;
+			voice_chat_container.appendChild(audio_element);
+		}
+		else {
+			this.handleMediaError("Unrecognized MID " + mid);
+		}
+	}
+
+	async onAudioSlotAdded(payload) {
+		await this.conn.setRemoteDescription(payload.description);
+		const answer = await this.conn.createAnswer();
+		await this.conn.setLocalDescription(answer);
+		this.sock.send(JSON.stringify({
+			type: "webrtc_audio_added_answer",
+			payload: { connection_id: payload.connection_id, description: { type: answer.type, sdp: answer.sdp } }
+		}));
+	}
+	syncSharingStatus() {
+		this.sock.send(JSON.stringify({
+			type: "webrtc_sharing_status_update",
+			payload: {
+				mic_sharing_enabled: !!this.mic_audio_track,
+				video_sharing_enabled: !!this.video_sending_track
+			}
+		}));
 	}
 	static handleMediaError(error, pc) {
 		let error_content;
@@ -218,12 +287,9 @@ class RoomConnection {
 			default:
 				error_content = error.message ?? String(error);
 		}
-		// error_message ??= error.message ?? String(error);
-
 		console.error(error);
 		error_message.textContent = error_content;
 		error_dialog.showModal();
-
 		pc?.close();
 	}
 }

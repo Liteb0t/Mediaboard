@@ -27,7 +27,10 @@
 	</dialog>
 </body>
 <style>
-.LiveVideoContainer &>video {
+.VoiceChatContainer >* {
+	border: 2px dotted #f93;
+}
+.LiveVideoContainer >video {
 	border: 2px solid #000;
 	margin: 4px;
 }
@@ -71,6 +74,7 @@ async function createRoom() {
 		error_message ??= "An unknown error occured when attempting to create room.";
 		throw error_message;
 	}
+	await getAllRooms();
 	return fetch_response;
 }
 show_rooms_button.onclick = () => { getAllRooms(); }
@@ -176,6 +180,7 @@ async function getBoardInfo() {
 }
 getClientInfo(); // runs asynchronously
 getBoardInfo();
+getAllRooms();
 </script>
 </body>
 </html>

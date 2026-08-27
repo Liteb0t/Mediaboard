@@ -15,6 +15,7 @@ export module Mediaboard.MediaboardWebsocketSession;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 import Mediaboard.Board;
+import Mediaboard.Room;
 import Mediaboard.Permission;
 import Mediaboard.State;
 
@@ -23,38 +24,97 @@ class WebsocketSession : public FuzeHttp::WebsocketSession {
 public:
 	WebsocketSession(boost::asio::ip::tcp::socket&& socket, FuzeHttp::StateBase* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
 	~WebsocketSession() {
-		auto closePeer = [](RtcPeer* peer) {
-			if (peer->track) {
-				peer->track->onMessage(nullptr, nullptr); // detach callback before closing
-				peer->track->close();
+		if (own_peer_ptr) {
+			auto closeTrack = [](std::shared_ptr<rtc::Track> track) {
+				if (track) {
+					track->onMessage(nullptr, nullptr); // detach callback before closing
+					track->close();
+				}
+			};
+			own_peer_ptr.value()->send_message = nullptr;
+			closeTrack(own_peer_ptr.value()->video_sending_track);
+			closeTrack(own_peer_ptr.value()->video_receiving_track);
+			closeTrack(own_peer_ptr.value()->desktop_audio_track);
+			closeTrack(own_peer_ptr.value()->mic_track);
+			if (own_peer_ptr.value()->connection)
+				own_peer_ptr.value()->connection->close();
+			if (tracking_room_ptr) {
+				tracking_room_ptr.value()->peers.erase(own_connection_id);
+				broadcastPeerList();
 			}
-			if (peer->connection)
-				peer->connection->close();
-		};
-			// C++26 can use std::ranges::concat_view instead, but this is c++ 23
-		for (auto& [id, peer] : own_senders)   closePeer(peer.get());
-		for (auto& [id, peer] : own_receivers) closePeer(peer.get());
-
-		if (tracking_room_ptr) {
-			for (auto& [id, _] : own_senders) tracking_room_ptr.value()->senders.erase(id);
-			for (auto& [id, _] : own_receivers) tracking_room_ptr.value()->receivers.erase(id);
 		}
-		own_receivers.clear();
-		own_senders.clear();
 	}
 private:
-	// std::optional<std::shared_ptr<Receiver>> webrtc_receiver;
-	int tracking_board = -1; // using pointer could segfault bringing down the whole server, so we avoid raw pointers unless its lifetime is within a function
-	std::optional<std::shared_ptr<Room>> tracking_room_ptr;
-	std::unordered_map<int, std::shared_ptr<RtcPeer>> own_senders;
-	std::unordered_map<int, std::shared_ptr<RtcPeer>> own_receivers;
-	int tracking_thread = -1;
-#ifdef WITH_WEBRTC
-	static const rtc::SSRC targetSSRC = 42;
-#endif
 	State* getState() const {
 		return (State*)this->state_; // base FuzeHttp state must be casted to Mediaboard state
 	}
+	int tracking_board = -1; // using pointer could segfault bringing down the whole server, so avoid raw pointers unless its lifetime is within a function
+	int tracking_thread = -1;
+#ifdef WITH_WEBRTC
+	std::optional<std::shared_ptr<Room>> tracking_room_ptr;
+	int own_connection_id;
+	std::optional<std::shared_ptr<RtcPeer>> own_peer_ptr;
+	static const rtc::SSRC targetSSRC = 42;
+	void addAudioRelayTrack(std::shared_ptr<RtcPeer> receiver_peer, int sender_connection_id) {
+		unsigned int relay_ssrc = tracking_room_ptr.value()->ssrc_counter++;
+		rtc::Description::Audio relay_media(std::format("audio_relay_{}", sender_connection_id), rtc::Description::Direction::SendOnly);
+		relay_media.addOpusCodec(111);
+		relay_media.addSSRC(relay_ssrc, std::format("audio_relay_{}", sender_connection_id));
+
+		auto relay_track = receiver_peer->connection->addTrack(relay_media);
+		relay_track->onMessage([this](rtc::binary message) {}, nullptr); // fixes "no receive callback" warning
+		receiver_peer->audio_relays.emplace(sender_connection_id, AudioRelaySlot{relay_track, relay_ssrc});
+
+	}
+	void addAudioRelaySlot(std::shared_ptr<RtcPeer> receiver_peer, int sender_connection_id) {
+		if (receiver_peer->renegotiation_in_flight) {
+			receiver_peer->pending_audio_relay_additions.push_back(sender_connection_id);
+			return;
+		}
+		receiver_peer->renegotiation_in_flight = true;
+		addAudioRelayTrack(receiver_peer, sender_connection_id);
+
+		// FuzeHttp::WebsocketSession* receiver_session = static_cast<FuzeHttp::WebsocketSession*>(receiver_peer->owner_session);
+		receiver_peer->connection->onLocalDescription([receiver_peer, sender_connection_id](rtc::Description description) {
+			if (description.type() != rtc::Description::Type::Offer)
+				return; // ignore the answer echo, if any
+			receiver_peer->send_message({
+				{"type", "webrtc_audio_added"},
+				{"payload", {
+					{"sender_connection_id", sender_connection_id},
+					{"description", {
+						{"type", description.typeString()},
+						{"sdp", std::string(description)}
+					}}
+				}}
+			});
+		});
+		receiver_peer->connection->setLocalDescription();
+	}
+
+	void sendMessageToMicRelays(rtc::binary&& message) {
+		for (auto& [peer_id, weak_peer] : tracking_room_ptr.value()->peers) {
+			if (peer_id == own_connection_id) continue;
+			if (auto strong_peer = weak_peer.lock()) {
+				if (auto it = strong_peer->audio_relays.find(own_connection_id); it != strong_peer->audio_relays.end() && it->second.track->isOpen()) {
+					auto rtp = reinterpret_cast<rtc::RtpHeader*>(message.data());
+					rtp->setSsrc(it->second.ssrc); // it->second is AudioRelaySlot
+					it->second.track->send(message);
+				}
+			}
+		}
+	}
+	void broadcastPeerList() {
+		boost::json::object data_to_send = {
+			{"type", "peers_updated"},
+			{"payload", {{"peers", tracking_room_ptr.value()->asJson().at("peers")}}}
+		};
+		for (auto& weak_peer : tracking_room_ptr.value()->peers) {
+			if (auto strong_peer = weak_peer.second.lock())
+				strong_peer->send_message(data_to_send);
+		}
+	}
+#endif
 	void readEvent(std::string buffer_data) override {
 		try {
 			std::cout << buffer_data << std::endl;
@@ -78,188 +138,184 @@ private:
 				board.value()->addListenerToThread(this, thread_id);
 			}
 #ifdef WITH_WEBRTC
-			else if (request_type == "connect_to_room") {
-				std::string board_slug = buffer_as_json["board"].as_string().c_str();
-				int room_id = buffer_as_json["room"].as_int64();
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
-				if (!board)
-					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
-				this->tracking_room_ptr = board.value()->getSharedRoomIfExists(room_id); // TODO check client permission
-				if (!tracking_room_ptr)
-					throw std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id);
-				this->send({
-					{"type", "connect_to_room_response"},
-					{"payload", {
-						{"ok", true},
-						{"room", room_id}
-					}}
-				});
+			else if (request_type == "webrtc_audio_added_answer") {
+				std::string sdp = buffer_as_json.at("payload").at("description").at("sdp").as_string().c_str();
+				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
+				if (!own_peer_ptr)
+					throw "No WebRTC peer associated with this session";
+				own_peer_ptr.value()->connection->setRemoteDescription(rtc::Description(sdp, type));
+				own_peer_ptr.value()->renegotiation_in_flight = false;
+				if (!own_peer_ptr.value()->pending_audio_relay_additions.empty()) {
+					int next = own_peer_ptr.value()->pending_audio_relay_additions.front();
+					own_peer_ptr.value()->pending_audio_relay_additions.pop_front();
+					addAudioRelaySlot(own_peer_ptr.value(), next);
+				}
 			}
-			else if (request_type == "disconnect_from_room") {
-				if (!tracking_room_ptr)
-					throw "Client is not connected to any room";
-			}
-			else if (request_type == "webrtc_share_request") {
-				std::println("Creating WebRTC offer...");
-				std::string board_slug = buffer_as_json["board"].as_string().c_str();
+			else if (request_type == "webrtc_room_connect_request") {
+				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
+				int room_id = buffer_as_json.at("room").as_int64();
 				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
 				if (!board)
 					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
 				this->tracking_board = board.value()->getId();
+				this->tracking_room_ptr = board.value()->getSharedRoomIfExists(room_id); // TODO check client permission
 				if (!tracking_room_ptr)
-					throw "Client is not connected to a room";
-				int new_connection_id = tracking_room_ptr.value()->connection_id_counter++;
-				// auto pc = std::make_shared<rtc::PeerConnection>();
-				auto sender = std::make_shared<RtcPeer>();
-				sender->connection = std::make_shared<rtc::PeerConnection>();
-				// board.value()->webrtc_room.peer_connection = pc;
-				sender->connection->onStateChange(
-					[](rtc::PeerConnection::State state) { std::cout << "State: " << state << std::endl; });
-				sender->connection->onGatheringStateChange([this, sender, new_connection_id](rtc::PeerConnection::GatheringState state) {
+					throw std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id);
+
+				this->own_peer_ptr = std::make_shared<RtcPeer>();
+				this->own_connection_id = tracking_room_ptr.value()->connection_id_counter++;
+				own_peer_ptr.value()->client_id = getClient() ? getClient()->id : -1;
+				own_peer_ptr.value()->send_message = [this](boost::json::object payload) { this->send(std::move(payload)); };
+				own_peer_ptr.value()->connection = std::make_shared<rtc::PeerConnection>();
+
+				///////////// RECEIVING /////////////
+				for (auto& [sender_id, weak_sender] : tracking_room_ptr.value()->peers) {
+					if (sender_id == own_connection_id) continue;
+					auto sender_peer = weak_sender.lock();
+					if (sender_peer && sender_peer->mic_relay_initialized) {
+						addAudioRelayTrack(own_peer_ptr.value(), sender_id);
+					}
+				}
+
+				own_peer_ptr.value()->connection->onStateChange([](rtc::PeerConnection::State state) {
+					std::cout << "State: " << state << std::endl;
+				});
+				own_peer_ptr.value()->connection->onGatheringStateChange([this](rtc::PeerConnection::GatheringState state) {
 					std::cout << "Gathering State: " << state << std::endl;
 					if (state == rtc::PeerConnection::GatheringState::Complete) {
-						auto description = sender->connection->localDescription();
-						boost::json::object message = {
-							{"type", "webrtc_offer"},
+						auto description = this->own_peer_ptr.value()->connection->localDescription();
+						this->send({
+							{"type", "webrtc_room_connect"},
 							{"payload", {
-								{"connection_id", new_connection_id},
+								{"connection_id", own_connection_id},
 								{"description", {
 									{"type", description->typeString()},
 									{"sdp", std::string(description.value())}
 								}}
 							}}
-						};
-						this->send(std::make_shared<const std::string>(boost::json::serialize(message)));
+						});
 					}
 				});
-				rtc::Description::Video media("video", rtc::Description::Direction::RecvOnly);
-				// Idealy H264 would be used because it's the superior codec [source: it just is, ok?]
-				// but, for compatibility reasons (god damn it Firefox) Vp8 is used instead
-				media.addVP8Codec(96);
-				media.setBitrate(3000); // Request 3Mbps (Browsers do not encode more than 2.5MBps from a webcam)
-				// std::shared_ptr<rtc::Track> track = pc->addTrack(media);
-				// board.value()->webrtc_room.track = track;
-				sender->track = sender->connection->addTrack(media);
-				sender->track->setMediaHandler(std::make_shared<rtc::RtcpReceivingSession>());
-				sender->track->onMessage(
+				{
+					rtc::Description::Video media("video_relay", rtc::Description::Direction::SendOnly);
+					media.addVP8Codec(96);
+					media.setBitrate(3000);
+					media.addSSRC(targetSSRC, "video_sending", "video_sending", "video_sending");
+
+					own_peer_ptr.value()->video_receiving_track = own_peer_ptr.value()->connection->addTrack(media);
+
+					own_peer_ptr.value()->video_receiving_track->onMessage([](rtc::binary var) {}, nullptr);
+				}
+
+
+				////////////// SENDING ////////////////
+				{
+					rtc::Description::Video media("video_sending", rtc::Description::Direction::RecvOnly);
+					// Idealy H264 would be used because it's the superior codec [source: it just is, ok?]
+					// but, for compatibility reasons (god damn it Firefox) Vp8 is used instead
+					media.addVP8Codec(96);
+					media.setBitrate(3000); // Request 3Mbps (Browsers do not encode more than 2.5MBps from a webcam)
+					own_peer_ptr.value()->video_sending_track = own_peer_ptr.value()->connection->addTrack(media);
+				}
+				own_peer_ptr.value()->video_sending_track->setMediaHandler(std::make_shared<rtc::RtcpReceivingSession>());
+				own_peer_ptr.value()->video_sending_track->onMessage(
 					[this](rtc::binary message) {
+						if (!this->own_peer_ptr.value()->video_sharing_enabled)
+							return;
 						// This is an RTP packet
 						auto rtp = reinterpret_cast<rtc::RtpHeader *>(message.data());
 						rtp->setSsrc(targetSSRC);
 						auto board = this->getState()->getBoardIfExists(this->tracking_board);
 						if (!board)
 							throw "board no longer exists";
-						for (auto peer : this->tracking_room_ptr.value()->receivers) {
+						for (auto peer : this->tracking_room_ptr.value()->peers) {
 							if (auto peer_ptr = peer.second.lock()) {
-								if (peer_ptr->track != nullptr && peer_ptr->track->isOpen()) {
-									peer_ptr->track->send(message);
+								if (peer_ptr->video_receiving_track != nullptr && peer_ptr->video_receiving_track->isOpen()) {
+									peer_ptr->video_receiving_track->send(message);
 								}
 							}
 						}
 					},
 					nullptr);
-				sender->connection->setLocalDescription();
-				std::println("Adding new sender with ID {}", new_connection_id);
-				this->own_senders.emplace(new_connection_id, sender);
-				this->tracking_room_ptr.value()->senders.emplace(new_connection_id, sender);
-			}
-			else if (request_type == "webrtc_share_answer") {
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, getClient());
-				if (!board)
-					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", tracking_board);
-				if (!tracking_room_ptr)
-					throw "Client is not connected to a room";
-				std::string sdp  = buffer_as_json.at("payload").at("description").at("sdp" ).as_string().c_str();
-				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
-				int connection_id = buffer_as_json.at("payload").at("connection_id").as_int64();
-				rtc::Description answer(sdp, type);
-				std::println("Setting remote description for sender {}", connection_id);
-				if (auto it = this->own_senders.find(connection_id); it != own_senders.end())
-					it->second->connection->setRemoteDescription(answer);
-				else
-					throw "Couldn't find owned sender";
-			}
-			else if (request_type == "webrtc_watch_stream_request") {
-				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
-				if (!board)
-					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
-				this->tracking_board = board.value()->getId();
-				if (!tracking_room_ptr)
-					throw "Client is not connected to a room";
-				int new_connection_id = this->tracking_room_ptr.value()->connection_id_counter++;
-				auto receiver = std::make_shared<RtcPeer>();
-				receiver->connection = std::make_shared<rtc::PeerConnection>();
-				receiver->connection->onStateChange([](rtc::PeerConnection::State state) {
-					std::cout << "State: " << state << std::endl;
-				});
-				receiver->connection->onGatheringStateChange([this, receiver, new_connection_id](rtc::PeerConnection::GatheringState state) {
-					std::cout << "Gathering State: " << state << std::endl;
-					if (state == rtc::PeerConnection::GatheringState::Complete) {
-						auto description = receiver->connection->localDescription();
-						boost::json::object message = {
-							{"type", "webrtc_watch_stream"},
-							{"payload", {
-								{"connection_id", new_connection_id},
-								{"description", {
-									{"type", description->typeString()},
-									{"sdp", std::string(description.value())}
-								}}
-							}}
-						};
-						const std::shared_ptr<const std::string> ss = std::make_shared<const std::string>(boost::json::serialize(message));
-						this->send(ss);
+
+
+				// mic audio
+				rtc::Description::Audio mic_media("mic_audio", rtc::Description::Direction::RecvOnly);
+				mic_media.addOpusCodec(111);
+				own_peer_ptr.value()->mic_track = own_peer_ptr.value()->connection->addTrack(mic_media);
+				own_peer_ptr.value()->mic_track->onMessage([this](rtc::binary message) {
+					if (!this->own_peer_ptr.value()->mic_sharing_enabled)
+						return;
+					if (!this->own_peer_ptr.value()->mic_relay_initialized) {
+						std::println("Initialising mic relay!");
+						this->own_peer_ptr.value()->mic_relay_initialized = true;
+						auto room = this->tracking_room_ptr.value();
+						for (auto& [peer_id, weak_peer] : room->peers) {
+							if (peer_id == own_connection_id) continue;
+							if (auto strong_peer = weak_peer.lock())
+								addAudioRelaySlot(strong_peer, own_connection_id);
+						}
 					}
-				});
-				rtc::Description::Video media("video", rtc::Description::Direction::SendOnly);
-				media.addVP8Codec(96);
-				media.setBitrate(3000);
-				media.addSSRC(targetSSRC, "video-send", "video-send", "video-send");
+					sendMessageToMicRelays(std::move(message));
+				}, nullptr);
 
-				receiver->track = receiver->connection->addTrack(media);
+				rtc::Description::Audio desktop_media("desktop_audio", rtc::Description::Direction::RecvOnly);
+				desktop_media.addOpusCodec(111);
+				own_peer_ptr.value()->desktop_audio_track = own_peer_ptr.value()->connection->addTrack(desktop_media);
+				own_peer_ptr.value()->desktop_audio_track->onMessage([this](rtc::binary message) {
+					// TODO implement same as mic track
+				}, nullptr);
 
-				receiver->track->onMessage([](rtc::binary var) {}, nullptr);
-
-				receiver->connection->setLocalDescription();
-				this->tracking_room_ptr.value()->receivers.emplace(new_connection_id, receiver);
-				this->own_receivers.emplace(new_connection_id, receiver);
+				own_peer_ptr.value()->connection->setLocalDescription();
+				this->tracking_room_ptr.value()->peers.emplace(own_connection_id, own_peer_ptr.value());
+				broadcastPeerList();
 			}
-			else if (request_type == "webrtc_watch_stream_answer") { // TODO check if sender is still there
+			else if (request_type == "webrtc_room_connect_answer") {
 				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, getClient());
 				if (!board)
 					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", tracking_board);
 				if (!tracking_room_ptr)
 					throw "Client is not connected to a room";
-				int connection_id = buffer_as_json.at("payload").at("connection_id").as_int64();
-				int sender_connection_id = buffer_as_json.at("payload").at("sender_connection_id").as_int64();
+				// int sender_connection_id = buffer_as_json.at("payload").at("sender_connection_id").as_int64();
 				std::string sdp  = buffer_as_json.at("payload").at("description").at("sdp" ).as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
 				rtc::Description answer(sdp, type);
-				this->own_receivers.at(connection_id)->connection->setRemoteDescription(answer);
-				if (auto sender_ptr = this->tracking_room_ptr.value()->senders.at(sender_connection_id).lock())
-					sender_ptr->track->requestKeyframe();
+				this->own_peer_ptr.value()->connection->setRemoteDescription(answer);
+				// sending keyframe ignored when video sender is not there
+				for (auto& weak_peer : tracking_room_ptr.value()->peers) {
+					if (auto strong_peer = weak_peer.second.lock()) {
+						if (strong_peer->video_sending_track->isOpen() && strong_peer->video_sharing_enabled) {
+							strong_peer->video_sending_track->requestKeyframe();
+							break;
+						}
+					}
+				}
 			}
-			// else if (request_type == "webrtc_signal") {
-			// 	std::println("received webrtc_signal WS message");
-			// 	const auto message = std::make_shared<const std::string>("This is a response");
-			// 	this->send(message);
-			// 	// state_->sendToWebRTC(buffer_data);
-			// }
+			else if (request_type == "webrtc_sharing_status_update") {
+				if (!own_peer_ptr)
+					throw "No WebRTC peer associated with this session";
+				own_peer_ptr.value()->mic_sharing_enabled = buffer_as_json.at("payload").at("mic_sharing_enabled").as_bool();
+				own_peer_ptr.value()->video_sharing_enabled = buffer_as_json.at("payload").at("video_sharing_enabled").as_bool();
+				broadcastPeerList();
+			}
 #endif
 			else {
-				// TODO send error message back to requester
-				throw std::runtime_error("request_type " + request_type + " not recognised");
+				throw "request_type " + request_type + " not recognised";
 			}
 		}
 		catch (const std::exception& e) {
-			std::println(std::cerr, "[MediaboardWebsocketSession] {}", e.what());
+			returnError(e.what());
 		}
 		catch (const char* message) {
-			std::println(std::cerr, "[MediaboardWebsocketSession] {}", message);
+			returnError(message);
 		}
 		catch (const std::string& message) {
-			std::println(std::cerr, "[MediaboardWebsocketSession] {}", message);
+			returnError(message);
 		}
+	}
+	void returnError(const std::string& message) {
+		std::println(std::cerr, "[MediaboardWebsocketSession] {}", message);
+		this->send({{"type", "error"}, {"error_message", message}});
 	}
 };
 }
