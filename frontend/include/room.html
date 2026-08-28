@@ -1,29 +1,33 @@
-<div id="connection_information_container" style="display: none">
-	<h4 id="connection_status_indicator">Connected</h4>
-	<button id="connection_information_disconnect_button">Exit room</button>
-</div>
+<!--<div id="connection_information_container" style="display: none"></div>-->
 <div id="room_container" style="display: none">
-<h2>SENDER</h2>
-<button id="mic_toggle_button">Share microphone audio</button><br>
-<input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
-<input id="share_desktop_audio_checkbox" type="checkbox" checked="true"><label for="share_desktop_audio_checkbox">Share desktop audio</label><br>
-<button id="room_share_button">Share video</button>
-<h2>RECEIVER</h2>
-<div id="peers_list_container"><table><thead><tr><th>connection_id</th><th>client_id</th><th>mic</th><th>video</th></tr></thead><tbody id="peers_list">Not loaded.</tbody></table></div>
-<div id="voice_chat_container"></div>
-<div id="video_container" class="LiveVideoContainer"></div>
+	<h4 id="connection_status_indicator">Not connected.</h4>
+	<button id="connection_information_disconnect_button">Exit room</button>
+	<h2>SENDER</h2>
+	<button id="mic_toggle_button">Share microphone audio</button><br>
+	<input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
+	<input id="share_desktop_audio_checkbox" type="checkbox" checked="true"><label for="share_desktop_audio_checkbox">Share desktop audio</label><br>
+	<button id="room_share_button">Share video</button>
+	<h2>RECEIVER</h2>
+	<div id="peers_list_container"><table><thead><tr><th>connection_id</th><th>client_id</th><th>mic</th><th>video</th></tr></thead><tbody id="peers_list">Not loaded.</tbody></table></div>
+	<div id="voice_chat_container"></div>
+	<div id="video_container" class="LiveVideoContainer"></div>
 </div>
 <script>
+"use strict";
 class RoomConnection {
 	constructor(room_id) {
 		room_share_button.onclick = () => { this.enableShareVideo(); }
 		mic_toggle_button.onclick = () => { this.enableMic(); }
 		connection_information_disconnect_button.onclick = () => { this.disconnectFromRoom(); }
+		document.addEventListener("on_room_exit", () => { this.onDisconnectFromRoom(); });
+			this.on_call = false;
 		connection_status_indicator.textContent = "Connecting...";
-		connection_information_container.style["display"] = "inherit";
+		room_container.style["display"] = "inherit";
+		// connection_information_container.style["display"] = "inherit";
 		this.on_call = true;
 		// const websocket_connect_event = new Event("on_websocket_connect");
 		this.sock = new WebSocket(websocket_url);
+		const on_room_exit_event = new Event("on_room_exit");
 		this.sock.onopen = (event) => {
 			console.log("Websocket connected 🙂.");
 			this.makeRtcConnection(room_id); // connect on open because websocket session is tied to room call. Maybe change in future
@@ -55,12 +59,12 @@ class RoomConnection {
 			catch (error) {
 				console.error(error);
 				error_message.textContent = error;
+				connection_status_indicator.textContent = "Errored.";
 				error_dialog.showModal();
 			}
 		}
 		this.sock.onclose = (event) => {
-			this.onDisconnectFromRoom();
-			this.on_call = false;
+			document.dispatchEvent(on_room_exit_event);
 		}
 	}
 
@@ -115,7 +119,7 @@ class RoomConnection {
 
 	onDisconnectFromRoom(payload) {
 		selected_room_id = -1;
-		connection_information_container.style["display"] = "none";
+		// connection_information_container.style["display"] = "none";
 		room_container.style["display"] = "none";
 		// document.getElementById(`room_${selected_room_id}`).classList.add("Connected");
 	}
@@ -173,7 +177,6 @@ class RoomConnection {
 
 	async onReceiveMakeRtcConnection(payload) {
 		selected_room_id = payload.room;
-		room_container.style["display"] = "inherit";
 		video_container.innerHTML = "";
 		connection_status_indicator.textContent = "Connected.";
 		let conn = new RTCPeerConnection({

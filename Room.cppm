@@ -59,7 +59,11 @@ public:
 				});
 			}
 		}
-		return {{"id", this->id}, {"peers", peers_json}};
+		return {
+			{"id", this->id},
+			{"number_of_peers", this->peers.size()},
+			{"peers", peers_json}
+		};
 	}
 
 	int id;

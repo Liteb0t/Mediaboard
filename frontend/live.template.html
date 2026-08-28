@@ -12,9 +12,10 @@
 	<main>
 #include "navbar.html"
 		<h3 id="location_indicator"></h3>
-		<button id="create_room_button">Create room</button>
-		<button id="show_rooms_button">Show rooms</button><br>
-		<div id="room_list_container"></div>
+		<div id="room_list_container">
+			<button id="create_room_button">Create room</button><br>
+			<ul id="room_list" class="MetroList"></ul>
+		</div>
 #include "room.html"
 	</main>
 	<noscript>
@@ -60,24 +61,34 @@ if (url_params.get("board")) {
 
 let room_connection = null;
 function connectClientToRoom(room_id) {
+	room_list_container.style["display"] = "none";
 	room_connection = new RoomConnection(room_id);
 }
 // let pc;
 // let listening_connections = [];
 
+refresh_button.onclick = () => {getAllRooms();} // imported from navbar.html
+document.addEventListener("on_room_exit", () => {  // imported from room.html
+	this.getAllRooms();
+	room_list_container.style["display"] = null;
+});
 create_room_button.onclick = () => { createRoom(); }
 async function createRoom() {
 	console.log("sending create room request...");
-	const fetch_response = await fetch(`api/board/${state.selected_board.slug}/room`, {method: "POST"});
-	if (!fetch_response.ok) {
+	const response = await fetch(`api/board/${state.selected_board.slug}/room`, {method: "POST"});
+	if (response.ok) {
+		let new_room_id = Number(response.headers.get("new-room-id"));
+		connectClientToRoom(new_room_id); // "redirects" to room view
+	}
+	else {
 		let error_message = response.headers.get("message");
 		error_message ??= "An unknown error occured when attempting to create room.";
 		throw error_message;
 	}
-	await getAllRooms();
-	return fetch_response;
+	// await getAllRooms();
+	return response;
 }
-show_rooms_button.onclick = () => { getAllRooms(); }
+
 async function getAllRooms() {
 	let response = await fetch(`./api/board/${state.selected_board.slug}/rooms`);
 	console.log(response);
@@ -102,25 +113,28 @@ function showAllRooms(message_json) {
 	for (let room of message_json.rooms) {
 		// console.log(thread.id);
 		// console.log(thread.post_zero);
-			let room_element = document.createElement("div");
-			room_element.classList.add("Room");
+			let room_element = document.createElement("li");
+			room_element.classList.add("ToolBar", "WithBorders");
 			room_element.id = `room_${room.id}`;
 			// Toolbar at the bottom of each thread
 			const id_indicator = document.createElement("span");
 			id_indicator.textContent = room.id;
+			const number_of_peers = document.createElement("span");
+			number_of_peers.innerHTML = `<b>${room.number_of_peers}</b>&nbsp;connected`;
 			const connect_button = document.createElement("button");
+			connect_button.classList.add("ToolBarButton", "RightAligned");
 			connect_button.textContent = "Connect";
 			connect_button.onclick = () => {
 				connectClientToRoom(room.id);
 			}
-			room_element.append(id_indicator, connect_button);
+			room_element.append(id_indicator, number_of_peers, connect_button);
 
 			fragment.appendChild(room_element);
 	}
 	if (fragment.children.length === 0)
-		room_list_container.replaceChildren(document.createTextNode("None."));
+		room_list.replaceChildren(document.createTextNode("None."));
 	else
-		room_list_container.replaceChildren(fragment);
+		room_list.replaceChildren(fragment);
 }
 
 async function getClientInfo() {
