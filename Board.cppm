@@ -43,7 +43,7 @@ public:
 	}
 	void cacheAllThreads() {
 		std::cout << "[Board] Retrieving threads from database..." << std::endl;
-		for (auto thread_tuple : db->queryRows<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = FALSE AND board_id = $1", this->id)) {
+		for (auto thread_tuple : db->queryRowsIncrementally<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = FALSE AND board_id = $1", this->id)) {
 			// Thread thread(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), this->id);
 			auto thread = std::make_unique<Thread>(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), this->id);
 			std::cout << thread->getId() << ", ";

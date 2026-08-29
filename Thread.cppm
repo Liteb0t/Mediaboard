@@ -30,7 +30,7 @@ public:
 		};
 
 		std::print("[Thread] ID: {} \tRetrieving messages from database... ", id);
-		for (auto message_tuple : db->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE thread_id = $1 AND deleted = FALSE", id)) {
+		for (auto message_tuple : db->queryRowsIncrementally<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE thread_id = $1 AND deleted = FALSE", id)) {
 			int message_id = std::get<0>(message_tuple);
 			int thread_id = std::get<1>(message_tuple);
 			int id_in_thread = std::get<2>(message_tuple);
@@ -39,7 +39,7 @@ public:
 			std::chrono::seconds sec(seconds_since_epoch);
 			std::chrono::time_point<std::chrono::system_clock> created_at(sec);
 			std::vector<File> message_files;
-			for (auto file_tuple : db->queryRows<std::tuple<std::string, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT file_name, width, height, thumbnail_file_extension FROM message_file WHERE message_id = $1", message_id)) {
+			for (auto file_tuple : db->queryRowsIncrementally<std::tuple<std::string, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT file_name, width, height, thumbnail_file_extension FROM message_file WHERE message_id = $1", message_id)) {
 				message_files.push_back(File{
 					.filename = std::get<0>(file_tuple),
 					.width = std::get<1>(file_tuple),

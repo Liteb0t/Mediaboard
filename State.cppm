@@ -81,7 +81,7 @@ public:
 		return this->video_formats_to_create_thumbnails_for.contains(std::string(mime_type));
 	}
 
-	void cacheAllBoards() {
+	void cacheAllBoards() { // no mutex needed because it's run once at startup
 		std::print("[State] Retrieving boards from database...");
 		for (auto thread_tuple : db->queryRows<std::tuple<int, int, std::string, std::string>>("SELECT id, permission_object_id, slug, title FROM board WHERE deleted = FALSE")) {
 			// Board board(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), std::get<2>(thread_tuple), std::get<3>(thread_tuple));
@@ -96,18 +96,21 @@ public:
 			std::println("{} - {}", slug_board_id.first, slug_board_id.second);
 	}
 
-	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
-	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
-
 	std::optional<Board*> getBoardIfExists(int board_id) {
-		auto it = boards.find(board_id);
-		if (it != boards.end() && !(it->second.get()->isDeleted()))
+		std::lock_guard<std::mutex> lock(mutex);
+		if (auto it = boards.find(board_id); it != boards.end() && !(it->second.get()->isDeleted()))
 			return it->second.get();
 		else
 			return {};
 	}
 	std::optional<Board*> getBoardIfExists(const std::string& slug) {
-		if (auto it = slug_to_board_id.find(slug); it == slug_to_board_id.end()) return {}; else return getBoardIfExists(it->second);
+		std::lock_guard<std::mutex> lock(mutex);
+		if (auto it = slug_to_board_id.find(slug); it == slug_to_board_id.end())
+			return {};
+		else {
+			mutex.unlock();
+			return getBoardIfExists(it->second);
+		}
 	}
 	std::optional<Board*> getBoardIfExistsAndClientHasReadPermission(const std::string& slug, const std::optional<FuzeHttp::Client>& client) {
 		std::optional<Board*> board = getBoardIfExists(slug);
@@ -130,6 +133,7 @@ public:
 	// 	return this->boards.at(board_id).createMessage(message_json, author_client_id);
 	// }
 	Board* createBoard(boost::json::object board_json) {
+		std::lock_guard<std::mutex> lock(mutex);
 		// boost::json::object board_json = request_json.at("board").as_object();
 		auto board = std::make_unique<Board>(this, db, board_json);
 		int new_board_id = board->getId();
@@ -139,6 +143,7 @@ public:
 	}
 
 	std::string dumpAllGroups(const std::optional<FuzeHttp::Client>& client) const {
+		std::lock_guard<std::mutex> lock(mutex);
 		std::cout << "Dumping from ordered_groups_vec: ";
 
 		boost::json::object groups_json;
@@ -168,11 +173,8 @@ public:
 			{"group_heirarchy", group_heirarchy_json}
 		});
 	}
-	// BasicResponse setGroupHeirarchy(const FuzeHttp::Client& client, std::vector<int> ordered_groups);
-	// BasicResponse createAccount(nlohmann::json user_json);
-	// std::string dumpMembersInGroup(int group_id) const;
-	// std::string dumpMembersInGroupAsArray(int group_id) const;
 	std::string dumpAllUsers(const std::optional<FuzeHttp::Client>& client) const {
+		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::object users_json;
 		int client_rank = this->getClientRank(client);
 		bool client_has_manage_permissions_permission = this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS));
@@ -204,6 +206,7 @@ public:
 		});
 	}
 	boost::json::object getBoardsAsJson(const std::optional<FuzeHttp::Client>& client) const {
+		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::array boards_json = boost::json::array();
 		for (auto& [board_id, board] : this->boards) {
 			if (board->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD)) && !board->isDeleted()) {
@@ -229,7 +232,7 @@ public:
 		// holding the mutex:
 		std::vector<std::weak_ptr<FuzeHttp::WebsocketSession>> v;
 		{
-			std::lock_guard<std::mutex> lock(mutex_);
+			std::lock_guard<std::mutex> lock(mutex);
 			v.reserve(websocket_sessions.size());
 			board->removeUnauthorizedListenersFromThread(thread_id);
 			for(auto p : board->getListenersFromThread(thread_id))
@@ -246,9 +249,13 @@ public:
 	void sendToWebRTC(std::string message);
 	void clearWebsockets();
 	void setBoardSlug(int board_id, const std::string& new_slug) {
+		std::lock_guard<std::mutex> lock(mutex);
 		this->boards.at(board_id)->setSlug(new_slug);
 		this->slug_to_board_id.emplace(new_slug, board_id);
 	}
+
+	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
+	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
 
 	const std::filesystem::path& getMediaLocation() const { return media_location; }
 	// const std::filesystem::path& getProgramLocation() const { return program_location; }
@@ -261,9 +268,8 @@ private:
 	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png"};
 	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;
 
-	// This mutex synchronizes all access to sessions_
+	// we use mutex from FuzeHttp::StateBase instead
 	// std::mutex mutex_;
-
 
 	// std::unordered_map<int, Board> boards;
 	std::unordered_map<int, std::unique_ptr<Board>> boards;
