@@ -37,6 +37,7 @@ endif()
 if(WITH_WEBRTC)
   target_compile_definitions(MediaboardServer PRIVATE WITH_WEBRTC)
   target_link_libraries(MediaboardServer PRIVATE datachannel)
+  target_sources(MediaboardServer PUBLIC FILE_SET CXX_MODULES FILES Room.cppm)
 endif()
 target_link_libraries(MediaboardServer
   PRIVATE
@@ -56,7 +57,6 @@ target_sources(MediaboardServer
       MediaboardWebsocketSession.cppm
       Message.cppm
       Permission.cppm
-      Room.cppm;
       State.cppm
       Thread.cppm
       views.cppm

@@ -288,7 +288,8 @@ FuzeHttp::Response deleteBoardUserPermission(Mediaboard::State* state, FuzeHttp:
 		.status = http::status::ok
 	};
 }
-
+#ifdef WITH_WEBRTC
+/*
 FuzeHttp::Response createRoom(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
 	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
 	if (!board)
@@ -302,18 +303,19 @@ FuzeHttp::Response createRoom(Mediaboard::State* state, FuzeHttp::Request req, C
 		}}
 	};
 }
+*/
 
 FuzeHttp::Response getRoom(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int room_id) {
 	std::optional<Client> client = state->getClientIfExists(req);
 	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
 	if (!board)
 		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	auto room = board.value()->getRoomIfExists(room_id);
+	auto room = board.value()->getSharedRoomIfExists(room_id);
 	if (!room)
 		return Response{.status = http::status::not_found, .error_message = std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id)};
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.json = room.value()->asJson()
+		.json = room.value().get()->asJson()
 	};
 }
 
@@ -329,7 +331,7 @@ FuzeHttp::Response getRooms(Mediaboard::State* state, FuzeHttp::Request req, std
 		.json = board.value()->getRoomsAsJson()
 	};
 }
-
+#endif
 FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
 	boost::json::object thread_json;
 	try {

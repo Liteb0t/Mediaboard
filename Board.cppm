@@ -14,7 +14,9 @@ module;
 export module Mediaboard.Board;
 
 export import Mediaboard.Thread;
+#ifdef WITH_WEBRTC
 import Mediaboard.Room;
+#endif
 import Mediaboard.Permission;
 import FuzeDBI;
 import FuzeHttp.PermissionObject;
@@ -79,12 +81,35 @@ public:
 		};
 		return board_json;
 	}
-	int createRoom() {
-		int new_room_id = room_id_seq++;
-		auto room = std::make_shared<Room>(new_room_id, this->id);
-		this->rooms.emplace(new_room_id, std::move(room));
-		return new_room_id;
+#ifdef WITH_WEBRTC
+	// int createRoom() {
+	// 	int new_room_id = room_id_seq++;
+	// 	auto room = std::make_shared<Room>(new_room_id, this->id);
+	// 	this->rooms.emplace(new_room_id, std::move(room));
+	// 	return new_room_id;
+	// }
+	boost::json::object getRoomsAsJson() const {
+		boost::json::array rooms_json = boost::json::array();
+		for (auto& [room_id, weak_room] : this->rooms) {
+			if (auto strong_room = weak_room.lock())
+				rooms_json.push_back(strong_room->asJson());
+		}
+		return {{"rooms", rooms_json}};
 	}
+	std::optional<std::shared_ptr<Room>> getSharedRoomIfExists(int room_id) const {
+		auto it = rooms.find(room_id);
+		if (it != rooms.end()) {
+			if (auto strong_room = it->second.lock())
+				return strong_room;
+		}
+		return {};
+	}
+	void clearEmptyRooms() { // TODO use this at some point
+		std::erase_if(this->rooms, [this](const auto& id_weak_room_pair)->bool{
+			return id_weak_room_pair.second.expired();
+		});
+	}
+#endif
 	int createThread(boost::json::object thread_json, int author_client_id) {
 		// int new_thread_id_in_board = db->query<int>("SELECT thread_id_seq FROM board WHERE id = $1", this->id);
 		// db->query<void>("UPDATE board SET thread_id_seq = $1 WHERE id = $2", new_thread_id_in_board+1, this->id);
@@ -134,14 +159,6 @@ public:
 			{"threads", threads_json}
 		};
 	}
-	boost::json::object getRoomsAsJson() const {
-		boost::json::array rooms_json = boost::json::array();
-		for (auto& [room_id, room] : this->rooms) {
-			rooms_json.push_back(room->asJson());
-		}
-		return {{"rooms", rooms_json}};
-	}
-
 	// std::string dumpThread(int thread_id, int client_id, std::string key) const;
 	// std::string dumpPermissionsInThread(int thread_id, int client_id) const;
 	boost::json::object getThreadPermissionsAsJson(int thread_id, const std::optional<FuzeHttp::Client>& client) const {
@@ -186,20 +203,6 @@ public:
 				return false;
 		}
 	};
-	std::optional<Room*> getRoomIfExists(int room_id) const {
-		auto it = rooms.find(room_id);
-		if (it != rooms.end()/* && !(it->second.get()->isDeleted())*/)
-			return it->second.get();
-		else
-			return {};
-	}
-	std::optional<std::shared_ptr<Room>> getSharedRoomIfExists(int room_id) const {
-		auto it = rooms.find(room_id);
-		if (it != rooms.end()/* && !(it->second.get()->isDeleted())*/)
-			return it->second;
-		else
-			return {};
-	}
 	Thread* getThread(int thread_id) const { return this->threads.at(thread_id).get(); }
 	void addGroupPermissionCollectionToThread(int group_id, int thread_id) { this->threads.at(thread_id)->addGroupPermissionCollection(group_id); }
 	void addAccountPermissionCollectionToThread(int account_id, int thread_id) { this->threads.at(thread_id)->addAccountPermissionCollection(account_id); }
@@ -226,17 +229,19 @@ public:
 			db->query<void>("UPDATE board SET title = $1 WHERE id = $2", new_title, id);
 		}
 	}
+	int room_id_seq = 0;
+	std::unordered_map<int, std::weak_ptr<Room>> rooms;
 	inline bool isDeleted() const { return this->deleted; }
 	// int getTitle() const { return this->title; }
 	inline static const size_t MAX_SLUG = 32;
 	inline static const size_t MAX_TITLE = 64;
 private:
 	int id;
-	int room_id_seq = 0;
 	std::string slug;
 	std::string title;
 	std::unordered_map<int, std::unique_ptr<Thread>> threads;
-	std::unordered_map<int, std::shared_ptr<Room>> rooms;
+#ifdef WITH_WEBRTC
+#endif
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
 	boost::json::object board_as_json;
 	bool deleted = false; // It is assumed new Board objects are not marked as deleted, because deleted threads are not retrieved from the database, nor can they be created through the API.

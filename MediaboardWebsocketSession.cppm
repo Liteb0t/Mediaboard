@@ -15,7 +15,9 @@ export module Mediaboard.MediaboardWebsocketSession;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 import Mediaboard.Board;
+#ifdef WITH_WEBRTC
 import Mediaboard.Room;
+#endif
 import Mediaboard.Permission;
 import Mediaboard.State;
 
@@ -23,6 +25,7 @@ export namespace Mediaboard {
 class WebsocketSession : public FuzeHttp::WebsocketSession {
 public:
 	WebsocketSession(boost::asio::ip::tcp::socket&& socket, FuzeHttp::StateBase* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
+#ifdef WITH_WEBRTC
 	~WebsocketSession() {
 		if (own_peer_ptr) {
 			auto closeTrack = [](std::shared_ptr<rtc::Track> track) {
@@ -44,6 +47,7 @@ public:
 			}
 		}
 	}
+#endif
 private:
 	State* getState() const {
 		return (State*)this->state_; // base FuzeHttp state must be casted to Mediaboard state
@@ -138,6 +142,22 @@ private:
 				board.value()->addListenerToThread(this, thread_id);
 			}
 #ifdef WITH_WEBRTC
+			else if (request_type == "create_room") {
+				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
+				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
+				if (!board)
+					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
+				// int new_room_id = board.value()->createRoom(this);
+
+				int new_room_id = board.value()->room_id_seq++;
+				auto room = std::make_shared<Room>(new_room_id);
+				this->tracking_room_ptr = room;
+				board.value()->rooms.emplace(new_room_id, room);
+				this->send({
+					{"type", "create_room_response"},
+					{"payload", {{"room_id", new_room_id}}}
+				});
+			}
 			else if (request_type == "webrtc_audio_added_answer") {
 				std::string sdp = buffer_as_json.at("payload").at("description").at("sdp").as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();

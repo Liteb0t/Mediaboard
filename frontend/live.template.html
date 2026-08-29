@@ -13,6 +13,9 @@
 #include "navbar.html"
 		<h3 id="location_indicator"></h3>
 		<div id="room_list_container">
+			<p>
+				Click "Create room" to start a live WebRTC session, or join an existing one.
+			</p>
 			<button id="create_room_button">Create room</button><br>
 			<ul id="room_list" class="MetroList"></ul>
 		</div>
@@ -64,6 +67,10 @@ function connectClientToRoom(room_id) {
 	room_list_container.style["display"] = "none";
 	room_connection = new RoomConnection(room_id);
 }
+function connectToNewRoom() {
+	room_list_container.style["display"] = "none";
+	room_connection = new RoomConnection();
+}
 // let pc;
 // let listening_connections = [];
 
@@ -72,7 +79,8 @@ document.addEventListener("on_room_exit", () => {  // imported from room.html
 	this.getAllRooms();
 	room_list_container.style["display"] = null;
 });
-create_room_button.onclick = () => { createRoom(); }
+create_room_button.onclick = () => { connectToNewRoom(); }
+/*
 async function createRoom() {
 	console.log("sending create room request...");
 	const response = await fetch(`api/board/${state.selected_board.slug}/room`, {method: "POST"});
@@ -88,6 +96,7 @@ async function createRoom() {
 	// await getAllRooms();
 	return response;
 }
+*/
 
 async function getAllRooms() {
 	let response = await fetch(`./api/board/${state.selected_board.slug}/rooms`);
@@ -118,7 +127,7 @@ function showAllRooms(message_json) {
 			room_element.id = `room_${room.id}`;
 			// Toolbar at the bottom of each thread
 			const id_indicator = document.createElement("span");
-			id_indicator.textContent = room.id;
+			id_indicator.textContent = `Room ${room.id}`;
 			const number_of_peers = document.createElement("span");
 			number_of_peers.innerHTML = `<b>${room.number_of_peers}</b>&nbsp;connected`;
 			const connect_button = document.createElement("button");

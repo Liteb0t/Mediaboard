@@ -44,8 +44,8 @@ struct RtcPeer {
 
 class Room /*: public FuzeHttp::PermissionManagedObject*/ {
 public:
-	Room(/*PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, */int id, int board_id/*const ValidatedInput&& input*/)
-			: /*PermissionManagedObject(permission_parent, db), */id(id), board_id(board_id) {}
+	Room(/*PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, */int id/*const ValidatedInput&& input*/)
+			: /*PermissionManagedObject(permission_parent, db), */id(id) {}
 
 	boost::json::object asJson() const {
 		boost::json::array peers_json;
@@ -67,7 +67,6 @@ public:
 	}
 
 	int id;
-	int board_id;
 	int connection_id_counter = 0;
 	unsigned int ssrc_counter = 0;
 	std::unordered_map<int, std::weak_ptr<RtcPeer>> peers;

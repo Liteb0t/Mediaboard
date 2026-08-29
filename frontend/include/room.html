@@ -30,12 +30,23 @@ class RoomConnection {
 		const on_room_exit_event = new Event("on_room_exit");
 		this.sock.onopen = (event) => {
 			console.log("Websocket connected 🙂.");
-			this.makeRtcConnection(room_id); // connect on open because websocket session is tied to room call. Maybe change in future
+			console.log("RoomConnection room_id: " + room_id);
+			// connect on open because websocket session is tied to room call. Maybe change in future
+			if (typeof room_id === "undefined") {
+				this.createRoom();
+			}
+			else {
+				this.makeRtcConnection(room_id);
+			}
 		}
 		this.sock.onmessage = (event) => {
 			try {
 				let message_json = JSON.parse(event.data);
-				if (message_json.type === "webrtc_offer") {
+				console.log(message_json);
+				if (message_json.type === "create_room_response") {
+					this.makeRtcConnection(message_json.payload.room_id);
+				}
+				else if (message_json.type === "webrtc_offer") {
 					console.log("calling onReceiveOffer");
 					this.onReceiveOffer(message_json.payload);
 				}
@@ -83,6 +94,13 @@ class RoomConnection {
 			peers_list.replaceChildren(document.createTextNode("None."));
 		else
 			peers_list.replaceChildren(fragment);
+	}
+	async createRoom() {
+		console.log("Creating new room");
+		this.sock.send(JSON.stringify({
+			"type": "create_room",
+			"board": state.selected_board.slug
+		}));
 	}
 	async enableMic() {
 		if (this.mic_audio_track)

@@ -1,7 +1,7 @@
 CREATE TABLE _info(version TEXT);
 CREATE TABLE _owner(account_id INTEGER NOT NULL);
 CREATE TABLE _sequences(account_id INTEGER, board_id INTEGER, client_id INTEGER, message_id INTEGER, permission_collection_id INTEGER, permission_group_id INTEGER, permission_object_id INTEGER, permission_setting_id INTEGER, thread_id INTEGER);
-INSERT INTO _sequences VALUES (0, 0, 0, 3, 3, 2, 0, 0);
+INSERT INTO _sequences VALUES (0, 0, 0, 0, 3, 3, 2, 0, 0);
 CREATE TABLE account(id INTEGER PRIMARY KEY, username TEXT, password_hash_hash_base64 TEXT, intermediate_salt_base64 TEXT);
 CREATE TABLE client(id INTEGER PRIMARY KEY, account_id INTEGER);
 CREATE TABLE permission_collection(id INTEGER PRIMARY KEY, permission_object_id INTEGER, account_id INTEGER, permission_group_id INTEGER);
