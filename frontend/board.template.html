@@ -1031,43 +1031,55 @@ function getFiles() {
 }
 
 async function postAction() {
-	let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
-	let content_length_bytes = (content_field_text_encoder.encode(content_field.innerText)).length;
-	console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
-	if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
-		post_content_empty_dialog.showModal();
-	}
-	else if (name_length_bytes > CONFIG_post_max_name) {
-		post_name_too_long_dialog_name_length.textContent = name_length_bytes;
-		post_name_too_long_dialog.showModal();
-	}
-	else if (content_length_bytes > CONFIG_post_max_content) {
-		post_content_too_long_dialog_content_length.textContent = content_length_bytes;
-		post_content_too_long_dialog.showModal();
-	}
-	else if (file_post_list.querySelector("progress")) {
-		post_file_upload_not_complete_dialog.showModal();
-	}
-	else {
-		let response;
-		if (state.selected_thread.id === -1) {
-			response = await postThread();
+	try {
+		let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
+		let content_length_bytes = (content_field_text_encoder.encode(content_field.innerText)).length;
+		console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
+		if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
+			post_content_empty_dialog.showModal();
+		}
+		else if (name_length_bytes > CONFIG_post_max_name) {
+			post_name_too_long_dialog_name_length.textContent = name_length_bytes;
+			post_name_too_long_dialog.showModal();
+		}
+		else if (content_length_bytes > CONFIG_post_max_content) {
+			post_content_too_long_dialog_content_length.textContent = content_length_bytes;
+			post_content_too_long_dialog.showModal();
+		}
+		else if (file_post_list.querySelector("progress")) {
+			post_file_upload_not_complete_dialog.showModal();
 		}
 		else {
-			response = await postMessage();
-		}
-		if (response.ok) {
-			content_field.textContent = "";
-			file_upload.value = "";
-			file_post_list.textContent = "";
-			content_length_indicator.style["display"] = "none";
+			let response;
 			if (state.selected_thread.id === -1) {
-				let new_thread_id = Number(response.headers.get("new-thread-id"));
-				thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
-				thread_posted_dialog.showModal();
+				response = await postThread();
 			}
+			else {
+				response = await postMessage();
+			}
+			if (response.ok) {
+				content_field.textContent = "";
+				file_upload.value = "";
+				file_post_list.textContent = "";
+				content_length_indicator.style["display"] = "none";
+				if (state.selected_thread.id === -1) {
+					let new_thread_id = Number(response.headers.get("new-thread-id"));
+					thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
+					thread_posted_dialog.showModal();
+				}
+			}
+			else {
+				let error_message = response.headers.get("message");
+				error_message ??= "An unknown error occured when attempting to post message.";
+				throw error_message;
+			}
+			localStorage.setItem("name", name_field.value);
 		}
-		localStorage.setItem("name", name_field.value);
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
 	}
 }
 

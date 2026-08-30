@@ -3,6 +3,7 @@ module;
 #include <boost/json.hpp>
 #include <boost/smart_ptr.hpp>
 #include <sodium.h>
+#include <expected>
 #include <filesystem>
 #include <iostream>
 #include <list>
@@ -132,10 +133,20 @@ public:
 	// int createMessage(int board_id, boost::json::object message_json, int author_client_id) {
 	// 	return this->boards.at(board_id).createMessage(message_json, author_client_id);
 	// }
-	Board* createBoard(boost::json::object board_json) {
+	std::expected<Board*, std::string> createBoard(boost::json::object board_json, bool make_public) {
 		std::lock_guard<std::mutex> lock(mutex);
+		auto validated = Board::validateInput(board_json);
+		if (!validated) {
+			return std::unexpected(validated.error());
+		}
+		if (slug_to_board_id.contains(validated.value().slug))
+			return std::unexpected("Board with slug already exists");
 		// boost::json::object board_json = request_json.at("board").as_object();
-		auto board = std::make_unique<Board>(this, db, board_json);
+		auto board = std::make_unique<Board>(this, db, validated.value());
+		if (make_public && !board->clientHasPermission({}, static_cast<int>(PERMISSION::VIEW_BOARD)))
+			board->setGroupPermission(static_cast<int>(BUILTIN_GROUPS::PUBLIC), static_cast<int>(PERMISSION::VIEW_BOARD), THREE_STATE_SETTING::ALLOW);
+		else if (!make_public && board->clientHasPermission({}, static_cast<int>(PERMISSION::VIEW_BOARD)))
+			board->setGroupPermission(static_cast<int>(BUILTIN_GROUPS::PUBLIC), static_cast<int>(PERMISSION::VIEW_BOARD), THREE_STATE_SETTING::DENY);
 		int new_board_id = board->getId();
 		this->slug_to_board_id.emplace(board->getSlug(), new_board_id);
 		this->boards.emplace(new_board_id, std::move(board));
@@ -143,14 +154,14 @@ public:
 	}
 
 	std::string dumpAllGroups(const std::optional<FuzeHttp::Client>& client) const {
-		std::lock_guard<std::mutex> lock(mutex);
+		std::lock_guard<std::mutex> lock(permission_mutex);
 		std::cout << "Dumping from ordered_groups_vec: ";
 
 		boost::json::object groups_json;
 		boost::json::array group_heirarchy_json;
 		int group_editable_threshold;
-		if (this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS)))
-			group_editable_threshold = this->getClientRank(client) + 1;
+		if (this->clientHasPermissionUnlocked(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS)))
+			group_editable_threshold = this->getClientRankUnlocked(client) + 1;
 		else
 			group_editable_threshold = this->getOrderedGroups()->size();
 		for (int i = 0; i < this->getOrderedGroups()->size(); i++) {
@@ -174,21 +185,21 @@ public:
 		});
 	}
 	std::string dumpAllUsers(const std::optional<FuzeHttp::Client>& client) const {
-		std::lock_guard<std::mutex> lock(mutex);
+		std::lock_guard<std::mutex> lock(permission_mutex);
 		boost::json::object users_json;
-		int client_rank = this->getClientRank(client);
-		bool client_has_manage_permissions_permission = this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS));
+		int client_rank = this->getClientRankUnlocked(client);
+		bool client_has_manage_permissions_permission = this->clientHasPermissionUnlocked(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS));
 		for (auto& account : this->accounts) {
 			int account_id = account.first;
 			std::cout << account_id << ", ";
-			int account_rank = this->getAccountRank(account_id);
+			int account_rank = this->getAccountRankUnlocked(account_id);
 			boost::json::object account_json {
 				{"id", account_id},
-				{"username", this->getUsernameFromAccount(account_id)},
+				{"username", account.second.username},
 				{"rank", account_rank}
 			};
 			boost::json::array user_groups_json;
-			for (const int group_id : this->getOrderedGroupsContainingMember(account_id)) {
+			for (const int group_id : this->getOrderedGroupsContainingMemberUnlocked(account_id)) {
 				const Group* group = this->getGroup(group_id);
 				user_groups_json.emplace_back(boost::json::object{
 					{"id", group->getId()},

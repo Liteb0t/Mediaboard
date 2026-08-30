@@ -67,8 +67,8 @@ FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 	if (out_filename.empty()) {
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "File name not found in POST header"};
 	}
-	else if (out_filename.length() > static_cast<int>(MESSAGE_FIELDS::MAX_FILE_NAME)) {
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("File name length exceeds the server-defined limit of {}", static_cast<int>(MESSAGE_FIELDS::MAX_FILE_NAME))};
+	else if (out_filename.length() > static_cast<int>(File::MAX_FILE_NAME)) {
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("File name length exceeds the server-defined limit of {}", static_cast<int>(File::MAX_FILE_NAME))};
 	}
 	FuzeHttp::sanitiseFileName(out_filename);
 	std::cout << "Sanitised out_filename: " << out_filename << std::endl;

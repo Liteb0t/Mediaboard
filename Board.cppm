@@ -7,6 +7,7 @@ module;
 #include <boost/json.hpp>
 #include <bits/unique_ptr.h>
 #include <ctime>
+#include <expected>
 #include <iostream>
 #include <print>
 #include <set>
@@ -21,9 +22,9 @@ import Mediaboard.Permission;
 import FuzeDBI;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
+import FuzeHttp.Utils;
 
 export namespace Mediaboard {
-
 class Board : public FuzeHttp::PermissionManagedObject {
 public:
 	Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int permission_object_id, std::string slug, std::string title)
@@ -33,17 +34,47 @@ public:
 			title(title) {
 	}
 	// Save board when JSON is received
-	Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, boost::json::object board_json)
-			: PermissionManagedObject(permission_parent, db) {
-		this->id = db->query<int>("SELECT board_id FROM _sequences");
-		this->slug = board_json.at("slug").as_string();
-		this->title = board_json.at("title").as_string();
-		db->query<void>("UPDATE _sequences SET board_id = $1", this->id+1);
+	struct Validated {
+		std::string slug;
+		std::string title;
+	};
+	static std::expected<Board::Validated, std::string> validateInput(const boost::json::object json) {
+		auto slug_it = json.find("slug");
+		if (slug_it == json.end()) {
+			return std::unexpected("Missing JSON field: slug");
+		}
+		if (!slug_it->value().is_string()) {
+			return std::unexpected("JSON field 'slug' must be a string");
+		}
+		auto slug = std::string{slug_it->value().as_string()};
+
+		if (slug.length() < 1 || slug.length() > MAX_SLUG)
+			return std::unexpected(std::format("Slug length {} is not between 1 and {}", slug.length(), MAX_SLUG));
+		if (!FuzeHttp::isValidURLParameter(slug))
+			return std::unexpected("Slug can only contain alphanumeric characters, '_', or '-'.");
+
+		auto title_it = json.find("title");
+		if (title_it == json.end()) {
+			return std::unexpected("Missing JSON field: title");
+		}
+		if (!title_it->value().is_string()) {
+			return std::unexpected("JSON field 'title' must be a string");
+		}
+		auto title = std::string{title_it->value().as_string()};
+
+		if (title.length() < 1 || title.length() > Board::MAX_TITLE)
+			return std::unexpected(std::format("Title length {} is not between 1 and {}", title.length(), Board::MAX_TITLE));
+
+		return Validated{slug, title};
+	}
+	Board(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, Board::Validated input)
+			: PermissionManagedObject(permission_parent, db), slug(input.slug), title(input.title) {
+		this->id = db->incrementSequence("board_id");
 		db->query<void>("INSERT INTO board(id, permission_object_id, slug, title) VALUES ($1, $2, $3, $4)", id, this->getPermissionObjectId(), slug, title);
 	}
 	void cacheAllThreads() {
 		std::cout << "[Board] Retrieving threads from database..." << std::endl;
-		for (auto thread_tuple : db->queryRowsIncrementally<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = FALSE AND board_id = $1", this->id)) {
+		for (auto thread_tuple : db->queryRows<std::tuple<int, int>>("SELECT id, permission_object_id FROM thread WHERE deleted = FALSE AND board_id = $1", this->id)) {
 			// Thread thread(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), this->id);
 			auto thread = std::make_unique<Thread>(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), this->id);
 			std::cout << thread->getId() << ", ";
@@ -113,8 +144,7 @@ public:
 	int createThread(boost::json::object thread_json, int author_client_id) {
 		// int new_thread_id_in_board = db->query<int>("SELECT thread_id_seq FROM board WHERE id = $1", this->id);
 		// db->query<void>("UPDATE board SET thread_id_seq = $1 WHERE id = $2", new_thread_id_in_board+1, this->id);
-		int new_thread_id = db->query<int>("SELECT thread_id FROM _sequences");
-		db->query<void>("UPDATE _sequences SET thread_id = $1", new_thread_id+1);
+		int new_thread_id = db->incrementSequence("thread_id");
 		auto thread = std::make_unique<Thread>(this, thread_json, author_client_id, db, this->id);
 		// int new_thread_id = thread->getId();
 		this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count(), new_thread_id));
@@ -126,7 +156,11 @@ public:
 		int thread_id = message_json["thread_id"].as_int64();
 		Thread* thread = this->getThread(thread_id);
 		std::time_t old_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
-		int new_post_id = thread->createMessageFromJson(message_json, author_client_id);
+		int new_post_id;
+		if (auto message_maybe = thread->createMessageFromJson(message_json, author_client_id))
+			new_post_id = message_maybe.value()->getId();
+		else
+			throw message_maybe.error();
 		std::time_t new_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
 		this->ordered_threads.erase(std::make_pair(old_message_time, thread_id));
 		this->ordered_threads.insert(std::make_pair(new_message_time, thread_id));

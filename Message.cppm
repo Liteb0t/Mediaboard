@@ -1,31 +1,65 @@
 module;
 #include <ctime>
 #include <boost/json.hpp>
+#include <expected>
 #include <iostream>
 #include <string>
 export module Mediaboard.Message;
 
 import FuzeDBI;
 import FuzeHttp.Core;
-// import FuzeHttp.ValidatedOrError;
 
 export namespace Mediaboard {
-enum class MESSAGE_FIELDS : size_t { MAX_NAME = 32, MAX_CONTENT = 5000, MAX_FILE_NAME = 205, MAX_FILE_NAME_WITH_UUID = 205+36 };
+class File {
+public:
+	static std::expected<File, std::string> validateInput(const boost::json::object json) {
+		File file;
+		if (auto filename_it = json.find("filename"); filename_it == json.end())
+			return std::unexpected("Missing JSON field: filename");
+		else if (!filename_it->value().is_string())
+			return std::unexpected("JSON field 'filename' must be an string");
+		else {
+			file.filename = filename_it->value().as_string();
+			if (file.filename.size() < 1 || file.filename.size() > static_cast<size_t>(MAX_FILE_NAME_WITH_UUID))
+				return std::unexpected(std::format("Filename length {} is not between 1 and {}", file.filename.length(), MAX_FILE_NAME_WITH_UUID));
+		}
 
-struct File {
+		if (json.contains("width") || json.contains("height") || json.contains("thumbnail_file_extension")) {
+			if (auto width_it = json.find("width"); width_it == json.end())
+				return std::unexpected("Missing JSON field: width");
+			else if (!width_it->value().is_int64())
+				return std::unexpected("JSON field 'width' must be an int");
+			else
+				file.width = width_it->value().as_int64();
+			if (auto height_it = json.find("height"); height_it == json.end())
+				return std::unexpected("Missing JSON field: height");
+			else if (!height_it->value().is_int64())
+				return std::unexpected("JSON field 'height' must be an int");
+			else
+				file.height = height_it->value().as_int64();
+
+			if (auto thumbnail_file_extension_it = json.find("thumbnail_file_extension"); thumbnail_file_extension_it == json.end())
+				return std::unexpected("Missing JSON field: thumbnail_file_extension");
+			else if (!thumbnail_file_extension_it->value().is_string())
+				return std::unexpected("JSON field 'thumbnail_file_extension' must be an string");
+			else {
+				file.thumbnail_file_extension = thumbnail_file_extension_it->value().as_string();
+				// TODO check if file extension is in supported formats
+				// TODO sanitise filename. Frontend handles this but not if the API is used directly
+				if (file.thumbnail_file_extension->length() < 1 || file.thumbnail_file_extension->length() > MAX_FILE_NAME)
+					return std::unexpected(std::format("thumbnail_file_extension length {} is not between 1 and {}", file.thumbnail_file_extension->length(), MAX_FILE_NAME));
+			}
+		}
+		return file;
+	}
+	inline static const size_t MAX_FILE_NAME = 205;
+	inline static const size_t MAX_FILE_NAME_WITH_UUID = 205+36;
 	std::string filename;
 	std::optional<int> width, height;
 	std::optional<std::string> thumbnail_file_extension;
 };
-
 class Message {
 public:
-	// struct ValidatedInput {
-	// 	int board_id;
-	// };
-	// static FuzeHttp::ValidatedOrError<ValidatedInput> validateInput(const boost::json::object json) {
- //
-	// }
 	// Cache message from database
 	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::string content, std::vector<File> files, bool deleted = false)
 			: id(id),
@@ -46,71 +80,102 @@ public:
 			{"content", content}
 		};
 	}
+
+	inline static const size_t MAX_NAME = 32;
+	inline static const size_t MAX_CONTENT = 5000;
+	inline static const size_t MAX_NUMBER_OF_FILES = 4;
 	// Save message when JSON is received
-	Message(boost::json::object post_json, int author_client_id, FuzeDBI::Connection* fuze_dbi) {
-		if (!(post_json.contains("files") && post_json.contains("name") && post_json.contains("content"))) {
-			throw std::runtime_error("Message JSON is missing one or more of the following entries: files, name, content");
-		}
-		// if ((message_content.length() == 0 && post_json["files"].size() == 0) || message_content.length() > static_cast<size_t>(MESSAGE_FIELDS::MAX_CONTENT))
-		//	return api_response(http::status::bad_request, std::string("The post does not meet the constraints set by the server.\nThis could mean that the message content was empty and no files were uploaded, or the message content is too long."));
-		this->post_as_json = post_json;
-		this->post_as_json["type"] = "post";
+	struct Validated {
+		int thread_id;
+		int id_in_thread;
+		std::string name;
+		std::string content;
+		std::vector<File> files;
+	};
+	static std::expected<Message::Validated, std::string> validateInput(const boost::json::object json) {
+		Validated validated;
+		if (auto thread_id_it = json.find("thread_id"); thread_id_it == json.end())
+			return std::unexpected("Missing JSON field: thread_id");
+		else if (!thread_id_it->value().is_int64())
+			return std::unexpected("JSON field 'thread_id' must be an int");
+		else
+			validated.thread_id = thread_id_it->value().as_int64();
 
-		this->id_in_thread = post_json["id_in_thread"].as_uint64();
-		this->thread_id = post_json["thread_id"].as_int64();
-		this->author_client_id = author_client_id;
-		// User input checking is done on front-end, so it's not high priority to return an http error when username or content is empty/too long.
-		this->author_username = post_json["name"].as_string();
-		if (this->author_username == "") {
-			this->author_username = "Anonymous"; // Blank username becoming Anonymous is intended behaviour
-			this->post_as_json["name"] = this->author_username;
-		}
-		else if (this->author_username.length() > static_cast<size_t>(MESSAGE_FIELDS::MAX_NAME)) {
-			this->author_username = "Bad Username";
-			this->post_as_json["name"] = this->author_username;
-		}
-		this->content = post_json["content"].as_string();
-		if (this->content.length() > static_cast<size_t>(MESSAGE_FIELDS::MAX_CONTENT)) {
-			throw std::runtime_error(std::format("Message content length {} exceeds the limit of {}", this->content.length(), static_cast<size_t>(MESSAGE_FIELDS::MAX_CONTENT)));
-		}
-		this->created_at = std::chrono::system_clock::now();
-		this->post_as_json["created_at"] = std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count();
+		if (auto id_in_thread_it = json.find("id_in_thread"); id_in_thread_it == json.end())
+			return std::unexpected("Missing JSON field: id_in_thread");
+		else if (!id_in_thread_it->value().is_int64())
+			return std::unexpected("JSON field 'id_in_thread' must be an int");
+		else
+			validated.id_in_thread = id_in_thread_it->value().as_int64();
 
-		this->id = fuze_dbi->query<int>("SELECT message_id FROM _sequences");
-		fuze_dbi->query<void>("UPDATE _sequences SET message_id = $1", this->id + 1);
-		fuze_dbi->query<void>("INSERT INTO message(id, thread_id, id_in_thread, author_client_id, author_username, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->author_username, (int)std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count(), this->content);
-		boost::json::array files_json = post_json["files"].as_array();
-		if (this->content.length() == 0 && files_json.size() == 0) {
-			throw std::runtime_error("Message Cannot be empty");
+		if (auto name_it = json.find("name"); name_it == json.end())
+			return std::unexpected("Missing JSON field: name");
+		else if (!name_it->value().is_string())
+			return std::unexpected("JSON field 'name' must be an string");
+		else {
+			validated.name = name_it->value().as_string();
+			if (validated.name.length() > Message::MAX_NAME)
+				return std::unexpected(std::format("Name length {} must be less than {}", validated.name.length(), Message::MAX_NAME));
 		}
+		if (auto content_it = json.find("content"); content_it == json.end())
+			return std::unexpected("Missing JSON field: content");
+		else if (!content_it->value().is_string())
+			return std::unexpected("JSON field 'content' must be an string");
+		else {
+			validated.content = content_it->value().as_string();
+			if (validated.content.length() < 1 || validated.content.length() > MAX_CONTENT)
+				return std::unexpected(std::format("Content length {} is not between 1 and {}", validated.content.length(), MAX_CONTENT));
+		}
+
+		if (auto files_it = json.find("files"); files_it == json.end())
+			return std::unexpected("Missing JSON field: files");
+		else if (!files_it->value().is_array())
+			return std::unexpected("JSON field 'files' must be an array");
+		else {
+			boost::json::array files_json = files_it->value().as_array();
+			for (boost::json::value file_val : files_json) {
+				if (!file_val.is_object())
+					return std::unexpected("file_val must be an object");
+				boost::json::object& file_obj = file_val.as_object();
+				auto file_maybe = File::validateInput(file_obj);
+				if (!file_maybe)
+					return std::unexpected(file_maybe.error());
+				validated.files.push_back(file_maybe.value());
+			}
+		}
+
+		return validated;
+	}
+	Message(Validated input, int author_client_id, FuzeDBI::Connection* db)
+			: id(db->incrementSequence("message_id")),
+			author_client_id(author_client_id),
+			author_username(input.name.length() == 0 ? "Anonymous" : input.name),
+			content(input.content),
+			thread_id(input.thread_id),
+			id_in_thread(input.id_in_thread),
+			files(input.files),
+			created_at(std::chrono::system_clock::now()),
+			deleted(false) {
+		int time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count();
+		this->post_as_json = {
+			{"type", "post"},
+			{"id", id},
+			{"thread_id", thread_id},
+			{"id_in_thread", id_in_thread},
+			{"name", author_username},
+			{"created_at", time_since_epoch},
+			{"content", content}
+		};
+		// save shit to database
+		db->query<void>("INSERT INTO message(id, thread_id, id_in_thread, author_client_id, author_username, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->author_username, time_since_epoch, this->content);
 		this->files_i = 0;
-		for (boost::json::value file_val : files_json) {
-			boost::json::object& file_obj = file_val.as_object();
-			const boost::json::string filename = file_val.at("filename").as_string();
-			if (filename.size() <= static_cast<size_t>(MESSAGE_FIELDS::MAX_FILE_NAME_WITH_UUID)) {
-				File file{.filename = filename.c_str()}; // TODO sanitise filename. Frontend handles this but not if the API is used directly
-				if (file_obj.contains("width") && file_obj.contains("height") && file_obj.contains("thumbnail_file_extension")) {
-					file.width = file_obj.at("width").as_int64();
-					file.height = file_obj.at("height").as_int64();
-					file.thumbnail_file_extension = file_obj.at("thumbnail_file_extension").as_string();
-					fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name, width, height, thumbnail_file_extension) VALUES ($1, $2, $3, $4, $5)", this->id, filename.c_str(), file.width.value(), file.height.value(), file.thumbnail_file_extension.value());
-				}
-				else
-					fuze_dbi->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, filename.c_str());
-				this->files.push_back(file);
+		for (const File& file : files) {
+			if (file.width && file.height && file.thumbnail_file_extension) {
+				db->query<void>("INSERT INTO message_file(message_id, file_name, width, height, thumbnail_file_extension) VALUES ($1, $2, $3, $4, $5)", this->id, file.filename.c_str(), file.width.value(), file.height.value(), file.thumbnail_file_extension.value());
 			}
 			else
-				std::cerr << "File name too long to save to database. Length: " << filename.size() << std::endl;
-			if (++files_i >= 4)
-				break;
+				db->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, file.filename.c_str());
 		}
-		post_as_json.erase("files");
-		this->post_as_json["id"] = this->id;
-
-		// New posts are not in a deleted state
-		this->deleted = false;
-		// Moderators will be able to view deleted messages
-		// this->post_as_json["deleted"] = false;
 	}
 
 	std::string dump() const {

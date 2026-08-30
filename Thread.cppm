@@ -1,6 +1,7 @@
 module;
 #include <boost/json.hpp>
 #include <ctime>
+#include <expected>
 #include <iostream>
 #include <map>
 #include <print>
@@ -30,7 +31,7 @@ public:
 		};
 
 		std::print("[Thread] ID: {} \tRetrieving messages from database... ", id);
-		for (auto message_tuple : db->queryRowsIncrementally<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE thread_id = $1 AND deleted = FALSE", id)) {
+		for (auto message_tuple : db->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE thread_id = $1 AND deleted = FALSE", id)) {
 			int message_id = std::get<0>(message_tuple);
 			int thread_id = std::get<1>(message_tuple);
 			int id_in_thread = std::get<2>(message_tuple);
@@ -39,7 +40,7 @@ public:
 			std::chrono::seconds sec(seconds_since_epoch);
 			std::chrono::time_point<std::chrono::system_clock> created_at(sec);
 			std::vector<File> message_files;
-			for (auto file_tuple : db->queryRowsIncrementally<std::tuple<std::string, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT file_name, width, height, thumbnail_file_extension FROM message_file WHERE message_id = $1", message_id)) {
+			for (auto file_tuple : db->queryRows<std::tuple<std::string, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT file_name, width, height, thumbnail_file_extension FROM message_file WHERE message_id = $1", message_id)) {
 				message_files.push_back(File{
 					.filename = std::get<0>(file_tuple),
 					.width = std::get<1>(file_tuple),
@@ -65,9 +66,12 @@ public:
 		// this->thread_as_json["id_in_board"] = id_in_board;
 		post_zero.emplace("thread_id", this->id);
 		// post_zero.emplace("thread_id_in_board", id_in_board);
-		int new_message_id = this->createMessageFromJson(std::move(post_zero), author_client_id);
-		this->thread_as_json["post_zero"] = this->messages.at(new_message_id)->asJson();
-		this->thread_as_json["reply_count"] = 0;
+		if (auto new_message = this->createMessageFromJson(std::move(post_zero), author_client_id)) {
+			this->thread_as_json["post_zero"] = new_message.value()->asJson();
+			this->thread_as_json["reply_count"] = 0;
+		}
+		else
+			throw new_message.error();
 	}
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* db);
 	// std::string dumpThread() const;
@@ -94,20 +98,21 @@ public:
 		this->last_message_created_at = message->createdAt();
 		this->messages.emplace(message->getIdInThread(), std::move(message));
 	}
-	int createMessageFromJson(boost::json::object message_json, int author_client_id) {
-		int new_message_id_in_thread = db->query<int>("SELECT message_id_seq FROM thread WHERE id = $1", this->id);
+	std::expected<Message*, std::string> createMessageFromJson(boost::json::object message_json, int author_client_id) {
+		int new_message_id_in_thread = db->query<int>("SELECT message_id_seq FROM thread WHERE id = $1", this->id); // TODO fix possible ID clash from non atomic operation
 		db->query<void>("UPDATE thread SET message_id_seq = $1 WHERE id = $2", new_message_id_in_thread+1, this->id);
-		message_json.emplace("id_in_thread", (size_t)new_message_id_in_thread);
-		auto message = std::make_unique<Message>(message_json, author_client_id, db); // Key is deleted from message_json in its constructor
-		if (this->messages.empty())
-			this->thread_as_json["post_zero"] = message->asJson();
-		else {
-			this->reply_count++;
-			this->thread_as_json["reply_count"] = this->reply_count;
+		message_json.emplace("id_in_thread", new_message_id_in_thread);
+		auto message_maybe = Message::validateInput(message_json);
+		if (!message_maybe) {
+			return std::unexpected(message_maybe.error());
 		}
+		auto message = std::make_unique<Message>(message_maybe.value(), author_client_id, db); // Key is deleted from message_json in its constructor
+		auto message_raw = message.get();
+		this->reply_count++;
+		this->thread_as_json["reply_count"] = this->reply_count;
 		this->last_message_created_at = message->createdAt();
 		this->messages.emplace(message->getIdInThread(), std::move(message));
-		return new_message_id_in_thread;
+		return message_raw;
 	}
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
@@ -175,7 +180,7 @@ private:
 	std::chrono::time_point<std::chrono::system_clock> last_message_created_at;
 	// std::vector<Post> posts;
 	std::map<int, std::unique_ptr<Message>> messages;
-	int reply_count = 0;
+	int reply_count = -1;
 	std::unordered_set<FuzeHttp::WebsocketSession*> listeners;
 	// char subject[256];
 	boost::json::object thread_as_json;
