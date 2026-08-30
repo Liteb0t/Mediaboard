@@ -25,11 +25,6 @@ public:
 			id(id),
 			board_id(board_id) {
 		this->cacheAllPermissions();
-		this->thread_as_json = {
-			{"id", id},
-			{"reply_count", 0}
-		};
-
 		std::print("[Thread] ID: {} \tRetrieving messages from database... ", id);
 		for (auto message_tuple : db->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE thread_id = $1 AND deleted = FALSE", id)) {
 			int message_id = std::get<0>(message_tuple);
@@ -55,30 +50,41 @@ public:
 		std::cout << "done." << std::endl;
 	}
 	// Save thread when JSON is received
-	Thread(PermissionObjectBase* permission_parent, boost::json::object thread_json, int author_client_id, FuzeDBI::Connection* db, int board_id/*, int id_in_board*/)
-			: PermissionManagedObject(permission_parent, db), board_id(board_id)/*, id_in_board(id_in_board)*/ {
-		boost::json::object post_zero = thread_json.at("post_zero").as_object();
-		this->thread_as_json = thread_json;
-		this->id = db->query<int>("SELECT thread_id FROM _sequences");
-		db->query<void>("UPDATE _sequences SET thread_id = $1", this->id+1);
-		db->query<void>("INSERT INTO thread(id, permission_object_id, board_id) VALUES ($1, $2, $3)", this->id, this->getPermissionObjectId(), this->board_id);
-		this->thread_as_json["id"] = this->id;
-		// this->thread_as_json["id_in_board"] = id_in_board;
-		post_zero.emplace("thread_id", this->id);
-		// post_zero.emplace("thread_id_in_board", id_in_board);
-		if (auto new_message = this->createMessageFromJson(std::move(post_zero), author_client_id)) {
-			this->thread_as_json["post_zero"] = new_message.value()->asJson();
-			this->thread_as_json["reply_count"] = 0;
+	struct Validated {
+		Message::Validated post_zero_validated;
+	};
+	static std::expected<Thread::Validated, std::string> validateInput(const boost::json::object json) {
+		Validated validated;
+
+		if (auto post_zero_it = json.find("post_zero"); post_zero_it == json.end())
+			return std::unexpected("Missing JSON field: post_zero");
+		else if (!post_zero_it->value().is_object())
+			return std::unexpected("JSON field 'post_zero' must be an object");
+		else {
+			boost::json::object post_zero = post_zero_it->value().as_object();
+			if (auto message = Message::validateInput(post_zero))
+				validated.post_zero_validated = message.value();
+			else
+				return std::unexpected(message.error());
 		}
-		else
-			throw new_message.error();
+		return validated;
+	}
+	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, Validated input, int author_client_id, int board_id, int id)
+			: PermissionManagedObject(permission_parent, db),
+			board_id(board_id),
+			id(id) {
+		db->query<void>("INSERT INTO thread(id, permission_object_id, board_id) VALUES ($1, $2, $3)", this->id, this->getPermissionObjectId(), this->board_id);
+		this->insertMessage(std::make_unique<Message>(db, input.post_zero_validated, author_client_id, this->id, incrementMessageIdInThread()));
 	}
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* db);
 	// std::string dumpThread() const;
 	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
-		boost::json::object thread_json = this->thread_as_json;
-		thread_json.emplace("client_permissions", this->getPermissionsAsJson(client));
-		return thread_json;
+		return {
+			{"id", this->id},
+			{"post_zero", this->messages.at(0)->asJson()},
+			{"reply_count", this->reply_count},
+			{"client_permissions", this->getPermissionsAsJson(client)}
+		};
 	}
 	boost::json::object asJsonWithMessages(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::object thread_json = this->asJson(client);
@@ -89,30 +95,33 @@ public:
 	// void addInitialPost(json post_json, bool save_to_database);
 	// void createPostFromStruct(struct db_post_struct* post_struct);
 	void cacheMessage(std::unique_ptr<Message>&& message) {
-		if (message->getIdInThread() == 0)
-			this->thread_as_json["post_zero"] = message->asJson();
-		else if (!message->isDeleted()) {
+		if (!message->isDeleted()) {
 			this->reply_count++;
-			this->thread_as_json["reply_count"] = this->reply_count;
 		}
 		this->last_message_created_at = message->createdAt();
 		this->messages.emplace(message->getIdInThread(), std::move(message));
 	}
-	std::expected<Message*, std::string> createMessageFromJson(boost::json::object message_json, int author_client_id) {
+	int incrementMessageIdInThread() {
 		int new_message_id_in_thread = db->query<int>("SELECT message_id_seq FROM thread WHERE id = $1", this->id); // TODO fix possible ID clash from non atomic operation
 		db->query<void>("UPDATE thread SET message_id_seq = $1 WHERE id = $2", new_message_id_in_thread+1, this->id);
-		message_json.emplace("id_in_thread", new_message_id_in_thread);
+		return new_message_id_in_thread;
+	}
+	std::expected<Message*, std::string> createMessageFromJson(boost::json::object message_json, int author_client_id) {
+		// message_json.emplace("id_in_thread", incrementMessageIdInThread());
 		auto message_maybe = Message::validateInput(message_json);
 		if (!message_maybe) {
 			return std::unexpected(message_maybe.error());
 		}
-		auto message = std::make_unique<Message>(message_maybe.value(), author_client_id, db); // Key is deleted from message_json in its constructor
-		auto message_raw = message.get();
+		auto message = std::make_unique<Message>(db, message_maybe.value(), author_client_id, this->id, incrementMessageIdInThread()); // Key is deleted from message_json in its constructor
+		auto message_ptr = insertMessage(std::move(message));
+		return message_ptr;
+	}
+	Message* insertMessage(std::unique_ptr<Message> message) {
+		auto message_ptr = message.get();
 		this->reply_count++;
-		this->thread_as_json["reply_count"] = this->reply_count;
 		this->last_message_created_at = message->createdAt();
 		this->messages.emplace(message->getIdInThread(), std::move(message));
-		return message_raw;
+		return message_ptr;
 	}
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
@@ -120,7 +129,6 @@ public:
 		this->messages.at(id_in_thread)->markAsDeleted();
 		db->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $2", this->id, id_in_thread);
 		this->reply_count--;
-		this->thread_as_json["reply_count"] = this->reply_count;
 		std::cout << "Erased message " << id_in_thread << " from thread " << this->id << std::endl;
 	}
 	// bool keyMatchesMessage(std::string key, int message_id) const;
@@ -183,7 +191,6 @@ private:
 	int reply_count = -1;
 	std::unordered_set<FuzeHttp::WebsocketSession*> listeners;
 	// char subject[256];
-	boost::json::object thread_as_json;
 	bool deleted = false; // It is assumed new Thread object are not marked as deleted, because deleted threads are not retrieved from the database, nor can they be created through the API.
 }; // class Thread
 } // namespace FuzeHttp

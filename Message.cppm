@@ -87,27 +87,13 @@ public:
 	// Save message when JSON is received
 	struct Validated {
 		int thread_id;
-		int id_in_thread;
+		// int id_in_thread;
 		std::string name;
 		std::string content;
 		std::vector<File> files;
 	};
 	static std::expected<Message::Validated, std::string> validateInput(const boost::json::object json) {
 		Validated validated;
-		if (auto thread_id_it = json.find("thread_id"); thread_id_it == json.end())
-			return std::unexpected("Missing JSON field: thread_id");
-		else if (!thread_id_it->value().is_int64())
-			return std::unexpected("JSON field 'thread_id' must be an int");
-		else
-			validated.thread_id = thread_id_it->value().as_int64();
-
-		if (auto id_in_thread_it = json.find("id_in_thread"); id_in_thread_it == json.end())
-			return std::unexpected("Missing JSON field: id_in_thread");
-		else if (!id_in_thread_it->value().is_int64())
-			return std::unexpected("JSON field 'id_in_thread' must be an int");
-		else
-			validated.id_in_thread = id_in_thread_it->value().as_int64();
-
 		if (auto name_it = json.find("name"); name_it == json.end())
 			return std::unexpected("Missing JSON field: name");
 		else if (!name_it->value().is_string())
@@ -117,22 +103,17 @@ public:
 			if (validated.name.length() > Message::MAX_NAME)
 				return std::unexpected(std::format("Name length {} must be less than {}", validated.name.length(), Message::MAX_NAME));
 		}
-		if (auto content_it = json.find("content"); content_it == json.end())
-			return std::unexpected("Missing JSON field: content");
-		else if (!content_it->value().is_string())
-			return std::unexpected("JSON field 'content' must be an string");
-		else {
-			validated.content = content_it->value().as_string();
-			if (validated.content.length() < 1 || validated.content.length() > MAX_CONTENT)
-				return std::unexpected(std::format("Content length {} is not between 1 and {}", validated.content.length(), MAX_CONTENT));
-		}
 
+		size_t number_of_files;
 		if (auto files_it = json.find("files"); files_it == json.end())
 			return std::unexpected("Missing JSON field: files");
 		else if (!files_it->value().is_array())
 			return std::unexpected("JSON field 'files' must be an array");
 		else {
 			boost::json::array files_json = files_it->value().as_array();
+			number_of_files = files_json.size();
+			if (number_of_files > MAX_NUMBER_OF_FILES)
+				return std::unexpected(std::format("Cannot attach more than {} files", MAX_NUMBER_OF_FILES));
 			for (boost::json::value file_val : files_json) {
 				if (!file_val.is_object())
 					return std::unexpected("file_val must be an object");
@@ -144,15 +125,25 @@ public:
 			}
 		}
 
+		if (auto content_it = json.find("content"); content_it == json.end())
+			return std::unexpected("Missing JSON field: content");
+		else if (!content_it->value().is_string())
+			return std::unexpected("JSON field 'content' must be an string");
+		else {
+			validated.content = content_it->value().as_string();
+			if ((validated.content.length() < 1 && number_of_files == 0) || validated.content.length() > MAX_CONTENT)
+				return std::unexpected(std::format("Content length {} is not between 1 and {}", validated.content.length(), MAX_CONTENT));
+		}
+
 		return validated;
 	}
-	Message(Validated input, int author_client_id, FuzeDBI::Connection* db)
+	Message(FuzeDBI::Connection* db, Validated input, int author_client_id, int thread_id, int id_in_thread)
 			: id(db->incrementSequence("message_id")),
 			author_client_id(author_client_id),
 			author_username(input.name.length() == 0 ? "Anonymous" : input.name),
 			content(input.content),
-			thread_id(input.thread_id),
-			id_in_thread(input.id_in_thread),
+			thread_id(thread_id),
+			id_in_thread(id_in_thread),
 			files(input.files),
 			created_at(std::chrono::system_clock::now()),
 			deleted(false) {

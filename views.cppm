@@ -330,15 +330,16 @@ FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req,
 	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
 	if (!board)
 		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	int new_thread_id = board.value()->createThread(thread_json, client.id);
-
-	return FuzeHttp::Response{
-		.status = http::status::created,
-		.headers = {{
-			{"New-Thread-Id", std::to_string(new_thread_id)}
-			// ,{"Location", std::format("/thread/{}/", new_thread_id)}
-		}}
-	};
+	if (auto thread = board.value()->createThread(thread_json, client.id)) {
+		return FuzeHttp::Response{
+			.status = http::status::created,
+			.headers = {{
+				{"New-Thread-Id", std::to_string(thread.value()->getId())}
+			}}
+		};
+	}
+	else
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = thread.error()};
 }
 
 FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
@@ -361,12 +362,12 @@ FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req
 	if (!board.value()->getThread(thread_id)->clientHasPermission(client, static_cast<int>(PERMISSION::SEND_MESSAGE)))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "User lacks permission SEND_MESSAGE within this thread"};
 
-	int new_message_id = board.value()->createMessage(message_json, client.id);
-	std::string new_message_dump = board.value()->dumpMessage(thread_id, new_message_id);
-	state->sendToThread(new_message_dump, board.value(), thread_id);
-	return FuzeHttp::Response{
-		.status = http::status::created
-	};
+	if (const auto message = board.value()->createMessage(message_json, client.id)) {
+		state->sendToThread(boost::json::serialize(message.value()->asJson()), board.value(), thread_id);
+		return FuzeHttp::Response{.status = http::status::created};
+	}
+	else
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = message.error()};
 }
 
 FuzeHttp::Response deleteMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug, int thread_id, int message_id_in_thread) {

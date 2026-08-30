@@ -141,30 +141,32 @@ public:
 		});
 	}
 #endif
-	int createThread(boost::json::object thread_json, int author_client_id) {
+	std::expected<Thread*, std::string> createThread(boost::json::object thread_json, int author_client_id) {
 		// int new_thread_id_in_board = db->query<int>("SELECT thread_id_seq FROM board WHERE id = $1", this->id);
 		// db->query<void>("UPDATE board SET thread_id_seq = $1 WHERE id = $2", new_thread_id_in_board+1, this->id);
+		auto validated = Thread::validateInput(thread_json);
+		if (!validated)
+			return std::unexpected(validated.error());
 		int new_thread_id = db->incrementSequence("thread_id");
-		auto thread = std::make_unique<Thread>(this, thread_json, author_client_id, db, this->id);
+		auto thread = std::make_unique<Thread>(this, db, validated.value(), author_client_id, this->id, new_thread_id);
 		// int new_thread_id = thread->getId();
+		Thread* thread_ptr = thread.get();
 		this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count(), new_thread_id));
 		this->threads.emplace(new_thread_id, std::move(thread));
-		return new_thread_id;
+		return thread_ptr;
 	}
-	int createMessage(boost::json::object message_json, int author_client_id) {
-		// TODO better validate json input
+	std::expected<Message*, std::string> createMessage(boost::json::object message_json, int author_client_id) {
 		int thread_id = message_json["thread_id"].as_int64();
 		Thread* thread = this->getThread(thread_id);
 		std::time_t old_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
 		int new_post_id;
-		if (auto message_maybe = thread->createMessageFromJson(message_json, author_client_id))
-			new_post_id = message_maybe.value()->getId();
-		else
-			throw message_maybe.error();
+		auto message_maybe = thread->createMessageFromJson(message_json, author_client_id);
+		if (!message_maybe)
+			return std::unexpected(message_maybe.error());
 		std::time_t new_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
 		this->ordered_threads.erase(std::make_pair(old_message_time, thread_id));
 		this->ordered_threads.insert(std::make_pair(new_message_time, thread_id));
-		return new_post_id;
+		return message_maybe;
 	}
 	void deleteThread(int thread_id) {
 		this->threads.at(thread_id)->markAsDeleted();
