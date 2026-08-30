@@ -9,6 +9,7 @@ module;
 #include <ctime>
 #include <expected>
 #include <iostream>
+#include <mutex>
 #include <print>
 #include <set>
 #include <unordered_set>
@@ -151,13 +152,18 @@ public:
 		auto thread = std::make_unique<Thread>(this, db, validated.value(), author_client_id, this->id, new_thread_id);
 		// int new_thread_id = thread->getId();
 		Thread* thread_ptr = thread.get();
-		this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count(), new_thread_id));
-		this->threads.emplace(new_thread_id, std::move(thread));
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count(), new_thread_id));
+			this->threads.emplace(new_thread_id, std::move(thread));
+		}
 		return thread_ptr;
 	}
 	std::expected<Message*, std::string> createMessage(boost::json::object message_json, int author_client_id) {
 		int thread_id = message_json["thread_id"].as_int64();
+		std::lock_guard<std::mutex> board_lock(mutex);
 		Thread* thread = this->getThread(thread_id);
+		std::lock_guard<std::mutex> thread_lock(thread->mutex);
 		std::time_t old_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
 		int new_post_id;
 		auto message_maybe = thread->createMessageFromJson(message_json, author_client_id);
@@ -169,8 +175,10 @@ public:
 		return message_maybe;
 	}
 	void deleteThread(int thread_id) {
+		std::lock_guard<std::mutex> lock(mutex);
 		this->threads.at(thread_id)->markAsDeleted();
 	}
+	/*
 	void deleteMessageFromThread(int message_id, int thread_id) {
 		if (message_id != 0) {
 			std::cout << "[Board] Deleting message " << message_id << " in thread " << thread_id << std::endl;
@@ -178,7 +186,7 @@ public:
 		}
 		else
 			throw std::runtime_error("Can't delete message 0 from thread");
-	}
+	}*/
 	// std::string dumpLastThread() const;
 	// bool keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const;
 	boost::json::object getThreadsAsJson(const std::optional<FuzeHttp::Client>& client) const {
@@ -200,7 +208,10 @@ public:
 	boost::json::object getThreadPermissionsAsJson(int thread_id, const std::optional<FuzeHttp::Client>& client) const {
 		return this->threads.at(thread_id)->getPermissionsAsJson(client);
 	}
-	bool threadExists(int thread_id) const { auto it = threads.find(thread_id); return it != threads.end(); };
+	bool threadExists(int thread_id) const {
+		std::lock_guard<std::mutex> lock(mutex);
+		return threads.contains(thread_id);
+	};
 	bool messageExistsInThread(int message_id, int thread_id) const { return this->threads.at(thread_id)->messageExists(message_id); }
 	void addListenerToThread(FuzeHttp::WebsocketSession* listener, int thread_id) {
 		if (threadExists(thread_id)) {
@@ -272,6 +283,7 @@ public:
 	inline static const size_t MAX_SLUG = 32;
 	inline static const size_t MAX_TITLE = 64;
 private:
+	mutable std::mutex mutex;
 	int id;
 	std::string slug;
 	std::string title;

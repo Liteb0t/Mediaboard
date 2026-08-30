@@ -4,6 +4,7 @@ module;
 #include <expected>
 #include <iostream>
 #include <map>
+#include <mutex>
 #include <print>
 #include <string>
 #include <bits/unique_ptr.h>
@@ -125,25 +126,35 @@ public:
 	}
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
-	void deleteMessage(int id_in_thread) {
+	std::expected<void, std::string> deleteMessage(int id_in_thread) {
+		if (id_in_thread == 0)
+			return std::unexpected("Can't delete message 0 from thread");
+		std::lock_guard<std::mutex> lock(mutex);
 		this->messages.at(id_in_thread)->markAsDeleted();
 		db->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $2", this->id, id_in_thread);
 		this->reply_count--;
 		std::cout << "Erased message " << id_in_thread << " from thread " << this->id << std::endl;
+		return {};
 	}
 	// bool keyMatchesMessage(std::string key, int message_id) const;
-	bool messageExists(int message_id_in_thread) const { return this->messages.contains(message_id_in_thread); }
+	bool messageExists(int message_id_in_thread) const {
+		std::lock_guard<std::mutex> lock(mutex);
+		return this->messages.contains(message_id_in_thread);
+	}
 	int getId() const { return this->id; };
 	void addListener(FuzeHttp::WebsocketSession* listener) {
+		std::lock_guard<std::mutex> lock(mutex);
 		listeners.insert(listener);
 	}
 	void removeListener(FuzeHttp::WebsocketSession* listener) {
+		std::lock_guard<std::mutex> lock(mutex);
 		listeners.erase(listener);
 	}
 	std::unordered_set<FuzeHttp::WebsocketSession*> getListeners() const {
 		return this->listeners;
 	}
 	void removeUnauthorizedListeners() {
+		std::lock_guard<std::mutex> lock(mutex);
 		std::erase_if(this->listeners, [this](const FuzeHttp::WebsocketSession* ws)->bool{
 			return !this->clientHasPermission(ws->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD));
 		});
@@ -166,6 +177,7 @@ public:
 	}
 	// std::string dumpPermissions(int client_id) const;
 	void markAsDeleted() {
+		std::lock_guard<std::mutex> lock(mutex);
 		this->deleted = true;
 		db->query<void>("UPDATE thread SET deleted = TRUE WHERE id = $1", this->id);
 		db->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1", this->id);
@@ -180,8 +192,12 @@ public:
 			{"upload_file", this->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))},
 		};
 	}
-	const Message* getMessage(int message_id_in_thread) const { return this->messages.at(message_id_in_thread).get(); }
+	const Message* getMessage(int message_id_in_thread) const {
+		std::lock_guard<std::mutex> lock(mutex);
+		return this->messages.at(message_id_in_thread).get();
+	}
 	int board_id;
+	mutable std::mutex mutex;
 private:
 	int id;
 	// int id_in_board;

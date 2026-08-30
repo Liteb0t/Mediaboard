@@ -376,18 +376,21 @@ FuzeHttp::Response deleteMessage(Mediaboard::State* state, FuzeHttp::Request req
 		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
 	if (!board.value()->threadExists(thread_id))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
-	const Thread* thread = board.value()->getThread(thread_id);
+	Thread* thread = board.value()->getThread(thread_id);
 	if (!thread->messageExists(message_id_in_thread))
 		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "No such message found in this thread."};
 	if (!thread->clientHasPermission(client, static_cast<int>(PERMISSION::DELETE_POST)) && !thread->getMessage(message_id_in_thread)->clientIsAuthor(client))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this message."};
-	if (message_id_in_thread == 0)
+	if (message_id_in_thread == 0) {
 		board.value()->deleteThread(thread_id);
-	else
-		board.value()->deleteMessageFromThread(message_id_in_thread, thread_id);
-	return FuzeHttp::Response{
-		.status = http::status::ok
-	};
+		return FuzeHttp::Response{.status = http::status::ok};
+	}
+	else {
+		if (auto response = thread->deleteMessage(message_id_in_thread))
+			return FuzeHttp::Response{.status = http::status::ok};
+		else
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = response.error()};
+	}
 }
 
 FuzeHttp::Response getThread(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int thread_id) {
