@@ -6,7 +6,7 @@ Features include:
 - Easy database migration on update
 - File uploading
 - Screen-share
-- Voice chat
+- Voice chat \
 [Read the deployment guide here](https://fuze.page/software/mediaboard/documentation/)
 ### Dependencies
 **CMake**, **Boost::program_options**, **Boost::json**, **SQLite3** OR **PostgreSQL**.
