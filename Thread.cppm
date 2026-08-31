@@ -160,6 +160,7 @@ public:
 		});
 	}
 	boost::json::array getMessagesAsJson() const {
+		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::array multiple_post_json = boost::json::array();
 		for (auto it = this->messages.begin(); it != this->messages.end(); ++it) {
 			if (!it->second->isDeleted()) {
@@ -172,6 +173,7 @@ public:
 		return multiple_post_json;
 	}
 	std::string dumpMessage(int message_id) const  {
+		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::object message_json = this->messages.at(message_id)->asJson();
 		return boost::json::serialize(message_json);
 	}

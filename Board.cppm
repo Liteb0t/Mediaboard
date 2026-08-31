@@ -190,6 +190,7 @@ public:
 	// std::string dumpLastThread() const;
 	// bool keyMatchesMessageInThread(std::string key, int message_id, int thread_id) const;
 	boost::json::object getThreadsAsJson(const std::optional<FuzeHttp::Client>& client) const {
+		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::array threads_json = boost::json::array();
 		for (std::set<std::pair<std::time_t, int>>::const_iterator it = this->ordered_threads.begin(); it != this->ordered_threads.end(); ++it) {
 			if (!this->threads.at(it->second)->isDeleted() && this->threads.at(it->second)->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_THREAD))) {
