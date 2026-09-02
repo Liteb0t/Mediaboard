@@ -725,6 +725,32 @@ FuzeHttp::Response addGroupsToUser(Mediaboard::State* state, FuzeHttp::Request r
 	};
 }
 
+FuzeHttp::Response getIceServers(Mediaboard::State* state, FuzeHttp::Request req) {
+	std::optional<Client> client = state->getClientIfExists(req);
+	return FuzeHttp::Response{.status = http::status::ok, .json = {{
+		{"ice_servers", state->getIceServersAsJson()}}
+	}};
+}
+
+FuzeHttp::Response updateIceServers(Mediaboard::State* state, FuzeHttp::Request req) {
+	boost::json::array ice_servers_json;
+	try {
+		ice_servers_json = boost::json::parse(req.body()).as_object().at("ice_servers").as_array();
+	}
+	catch(const std::exception& e) {
+		std::string error_message = std::format("[createMessage] JSON error: {}", e.what());
+		std::cerr << error_message << std::endl;
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
+	}
+	std::optional<Client> client = state->getClientIfExists(req);
+	if (!state->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS)))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "Client needs MANAGE_PERMISSIONS to update ICE servers list."};
+	if (auto response = state->setIceServers(ice_servers_json))
+		return FuzeHttp::Response{.status = http::status::ok};
+	else
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = response.error()};
+}
+
 FuzeHttp::Response getServerPermissions(Mediaboard::State* state, FuzeHttp::Request req) {
 	return FuzeHttp::Response{
 		.status = http::status::ok,

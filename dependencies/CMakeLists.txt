@@ -6,4 +6,5 @@ if(WITH_WEBRTC)
   option(NO_EXAMPLES "" ON) # Removes dependence on nlohmann::json
   option(NO_TESTS "" ON)
   add_subdirectory(libdatachannel)
+  add_subdirectory(tiny-HMAC-c)
 endif()

@@ -1,4 +1,7 @@
 module;
+#ifdef WITH_WEBRTC
+#include "hmac.h"
+#endif
 #include "beast.hpp"
 #include <boost/json.hpp>
 #include <boost/smart_ptr.hpp>
@@ -32,6 +35,115 @@ using namespace FuzeHttp::Migrations;
 // };
 
 export namespace Mediaboard {
+#ifdef WITH_WEBRTC
+struct TurnCredential {
+	std::string username;
+	std::string credential;
+};
+class IceServer {
+public:
+	inline static const std::unordered_set<std::string> TYPE_OPTIONS = {"STUN", "TURN"};
+	inline static const std::unordered_set<std::string> TRANSPORT_OPTIONS = {"UDP", "TCP", "TLS"};
+	static std::expected<IceServer, std::string> validateInput(boost::json::object json) {
+		IceServer server;
+		if (auto type_it = json.find("type"); type_it == json.end())
+			return std::unexpected("Missing JSON field: type");
+		else if (!type_it->value().is_string())
+			return std::unexpected("JSON field 'type' must be an string");
+		else {
+			server.type = type_it->value().as_string();
+			if (!TYPE_OPTIONS.contains(server.type))
+				return std::unexpected(std::format("Type {} not recognised", server.type));
+		}
+		if (auto hostname_it = json.find("hostname"); hostname_it == json.end())
+			return std::unexpected("Missing JSON field: hostname");
+		else if (!hostname_it->value().is_string())
+			return std::unexpected("JSON field 'hostname' must be an string");
+		else {
+			server.hostname = hostname_it->value().as_string();
+			if (server.hostname.length() < 1)
+				return std::unexpected("Hostname cannot be empty");
+		}
+		if (auto port_it = json.find("port"); port_it == json.end())
+			return std::unexpected("Missing JSON field: port");
+		else if (!port_it->value().is_int64())
+			return std::unexpected("JSON field 'port' must be an int");
+		else {
+			server.port = port_it->value().as_int64();
+			if (server.port < 0)
+				return std::unexpected("Port cannot be negative");
+			if (server.port == 0)
+				server.port = 3478;
+		}
+		if (server.type == "TURN") {
+			if (auto transport_it = json.find("transport"); transport_it == json.end())
+				return std::unexpected("Missing JSON field: transport");
+			else if (!transport_it->value().is_string())
+				return std::unexpected("JSON field 'transport' must be an string");
+			else {
+				server.transport = transport_it->value().as_string();
+				if (!TRANSPORT_OPTIONS.contains(server.transport))
+					return std::unexpected(std::format("Transport option {} not recognised", server.transport));
+			}
+			if (auto shared_secret_it = json.find("shared_secret"); shared_secret_it == json.end())
+				return std::unexpected("Missing JSON field: shared_secret");
+			else if (!shared_secret_it->value().is_string())
+				return std::unexpected("JSON field 'shared_secret' must be an string");
+			else {
+				server.shared_secret = shared_secret_it->value().as_string();
+				if (server.shared_secret.length() < 1)
+					return std::unexpected("shared_secret cannot be empty");
+			}
+		}
+		return server;
+	}
+	// IceServer(std::string url, std::string shared_secret) : url(url), shared_secret(shared_secret) {}
+	std::string type;
+	std::string hostname;
+	int port;
+	std::string transport = "";
+	std::string shared_secret = "";
+	TurnCredential getCredentialForClient(const std::optional<Client>& client, std::chrono::seconds ttl = std::chrono::hours(24)) const {
+		auto expiry = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count() + ttl.count();
+		TurnCredential turn_credential;
+		if (client)
+			turn_credential.username = std::format("{}:client_{}", expiry, client.value().id);
+		else
+			turn_credential.username = std::to_string(expiry);
+		std::array<uint8_t, HMAC_SHA1_DIGEST_SIZE> digest;
+		fuze_hmac_sha1(
+			reinterpret_cast<const uint8_t*>(this->shared_secret.c_str()), this->shared_secret.length(),
+			reinterpret_cast<const uint8_t*>(turn_credential.username.c_str()), turn_credential.username.length(),
+			digest.data()
+		);
+		char encoded_base64[sodium_base64_ENCODED_LEN(digest.size(), sodium_base64_VARIANT_ORIGINAL)];
+		sodium_bin2base64(
+			encoded_base64, sizeof encoded_base64,
+			digest.data(), digest.size(),
+			sodium_base64_VARIANT_ORIGINAL
+		);
+		turn_credential.credential = encoded_base64;
+		return turn_credential;
+	}
+	boost::json::object valuesAsJson() const {
+		return {{
+			{"type", type},
+			{"hostname", hostname},
+			{"port", port},
+			{"transport", type == "TURN" ? transport : ""},
+			{"shared_secret", type == "TURN" ? shared_secret : ""}
+		}};
+	}
+	boost::json::object credentialsAsJson(const std::optional<Client>& client) const {
+		TurnCredential turn_credential = getCredentialForClient(client);
+		return {{
+			{"urls", std::format("{}:{}:{}", type, hostname, port)},
+			{"username", turn_credential.username},
+			{"credential", turn_credential.credential}
+		}};
+	}
+};
+#endif
 struct StateConfig {
 	std::string thumbnail_file_extension;
 	unsigned int thumbnail_size = 150;
@@ -56,6 +168,7 @@ public:
 	void start() override {
 		this->setAdditionalImageFormatsFromConfig(this->config);
 		this->cacheAllBoards();
+		this->addIceServers();
 		// Mediaboard::Board main_board(this, db);
 		// this->boards.emplace(0, main_board);
 		// this->boards.at(0).cacheAllThreads();
@@ -81,7 +194,53 @@ public:
 	bool canCreateThumbnailForVideoFormat(const std::string_view mime_type) const {
 		return this->video_formats_to_create_thumbnails_for.contains(std::string(mime_type));
 	}
-
+#ifdef WITH_WEBRTC
+	void addIceServers() {
+		std::lock_guard<std::mutex> lock(mutex);
+		std::println("[State] ICE servers from database...");
+		for (auto ice_server_tuple : db->queryRows<std::tuple<std::string, std::string, int, std::string, std::string>>("SELECT type, hostname, port, transport, shared_secret FROM ice_servers")) {
+			IceServer server;
+			server.type = std::get<0>(ice_server_tuple);
+			server.hostname = std::get<1>(ice_server_tuple);
+			server.port = std::get<2>(ice_server_tuple);
+			server.transport = std::get<3>(ice_server_tuple);
+			server.shared_secret = std::get<4>(ice_server_tuple);
+			std::println("{}:{}:{}", server.type, server.hostname, server.port);
+			this->ice_servers.push_back(server);
+		}
+		std::println("Finished saving a total of {} ICE servers.", this->ice_servers.size());
+	}
+	boost::json::array getIceServersAsJson() const {
+		std::lock_guard<std::mutex> lock(mutex);
+		boost::json::array ice_servers_json = boost::json::array();
+		for (auto& server : this->ice_servers) {
+			ice_servers_json.emplace_back(server.valuesAsJson());
+		}
+		return ice_servers_json;
+	}
+	boost::json::array getIceCredentialsForClient(const std::optional<Client>& client) const {
+		std::lock_guard<std::mutex> lock(mutex);
+		boost::json::array ice_servers_json = boost::json::array();
+		for (auto& server : this->ice_servers) {
+			ice_servers_json.emplace_back(server.credentialsAsJson(client));
+		}
+		return ice_servers_json;
+	}
+	[[nodiscard]]std::expected<void, std::string> setIceServers(boost::json::array ice_servers_json) {
+		std::lock_guard<std::mutex> lock(mutex);
+		ice_servers.clear();
+		db->query<void>("DELETE FROM ice_servers");
+		for (auto ice_server_json : ice_servers_json) {
+			auto server_maybe = IceServer::validateInput(ice_server_json.as_object());
+			if (!server_maybe)
+				return std::unexpected(server_maybe.error());
+			IceServer server = server_maybe.value();
+			ice_servers.push_back(server);
+			db->query<void>("INSERT INTO ice_servers VALUES ($1, $2, $3, $4, $5)", server.type, server.hostname, server.port, server.transport, server.shared_secret);
+		}
+		return {};
+	}
+#endif
 	void cacheAllBoards() { // no mutex needed because it's run once at startup
 		std::print("[State] Retrieving boards from database...");
 		for (auto thread_tuple : db->queryRows<std::tuple<int, int, std::string, std::string>>("SELECT id, permission_object_id, slug, title FROM board WHERE deleted = FALSE")) {
@@ -269,6 +428,7 @@ public:
 	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
 
 	const std::filesystem::path& getMediaLocation() const { return media_location; }
+	const std::vector<IceServer> getIceServers() const { return ice_servers; }
 	// const std::filesystem::path& getProgramLocation() const { return program_location; }
 	// const char* getSecret() const { return this->secret_base64; }
 private:
@@ -283,6 +443,9 @@ private:
 	// std::mutex mutex_;
 
 	// std::unordered_map<int, Board> boards;
+#ifdef WITH_WEBRTC
+	std::vector<IceServer> ice_servers;
+#endif
 	std::unordered_map<int, std::unique_ptr<Board>> boards;
 	std::unordered_map<std::string, int> slug_to_board_id; // when slug changes, old assosiation is not removed until reboot
 	// std::vector<int> ordered_boards;

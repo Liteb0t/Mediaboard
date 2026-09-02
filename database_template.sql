@@ -10,6 +10,7 @@ CREATE TABLE permission_group_account(permission_group_id INTEGER, account_id IN
 CREATE TABLE permission_group_heirarchy(rank INTEGER, permission_group_id INTEGER);
 CREATE TABLE permission_setting(id INTEGER PRIMARY KEY, permission_collection_id INTEGER, permission_number INTEGER, setting INTEGER);
 CREATE TABLE session(client_id INTEGER, key TEXT, created_at INTEGER);
+CREATE TABLE ice_servers(type TEXT, hostname TEXT, port INTEGER, transport TEXT, shared_secret TEXT);
 CREATE TABLE message(id INTEGER PRIMARY KEY, thread_id INTEGER, id_in_thread INTEGER, board_id INTEGER, author_client_id INTEGER, author_username TEXT, created_at INTEGER, content TEXT, deleted BOOLEAN DEFAULT FALSE);
 CREATE TABLE message_file(message_id INTEGER, file_name TEXT, width INTEGER, height INTEGER, thumbnail_file_extension TEXT);
 CREATE TABLE thread(id INTEGER PRIMARY KEY, deleted BOOLEAN DEFAULT FALSE, board_id INTEGER, id_in_board INTEGER, message_id_seq INTEGER DEFAULT 0, permission_object_id INTEGER);

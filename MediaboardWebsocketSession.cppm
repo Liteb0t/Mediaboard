@@ -118,6 +118,30 @@ private:
 				strong_peer->send_message(data_to_send);
 		}
 	}
+	rtc::IceServer::RelayType getRelayType(const Mediaboard::IceServer& server) {
+		if (server.transport == "UDP") {
+			return rtc::IceServer::RelayType::TurnUdp;
+		}
+		else if (server.transport == "TCP") {
+			return rtc::IceServer::RelayType::TurnTcp;
+		}
+		else if (server.transport == "TLS") {
+			return rtc::IceServer::RelayType::TurnTls;
+		}
+		else {
+			std::println(std::cerr, "Error: transport {} not recignised for server {}:{}", server.transport, server.hostname, server.port);
+			return rtc::IceServer::RelayType::TurnUdp;
+		}
+	}
+	rtc::Configuration getRtcConfig() {
+		rtc::Configuration config;
+		for (const Mediaboard::IceServer& server : getState()->getIceServers()) {
+			auto credentials = server.getCredentialForClient(getClient());
+			rtc::IceServer ice_server_config(server.hostname, server.port, credentials.username, credentials.credential, getRelayType(server));
+			config.iceServers.emplace_back(ice_server_config);
+		}
+		return config;
+	}
 #endif
 	void readEvent(std::string buffer_data) override {
 		try {
@@ -186,7 +210,7 @@ private:
 				this->own_connection_id = tracking_room_ptr.value()->connection_id_counter++;
 				own_peer_ptr.value()->client_id = getClient() ? getClient()->id : -1;
 				own_peer_ptr.value()->send_message = [this](boost::json::object payload) { this->send(std::move(payload)); };
-				own_peer_ptr.value()->connection = std::make_shared<rtc::PeerConnection>();
+				own_peer_ptr.value()->connection = std::make_shared<rtc::PeerConnection>(getRtcConfig());
 
 				///////////// RECEIVING /////////////
 				for (auto& [sender_id, weak_sender] : tracking_room_ptr.value()->peers) {
@@ -211,7 +235,8 @@ private:
 								{"description", {
 									{"type", description->typeString()},
 									{"sdp", std::string(description.value())}
-								}}
+								}},
+								{"ice_servers", this->getState()->getIceCredentialsForClient(getClient())}
 							}}
 						});
 					}

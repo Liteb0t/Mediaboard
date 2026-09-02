@@ -54,6 +54,8 @@ void addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
 	controller->addPattern(verb::get, getGroupMembers,					"api", "group", int(), "members");
 	controller->addPattern(verb::get, getGroups,						"api", "groups");
 	controller->addPattern(verb::put, setGroupHeirarchy,				"api", "group_heirarchy");
+	controller->addPattern(verb::get, getIceServers,					"api", "ice_servers");
+	controller->addPattern(verb::put, updateIceServers,					"api", "ice_servers");
 	controller->addPattern(verb::get, getServerPermissions,				"api", "server", "permissions");
 	controller->addPattern(verb::post, addServerGroupPermission,		"api", "server", "permissions", "group", int());
 	controller->addPattern(verb::put, updateServerGroupPermissions,		"api", "server", "permissions", "group", int());

@@ -200,6 +200,7 @@ class RoomConnection {
 		let conn = new RTCPeerConnection({
 			// Recommended for libdatachannel
 			bundlePolicy: 'max-bundle',
+			iceServers: payload.ice_servers
 		});
 		this.conn = conn;
 		console.log("[onReceiveWatchStream] audio_senders: " + JSON.stringify(payload.audio_senders));

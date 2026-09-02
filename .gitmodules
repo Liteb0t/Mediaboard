@@ -7,3 +7,6 @@
 [submodule "dependencies/libdatachannel"]
 	path = dependencies/libdatachannel
 	url = https://github.com/paullouisageneau/libdatachannel
+[submodule "dependencies/tiny-HMAC-c"]
+	path = dependencies/tiny-HMAC-c
+	url = https://github.com/Liteb0t/tiny-HMAC-c

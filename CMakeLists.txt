@@ -36,7 +36,7 @@ endif()
 
 if(WITH_WEBRTC)
   target_compile_definitions(MediaboardServer PRIVATE WITH_WEBRTC)
-  target_link_libraries(MediaboardServer PRIVATE datachannel-static)
+  target_link_libraries(MediaboardServer PRIVATE datachannel-static tiny-HMAC-c)
   target_sources(MediaboardServer PUBLIC FILE_SET CXX_MODULES FILES Room.cppm)
 endif()
 target_link_libraries(MediaboardServer
