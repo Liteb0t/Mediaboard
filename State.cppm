@@ -168,7 +168,9 @@ public:
 	void start() override {
 		this->setAdditionalImageFormatsFromConfig(this->config);
 		this->cacheAllBoards();
+#ifdef WITH_WEBRTC
 		this->addIceServers();
+#endif
 		// Mediaboard::Board main_board(this, db);
 		// this->boards.emplace(0, main_board);
 		// this->boards.at(0).cacheAllThreads();
@@ -428,14 +430,10 @@ public:
 	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
 
 	const std::filesystem::path& getMediaLocation() const { return media_location; }
+#ifdef WITH_WEBRTC
 	const std::vector<IceServer> getIceServers() const { return ice_servers; }
-	// const std::filesystem::path& getProgramLocation() const { return program_location; }
-	// const char* getSecret() const { return this->secret_base64; }
+#endif
 private:
-	// const std::filesystem::path media_location;
-	// const std::filesystem::path program_location;
-	// char secret_base64[sodium_base64_ENCODED_LEN(crypto_pwhash_SALTBYTES, sodium_base64_VARIANT_URLSAFE)];
-	// FuzeDBI::Connection* fuze_dbi;
 	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png"};
 	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;
 

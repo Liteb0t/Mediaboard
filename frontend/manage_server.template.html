@@ -90,17 +90,9 @@
 					<h2>Manage users - CONFIG_site_name</h2>
 					<ul id="user_list_element" class="MetroList"></ul>
 				</div>
-				<!-- WebRTC config -->
-				<div id="webrtc_config_container" style="display: none">
-					<h2>WebRTC config - CONFIG_site_name</h2>
-					<h3>ICE servers</h3>
-					<table>
-					<thead><tr><th>Type</th><th>Hostname</th><th>Port</th><th>Transport</th><th>Shared secret</th></tr></thead>
-					<tbody id="ice_server_list_element"><tr><td>Loading...</td></tr></tbody>
-					</table>
-					<button id="ice_server_add_button">Add server</button>
-					<button id="ice_server_submit_button">Submit</button>
-				</div>
+#ifdef WITH_WEBRTC
+#include "webrtc_config.html"
+#endif
 			</div>
 		</main>
 		<dialog id="success_dialog" closedby="any">
@@ -142,7 +134,14 @@
 "use strict";
 loading_dialog.showModal();
 
-const control_panel_tabs = [manage_permissions_container, manage_groups_container, manage_users_container, webrtc_config_container];
+const control_panel_tabs = [
+	manage_permissions_container
+	,manage_groups_container
+	,manage_users_container
+#ifdef WITH_WEBRTC
+	,webrtc_config_container
+#endif
+];
 function showTab(element) {
 	for (let tab of control_panel_tabs) {
 		if (tab.id !== element.id) {
@@ -151,126 +150,7 @@ function showTab(element) {
 	}
 	element.style["display"] = "initial";
 }
-ice_server_submit_button.onclick = () => { submitIceServers(); }
-ice_server_add_button.onclick = () => { addIceServerToList(ice_server_list_element); }
-async function getIceServers() {
-	try {
-		let response = await fetch(`./api/ice_servers`);
-		console.log(response);
-		if (response.ok) {
-			await response.json().then(response_obj => {
-				console.log(response_obj);
-				showIceServers(response_obj);
-			});
-		}
-		else {
-			let error_message = response.headers.get("message");
-			error_message ??= "An unknown error occured when attempting to fetch ICE servers.";
-			throw error_message;
-		}
-	}
-	catch (error) {
-		console.error(error);
-		error_message.textContent = error;
-		error_dialog.showModal();
-	}
-}
 
-function showIceServers(json) {
-	const fragment = new DocumentFragment();
-	for (let server of json.ice_servers) {
-		addIceServerToList(fragment, server);
-	}
-	ice_server_list_element.replaceChildren(fragment);
-}
-function addIceServerToList(list_element, server = null) {
-	let row_element = document.createElement("tr");
-
-	let type_select_column_element = document.createElement("td");
-	let type_select = document.createElement("select");
-	["STUN", "TURN"].forEach((type) => {
-		const type_option_element = document.createElement("option");
-		type_option_element.textContent = type;
-		type_option_element.value = type;
-		type_select.appendChild(type_option_element);
-	});
-	type_select.selectedIndex = server ? ["STUN", "TURN"].indexOf(server["type"]) : 0;
-	type_select_column_element.appendChild(type_select);
-
-	let hostname_column_element = document.createElement("td");
-	let hostname_input_element = document.createElement("input");
-	hostname_input_element.type = "text";
-	hostname_input_element.value = server ? server["hostname"] : "";
-	hostname_column_element.appendChild(hostname_input_element);
-
-	let port_column_element = document.createElement("td");
-	let port_input_element = document.createElement("input");
-	port_input_element.type = "number";
-	port_input_element.value = server ? server["port"] : 3478;
-	port_input_element.size = 6;
-	port_column_element.appendChild(port_input_element);
-
-	let transport_column_element = document.createElement("td");
-	let transport = document.createElement("select");
-	["UDP", "TCP", "TLS"].forEach((type) => {
-		const transport_option_element = document.createElement("option");
-		transport_option_element.textContent = type;
-		transport_option_element.value = type;
-		transport.appendChild(transport_option_element);
-	});
-	transport.selectedIndex = server ? ["UDP", "TCP", "TLS"].indexOf(server["transport"]) : 0;
-	transport_column_element.appendChild(transport);
-
-	// TODO dont transmit secret
-	let secret_column_element = document.createElement("td");
-	let secret_input_element = document.createElement("input");
-	secret_input_element.type = "text";
-	secret_input_element.value = server ? server["shared_secret"] : "";
-	secret_column_element.appendChild(secret_input_element);
-
-	let delete_button_element = document.createElement("button");
-	delete_button_element.textContent = "clear";
-	delete_button_element.onclick = () => {
-		ice_server_list_element.removeChild(row_element);
-	}
-	type_select.onchange = (event) => {
-		console.log(event.target);
-		transport.disabled = type_select.value == "STUN";
-		secret_input_element.disabled = type_select.value == "STUN";
-	}
-	transport.disabled = type_select.value == "STUN";
-	secret_input_element.disabled = type_select.value == "STUN";
-	row_element.append(type_select_column_element, hostname_column_element, port_column_element, transport_column_element, secret_column_element, delete_button_element);
-	list_element.appendChild(row_element);
-}
-async function submitIceServers() {
-	let new_server_list = [];
-	try {
-		for (let row of ice_server_list_element.children) {
-			new_server_list.push({
-				type: row.children[0].children[0].value,
-				hostname: row.children[1].children[0].value,
-				port: Number(row.children[2].children[0].value),
-				transport: row.children[3].children[0].value,
-				shared_secret: row.children[4].children[0].value,
-			});
-		}
-		let response = await fetch("./api/ice_servers", {method: "PUT", body: JSON.stringify({"ice_servers": new_server_list})});
-		if (response.ok) {
-			showSuccessDialog("Submitted new list of ICE servers.")
-		}
-		else {
-			let error_message = response.headers.get("message");
-			error_message ??= "An unknown error occured when attempting to fetch ICE servers.";
-			throw error_message;
-		}
-	}
-	catch (error) {
-		console.error(error);
-		error_message.textContent = error;
-		error_dialog.showModal();
-	}
-}
 function showSuccessDialog(message) {
 	success_message.textContent = message;
 	success_dialog.showModal();
@@ -291,7 +171,8 @@ async function initialLoad() {
 	loading_dialog.close();
 }
 initialLoad();
-getIceServers();
-
+// #ifdef WITH_WEBRTC
+// getIceServers();
+// #endif
 </script>
 </html>

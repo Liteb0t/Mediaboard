@@ -724,7 +724,7 @@ FuzeHttp::Response addGroupsToUser(Mediaboard::State* state, FuzeHttp::Request r
 		.status = http::status::ok,
 	};
 }
-
+#ifdef WITH_WEBRTC
 FuzeHttp::Response getIceServers(Mediaboard::State* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
 	return FuzeHttp::Response{.status = http::status::ok, .json = {{
@@ -750,7 +750,7 @@ FuzeHttp::Response updateIceServers(Mediaboard::State* state, FuzeHttp::Request 
 	else
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = response.error()};
 }
-
+#endif
 FuzeHttp::Response getServerPermissions(Mediaboard::State* state, FuzeHttp::Request req) {
 	return FuzeHttp::Response{
 		.status = http::status::ok,

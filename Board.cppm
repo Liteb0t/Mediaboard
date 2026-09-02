@@ -6,6 +6,7 @@ module;
 #endif
 #include <boost/json.hpp>
 #include <bits/unique_ptr.h>
+#include <bits/shared_ptr.h>
 #include <ctime>
 #include <expected>
 #include <iostream>
@@ -277,8 +278,10 @@ public:
 			db->query<void>("UPDATE board SET title = $1 WHERE id = $2", new_title, id);
 		}
 	}
+#ifdef WITH_WEBRTC
 	int room_id_seq = 0;
 	std::unordered_map<int, std::weak_ptr<Room>> rooms;
+#endif
 	inline bool isDeleted() const { return this->deleted; }
 	// int getTitle() const { return this->title; }
 	inline static const size_t MAX_SLUG = 32;
@@ -289,8 +292,6 @@ private:
 	std::string slug;
 	std::string title;
 	std::unordered_map<int, std::unique_ptr<Thread>> threads;
-#ifdef WITH_WEBRTC
-#endif
 	std::set<std::pair<std::time_t, int>, thread_order_comparator> ordered_threads;
 	boost::json::object board_as_json;
 	bool deleted = false; // It is assumed new Board objects are not marked as deleted, because deleted threads are not retrieved from the database, nor can they be created through the API.
