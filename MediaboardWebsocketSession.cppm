@@ -59,32 +59,32 @@ private:
 	int own_connection_id;
 	std::optional<std::shared_ptr<RtcPeer>> own_peer_ptr;
 	static const rtc::SSRC targetSSRC = 42;
-	void addAudioRelayTrack(std::shared_ptr<RtcPeer> receiver_peer, int sender_connection_id) {
+	void addAudioRelayTrack(std::shared_ptr<RtcPeer> receiver_peer, int sender_connection_id, Relay* relay) {
 		unsigned int relay_ssrc = tracking_room_ptr.value()->ssrc_counter++;
-		rtc::Description::Audio relay_media(std::format("audio_relay_{}", sender_connection_id), rtc::Description::Direction::SendOnly);
+		rtc::Description::Audio relay_media(std::format("{}_relay_{}", relay->name, sender_connection_id), rtc::Description::Direction::SendOnly);
 		relay_media.addOpusCodec(111);
-		relay_media.addSSRC(relay_ssrc, std::format("audio_relay_{}", sender_connection_id));
+		relay_media.addSSRC(relay_ssrc, std::format("{}_relay_{}", relay->name, sender_connection_id));
 
 		auto relay_track = receiver_peer->connection->addTrack(relay_media);
 		relay_track->onMessage([this](rtc::binary message) {}, nullptr); // fixes "no receive callback" warning
-		receiver_peer->audio_relays.emplace(sender_connection_id, AudioRelaySlot{relay_track, relay_ssrc});
-
+		relay->relays.emplace(sender_connection_id, RelaySlot{relay_track, relay_ssrc});
 	}
-	void addAudioRelaySlot(std::shared_ptr<RtcPeer> receiver_peer, int sender_connection_id) {
-		if (receiver_peer->renegotiation_in_flight) {
-			receiver_peer->pending_audio_relay_additions.push_back(sender_connection_id);
+	void addAudioRelaySlot(std::shared_ptr<RtcPeer> receiver_peer, int sender_connection_id, Relay* relay) {
+		if (relay->renegotiation_in_flight) {
+			relay->pending_relay_additions.push_back(sender_connection_id);
 			return;
 		}
-		receiver_peer->renegotiation_in_flight = true;
-		addAudioRelayTrack(receiver_peer, sender_connection_id);
+		relay->renegotiation_in_flight = true;
+		addAudioRelayTrack(receiver_peer, sender_connection_id, relay);
 
 		// FuzeHttp::WebsocketSession* receiver_session = static_cast<FuzeHttp::WebsocketSession*>(receiver_peer->owner_session);
-		receiver_peer->connection->onLocalDescription([receiver_peer, sender_connection_id](rtc::Description description) {
+		receiver_peer->connection->onLocalDescription([receiver_peer, sender_connection_id, relay](rtc::Description description) {
 			if (description.type() != rtc::Description::Type::Offer)
 				return; // ignore the answer echo, if any
 			receiver_peer->send_message({
-				{"type", "webrtc_audio_added"},
+				{"type", "webrtc_relay_added"},
 				{"payload", {
+					{"relay_name", relay->name},
 					{"sender_connection_id", sender_connection_id},
 					{"description", {
 						{"type", description.typeString()},
@@ -100,7 +100,7 @@ private:
 		for (auto& [peer_id, weak_peer] : tracking_room_ptr.value()->peers) {
 			if (peer_id == own_connection_id) continue;
 			if (auto strong_peer = weak_peer.lock()) {
-				if (auto it = strong_peer->audio_relays.find(own_connection_id); it != strong_peer->audio_relays.end() && it->second.track->isOpen()) {
+				if (auto it = strong_peer->mic_relay.relays.find(own_connection_id); it != strong_peer->mic_relay.relays.end() && it->second.track->isOpen()) {
 					auto rtp = reinterpret_cast<rtc::RtpHeader*>(message.data());
 					rtp->setSsrc(it->second.ssrc); // it->second is AudioRelaySlot
 					it->second.track->send(message);
@@ -182,17 +182,20 @@ private:
 					{"payload", {{"room_id", new_room_id}}}
 				});
 			}
-			else if (request_type == "webrtc_audio_added_answer") {
+			else if (request_type == "webrtc_relay_added_answer") {
 				std::string sdp = buffer_as_json.at("payload").at("description").at("sdp").as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
+				std::string relay_type = buffer_as_json.at("payload").at("relay_type").as_string().c_str();
 				if (!own_peer_ptr)
 					throw "No WebRTC peer associated with this session";
 				own_peer_ptr.value()->connection->setRemoteDescription(rtc::Description(sdp, type));
-				own_peer_ptr.value()->renegotiation_in_flight = false;
-				if (!own_peer_ptr.value()->pending_audio_relay_additions.empty()) {
-					int next = own_peer_ptr.value()->pending_audio_relay_additions.front();
-					own_peer_ptr.value()->pending_audio_relay_additions.pop_front();
-					addAudioRelaySlot(own_peer_ptr.value(), next);
+				if (relay_type == "mic") {
+					own_peer_ptr.value()->mic_relay.renegotiation_in_flight = false;
+					if (!own_peer_ptr.value()->mic_relay.pending_relay_additions.empty()) {
+						int next = own_peer_ptr.value()->mic_relay.pending_relay_additions.front();
+						own_peer_ptr.value()->mic_relay.pending_relay_additions.pop_front();
+						addAudioRelaySlot(own_peer_ptr.value(), next, &(own_peer_ptr.value()->mic_relay));
+					}
 				}
 			}
 			else if (request_type == "webrtc_room_connect_request") {
@@ -217,7 +220,7 @@ private:
 					if (sender_id == own_connection_id) continue;
 					auto sender_peer = weak_sender.lock();
 					if (sender_peer && sender_peer->mic_relay_initialized) {
-						addAudioRelayTrack(own_peer_ptr.value(), sender_id);
+						addAudioRelayTrack(own_peer_ptr.value(), sender_id, &(own_peer_ptr.value()->mic_relay));
 					}
 				}
 
@@ -298,7 +301,7 @@ private:
 						for (auto& [peer_id, weak_peer] : room->peers) {
 							if (peer_id == own_connection_id) continue;
 							if (auto strong_peer = weak_peer.lock())
-								addAudioRelaySlot(strong_peer, own_connection_id);
+								addAudioRelaySlot(strong_peer, own_connection_id, &(strong_peer->mic_relay));
 						}
 					}
 					sendMessageToMicRelays(std::move(message));

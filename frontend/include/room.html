@@ -60,8 +60,8 @@ class RoomConnection {
 					error_message.textContent = message_json.error_message;
 					error_dialog.showModal();
 				}
-				else if (message_json.type === "webrtc_audio_added") {
-					this.onAudioSlotAdded(message_json.payload);
+				else if (message_json.type === "webrtc_relay_added") {
+					this.onRelaySlotAdded(message_json.payload);
 				}
 				else {
 					throw `message_json type ${message_json.type} not recognised.`;
@@ -262,8 +262,8 @@ class RoomConnection {
 			video_element.srcObject = event.streams[0] ?? new MediaStream([event.track]);
 			video_container.appendChild(video_element);
 		}
-		else if (mid && mid.startsWith("audio_relay_")) {
-			const sender_id = mid.slice("audio_relay_".length);
+		else if (mid && mid.startsWith("mic_relay_")) {
+			const sender_id = mid.slice("mic_relay_".length);
 			const audio_element = document.createElement("audio");
 			audio_element.autoplay = true;
 			audio_element.controls = true; // element is hidden otherwise
@@ -276,13 +276,13 @@ class RoomConnection {
 		}
 	}
 
-	async onAudioSlotAdded(payload) {
+	async onRelaySlotAdded(payload) {
 		await this.conn.setRemoteDescription(payload.description);
 		const answer = await this.conn.createAnswer();
 		await this.conn.setLocalDescription(answer);
 		this.sock.send(JSON.stringify({
-			type: "webrtc_audio_added_answer",
-			payload: { connection_id: payload.connection_id, description: { type: answer.type, sdp: answer.sdp } }
+			type: "webrtc_relay_added_answer",
+			payload: { connection_id: payload.connection_id, relay_type: payload.relay_type, description: { type: answer.type, sdp: answer.sdp } }
 		}));
 	}
 	syncSharingStatus() {

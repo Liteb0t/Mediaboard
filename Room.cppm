@@ -19,9 +19,15 @@ import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 
 export namespace Mediaboard {
-struct AudioRelaySlot {
+struct RelaySlot {
 	std::shared_ptr<rtc::Track> track;
 	rtc::SSRC ssrc;
+};
+struct Relay {
+	std::string name;
+	std::unordered_map<int, RelaySlot> relays;
+	bool renegotiation_in_flight = false; // if addAudioRelaySlot is called before request_type == "webrtc_audio_added_answer", connection id is added to the deque next line
+	std::deque<int> pending_relay_additions;
 };
 struct RtcPeer {
 	std::function<void(boost::json::object)> send_message;
@@ -37,9 +43,7 @@ struct RtcPeer {
 	bool mic_relay_initialized = false;
 	// receiver
 	std::shared_ptr<rtc::Track> video_receiving_track;
-	std::unordered_map<int, AudioRelaySlot> audio_relays;
-	bool renegotiation_in_flight = false; // if addAudioRelaySlot is called before request_type == "webrtc_audio_added_answer", connection id is added to the deque next line
-	std::deque<int> pending_audio_relay_additions;
+	Relay mic_relay{.name="mic"};
 };
 
 class Room /*: public FuzeHttp::PermissionManagedObject*/ {
