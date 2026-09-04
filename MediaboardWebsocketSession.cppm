@@ -59,23 +59,40 @@ private:
 	int own_connection_id;
 	std::optional<std::shared_ptr<RtcPeer>> own_peer_ptr;
 	static const rtc::SSRC targetSSRC = 42;
-	void addAudioRelayTrack(std::shared_ptr<RtcPeer> receiver_peer, int sender_connection_id, Relay* relay) {
-		unsigned int relay_ssrc = tracking_room_ptr.value()->ssrc_counter++;
-		rtc::Description::Audio relay_media(std::format("{}_relay_{}", relay->name, sender_connection_id), rtc::Description::Direction::SendOnly);
+	struct DescriptionMID {
+		DescriptionMID(std::string relay_name, int sender_connection_id) : value(std::format("{}_relay_{}", relay_name, sender_connection_id)) {}
+		const std::string value;
+	};
+	template<class DescriptionType>
+	struct MediaDescription {
+		DescriptionType media;
+		unsigned int ssrc;
+	};
+	template<class DescriptionType>
+	MediaDescription<DescriptionType> createMediaDescription(DescriptionMID mid);
+	template<>
+	MediaDescription<rtc::Description::Audio> createMediaDescription(DescriptionMID mid) {
+		unsigned int ssrc = tracking_room_ptr.value()->ssrc_counter++;
+		rtc::Description::Audio relay_media(mid.value, rtc::Description::Direction::SendOnly);
 		relay_media.addOpusCodec(111);
-		relay_media.addSSRC(relay_ssrc, std::format("{}_relay_{}", relay->name, sender_connection_id));
-
-		auto relay_track = receiver_peer->connection->addTrack(relay_media);
-		relay_track->onMessage([this](rtc::binary message) {}, nullptr); // fixes "no receive callback" warning
-		relay->relays.emplace(sender_connection_id, RelaySlot{relay_track, relay_ssrc});
+		relay_media.addSSRC(ssrc, mid.value);
+		return MediaDescription{relay_media, ssrc};
 	}
-	void addAudioRelaySlot(std::shared_ptr<RtcPeer> receiver_peer, int sender_connection_id, Relay* relay) {
+	template<class DescriptionType>
+	void addRelayTrack(int sender_connection_id, std::shared_ptr<RtcPeer> receiver_peer, Relay* relay) {
+		auto media_description = createMediaDescription<DescriptionType>(DescriptionMID(relay->name, sender_connection_id));
+		auto relay_track = receiver_peer->connection->addTrack(media_description.media);
+		relay_track->onMessage([this](rtc::binary message) {}, nullptr); // fixes "no receive callback" warning
+		relay->relays.emplace(sender_connection_id, RelaySlot{relay_track, media_description.ssrc});
+	}
+	template<class DescriptionType>
+	void addRelaySlot(int sender_connection_id, std::shared_ptr<RtcPeer> receiver_peer, Relay* relay) {
 		if (relay->renegotiation_in_flight) {
 			relay->pending_relay_additions.push_back(sender_connection_id);
 			return;
 		}
 		relay->renegotiation_in_flight = true;
-		addAudioRelayTrack(receiver_peer, sender_connection_id, relay);
+		addRelayTrack<DescriptionType>(sender_connection_id, receiver_peer, relay);
 
 		// FuzeHttp::WebsocketSession* receiver_session = static_cast<FuzeHttp::WebsocketSession*>(receiver_peer->owner_session);
 		receiver_peer->connection->onLocalDescription([receiver_peer, sender_connection_id, relay](rtc::Description description) {
@@ -96,11 +113,12 @@ private:
 		receiver_peer->connection->setLocalDescription();
 	}
 
-	void sendMessageToMicRelays(rtc::binary&& message) {
+	void sendMessageToRelays(rtc::binary&& message, const std::string& relay_name) {
 		for (auto& [peer_id, weak_peer] : tracking_room_ptr.value()->peers) {
 			if (peer_id == own_connection_id) continue;
 			if (auto strong_peer = weak_peer.lock()) {
-				if (auto it = strong_peer->mic_relay.relays.find(own_connection_id); it != strong_peer->mic_relay.relays.end() && it->second.track->isOpen()) {
+				Relay* relay = strong_peer->getRelayFromString(relay_name).value();
+				if (auto it = relay->relays.find(own_connection_id); it != relay->relays.end() && it->second.track->isOpen()) {
 					auto rtp = reinterpret_cast<rtc::RtpHeader*>(message.data());
 					rtp->setSsrc(it->second.ssrc); // it->second is AudioRelaySlot
 					it->second.track->send(message);
@@ -185,16 +203,20 @@ private:
 			else if (request_type == "webrtc_relay_added_answer") {
 				std::string sdp = buffer_as_json.at("payload").at("description").at("sdp").as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
-				std::string relay_type = buffer_as_json.at("payload").at("relay_type").as_string().c_str();
+				std::string relay_name = buffer_as_json.at("payload").at("relay_name").as_string().c_str();
 				if (!own_peer_ptr)
 					throw "No WebRTC peer associated with this session";
 				own_peer_ptr.value()->connection->setRemoteDescription(rtc::Description(sdp, type));
-				if (relay_type == "mic") {
-					own_peer_ptr.value()->mic_relay.renegotiation_in_flight = false;
-					if (!own_peer_ptr.value()->mic_relay.pending_relay_additions.empty()) {
-						int next = own_peer_ptr.value()->mic_relay.pending_relay_additions.front();
-						own_peer_ptr.value()->mic_relay.pending_relay_additions.pop_front();
-						addAudioRelaySlot(own_peer_ptr.value(), next, &(own_peer_ptr.value()->mic_relay));
+				auto relay_maybe = own_peer_ptr.value()->getRelayFromString(relay_name);
+				if (!relay_maybe)
+					throw relay_maybe.error();
+				else {
+					Relay* relay_ptr = relay_maybe.value();
+					relay_ptr->renegotiation_in_flight = false;
+					if (!relay_ptr->pending_relay_additions.empty()) {
+						int next = relay_ptr->pending_relay_additions.front();
+						relay_ptr->pending_relay_additions.pop_front();
+						addRelaySlot<rtc::Description::Audio>(next, own_peer_ptr.value(), own_peer_ptr.value()->getRelayFromString("mic").value());
 					}
 				}
 			}
@@ -219,8 +241,9 @@ private:
 				for (auto& [sender_id, weak_sender] : tracking_room_ptr.value()->peers) {
 					if (sender_id == own_connection_id) continue;
 					auto sender_peer = weak_sender.lock();
-					if (sender_peer && sender_peer->mic_relay_initialized) {
-						addAudioRelayTrack(own_peer_ptr.value(), sender_id, &(own_peer_ptr.value()->mic_relay));
+					Relay* relay = sender_peer->getRelayFromString("mic").value();
+					if (sender_peer && relay->initialized) {
+						addRelayTrack<rtc::Description::Audio>(sender_id, own_peer_ptr.value(), own_peer_ptr.value()->getRelayFromString("mic").value());
 					}
 				}
 
@@ -292,19 +315,20 @@ private:
 				mic_media.addOpusCodec(111);
 				own_peer_ptr.value()->mic_track = own_peer_ptr.value()->connection->addTrack(mic_media);
 				own_peer_ptr.value()->mic_track->onMessage([this](rtc::binary message) {
+					Relay* relay = this->own_peer_ptr.value()->getRelayFromString("mic").value();
 					if (!this->own_peer_ptr.value()->mic_sharing_enabled)
 						return;
-					if (!this->own_peer_ptr.value()->mic_relay_initialized) {
+					if (!relay->initialized) {
 						std::println("Initialising mic relay!");
-						this->own_peer_ptr.value()->mic_relay_initialized = true;
+						relay->initialized = true;
 						auto room = this->tracking_room_ptr.value();
 						for (auto& [peer_id, weak_peer] : room->peers) {
 							if (peer_id == own_connection_id) continue;
 							if (auto strong_peer = weak_peer.lock())
-								addAudioRelaySlot(strong_peer, own_connection_id, &(strong_peer->mic_relay));
+								addRelaySlot<rtc::Description::Audio>(own_connection_id, strong_peer, strong_peer->getRelayFromString("mic").value());
 						}
 					}
-					sendMessageToMicRelays(std::move(message));
+					sendMessageToRelays(std::move(message), "mic");
 				}, nullptr);
 
 				rtc::Description::Audio desktop_media("desktop_audio", rtc::Description::Direction::RecvOnly);

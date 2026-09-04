@@ -4,6 +4,7 @@ module;
 #include "rtc/track.hpp"
 #include <boost/json.hpp>
 #include <ctime>
+#include <expected>
 #include <iostream>
 #include <map>
 #include <print>
@@ -26,6 +27,7 @@ struct RelaySlot {
 struct Relay {
 	std::string name;
 	std::unordered_map<int, RelaySlot> relays;
+	bool initialized = false;
 	bool renegotiation_in_flight = false; // if addAudioRelaySlot is called before request_type == "webrtc_audio_added_answer", connection id is added to the deque next line
 	std::deque<int> pending_relay_additions;
 };
@@ -40,10 +42,15 @@ struct RtcPeer {
 	std::shared_ptr<rtc::Track> desktop_audio_track;
 	std::shared_ptr<rtc::Track> mic_track;
 	bool mic_sharing_enabled = false;
-	bool mic_relay_initialized = false;
 	// receiver
 	std::shared_ptr<rtc::Track> video_receiving_track;
 	Relay mic_relay{.name="mic"};
+	std::expected<Relay*, std::string> getRelayFromString(const std::string& relay_type) {
+		if (relay_type == "mic")
+			return &(this->mic_relay);
+		else
+			return std::unexpected(std::format("[getRelayFromString] relay_type {} not recognised", relay_type));
+	}
 };
 
 class Room /*: public FuzeHttp::PermissionManagedObject*/ {

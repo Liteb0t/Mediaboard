@@ -282,7 +282,10 @@ class RoomConnection {
 		await this.conn.setLocalDescription(answer);
 		this.sock.send(JSON.stringify({
 			type: "webrtc_relay_added_answer",
-			payload: { connection_id: payload.connection_id, relay_type: payload.relay_type, description: { type: answer.type, sdp: answer.sdp } }
+			payload: {
+				relay_name: payload.relay_name,
+				description: { type: answer.type, sdp: answer.sdp }
+			}
 		}));
 	}
 	syncSharingStatus() {
