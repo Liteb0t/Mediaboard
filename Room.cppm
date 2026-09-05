@@ -38,16 +38,19 @@ struct RtcPeer {
 	std::shared_ptr<rtc::PeerConnection> connection;
 	// sender
 	std::shared_ptr<rtc::Track> video_sending_track;
-	bool video_sharing_enabled;
+	bool video_sharing_enabled = false;
 	std::shared_ptr<rtc::Track> desktop_audio_track;
 	std::shared_ptr<rtc::Track> mic_track;
 	bool mic_sharing_enabled = false;
 	// receiver
 	std::shared_ptr<rtc::Track> video_receiving_track;
 	Relay mic_relay{.name="mic"};
+	Relay video_relay{.name="video"};
 	std::expected<Relay*, std::string> getRelayFromString(const std::string& relay_type) {
 		if (relay_type == "mic")
 			return &(this->mic_relay);
+		else if (relay_type == "video")
+			return &(this->video_relay);
 		else
 			return std::unexpected(std::format("[getRelayFromString] relay_type {} not recognised", relay_type));
 	}

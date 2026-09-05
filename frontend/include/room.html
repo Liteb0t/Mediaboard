@@ -255,11 +255,13 @@ class RoomConnection {
 	handleIncomingTrack(event) {
 		const mid = event.transceiver.mid;
 		console.log("Incoming track MID " + mid);
-		if (mid === "video_relay") {
+		if (mid && mid.startsWith("video_relay_")) {
+			const sender_id = mid.slice("video_relay_".length);
 			const video_element = document.createElement("video");
 			video_element.autoplay = true;
 			video_element.playsInline = true;
-			video_element.srcObject = event.streams[0] ?? new MediaStream([event.track]);
+			video_element.srcObject = new MediaStream([event.track]);
+			video_element.dataset.senderConnectionId = sender_id;
 			video_container.appendChild(video_element);
 		}
 		else if (mid && mid.startsWith("mic_relay_")) {
