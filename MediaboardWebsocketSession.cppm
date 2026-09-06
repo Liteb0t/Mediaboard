@@ -43,12 +43,27 @@ public:
 				own_peer_ptr.value()->connection->close();
 			if (tracking_room_ptr) {
 				tracking_room_ptr.value()->peers.erase(own_connection_id);
-				broadcastPeerList();
+				broadcastPeerList(ACTION::LEAVE);
 			}
 		}
 	}
 #endif
 private:
+	enum struct ACTION : int {
+		JOIN,
+		UPDATE,
+		LEAVE
+	};
+	std::string getActionString(ACTION action) {
+		if (action == ACTION::JOIN)
+			return "join";
+		else if (action == ACTION::UPDATE)
+			return "update";
+		else if (action == ACTION::LEAVE)
+			return "leave";
+		else
+			throw "action not recognised";
+	}
 	State* getState() const {
 		return (State*)this->state_; // base FuzeHttp state must be casted to Mediaboard state
 	}
@@ -60,7 +75,7 @@ private:
 	std::optional<std::shared_ptr<RtcPeer>> own_peer_ptr;
 	static const rtc::SSRC targetSSRC = 42;
 	struct DescriptionMID {
-		DescriptionMID(std::string relay_name, int sender_connection_id) : value(std::format("{}_relay_{}", relay_name, sender_connection_id)) {}
+		DescriptionMID(std::string relay_name, int sender_connection_id) : value(std::format("{}_relay-{}", relay_name, sender_connection_id)) {}
 		const std::string value;
 	};
 	template<class DescriptionType>
@@ -148,10 +163,13 @@ private:
 			}
 		}
 	}
-	void broadcastPeerList() {
+	void broadcastPeerList(ACTION action) {
 		boost::json::object data_to_send = {
 			{"type", "peers_updated"},
-			{"payload", {{"peers", tracking_room_ptr.value()->asJson().at("peers")}}}
+			{"payload", {
+				{"action", {{"type", getActionString(action)}, {"peer", this->own_connection_id}}},
+				{"peers", tracking_room_ptr.value()->asJson().at("peers")}}
+			}
 		};
 		for (auto& weak_peer : tracking_room_ptr.value()->peers) {
 			if (auto strong_peer = weak_peer.second.lock())
@@ -396,7 +414,7 @@ private:
 
 				own_peer_ptr.value()->connection->setLocalDescription();
 				this->tracking_room_ptr.value()->peers.emplace(own_connection_id, own_peer_ptr.value());
-				broadcastPeerList();
+				broadcastPeerList(ACTION::JOIN);
 				// [AI glasnost] end AI-assisted section
 			}
 			else if (request_type == "webrtc_room_connect_answer") {
@@ -425,7 +443,7 @@ private:
 					throw "No WebRTC peer associated with this session";
 				own_peer_ptr.value()->mic_sharing_enabled = buffer_as_json.at("payload").at("mic_sharing_enabled").as_bool();
 				own_peer_ptr.value()->video_sharing_enabled = buffer_as_json.at("payload").at("video_sharing_enabled").as_bool();
-				broadcastPeerList();
+				broadcastPeerList(ACTION::UPDATE);
 			}
 #endif
 			else {

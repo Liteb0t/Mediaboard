@@ -14,6 +14,27 @@
 </div>
 <script>
 "use strict";
+class PeerMedia {
+	setAudio(event) {
+		this.audio_element = document.createElement("audio");
+		this.audio_element.autoplay = true;
+		// audio_element.controls = true; // element is hidden otherwise
+		this.audio_element.srcObject = new MediaStream([event.track]);
+		return this.audio_element;
+	}
+	setVideo(event) {
+		this.video_element = document.createElement("video");
+		this.video_element.autoplay = true;
+		this.video_element.playsInline = true;
+		this.video_element.srcObject = new MediaStream([event.track]);
+		// this.video_element.dataset.senderConnectionId = sender_id;
+		return this.video_element;
+	}
+	onLeave() {
+		this.video_element?.parentNode.removeChild(this.video_element);
+		this.audio_element?.parentNode.removeChild(this.audio_element);
+	}
+}
 class RoomConnection {
 	constructor(room_id) {
 		room_share_button.onclick = () => { this.enableShareVideo(); }
@@ -25,6 +46,7 @@ class RoomConnection {
 		room_container.style["display"] = "inherit";
 		// connection_information_container.style["display"] = "inherit";
 		this.on_call = true;
+		this.peer_media = {};
 		// const websocket_connect_event = new Event("on_websocket_connect");
 		this.sock = new WebSocket(websocket_url);
 		const on_room_exit_event = new Event("on_room_exit");
@@ -55,6 +77,7 @@ class RoomConnection {
 				}
 				else if (message_json.type === "peers_updated") {
 					this.showPeers(message_json.payload.peers);
+					this.updateMediaElements(message_json.payload);
 				}
 				else if (message_json.type === "error") {
 					error_message.textContent = message_json.error_message;
@@ -94,6 +117,11 @@ class RoomConnection {
 			peers_list.replaceChildren(document.createTextNode("None."));
 		else
 			peers_list.replaceChildren(fragment);
+	}
+	updateMediaElements(payload) {
+		if (payload.action.type == "leave") {
+			this.peer_media[payload.action.peer].onLeave();
+		}
 	}
 	async createRoom() {
 		console.log("Creating new room");
@@ -252,26 +280,21 @@ class RoomConnection {
 			RoomConnection.handleMediaError(err, conn);
 		}
 	}
+	getConnectionIdFromMid(mid) {
+		return Number(mid.substring(mid.lastIndexOf('-') + 1));
+	}
 	handleIncomingTrack(event) {
 		const mid = event.transceiver.mid;
-		console.log("Incoming track MID " + mid);
-		if (mid && mid.startsWith("video_relay_")) {
-			const sender_id = mid.slice("video_relay_".length);
-			const video_element = document.createElement("video");
-			video_element.autoplay = true;
-			video_element.playsInline = true;
-			video_element.srcObject = new MediaStream([event.track]);
-			video_element.dataset.senderConnectionId = sender_id;
-			video_container.appendChild(video_element);
+		const connection_id = this.getConnectionIdFromMid(mid);
+		if (!(connection_id in this.peer_media)) {
+			this.peer_media[connection_id] = new PeerMedia();
 		}
-		else if (mid && mid.startsWith("mic_relay_")) {
-			const sender_id = mid.slice("mic_relay_".length);
-			const audio_element = document.createElement("audio");
-			audio_element.autoplay = true;
-			audio_element.controls = true; // element is hidden otherwise
-			audio_element.srcObject = new MediaStream([event.track]);
-			audio_element.dataset.senderConnectionId = sender_id;
-			voice_chat_container.appendChild(audio_element);
+		console.log("Incoming track MID " + mid);
+		if (mid && mid.startsWith("video_relay")) {
+			video_container.appendChild(this.peer_media[connection_id].setVideo(event));
+		}
+		else if (mid && mid.startsWith("mic_relay")) {
+			voice_chat_container.appendChild(this.peer_media[connection_id].setMicAudio(event));
 		}
 		else {
 			this.handleMediaError("Unrecognized MID " + mid);
