@@ -295,7 +295,7 @@ class RoomConnection {
 			video_container.appendChild(this.peer_media[connection_id].setVideo(event));
 		}
 		else if (mid && mid.startsWith("mic_relay")) {
-			voice_chat_container.appendChild(this.peer_media[connection_id].setMicAudio(event));
+			voice_chat_container.appendChild(this.peer_media[connection_id].setAudio(event));
 		}
 		else {
 			this.handleMediaError("Unrecognized MID " + mid);
