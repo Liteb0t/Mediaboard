@@ -224,7 +224,7 @@ class RoomConnection {
 	async onReceiveMakeRtcConnection(payload) {
 		selected_room_id = payload.room;
 		video_container.innerHTML = "";
-		connection_status_indicator.textContent = "Connected.";
+		connection_status_indicator.textContent = "Gathering ICE...";
 		let conn = new RTCPeerConnection({
 			// Recommended for libdatachannel
 			bundlePolicy: 'max-bundle',
@@ -237,6 +237,7 @@ class RoomConnection {
 		conn.onicegatheringstatechange = (state) => {
 			console.log("[sender] ICE gathering state: " + conn.iceGatheringState);
 			if (conn.iceGatheringState === 'complete') {
+				connection_status_indicator.textContent = "Connected.";
 				const answer = conn.localDescription;
 				this.sock.send(JSON.stringify({
 					type: "webrtc_room_connect_answer",

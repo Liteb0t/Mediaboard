@@ -429,14 +429,19 @@ private:
 				rtc::Description answer(sdp, type);
 				this->own_peer_ptr.value()->connection->setRemoteDescription(answer);
 				// sending keyframe ignored when video sender is not there
-				for (auto& weak_peer : tracking_room_ptr.value()->peers) {
-					if (auto strong_peer = weak_peer.second.lock()) {
-						if (strong_peer->video_sending_track->isOpen() && strong_peer->video_sharing_enabled) {
-							strong_peer->video_sending_track->requestKeyframe();
-							break;
+				own_peer_ptr.value()->connection->onStateChange([this](rtc::PeerConnection::State state) {
+					std::cout << "State: " << state << std::endl;
+					if (state == rtc::PeerConnection::State::Connected) {
+						for (auto& [peer_id, weak_peer] : tracking_room_ptr.value()->peers) {
+							if (peer_id == own_connection_id)
+								continue;
+							if (auto strong_peer = weak_peer.lock()) {
+								if (strong_peer->video_sharing_enabled && strong_peer->video_sending_track->isOpen())
+									strong_peer->video_sending_track->requestKeyframe();
+							}
 						}
 					}
-				}
+				});
 			}
 			else if (request_type == "webrtc_sharing_status_update") {
 				if (!own_peer_ptr)
