@@ -36,7 +36,6 @@ public:
 			};
 			own_peer_ptr.value()->send_message = nullptr;
 			closeTrack(own_peer_ptr.value()->video_sending_track);
-			closeTrack(own_peer_ptr.value()->video_receiving_track);
 			closeTrack(own_peer_ptr.value()->desktop_audio_track);
 			closeTrack(own_peer_ptr.value()->mic_track);
 			if (own_peer_ptr.value()->connection)
@@ -75,7 +74,7 @@ private:
 	std::optional<std::shared_ptr<RtcPeer>> own_peer_ptr;
 	static const rtc::SSRC targetSSRC = 42;
 	struct DescriptionMID {
-		DescriptionMID(std::string relay_name, int sender_connection_id) : value(std::format("{}_relay-{}", relay_name, sender_connection_id)) {}
+		DescriptionMID(std::string relay_name, int sender_connection_id) : value(std::format("{}-{}", relay_name, sender_connection_id)) {}
 		const std::string value;
 	};
 	template<class DescriptionType>
@@ -256,10 +255,12 @@ private:
 					if (!relay_ptr->pending_relay_additions.empty()) {
 						int next = relay_ptr->pending_relay_additions.front();
 						relay_ptr->pending_relay_additions.pop_front();
-						if (relay_ptr->name == "mic")
+						if (relay_ptr->name == MIC_AUDIO_MID)
 							addRelaySlot<rtc::Description::Audio>(next, own_peer_ptr.value(), relay_ptr);
-						else if (relay_ptr->name == "video")
+						else if (relay_ptr->name == VIDEO_MID)
 							addRelaySlot<rtc::Description::Video>(next, own_peer_ptr.value(), relay_ptr);
+						else if (relay_ptr->name == DESKTOP_AUDIO_MID)
+							addRelaySlot<rtc::Description::Audio>(next, own_peer_ptr.value(), relay_ptr);
 					}
 				}
 			}
@@ -287,9 +288,9 @@ private:
 				for (auto& [sender_id, weak_sender] : tracking_room_ptr.value()->peers) {
 					if (sender_id == own_connection_id) continue;
 					auto sender_peer = weak_sender.lock();
-					Relay* relay = sender_peer->getRelayFromString("mic").value();
+					Relay* relay = sender_peer->getRelayFromString(MIC_AUDIO_MID).value();
 					if (sender_peer && relay->initialized) {
-						addRelayTrack<rtc::Description::Audio>(sender_id, own_peer_ptr.value(), own_peer_ptr.value()->getRelayFromString("mic").value());
+						addRelayTrack<rtc::Description::Audio>(sender_id, own_peer_ptr.value(), own_peer_ptr.value()->getRelayFromString(MIC_AUDIO_MID).value());
 					}
 				}
 
@@ -297,11 +298,25 @@ private:
 				for (auto& [sender_id, weak_sender] : tracking_room_ptr.value()->peers) {
 					if (sender_id == own_connection_id) continue;
 					auto sender_peer = weak_sender.lock();
-					Relay* relay = sender_peer->getRelayFromString("video").value();
+					Relay* relay = sender_peer->getRelayFromString(VIDEO_MID).value();
 					if (sender_peer && relay->initialized) {
-						addRelayTrack<rtc::Description::Video>(sender_id, own_peer_ptr.value(), own_peer_ptr.value()->getRelayFromString("video").value());
+						addRelayTrack<rtc::Description::Video>(sender_id, own_peer_ptr.value(), own_peer_ptr.value()->getRelayFromString(VIDEO_MID).value());
 					}
 				}
+
+				own_peer_ptr.value()->connection->onStateChange([this](rtc::PeerConnection::State state) {
+					std::cout << "State: " << state << std::endl;
+					if (state == rtc::PeerConnection::State::Connected) {
+						for (auto& [peer_id, weak_peer] : tracking_room_ptr.value()->peers) {
+							if (peer_id == own_connection_id)
+								continue;
+							if (auto strong_peer = weak_peer.lock()) {
+								if (strong_peer->video_sharing_enabled && strong_peer->video_sending_track->isOpen())
+									strong_peer->video_sending_track->requestKeyframe();
+							}
+						}
+					}
+				});
 
 				own_peer_ptr.value()->connection->onStateChange([](rtc::PeerConnection::State state) {
 					std::cout << "State: " << state << std::endl;
@@ -323,21 +338,10 @@ private:
 						});
 					}
 				});
-				// {
-				// 	rtc::Description::Video media("video_relay", rtc::Description::Direction::SendOnly);
-				// 	media.addVP8Codec(96);
-				// 	media.setBitrate(3000);
-				// 	media.addSSRC(targetSSRC, "video_sending", "video_sending", "video_sending");
-    //
-				// 	own_peer_ptr.value()->video_receiving_track = own_peer_ptr.value()->connection->addTrack(media);
-    //
-				// 	own_peer_ptr.value()->video_receiving_track->onMessage([](rtc::binary var) {}, nullptr);
-				// }
-
 
 				////////////// SENDING ////////////////
 				{
-					rtc::Description::Video media("video_sending", rtc::Description::Direction::RecvOnly);
+					rtc::Description::Video media(VIDEO_MID, rtc::Description::Direction::RecvOnly);
 					// Idealy H264 would be used because it's the superior codec [source: it just is, ok?]
 					// but, for compatibility reasons (god damn it Firefox) Vp8 is used instead
 					media.addVP8Codec(96);
@@ -346,7 +350,7 @@ private:
 				}
 				own_peer_ptr.value()->video_sending_track->setMediaHandler(std::make_shared<rtc::RtcpReceivingSession>()); // is this needed?
 				own_peer_ptr.value()->video_sending_track->onMessage([this](rtc::binary message) {
-					Relay* relay = this->own_peer_ptr.value()->getRelayFromString("video").value();
+					Relay* relay = this->own_peer_ptr.value()->getRelayFromString(VIDEO_MID).value();
 					if (!this->own_peer_ptr.value()->video_sharing_enabled)
 						return;
 					if (!relay->initialized) {
@@ -356,40 +360,19 @@ private:
 						for (auto& [peer_id, weak_peer] : room->peers) {
 							if (peer_id == own_connection_id) continue;
 							if (auto strong_peer = weak_peer.lock())
-								addRelaySlot<rtc::Description::Video>(own_connection_id, strong_peer, strong_peer->getRelayFromString("video").value());
+								addRelaySlot<rtc::Description::Video>(own_connection_id, strong_peer, strong_peer->getRelayFromString(VIDEO_MID).value());
 						}
 					}
-					sendMessageToRelays(std::move(message), "video");
+					sendMessageToRelays(std::move(message), VIDEO_MID);
 				}, nullptr);
-				/*
-				own_peer_ptr.value()->video_sending_track->onMessage(
-					[this](rtc::binary message) {
-						if (!this->own_peer_ptr.value()->video_sharing_enabled)
-							return;
-						// This is an RTP packet
-						auto rtp = reinterpret_cast<rtc::RtpHeader *>(message.data());
-						rtp->setSsrc(targetSSRC);
-						auto board = this->getState()->getBoardIfExists(this->tracking_board);
-						if (!board)
-							throw "board no longer exists";
-						for (auto peer : this->tracking_room_ptr.value()->peers) {
-							if (auto peer_ptr = peer.second.lock()) {
-								if (peer_ptr->video_receiving_track != nullptr && peer_ptr->video_receiving_track->isOpen()) {
-									peer_ptr->video_receiving_track->send(message);
-								}
-							}
-						}
-					},
-					nullptr);
-					*/
 
 				// mic audio
 				// TODO side effects: this->tracking_room_ptr.value();, this->own_connection_id
-				rtc::Description::Audio mic_media("mic_audio", rtc::Description::Direction::RecvOnly);
+				rtc::Description::Audio mic_media(MIC_AUDIO_MID, rtc::Description::Direction::RecvOnly);
 				mic_media.addOpusCodec(111);
 				own_peer_ptr.value()->mic_track = own_peer_ptr.value()->connection->addTrack(mic_media);
 				own_peer_ptr.value()->mic_track->onMessage([this](rtc::binary message) {
-					Relay* relay = this->own_peer_ptr.value()->getRelayFromString("mic").value();
+					Relay* relay = this->own_peer_ptr.value()->getRelayFromString(MIC_AUDIO_MID).value();
 					if (!this->own_peer_ptr.value()->mic_sharing_enabled)
 						return;
 					if (!relay->initialized) {
@@ -399,17 +382,30 @@ private:
 						for (auto& [peer_id, weak_peer] : room->peers) {
 							if (peer_id == own_connection_id) continue;
 							if (auto strong_peer = weak_peer.lock())
-								addRelaySlot<rtc::Description::Audio>(own_connection_id, strong_peer, strong_peer->getRelayFromString("mic").value());
+								addRelaySlot<rtc::Description::Audio>(own_connection_id, strong_peer, strong_peer->getRelayFromString(MIC_AUDIO_MID).value());
 						}
 					}
-					sendMessageToRelays(std::move(message), "mic");
+					sendMessageToRelays(std::move(message), MIC_AUDIO_MID);
 				}, nullptr);
 
-				rtc::Description::Audio desktop_media("desktop_audio", rtc::Description::Direction::RecvOnly);
-				desktop_media.addOpusCodec(111);
-				own_peer_ptr.value()->desktop_audio_track = own_peer_ptr.value()->connection->addTrack(desktop_media);
+				rtc::Description::Audio desktop_audio_media(DESKTOP_AUDIO_MID, rtc::Description::Direction::RecvOnly);
+				desktop_audio_media.addOpusCodec(111);
+				own_peer_ptr.value()->desktop_audio_track = own_peer_ptr.value()->connection->addTrack(desktop_audio_media);
 				own_peer_ptr.value()->desktop_audio_track->onMessage([this](rtc::binary message) {
-					// TODO implement same as mic track
+					Relay* relay = this->own_peer_ptr.value()->getRelayFromString(DESKTOP_AUDIO_MID).value();
+					if (!this->own_peer_ptr.value()->desktop_audio_sharing_enabled)
+						return;
+					if (!relay->initialized) {
+						std::println("Initialising desktop_audio relay!");
+						relay->initialized = true;
+						auto room = this->tracking_room_ptr.value();
+						for (auto& [peer_id, weak_peer] : room->peers) {
+							if (peer_id == own_connection_id) continue;
+							if (auto strong_peer = weak_peer.lock())
+								addRelaySlot<rtc::Description::Audio>(own_connection_id, strong_peer, strong_peer->getRelayFromString(DESKTOP_AUDIO_MID).value());
+						}
+					}
+					sendMessageToRelays(std::move(message), DESKTOP_AUDIO_MID);
 				}, nullptr);
 
 				own_peer_ptr.value()->connection->setLocalDescription();
@@ -429,23 +425,24 @@ private:
 				rtc::Description answer(sdp, type);
 				this->own_peer_ptr.value()->connection->setRemoteDescription(answer);
 				// sending keyframe ignored when video sender is not there
-				own_peer_ptr.value()->connection->onStateChange([this](rtc::PeerConnection::State state) {
-					std::cout << "State: " << state << std::endl;
-					if (state == rtc::PeerConnection::State::Connected) {
-						for (auto& [peer_id, weak_peer] : tracking_room_ptr.value()->peers) {
-							if (peer_id == own_connection_id)
-								continue;
-							if (auto strong_peer = weak_peer.lock()) {
-								if (strong_peer->video_sharing_enabled && strong_peer->video_sending_track->isOpen())
-									strong_peer->video_sending_track->requestKeyframe();
-							}
-						}
-					}
-				});
+				// own_peer_ptr.value()->connection->onStateChange([this](rtc::PeerConnection::State state) {
+				// 	std::cout << "State: " << state << std::endl;
+					// if (state == rtc::PeerConnection::State::Connected) {
+					// 	for (auto& [peer_id, weak_peer] : tracking_room_ptr.value()->peers) {
+					// 		if (peer_id == own_connection_id)
+					// 			continue;
+					// 		if (auto strong_peer = weak_peer.lock()) {
+					// 			if (strong_peer->video_sharing_enabled && strong_peer->video_sending_track->isOpen())
+					// 				strong_peer->video_sending_track->requestKeyframe();
+					// 		}
+					// 	}
+					// }
+				// });
 			}
 			else if (request_type == "webrtc_sharing_status_update") {
 				if (!own_peer_ptr)
 					throw "No WebRTC peer associated with this session";
+				own_peer_ptr.value()->desktop_audio_sharing_enabled = buffer_as_json.at("payload").at("desktop_audio_sharing_enabled").as_bool();
 				own_peer_ptr.value()->mic_sharing_enabled = buffer_as_json.at("payload").at("mic_sharing_enabled").as_bool();
 				own_peer_ptr.value()->video_sharing_enabled = buffer_as_json.at("payload").at("video_sharing_enabled").as_bool();
 				broadcastPeerList(ACTION::UPDATE);

@@ -20,6 +20,9 @@ import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 
 export namespace Mediaboard {
+	const std::string MIC_AUDIO_MID = "ma";
+	const std::string DESKTOP_AUDIO_MID = "da";
+	const std::string VIDEO_MID = "v";
 struct RelaySlot {
 	std::shared_ptr<rtc::Track> track;
 	rtc::SSRC ssrc;
@@ -40,17 +43,20 @@ struct RtcPeer {
 	std::shared_ptr<rtc::Track> video_sending_track;
 	bool video_sharing_enabled = false;
 	std::shared_ptr<rtc::Track> desktop_audio_track;
+	bool desktop_audio_sharing_enabled = false;
 	std::shared_ptr<rtc::Track> mic_track;
 	bool mic_sharing_enabled = false;
 	// receiver
-	std::shared_ptr<rtc::Track> video_receiving_track;
-	Relay mic_relay{.name="mic"};
-	Relay video_relay{.name="video"};
+	Relay mic_relay{.name=MIC_AUDIO_MID};
+	Relay video_relay{.name=VIDEO_MID};
+	Relay desktop_audio_relay{.name=DESKTOP_AUDIO_MID};
 	std::expected<Relay*, std::string> getRelayFromString(const std::string& relay_type) {
-		if (relay_type == "mic")
+		if (relay_type == MIC_AUDIO_MID)
 			return &(this->mic_relay);
-		else if (relay_type == "video")
+		else if (relay_type == VIDEO_MID)
 			return &(this->video_relay);
+		else if (relay_type == DESKTOP_AUDIO_MID)
+			return &(this->desktop_audio_relay);
 		else
 			return std::unexpected(std::format("[getRelayFromString] relay_type {} not recognised", relay_type));
 	}
@@ -68,6 +74,7 @@ public:
 				peers_json.push_back({
 					{"connection_id", id},
 					{"client_id", peer->client_id},
+					{"desktop_audio_sharing_enabled", peer->desktop_audio_sharing_enabled},
 					{"mic_sharing_enabled", peer->mic_sharing_enabled},
 					{"video_sharing_enabled", peer->video_sharing_enabled}
 				});

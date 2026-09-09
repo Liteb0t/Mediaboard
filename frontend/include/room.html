@@ -15,12 +15,16 @@
 <script>
 "use strict";
 class PeerMedia {
-	setAudio(event) {
-		this.audio_element = document.createElement("audio");
-		this.audio_element.autoplay = true;
+	constructor() {
+		this.audio_elements = {}; // keyed by MID because sender can send multiple audio tracks
+	}
+	setAudio(event, mid) {
+		const audio_element = document.createElement("audio");
+		audio_element.autoplay = true;
 		// audio_element.controls = true; // element is hidden otherwise
-		this.audio_element.srcObject = new MediaStream([event.track]);
-		return this.audio_element;
+		audio_element.srcObject = new MediaStream([event.track]);
+		this.audio_elements[mid] = audio_element;
+		return this.audio_elements[mid];
 	}
 	setVideo(event) {
 		this.video_element = document.createElement("video");
@@ -101,6 +105,9 @@ class RoomConnection {
 			document.dispatchEvent(on_room_exit_event);
 		}
 	}
+	static MIC_AUDIO_MID = "ma";
+	static DESKTOP_AUDIO_MID = "da";
+	static VIDEO_MID = "v";
 
 	showPeers(peers) {
 		const fragment = new DocumentFragment();
@@ -119,8 +126,11 @@ class RoomConnection {
 			peers_list.replaceChildren(fragment);
 	}
 	updateMediaElements(payload) {
+		if (payload.action.type == "join") {
+			this.peer_media[payload.action.peer] = new PeerMedia();
+		}
 		if (payload.action.type == "leave") {
-			this.peer_media[payload.action.peer].onLeave();
+			this.peer_media[payload.action.peer]?.onLeave();
 		}
 	}
 	async createRoom() {
@@ -175,6 +185,8 @@ class RoomConnection {
 			if (share_screen_checkbox.checked) {
 				const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
 				this.video_sending_track = display.getVideoTracks()[0];
+				console.log("depug information:");
+				console.log(display.getAudioTracks());
 				if (share_desktop_audio_checkbox.checked)
 					this.desktop_audio_track = display.getAudioTracks()[0]; // undefined if the OS/browser doesn't support system audio capture
 				else
@@ -262,11 +274,11 @@ class RoomConnection {
 			/////// Sending //////
 			const transceivers = conn.getTransceivers();
 			console.log("Transceivers: ", transceivers);
-			this.video_sending_transceiver =  conn.getTransceivers().find(t => t.mid === "video_sending");
+			this.video_sending_transceiver =  conn.getTransceivers().find(t => t.mid === RoomConnection.VIDEO_MID);
 			this.video_sending_track = null;
-			this.mic_audio_transceiver =  conn.getTransceivers().find(t => t.mid === "mic_audio");
+			this.mic_audio_transceiver =  conn.getTransceivers().find(t => t.mid === RoomConnection.MIC_AUDIO_MID);
 			this.mic_audio_track = null;
-			this.desktop_audio_transceiver =  conn.getTransceivers().find(t => t.mid === "desktop_audio");
+			this.desktop_audio_transceiver =  conn.getTransceivers().find(t => t.mid === RoomConnection.DESKTOP_AUDIO_MID);
 			this.desktop_audio_track = null;
 			this.video_sending_transceiver.direction = "sendonly";
 			this.mic_audio_transceiver.direction = "sendonly";
@@ -291,11 +303,11 @@ class RoomConnection {
 			this.peer_media[connection_id] = new PeerMedia();
 		}
 		console.log("Incoming track MID " + mid);
-		if (mid && mid.startsWith("video_relay")) {
+		if (mid && mid.startsWith(RoomConnection.VIDEO_MID)) {
 			video_container.appendChild(this.peer_media[connection_id].setVideo(event));
 		}
-		else if (mid && mid.startsWith("mic_relay")) {
-			voice_chat_container.appendChild(this.peer_media[connection_id].setAudio(event));
+		else if (mid && (mid.startsWith(RoomConnection.MIC_AUDIO_MID) || mid.startsWith(RoomConnection.DESKTOP_AUDIO_MID))) {
+			voice_chat_container.appendChild(this.peer_media[connection_id].setAudio(event, mid));
 		}
 		else {
 			this.handleMediaError("Unrecognized MID " + mid);
@@ -319,6 +331,7 @@ class RoomConnection {
 			type: "webrtc_sharing_status_update",
 			payload: {
 				mic_sharing_enabled: !!this.mic_audio_track,
+				desktop_audio_sharing_enabled: !!this.desktop_audio_track,
 				video_sharing_enabled: !!this.video_sending_track
 			}
 		}));
