@@ -1,3 +1,5 @@
+// Copyright (c) 2026, Fuze.page
+// Fuze Human-oriented License v1
 module;
 #include <ctime>
 #include <boost/json.hpp>

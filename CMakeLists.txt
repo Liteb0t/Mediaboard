@@ -1,3 +1,5 @@
+# Copyright (c) 2026, Fuze.page
+# Fuze Human-oriented License v1
 cmake_minimum_required(VERSION 3.28 FATAL_ERROR)
 
 project(Mediaboard

@@ -1,3 +1,5 @@
+// Copyright (c) 2026, Fuze.page
+// Fuze Human-oriented License v1
 module;
 #ifdef WITH_WEBRTC
 #include <rtc/rtcpreceivingsession.hpp>
@@ -281,9 +283,12 @@ private:
 				own_peer_ptr.value()->send_message = [this](boost::json::object payload) { this->send(std::move(payload)); };
 				own_peer_ptr.value()->connection = std::make_shared<rtc::PeerConnection>(getRtcConfig());
 
+
+				bool client_has_permission_to_share_media = board.value()->clientHasPermission(this->getClient(), static_cast<int>(PERMISSION::ROOM_SHARE_MEDIA));
 				///////////// RECEIVING /////////////
 
 				// [AI glasnost] this section assisted by Claude Sonnet 5
+
 				// Mic relay
 				for (auto& [sender_id, weak_sender] : tracking_room_ptr.value()->peers) {
 					if (sender_id == own_connection_id) continue;
@@ -321,7 +326,7 @@ private:
 				own_peer_ptr.value()->connection->onStateChange([](rtc::PeerConnection::State state) {
 					std::cout << "State: " << state << std::endl;
 				});
-				own_peer_ptr.value()->connection->onGatheringStateChange([this](rtc::PeerConnection::GatheringState state) {
+				own_peer_ptr.value()->connection->onGatheringStateChange([this, client_has_permission_to_share_media](rtc::PeerConnection::GatheringState state) {
 					std::cout << "Gathering State: " << state << std::endl;
 					if (state == rtc::PeerConnection::GatheringState::Complete) {
 						auto description = this->own_peer_ptr.value()->connection->localDescription();
@@ -329,6 +334,7 @@ private:
 							{"type", "webrtc_room_connect"},
 							{"payload", {
 								{"connection_id", own_connection_id},
+								{"can_share_media", client_has_permission_to_share_media},
 								{"description", {
 									{"type", description->typeString()},
 									{"sdp", std::string(description.value())}
@@ -340,73 +346,79 @@ private:
 				});
 
 				////////////// SENDING ////////////////
-				{
-					rtc::Description::Video media(VIDEO_MID, rtc::Description::Direction::RecvOnly);
-					// Idealy H264 would be used because it's the superior codec [source: it just is, ok?]
-					// but, for compatibility reasons (god damn it Firefox) Vp8 is used instead
-					media.addVP8Codec(96);
-					media.setBitrate(3000); // Request 3Mbps (Browsers do not encode more than 2.5MBps from a webcam)
-					own_peer_ptr.value()->video_sending_track = own_peer_ptr.value()->connection->addTrack(media);
+				if (client_has_permission_to_share_media) {
+					{
+						rtc::Description::Video media(VIDEO_MID, rtc::Description::Direction::RecvOnly);
+						// Idealy H264 would be used because it's the superior codec [source: it just is, ok?]
+						// but, for compatibility reasons (god damn it Firefox) Vp8 is used instead
+						media.addVP8Codec(96);
+						media.setBitrate(3000); // Request 3Mbps (Browsers do not encode more than 2.5MBps from a webcam)
+						own_peer_ptr.value()->video_sending_track = own_peer_ptr.value()->connection->addTrack(media);
+					}
+					own_peer_ptr.value()->video_sending_track->setMediaHandler(std::make_shared<rtc::RtcpReceivingSession>()); // is this needed?
+					own_peer_ptr.value()->video_sending_track->onMessage([this](rtc::binary message) {
+						Relay* relay = this->own_peer_ptr.value()->getRelayFromString(VIDEO_MID).value();
+						if (!this->own_peer_ptr.value()->video_sharing_enabled)
+							return;
+						if (!relay->initialized) {
+							std::println("Initialising video relay!");
+							relay->initialized = true;
+							auto room = this->tracking_room_ptr.value();
+							for (auto& [peer_id, weak_peer] : room->peers) {
+								if (peer_id == own_connection_id) continue;
+								if (auto strong_peer = weak_peer.lock())
+									addRelaySlot<rtc::Description::Video>(own_connection_id, strong_peer, strong_peer->getRelayFromString(VIDEO_MID).value());
+							}
+						}
+						sendMessageToRelays(std::move(message), VIDEO_MID);
+					}, nullptr);
+
+					// mic audio
+					// TODO side effects: this->tracking_room_ptr.value();, this->own_connection_id
+					rtc::Description::Audio mic_media(MIC_AUDIO_MID, rtc::Description::Direction::RecvOnly);
+					mic_media.addOpusCodec(111);
+					own_peer_ptr.value()->mic_track = own_peer_ptr.value()->connection->addTrack(mic_media);
+					own_peer_ptr.value()->mic_track->onMessage([this](rtc::binary message) {
+						Relay* relay = this->own_peer_ptr.value()->getRelayFromString(MIC_AUDIO_MID).value();
+						if (!this->own_peer_ptr.value()->mic_sharing_enabled)
+							return;
+						if (!relay->initialized) {
+							std::println("Initialising mic relay!");
+							relay->initialized = true;
+							auto room = this->tracking_room_ptr.value();
+							for (auto& [peer_id, weak_peer] : room->peers) {
+								if (peer_id == own_connection_id) continue;
+								if (auto strong_peer = weak_peer.lock())
+									addRelaySlot<rtc::Description::Audio>(own_connection_id, strong_peer, strong_peer->getRelayFromString(MIC_AUDIO_MID).value());
+							}
+						}
+						sendMessageToRelays(std::move(message), MIC_AUDIO_MID);
+					}, nullptr);
+
+					rtc::Description::Audio desktop_audio_media(DESKTOP_AUDIO_MID, rtc::Description::Direction::RecvOnly);
+					desktop_audio_media.addOpusCodec(111);
+					own_peer_ptr.value()->desktop_audio_track = own_peer_ptr.value()->connection->addTrack(desktop_audio_media);
+					own_peer_ptr.value()->desktop_audio_track->onMessage([this](rtc::binary message) {
+						Relay* relay = this->own_peer_ptr.value()->getRelayFromString(DESKTOP_AUDIO_MID).value();
+						if (!this->own_peer_ptr.value()->desktop_audio_sharing_enabled)
+							return;
+						if (!relay->initialized) {
+							std::println("Initialising desktop_audio relay!");
+							relay->initialized = true;
+							auto room = this->tracking_room_ptr.value();
+							for (auto& [peer_id, weak_peer] : room->peers) {
+								if (peer_id == own_connection_id) continue;
+								if (auto strong_peer = weak_peer.lock())
+									addRelaySlot<rtc::Description::Audio>(own_connection_id, strong_peer, strong_peer->getRelayFromString(DESKTOP_AUDIO_MID).value());
+							}
+						}
+						sendMessageToRelays(std::move(message), DESKTOP_AUDIO_MID);
+					}, nullptr);
 				}
-				own_peer_ptr.value()->video_sending_track->setMediaHandler(std::make_shared<rtc::RtcpReceivingSession>()); // is this needed?
-				own_peer_ptr.value()->video_sending_track->onMessage([this](rtc::binary message) {
-					Relay* relay = this->own_peer_ptr.value()->getRelayFromString(VIDEO_MID).value();
-					if (!this->own_peer_ptr.value()->video_sharing_enabled)
-						return;
-					if (!relay->initialized) {
-						std::println("Initialising video relay!");
-						relay->initialized = true;
-						auto room = this->tracking_room_ptr.value();
-						for (auto& [peer_id, weak_peer] : room->peers) {
-							if (peer_id == own_connection_id) continue;
-							if (auto strong_peer = weak_peer.lock())
-								addRelaySlot<rtc::Description::Video>(own_connection_id, strong_peer, strong_peer->getRelayFromString(VIDEO_MID).value());
-						}
-					}
-					sendMessageToRelays(std::move(message), VIDEO_MID);
-				}, nullptr);
-
-				// mic audio
-				// TODO side effects: this->tracking_room_ptr.value();, this->own_connection_id
-				rtc::Description::Audio mic_media(MIC_AUDIO_MID, rtc::Description::Direction::RecvOnly);
-				mic_media.addOpusCodec(111);
-				own_peer_ptr.value()->mic_track = own_peer_ptr.value()->connection->addTrack(mic_media);
-				own_peer_ptr.value()->mic_track->onMessage([this](rtc::binary message) {
-					Relay* relay = this->own_peer_ptr.value()->getRelayFromString(MIC_AUDIO_MID).value();
-					if (!this->own_peer_ptr.value()->mic_sharing_enabled)
-						return;
-					if (!relay->initialized) {
-						std::println("Initialising mic relay!");
-						relay->initialized = true;
-						auto room = this->tracking_room_ptr.value();
-						for (auto& [peer_id, weak_peer] : room->peers) {
-							if (peer_id == own_connection_id) continue;
-							if (auto strong_peer = weak_peer.lock())
-								addRelaySlot<rtc::Description::Audio>(own_connection_id, strong_peer, strong_peer->getRelayFromString(MIC_AUDIO_MID).value());
-						}
-					}
-					sendMessageToRelays(std::move(message), MIC_AUDIO_MID);
-				}, nullptr);
-
-				rtc::Description::Audio desktop_audio_media(DESKTOP_AUDIO_MID, rtc::Description::Direction::RecvOnly);
-				desktop_audio_media.addOpusCodec(111);
-				own_peer_ptr.value()->desktop_audio_track = own_peer_ptr.value()->connection->addTrack(desktop_audio_media);
-				own_peer_ptr.value()->desktop_audio_track->onMessage([this](rtc::binary message) {
-					Relay* relay = this->own_peer_ptr.value()->getRelayFromString(DESKTOP_AUDIO_MID).value();
-					if (!this->own_peer_ptr.value()->desktop_audio_sharing_enabled)
-						return;
-					if (!relay->initialized) {
-						std::println("Initialising desktop_audio relay!");
-						relay->initialized = true;
-						auto room = this->tracking_room_ptr.value();
-						for (auto& [peer_id, weak_peer] : room->peers) {
-							if (peer_id == own_connection_id) continue;
-							if (auto strong_peer = weak_peer.lock())
-								addRelaySlot<rtc::Description::Audio>(own_connection_id, strong_peer, strong_peer->getRelayFromString(DESKTOP_AUDIO_MID).value());
-						}
-					}
-					sendMessageToRelays(std::move(message), DESKTOP_AUDIO_MID);
-				}, nullptr);
+				else {
+					// fixes "No DataChannel or Track to negotiate".
+					own_peer_ptr.value()->keepalive_channel = own_peer_ptr.value()->connection->createDataChannel("keepalive");
+				}
 
 				own_peer_ptr.value()->connection->setLocalDescription();
 				this->tracking_room_ptr.value()->peers.emplace(own_connection_id, own_peer_ptr.value());

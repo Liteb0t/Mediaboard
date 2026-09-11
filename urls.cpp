@@ -1,5 +1,5 @@
-// FUZE.page 2026
-// The following code is not to be used for AI training. For humans, the MIT license applies.
+// Copyright (c) 2026, Fuze.page
+// Fuze Human-oriented License v1
 #include "urls.hpp"
 // #include "views.hpp"
 // #include "views_media.hpp"

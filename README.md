@@ -37,11 +37,11 @@ View: <a href="https://github.com/Liteb0t/Mediaboard">Git</a>, <a href="https://
 	</ul>
 	The <code>--create_owner</code> flag is required on first boot. When the server starts, an invitation link will appear in the command-line output.
 	<figure>
-		<img src="Fuze_Mediaboard_0.1.3_register_owner_account_link.png" alt="Registration link">
+		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_register_owner_account_link.png" alt="Registration link">
 		<figcaption>Invitation link to create owner account.</figcaption>
 	</figure>
 	<figure>
-		<img src="Fuze_Mediaboard_0.1.3_accept_invitation.png" alt="Accepting the invitation">
+		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_accept_invitation.png" alt="Accepting the invitation">
 		<figcaption>A registration form is shown when invitation is opened</figcaption>
 	</figure>
 	After registering the owner account, you can now interact with the server.<br>
@@ -62,18 +62,18 @@ View: <a href="https://github.com/Liteb0t/Mediaboard">Git</a>, <a href="https://
 		<li>Change setting to <i>Allow</i> for the permissions you want to grant.</li>
 	</ol>
 	<figure>
-		<img src="Fuze_Mediaboard_0.1.3_manage_server.png" alt="Public permissions set in the Manage Server page">
+		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_manage_server.png" alt="Public permissions set in the Manage Server page">
 		<figcaption>Granted read/write permissions to Public</figcaption>
 	</figure>
 	Permissions can also be set on boards, which inherit from server-level settings, and threads, which inherit from boards.<br><br>
 	Leaving a setting on <i>Inherit</i> means the permission will be searched by traversing up the inheritance tree (if applicable), and cascading down the group heirarchy until a non-inherited setting is found. If no permission setting is found by the time inheritance passes the server-level setting for <i>Public</i>, permission is denied.<br><br>
 	If both a user and group permission are set on an object, the user setting takes priority.
 	<figure>
-		<img src="Fuze_Mediaboard_0.1.3_manage_users.png" alt="Manage Users tab">
+		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_manage_users.png" alt="Manage Users tab">
 		<figcaption>Adding groups to a user on the <i>Manage users</i> page.</figcaption>
 	</figure>
 	<figure>
-		<img src="Fuze_Mediaboard_0.1.3_manage_groups.png" alt="Manage Groups tab">
+		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_manage_groups.png" alt="Manage Groups tab">
 		<figcaption>In <i>Manage groups</i> you can add/delete groups, change their heirarchy, and dismiss members.</figcaption>
 	</figure>
 </p>
@@ -109,13 +109,13 @@ Changes made to <code>config.ini</code> are read when the server starts. These o
 	Fuze Mediaboard can be embedded inside of a page by using an iframe:<br>
 	<code>&lt;iframe src="http://localhost:8300/">&lt;/iframe></code>
 	<figure>
-		<img src="Fuze_Mediaboard_0.1.3_iframe.png">
+		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_iframe.png">
 		<figcaption>Using Fuze Mediaboard inside of an iframe</figcaption>
 	</figure>
 	It can be shown with controls hidden by adding <code>display=embed</code> as a URL parameter:</br>
 	<pre><code>&lt;iframe src="http://localhost:8300/?display=embed">&lt;/iframe></code></pre>
 	<figure>
-		<img src="Fuze_Mediaboard_0.1.3_iframe_embed.png">
+		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_iframe_embed.png">
 		<figcaption>Iframe with <code>display=embed</code></figcaption>
 	</figure>
 	<code>display=embed</code> also works with individual threads - just add <code>&thread=0</code> (with a valid thread ID) to the path. Embedding threads has a number of potential uses, for example adding comment sections on blog posts, or an artist uploading his/her latest work.
@@ -159,7 +159,7 @@ MAGICK_DISK_LIMIT=2GiB
 	On the Manage Server page, there is a tab to configure WebRTC features. There will be a table with columns for "Type", "Hostname", "Port", "Transport", and "Shared secret". ICE servers are often needed to connect remote peers in live rooms, where they might not have a unique public IP, thanks to CGNAT.<br>
 	The "Transport" and "Shared secret" values are only used for TURN.
 	<figure>
-		<img src="Fuze_Mediaboard_0.2_ice_servers.png" alt="ICE servers config table">
+		<img src="https://fuze.page/static/Fuze_Mediaboard_0.2_ice_servers.png" alt="ICE servers config table">
 		<figcaption>"Add server" to add a new entry, "Clear" to remove an entry, and "Submit" to update the list stored on the server.</figcaption>
 	</figure>
 </p>
@@ -245,7 +245,7 @@ AI usage is not principally rejected, but any generated code must be marked with
   else()</code></pre>
 </details>
 <br>
-AI should not be used to make media assets (icons, sounds etc), period. Neither should it be used to generate documentation. Aside from that, feel free to use AI to help understand the code, find bugs, and receive guidance on solutions.
+AI should not be used to make media assets (icons, sounds etc), period. Neither should it be used to generate documentation. Aside from that, feel free to use AI to help understand the code, find bugs, and receive guidance on solutions. Refer to the Fuze Human-oriented License for more info.
 </p>
 <h3>Creating an AppImage</h3>
 <p>
@@ -256,6 +256,8 @@ AI should not be used to make media assets (icons, sounds etc), period. Neither 
 </p>
 <h3>Other useful commands</h3>
 <p>
+Update submodules to the latest commit:<br>
+<code>git submodule update --remote</code><br>
 Dump PostgreSQL database:<br>
 <code>pg_dump fuze_mediaboard &gt; mediaboard_dump.sql</code><br>
 Restore PostgreSQL database backup:<br>

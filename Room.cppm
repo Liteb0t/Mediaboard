@@ -1,3 +1,5 @@
+// Copyright (c) 2026, Fuze.page
+// Fuze Human-oriented License v1
 module;
 #include "rtc/peerconnection.hpp"
 #include <rtc/rtc.hpp>
@@ -39,6 +41,7 @@ struct RtcPeer {
 	int client_id;
 	// std::shared_ptr<FuzeHttp::WebsocketSession> session;
 	std::shared_ptr<rtc::PeerConnection> connection;
+	std::shared_ptr<rtc::DataChannel> keepalive_channel;
 	// sender
 	std::shared_ptr<rtc::Track> video_sending_track;
 	bool video_sharing_enabled = false;

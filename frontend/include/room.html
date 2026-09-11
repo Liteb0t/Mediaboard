@@ -2,13 +2,14 @@
 <div id="room_container" style="display: none">
 	<h4 id="connection_status_indicator">Not connected.</h4>
 	<button id="connection_information_disconnect_button">Exit room</button>
-	<h2>SENDER</h2>
-	<button id="mic_toggle_button">Share microphone audio</button><br>
+	<fieldset>
+	<button id="mic_toggle_button" disabled>Share microphone audio</button><br>
 	<input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
 	<input id="share_desktop_audio_checkbox" type="checkbox" checked="true"><label for="share_desktop_audio_checkbox">Share desktop audio</label><br>
-	<button id="room_share_button">Share video</button>
-	<h2>RECEIVER</h2>
-	<div id="peers_list_container"><table><thead><tr><th>connection_id</th><th>client_id</th><th>mic</th><th>video</th></tr></thead><tbody id="peers_list">Not loaded.</tbody></table></div>
+	<button id="room_share_button" disabled>Share video</button>
+	</fieldset>
+	<h3>Peers</h3>
+	<div id="peers_list_container"><table><thead><tr><th>connection_id</th><th>client_id</th><th>mic</th><th>video</th></tr></thead><tbody id="peers_list"></tbody></table></div>
 	<div id="voice_chat_container"></div>
 	<div id="video_container" class="LiveVideoContainer"></div>
 </div>
@@ -234,6 +235,8 @@ class RoomConnection {
 	}
 
 	async onReceiveMakeRtcConnection(payload) {
+		room_share_button.disabled = !payload.can_share_media;
+		mic_toggle_button.disabled = !payload.can_share_media;
 		selected_room_id = payload.room;
 		video_container.innerHTML = "";
 		connection_status_indicator.textContent = "Gathering ICE...";
@@ -272,17 +275,19 @@ class RoomConnection {
 			console.log("Done. Creating answer...");
 
 			/////// Sending //////
+			this.video_sending_track = null;
+			this.mic_audio_track = null;
+			this.desktop_audio_track = null;
+			if (payload.can_share_media) {
 			const transceivers = conn.getTransceivers();
 			console.log("Transceivers: ", transceivers);
 			this.video_sending_transceiver =  conn.getTransceivers().find(t => t.mid === RoomConnection.VIDEO_MID);
-			this.video_sending_track = null;
 			this.mic_audio_transceiver =  conn.getTransceivers().find(t => t.mid === RoomConnection.MIC_AUDIO_MID);
-			this.mic_audio_track = null;
 			this.desktop_audio_transceiver =  conn.getTransceivers().find(t => t.mid === RoomConnection.DESKTOP_AUDIO_MID);
-			this.desktop_audio_track = null;
 			this.video_sending_transceiver.direction = "sendonly";
 			this.mic_audio_transceiver.direction = "sendonly";
 			this.desktop_audio_transceiver.direction = "sendonly";
+			}
 
 			const answer = await conn.createAnswer();
 			console.log("Done. Setting local description...");
