@@ -46,11 +46,9 @@ class RoomConnection {
 		mic_toggle_button.onclick = () => { this.enableMic(); }
 		connection_information_disconnect_button.onclick = () => { this.disconnectFromRoom(); }
 		document.addEventListener("on_room_exit", () => { this.onDisconnectFromRoom(); });
-			this.on_call = false;
 		connection_status_indicator.textContent = "Connecting...";
 		room_container.style["display"] = "inherit";
 		// connection_information_container.style["display"] = "inherit";
-		this.on_call = true;
 		this.peer_media = {};
 		// const websocket_connect_event = new Event("on_websocket_connect");
 		this.sock = new WebSocket(websocket_url);

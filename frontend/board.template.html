@@ -291,8 +291,6 @@ if (url_params.get("display") === "embed") {
 	url_params_display_as_embed = true;
 }
 else url_params_display_as_embed = false;
-if (CONFIG_show_watermarks && !url_params_display_as_embed) header_bar_mediaboard_link.style["display"] = "inherit";
-if (CONFIG_show_watermarks && url_params_display_as_embed) watermark.style["display"] = "inherit";
 state.selected_board.slug = url_params.get("board") ? url_params.get("board") : -1;
 state.selected_thread.id = url_params.get("thread") ? Number(url_params.get("thread")) : -1;
 #ifdef WITH_WEBRTC

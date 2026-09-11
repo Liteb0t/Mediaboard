@@ -1,5 +1,5 @@
-<h1 tabindex="-1" class="heading-element" dir="auto"><img src="https://fuze.page/static/fuze-min-hover.png" style="max-width: 100%;" width="94" height="45" alt="FUZE"> Mediaboard</h1>
-Version <b>0.2 BETA</b><br>
+<h1><img src="https://fuze.page/static/fuze-min-hover.png" style="max-width: 100%;" width="94" height="45" alt="FUZE"> Mediaboard</h1>
+Version <b>0.2</b><br>
 View: <a href="https://github.com/Liteb0t/Mediaboard">Git</a>, <a href="https://fuze.page/software/mediaboard/documentation/">Documentation</a>, <a href="https://fuze.page/software/mediaboard/">Overview</a><br>
 <p>
 	<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard</a> is a self-hosted multimedia messaging platform, running on the <a href="https://github.com/Liteb0t/FuzeHttp">FuzeHttp</a> framework. It is written for humans, by humans.
@@ -85,7 +85,7 @@ Changes made to <code>config.ini</code> are read when the server starts. These o
 	<tr><td>server_port</td><td>Serves http://localhost:8300 by default. Change this if running multiple Mediaboard instances.</td></tr>
 	<tr><td>threads</td><td>Number of async threads. Values greater than 1 should be used for testing only.</td></tr>
 	<tr><td>file_size_limit_mb</td><td>For limiting the maximum size of user-uploaded files and to prevent abuse.</td></tr>
-	<tr><td>favicon_url<br>site_name<br>show_watermarks</td><td>Cosmetic settings.</td></tr>
+	<tr><td>favicon_url<br>site_name</td><td>Cosmetic settings.</td></tr>
 	<tr><td>strip_metadata</td><td>Removes metadata from uploaded images (except SVG files).</td></tr>
 	<tr><td>thumbnail_file_exension<br>thumbnail_size</td><td>Format must be supported by ImageMagick. Please note that any change in this setting will not apply to existing thumbnails - those will have to be converted manually.</td></tr>
 	<tr><td>avif_thumbnails<br>

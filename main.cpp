@@ -28,7 +28,6 @@ using namespace FuzeHttp;
 std::vector<FuzeHttp::TemplateMacro*> template_macros{
 	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
 	new TemplateOption<std::string>("favicon_url", "https://fuze.page/favicon.ico"),
-	new TemplateOption("show_watermarks", true),
 	new TemplateConstant("post_max_name", static_cast<int>(Mediaboard::Message::MAX_NAME)),
 	new TemplateConstant("post_max_file_name", static_cast<int>(Mediaboard::File::MAX_FILE_NAME)),
 	new TemplateConstant("post_max_content", static_cast<int>(Mediaboard::Message::MAX_CONTENT)),
