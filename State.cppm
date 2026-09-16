@@ -259,9 +259,11 @@ public:
 		for (const std::pair<std::string, int>& slug_board_id : slug_to_board_id)
 			std::println("{} - {}", slug_board_id.first, slug_board_id.second);
 	}
-
+	template<bool locked = true>
 	std::optional<Board*> getBoardIfExists(int board_id) {
-		std::lock_guard<std::mutex> lock(mutex);
+		if constexpr (locked) {
+			std::lock_guard<std::mutex> lock(mutex);
+		}
 		if (auto it = boards.find(board_id); it != boards.end() && !(it->second.get()->isDeleted()))
 			return it->second.get();
 		else

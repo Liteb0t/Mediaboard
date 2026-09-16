@@ -59,6 +59,7 @@ target_sources(MediaboardServer
       MediaboardWebsocketSession.cppm
       Message.cppm
       Permission.cppm
+      resolvers.cppm
       State.cppm
       Thread.cppm
       views.cppm

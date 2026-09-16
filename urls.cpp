@@ -4,6 +4,7 @@
 // #include "views.hpp"
 // #include "views_media.hpp"
 // #include "views_registration.hpp"
+import Mediaboard.Resolvers;
 import Mediaboard.State;
 import Mediaboard.Views;
 import Mediaboard.Views_media;
@@ -14,14 +15,14 @@ using namespace http;
 using namespace Mediaboard;
 
 template<>
-void addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
+void FuzeHttp::addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
 	// C-style strings are immutable parts of the URL, and strings/ints are variables passed into the view.
 	// Client{} is used when the function needs to identify the user via a cookie.
 	controller->addPattern(verb::get, showDocument,						"*");
 	// controller->addPattern(verb::get, showBoardPage,					"board", std::string{}); // maybe use with SSR in futre
 	controller->addPattern(verb::post, createBoard, Client{},			"api", "board");
 	controller->addPattern(verb::get, getBoards,						"api", "boards");
-	controller->addPattern(verb::get, getBoard, 						"api", "board", std::string{});
+	controller->addPattern(verb::get, getBoard, 						"api", "board", BoardResolver{});
 	controller->addPattern(verb::put, editBoard, Client{},				"api", "board", std::string{});
 	controller->addPattern(verb::delete_, deleteBoard, Client{},		"api", "board", std::string{});
 	controller->addPattern(verb::get, getBoardPermissions,				"api", "board", std::string{}, "permissions");
@@ -39,7 +40,7 @@ void addURLsToController<State>(FuzeHttp::Controller<State*>* controller) {
 	controller->addPattern(verb::post, createMessage, Client{},			"api", "board", std::string{}, "message");
 	controller->addPattern(verb::delete_, deleteMessage, Client{},		"api", "board", std::string{}, "thread", int(), "message", int());
 	controller->addPattern(verb::post, createThread, Client{},			"api", "board", std::string{}, "thread");
-	controller->addPattern(verb::get, getThread, 						"api", "board", std::string{}, "thread", int());
+	controller->addPattern(verb::get, getThread, 						"api", "board", BoardResolver{}, "thread", ThreadResolver{});
 	controller->addPattern(verb::get, getThreadPermissions,				"api", "board", std::string{}, "thread", int(), "permissions");
 	controller->addPattern(verb::post, addThreadGroupPermission,		"api", "board", std::string{}, "thread", int(), "permissions", "group", int());
 	controller->addPattern(verb::put, updateThreadGroupPermissions,		"api", "board", std::string{}, "thread", int(), "permissions", "group", int());

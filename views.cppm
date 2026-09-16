@@ -73,14 +73,11 @@ FuzeHttp::Response getBoards(Mediaboard::State* state, FuzeHttp::Request req) {
 	};
 }
 
-FuzeHttp::Response getBoard(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug) {
+FuzeHttp::Response getBoard(Mediaboard::State* state, FuzeHttp::Request req, Board* board) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
 	return Response{
 		.status = http::status::ok,
-		.json = board.value()->asJson(client)
+		.json = board->asJson(client)
 	};
 }
 
@@ -393,21 +390,11 @@ FuzeHttp::Response deleteMessage(Mediaboard::State* state, FuzeHttp::Request req
 	}
 }
 
-FuzeHttp::Response getThread(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int thread_id) {
+FuzeHttp::Response getThread(Mediaboard::State* state, FuzeHttp::Request req, Board* board, Thread* thread) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->threadExists(thread_id))
-		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
-	const Thread* thread = board.value()->getThread(thread_id);
-	if (thread->isDeleted())
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "This thread has been deleted"};
-	if (!thread->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_THREAD)))
-		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to view this thread."};
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.json = board.value()->getThread(thread_id)->asJsonWithMessages(client)
+		.json = thread->asJsonWithMessages(client)
 	};
 }
 
