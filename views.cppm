@@ -82,7 +82,7 @@ FuzeHttp::Response getBoard(Mediaboard::State* state, FuzeHttp::Request req, Boa
 }
 
 // TODO update etag of index.html on edit to refresh cache
-FuzeHttp::Response editBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
+FuzeHttp::Response editBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client, Board* board) {
 	bool make_public;
 	boost::json::object board_json;
 	std::string new_slug, new_title;
@@ -97,26 +97,19 @@ FuzeHttp::Response editBoard(Mediaboard::State* state, FuzeHttp::Request req, Cl
 		std::cerr << error_message << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_BOARD))) {
-		return FuzeHttp::Response{
-			.status = http::status::forbidden,
-			.error_message = std::string("Client lacks permission CREATE_BOARD.")
-		};
+	if (new_slug != board->getSlug()) {
+		if (new_slug.length() < 1 || new_slug.length() > Board::MAX_SLUG)
+			return Response{.status = http::status::bad_request, .error_message = std::format("Slug length {} is not between 1 and {}", new_slug.length(), Board::MAX_SLUG)};
+		if (!isValidURLParameter(new_slug)) {
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Slug can only contain alphanumeric characters, '_', or '-'."};
+		}
+		if (state->getBoardIfExists(new_slug)) // Note: board slugs can be enumerated if client has permission to edit board. No real way to avoid this.
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("Board with slug {} already exists. Note: old slug associations are cleared on reboot.", new_slug)};
+		state->setBoardSlug(board->getId(), new_slug);
 	}
-	if (new_slug.length() < 1 || new_slug.length() > Board::MAX_SLUG)
-		return Response{.status = http::status::bad_request, .error_message = std::format("Slug length {} is not between 1 and {}", new_slug.length(), Board::MAX_SLUG)};
 	if (new_title.length() < 1 || new_title.length() > Board::MAX_TITLE)
 		return Response{.status = http::status::bad_request, .error_message = std::format("Title length {} is not between 1 and {}", new_title.length(), Board::MAX_TITLE)};
-	if (!isValidURLParameter(new_slug)) {
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Slug can only contain alphanumeric characters, '_', or '-'."};
-	}
-	if (state->getBoardIfExists(new_slug)) // Note: board slugs can be enumerated if client has permission to edit board. No real way to avoid this.
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = std::format("Board with slug {} already exists. Note: old slug associations are cleared on reboot.", new_slug)};
-	state->setBoardSlug(board.value()->getId(), new_slug);
-	board.value()->setTitle(new_title);
+	board->setTitle(new_title);
 	return FuzeHttp::Response{
 		.status = http::status::created
 	};

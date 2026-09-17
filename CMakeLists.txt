@@ -51,8 +51,6 @@ target_sources(MediaboardServer
   PRIVATE
     main.cpp
     migrations.cpp
-    urls.cpp
-    # views.cpp
   PUBLIC
     FILE_SET CXX_MODULES FILES
       Board.cppm
@@ -62,6 +60,7 @@ target_sources(MediaboardServer
       resolvers.cppm
       State.cppm
       Thread.cppm
+      urls.cppm
       views.cppm
       views_media.cppm
       views_registration.cppm

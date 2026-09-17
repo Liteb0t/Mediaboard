@@ -20,10 +20,12 @@ import FuzeHttp.Utils;
 import Mediaboard.Board;
 import Mediaboard.State;
 import Mediaboard.Message;
+import Mediaboard.URLs;
 
 const std::string current_version = "0.2";
 
 using namespace FuzeHttp;
+using namespace Mediaboard;
 
 std::vector<FuzeHttp::TemplateMacro*> template_macros{
 	new TemplateOption<std::string>("site_name", "Fuze Mediaboard", "Website name shown on tabs and headers."),
@@ -76,6 +78,8 @@ int main(int argc, char* argv[]) {
 		return return_code;
 	std::println("Finished processing options... adding confuig...");
 	server.state->config = state_config;
+	std::println("Finished adding config... adding URLs...");
+	addURLsToController(&server.controller);
 	std::println("Running server...");
 	server.run();
 
