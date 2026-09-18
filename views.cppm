@@ -115,66 +115,46 @@ FuzeHttp::Response editBoard(Mediaboard::State* state, FuzeHttp::Request req, Cl
 	};
 }
 
-FuzeHttp::Response deleteBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->clientHasPermission(client, static_cast<int>(PERMISSION::DELETE_BOARD)))
-		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this board."};
-	board.value()->markAsDeleted();
+FuzeHttp::Response deleteBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client, Board* board) {
+	board->markAsDeleted();
 	return Response{
 		.status = http::status::no_content
 	};
 }
 
-FuzeHttp::Response getBoardPermissions(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug) {
-	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	else if (!board.value()->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_THREAD)))
-		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to view this thread."};
+FuzeHttp::Response getBoardPermissions(Mediaboard::State* state, FuzeHttp::Request req, Board* board) {
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.json = board.value()->getPermissionCollectionsAsJson()
+		.json = board->getPermissionCollectionsAsJson()
 	};
 }
 
-FuzeHttp::Response addBoardGroupPermission(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int group_id) {
+FuzeHttp::Response addBoardGroupPermission(Mediaboard::State* state, FuzeHttp::Request req, Board* board, int group_id) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->clientHasPermissionForGroup(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), group_id))
-		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission manage permissions for this board."};
-	else if (board.value()->permissionCollectionExistsForGroup(group_id))
+	if (!board->clientHasPermissionForGroup(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), group_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this group in this board.."};
+	else if (board->permissionCollectionExistsForGroup(group_id))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Permissions for this group are already set. Use PUT request instead."};
-	board.value()->addGroupPermissionCollection(group_id);
+	board->addGroupPermissionCollection(group_id);
 	return FuzeHttp::Response{
 		.status = http::status::created
 	};
 }
 
-FuzeHttp::Response addBoardUserPermission(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int account_id) {
+FuzeHttp::Response addBoardUserPermission(Mediaboard::State* state, FuzeHttp::Request req, Board* board, int account_id) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
-		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission manage permissions for this thread."};
-	else if (board.value()->permissionCollectionExistsForAccount(account_id))
+	if (!board->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this account in this board."};
+	else if (board->permissionCollectionExistsForAccount(account_id))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Permissions for this account are already set. Use PUT request instead."};
-	board.value()->addAccountPermissionCollection(account_id);
+	board->addAccountPermissionCollection(account_id);
 	return FuzeHttp::Response{
 		.status = http::status::created
 	};
 }
 
-FuzeHttp::Response updateBoardGroupPermissions(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int group_id) {
+FuzeHttp::Response updateBoardGroupPermissions(Mediaboard::State* state, FuzeHttp::Request req, Board* board, int group_id) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
 	boost::json::object request_json;
 	int permission_number, permission_setting;
 	try {
@@ -191,19 +171,16 @@ FuzeHttp::Response updateBoardGroupPermissions(Mediaboard::State* state, FuzeHtt
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Invalid permission number in JSON"};
 	if (permission_setting < 0 || permission_setting >= 3)
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Invalid permission setting in JSON"};
-	if (!board.value()->clientHasPermissionForGroup(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), group_id))
+	if (!board->clientHasPermissionForGroup(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), group_id))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to update permissions for this group."};
-	board.value()->setGroupPermission(group_id, permission_number, static_cast<THREE_STATE_SETTING>(permission_setting));
+	board->setGroupPermission(group_id, permission_number, static_cast<THREE_STATE_SETTING>(permission_setting));
 	return FuzeHttp::Response{
 		.status = http::status::ok
 	};
 }
 
-FuzeHttp::Response updateBoardUserPermissions(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int account_id) {
+FuzeHttp::Response updateBoardUserPermissions(Mediaboard::State* state, FuzeHttp::Request req, Board* board, int account_id) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
 	boost::json::object request_json;
 	int permission_number, permission_setting;
 	try {
@@ -220,39 +197,33 @@ FuzeHttp::Response updateBoardUserPermissions(Mediaboard::State* state, FuzeHttp
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Invalid permission number in JSON"};
 	if (permission_setting < 0 || permission_setting >= 3)
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Invalid permission setting in JSON"};
-	if (!board.value()->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
+	if (!board->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to update permissions for this account."};
-	board.value()->setAccountPermission(account_id, permission_number, static_cast<THREE_STATE_SETTING>(permission_setting));
+	board->setAccountPermission(account_id, permission_number, static_cast<THREE_STATE_SETTING>(permission_setting));
 	return FuzeHttp::Response{
 		.status = http::status::ok
 	};
 }
 
-FuzeHttp::Response deleteBoardGroupPermission(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int group_id) {
+FuzeHttp::Response deleteBoardGroupPermission(Mediaboard::State* state, FuzeHttp::Request req, Board* board, int group_id) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->permissionCollectionExistsForGroup(group_id))
+	if (!board->permissionCollectionExistsForGroup(group_id))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "No permissions set for this group."};
-	if (!board.value()->clientHasPermissionForGroup(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), group_id))
+	if (!board->clientHasPermissionForGroup(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), group_id))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this group."};
-	board.value()->removeGroupPermissionCollection(group_id);
+	board->removeGroupPermissionCollection(group_id);
 	return FuzeHttp::Response{
 		.status = http::status::ok
 	};
 }
 
-FuzeHttp::Response deleteBoardUserPermission(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int account_id) {
+FuzeHttp::Response deleteBoardUserPermission(Mediaboard::State* state, FuzeHttp::Request req, Board* board, int account_id) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->permissionCollectionExistsForAccount(account_id))
+	if (!board->permissionCollectionExistsForAccount(account_id))
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "No permissions set for this account."};
-	if (!board.value()->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
+	if (!board->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this account."};
-	board.value()->removeAccountPermissionCollection(account_id);
+	board->removeAccountPermissionCollection(account_id);
 	return FuzeHttp::Response{
 		.status = http::status::ok
 	};
@@ -274,12 +245,8 @@ FuzeHttp::Response createRoom(Mediaboard::State* state, FuzeHttp::Request req, C
 }
 */
 
-FuzeHttp::Response getRoom(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug, int room_id) {
-	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	auto room = board.value()->getSharedRoomIfExists(room_id);
+FuzeHttp::Response getRoom(Mediaboard::State* state, FuzeHttp::Request req, Board* board, int room_id) {
+	auto room = board->getSharedRoomIfExists(room_id);
 	if (!room)
 		return Response{.status = http::status::not_found, .error_message = std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id)};
 	return FuzeHttp::Response{
@@ -288,20 +255,14 @@ FuzeHttp::Response getRoom(Mediaboard::State* state, FuzeHttp::Request req, std:
 	};
 }
 
-FuzeHttp::Response getRooms(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug) {
-	std::optional<Client> client = state->getClientIfExists(req);
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	// TODO check client permission
-
+FuzeHttp::Response getRooms(Mediaboard::State* state, FuzeHttp::Request req, Board* board) {
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.json = board.value()->getRoomsAsJson()
+		.json = board->getRoomsAsJson()
 	};
 }
 #endif
-FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
+FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req, Client client, Board* board) {
 	boost::json::object thread_json;
 	try {
 		thread_json = boost::json::parse(req.body()).at("thread").as_object();
@@ -311,16 +272,7 @@ FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req,
 		std::cerr << error_message << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
-	if (!state->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_THREAD))) {
-		return FuzeHttp::Response{
-			.status = http::status::forbidden,
-			.error_message = std::string("Client lacks permission CREATE_THREAD.")
-		};
-	}
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (auto thread = board.value()->createThread(thread_json, client.id)) {
+	if (auto thread = board->createThread(thread_json, client.id)) {
 		return FuzeHttp::Response{
 			.status = http::status::created,
 			.headers = {{
@@ -332,7 +284,7 @@ FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req,
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = thread.error()};
 }
 
-FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug) {
+FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, Board* board, Thread* thread) {
 	boost::json::object message_json;
 	int thread_id;
 	try {
@@ -344,35 +296,17 @@ FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req
 		std::cerr << error_message << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->threadExists(thread_id))
-		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
-	if (!board.value()->getThread(thread_id)->clientHasPermission(client, static_cast<int>(PERMISSION::SEND_MESSAGE)))
-		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "User lacks permission SEND_MESSAGE within this thread"};
-
-	if (const auto message = board.value()->createMessage(message_json, client.id)) {
-		state->sendToThread(boost::json::serialize(message.value()->asJson()), board.value(), thread_id);
+	if (const auto message = board->createMessage(message_json, client.id)) {
+		state->sendToThread(boost::json::serialize(message.value()->asJson()), board, thread->getId());
 		return FuzeHttp::Response{.status = http::status::created};
 	}
 	else
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = message.error()};
 }
 
-FuzeHttp::Response deleteMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, std::string board_slug, int thread_id, int message_id_in_thread) {
-	std::optional<Board*> board = state->getBoardIfExistsAndClientHasReadPermission(board_slug, client);
-	if (!board)
-		return Response{.status = http::status::not_found, .error_message = std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug)};
-	if (!board.value()->threadExists(thread_id))
-		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "This thread was not found."};
-	Thread* thread = board.value()->getThread(thread_id);
-	if (!thread->messageExists(message_id_in_thread))
-		return FuzeHttp::Response{.status = http::status::not_found, .error_message = "No such message found in this thread."};
-	if (!thread->clientHasPermission(client, static_cast<int>(PERMISSION::DELETE_POST)) && !thread->getMessage(message_id_in_thread)->clientIsAuthor(client))
-		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to delete this message."};
+FuzeHttp::Response deleteMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, Board* board, Thread* thread, int message_id_in_thread) {
 	if (message_id_in_thread == 0) {
-		board.value()->deleteThread(thread_id);
+		board->deleteThread(thread->getId());
 		return FuzeHttp::Response{.status = http::status::ok};
 	}
 	else {

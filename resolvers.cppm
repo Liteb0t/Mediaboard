@@ -42,7 +42,9 @@ struct BoardResolver<permission> : BoardResolver<PERMISSION::NUMBER_OF_PERMISSIO
 	}
 };
 
+template<PERMISSION permission = PERMISSION::NUMBER_OF_PERMISSIONS>
 struct ThreadResolver : Resolver<State*, Thread*, int, Board*> {
+	virtual std::expected<void, Response> validateExtraPermission(Thread* thread, const std::optional<Client>& client) const {return {};}
 	std::expected<std::any, FuzeHttp::Response> fetch(State* state, int thread_id, Board* board, const std::optional<Client>& client) const override {
 		if (!board->threadExists(thread_id))
 			return std::unexpected(Response{.status = http::status::not_found, .error_message = std::format("Thread {} was not found.", thread_id)});
@@ -54,4 +56,14 @@ struct ThreadResolver : Resolver<State*, Thread*, int, Board*> {
 		return thread;
 	}
 };
-}
+
+template<PERMISSION permission>
+requires (permission != PERMISSION::NUMBER_OF_PERMISSIONS)
+struct ThreadResolver<permission> : ThreadResolver<PERMISSION::NUMBER_OF_PERMISSIONS> {
+	virtual std::expected<void, Response> validateExtraPermission(Thread* thread, const std::optional<Client>& client) const override {
+		if (!thread->clientHasPermission(client, static_cast<int>(permission)))
+			return std::unexpected(Response{.status=http::status::forbidden, .error_message=std::format("Client does not have permission to perform this action on thread `{}`", thread->getId())});
+		return {}; // success
+	}
+};
+} // namespace Mediaboard

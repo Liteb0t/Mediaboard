@@ -1093,15 +1093,8 @@ async function postMessage() {
 		}
 	};
 	console.log(data);
-	const fetch_response = await fetch(`api/board/${state.selected_board.slug}/message`, {method: "POST", body: JSON.stringify(data)});
+	const fetch_response = await fetch(`api/board/${state.selected_board.slug}/thread/${state.selected_thread.id}/message`, {method: "POST", body: JSON.stringify(data)});
 
-	/*
-	const fetch_response = await fetch(window.location.pathname + "api/" + "create_message/", {
-		method: "POST",
-		headers: {"Token": API.getAccountToken()},
-		body: JSON.stringify(data)
-	});
-	*/
 	return fetch_response;
 }
 
