@@ -29,7 +29,7 @@ public:
 			board_id(board_id) {
 		this->cacheAllPermissions();
 		std::print("[Thread] ID: {} \tRetrieving messages from database... ", id);
-		for (auto message_tuple : db->queryRows<std::tuple<int, int, int, int, int, std::string, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, content FROM message WHERE thread_id = $1 AND deleted = FALSE", id)) {
+		for (auto message_tuple : db->queryRows<std::tuple<int, int, int, int, int, std::string, std::optional<std::string>, std::string>>("SELECT id, thread_id, id_in_thread, created_at, author_client_id, author_username, highest_ranked_group_name, content FROM message WHERE thread_id = $1 AND deleted = FALSE", id)) {
 			int message_id = std::get<0>(message_tuple);
 			int thread_id = std::get<1>(message_tuple);
 			int id_in_thread = std::get<2>(message_tuple);
@@ -46,7 +46,7 @@ public:
 					.thumbnail_file_extension = std::get<3>(file_tuple)
 				});
 			}
-			auto message = std::make_unique<Message>(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), message_files);
+			auto message = std::make_unique<Message>(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), std::get<7>(message_tuple), message_files);
 			this->cacheMessage(std::move(message));
 			std::print(", ");
 		}
@@ -56,28 +56,14 @@ public:
 	struct Validated {
 		Message::Validated post_zero_validated;
 	};
-	static std::expected<Thread::Validated, std::string> validateInput(const boost::json::object json) {
-		Validated validated;
-
-		if (auto post_zero_it = json.find("post_zero"); post_zero_it == json.end())
-			return std::unexpected("Missing JSON field: post_zero");
-		else if (!post_zero_it->value().is_object())
-			return std::unexpected("JSON field 'post_zero' must be an object");
-		else {
-			boost::json::object post_zero = post_zero_it->value().as_object();
-			if (auto message = Message::validateInput(post_zero))
-				validated.post_zero_validated = message.value();
-			else
-				return std::unexpected(message.error());
-		}
-		return validated;
-	}
-	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, Validated input, int author_client_id, int board_id, int id)
+	Thread(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, std::unique_ptr<Message>&& post_zero, int author_client_id, int board_id, int id)
 			: PermissionManagedObject(permission_parent, db),
 			board_id(board_id),
 			id(id) {
 		db->query<void>("INSERT INTO thread(id, permission_object_id, board_id) VALUES ($1, $2, $3)", this->id, this->getPermissionObjectId(), this->board_id);
-		this->insertMessage(std::make_unique<Message>(db, input.post_zero_validated, author_client_id, this->id, incrementMessageIdInThread()));
+		this->insertMessage(std::move(post_zero));
+		incrementMessageIdInThread(); // Leftover because we can't change default value of message_id_seq in SQLite
+		// this->insertMessage(std::make_unique<Message>(db, input.post_zero_validated, author_client_id, this->id, incrementMessageIdInThread()));
 	}
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* db);
 	// std::string dumpThread() const;
@@ -109,17 +95,7 @@ public:
 		db->query<void>("UPDATE thread SET message_id_seq = $1 WHERE id = $2", new_message_id_in_thread+1, this->id);
 		return new_message_id_in_thread;
 	}
-	std::expected<Message*, std::string> createMessageFromJson(boost::json::object message_json, int author_client_id) {
-		// message_json.emplace("id_in_thread", incrementMessageIdInThread());
-		auto message_maybe = Message::validateInput(message_json);
-		if (!message_maybe) {
-			return std::unexpected(message_maybe.error());
-		}
-		auto message = std::make_unique<Message>(db, message_maybe.value(), author_client_id, this->id, incrementMessageIdInThread()); // Key is deleted from message_json in its constructor
-		auto message_ptr = insertMessage(std::move(message));
-		return message_ptr;
-	}
-	Message* insertMessage(std::unique_ptr<Message> message) {
+	Message* insertMessage(std::unique_ptr<Message>&& message) {
 		auto message_ptr = message.get();
 		this->reply_count++;
 		this->last_message_created_at = message->createdAt();

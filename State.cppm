@@ -335,7 +335,7 @@ public:
 			std::cout << group_id << ", ";
 			boost::json::object group_json{
 				{"id", group_id},
-				{"name", this->getGroup(group_id)->getName()},
+				{"name", this->getGroupUnlocked(group_id)->getName()},
 				{"heirarchy_editable", i >= group_editable_threshold && (group_id != static_cast<int>(BUILTIN_GROUPS::USERS) && group_id != static_cast<int>(BUILTIN_GROUPS::PUBLIC))},
 				{"permission_editable", i >= group_editable_threshold}
 			};
@@ -365,7 +365,7 @@ public:
 			};
 			boost::json::array user_groups_json;
 			for (const int group_id : this->getOrderedGroupsContainingMemberUnlocked(account_id)) {
-				const Group* group = this->getGroup(group_id);
+				const Group* group = this->getGroupUnlocked(group_id);
 				user_groups_json.emplace_back(boost::json::object{
 					{"id", group->getId()},
 					{"name", group->getName()}
@@ -398,8 +398,153 @@ public:
 			}}
 		};
 	}
-	// void websocketRead (FuzeHttp::WebsocketSession* session) override;
-	void sendToThread (std::string message, Board* board, int thread_id) { // TODO move to Board
+	std::optional<const Group*> getHighestRankGroupForClient(const std::optional<FuzeHttp::Client>& client) const {
+		std::lock_guard<std::mutex> lock(mutex);
+		std::optional<const Group*> group_maybe;
+		if (client && client.value().account_id) {
+			int group_id = this->getOrderedGroupsContainingMemberUnlocked(client.value().account_id.value())[0];
+			group_maybe = this->getGroupUnlocked(group_id);
+		}
+		return group_maybe;
+	}
+	boost::json::object getClientAsJson(const std::optional<Client> client, bool has_cookie) const {
+		boost::json::object client_json = {{
+			{"server_permissions", {
+				{"manage_permissions", this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))}
+				// will be handled by Board-level perms
+				// {"create_thread", state->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_THREAD))},
+				// {"upload_file", state->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))}
+			}},
+			{"has_cookie", has_cookie}
+		}};
+		std::optional<const Group*> group_maybe = getHighestRankGroupForClient(client);
+		if (group_maybe)
+			client_json.emplace("highest_ranked_group", group_maybe.value()->asJson());
+		return client_json;
+	}
+	std::expected<Message*, std::string> createMessage(const boost::json::object message_json, Board* board, const Thread* thread, const FuzeHttp::Client client) {
+		if (auto message_maybe = validateMessageInThread(message_json, board, thread, client); !message_maybe)
+			return std::unexpected(message_maybe.error());
+		else {
+			Message* message = board->createMessage(message_maybe.value(), client.id);
+			sendToThread(boost::json::serialize(message->asJson()), board, thread->getId());
+			return message;
+		}
+	}
+	std::expected<Thread*, std::string> createThread(const boost::json::object thread_json, Board* board, const FuzeHttp::Client client) {
+		if (auto thread_maybe = validateThread(thread_json, board, client); !thread_maybe)
+			return std::unexpected(thread_maybe.error());
+		else
+			return board->createThread(thread_maybe.value(), client.id);
+	}
+	void sendToWebRTC(std::string message);
+	void clearWebsockets();
+	void setBoardSlug(int board_id, const std::string& new_slug) {
+		std::lock_guard<std::mutex> lock(mutex);
+		this->boards.at(board_id)->setSlug(new_slug);
+		this->slug_to_board_id.emplace(new_slug, board_id);
+	}
+
+	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
+	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
+
+	const std::filesystem::path& getMediaLocation() const { return media_location; }
+#ifdef WITH_WEBRTC
+	const std::vector<IceServer> getIceServers() const { return ice_servers; }
+#endif
+private:
+	std::expected<Thread::Validated, std::string> validateThread(const boost::json::object json, const Board* board, const FuzeHttp::Client client) {
+		Thread::Validated validated;
+
+		if (auto post_zero_it = json.find("post_zero"); post_zero_it == json.end())
+			return std::unexpected("Missing JSON field: post_zero");
+		else if (!post_zero_it->value().is_object())
+			return std::unexpected("JSON field 'post_zero' must be an object");
+		else {
+			boost::json::object post_zero = post_zero_it->value().as_object();
+			if (auto message = validateMessage(post_zero, board, client))
+				validated.post_zero_validated = message.value();
+			else
+				return std::unexpected(message.error());
+		}
+		return validated;
+	}
+	std::expected<Message::Validated, std::string> validateMessage(const boost::json::object json, const Board* board, const FuzeHttp::Client client, Message::Validated validated = {}) {
+		if (auto highest_ranked_group_id_it = json.find("highest_ranked_group_id"); highest_ranked_group_id_it != json.end()) {
+			if (!highest_ranked_group_id_it->value().is_int64())
+				return std::unexpected("JSON field 'highest_ranked_group_id' must be an int");
+			if (!client.account_id)
+				return std::unexpected("Including rank in message requires a logged-in user."); // TODO maybe silently skip instead
+			int account_id = client.account_id.value();
+			int highest_ranked_group_id = highest_ranked_group_id_it->value().as_int64();
+			std::lock_guard<std::mutex> lock(permission_mutex);
+			if (!this->groupExistsUnlocked(highest_ranked_group_id))
+				return std::unexpected(std::format("Group with ID {} does not exist", highest_ranked_group_id));
+			const Group* group = this->getGroupUnlocked(highest_ranked_group_id);
+			if (!group->containsMember(account_id))
+				return std::unexpected(std::format("Cannot attach rank because account {} is not in group {}", account_id, highest_ranked_group_id));
+			validated.highest_ranked_group_name = group->getName();
+		}
+
+		if (auto name_it = json.find("name"); name_it == json.end())
+			return std::unexpected("Missing JSON field: name");
+		else if (!name_it->value().is_string())
+			return std::unexpected("JSON field 'name' must be an string");
+		else {
+			validated.name = name_it->value().as_string();
+			if (validated.name.length() > Message::MAX_NAME)
+				return std::unexpected(std::format("Name length {} must be less than {}", validated.name.length(), Message::MAX_NAME));
+		}
+
+		size_t number_of_files;
+		if (auto files_it = json.find("files"); files_it == json.end())
+			return std::unexpected("Missing JSON field: files");
+		else if (!files_it->value().is_array())
+			return std::unexpected("JSON field 'files' must be an array");
+		else {
+			boost::json::array files_json = files_it->value().as_array();
+			number_of_files = files_json.size();
+			if (number_of_files > Message::MAX_NUMBER_OF_FILES)
+				return std::unexpected(std::format("Cannot attach more than {} files", Message::MAX_NUMBER_OF_FILES));
+			for (boost::json::value file_val : files_json) {
+				if (!file_val.is_object())
+					return std::unexpected("file_val must be an object");
+				boost::json::object& file_obj = file_val.as_object();
+				auto file_maybe = File::validateInput(file_obj);
+				if (!file_maybe)
+					return std::unexpected(file_maybe.error());
+				validated.files.push_back(file_maybe.value());
+			}
+		}
+
+		if (auto content_it = json.find("content"); content_it == json.end())
+			return std::unexpected("Missing JSON field: content");
+		else if (!content_it->value().is_string())
+			return std::unexpected("JSON field 'content' must be an string");
+		else {
+			validated.content = content_it->value().as_string();
+			if ((validated.content.length() < 1 && number_of_files == 0) || validated.content.length() > Message::MAX_CONTENT)
+				return std::unexpected(std::format("Content length {} is not between 1 and {}", validated.content.length(), Message::MAX_CONTENT));
+		}
+
+		return validated;
+	}
+	std::expected<Message::Validated, std::string> validateMessageInThread(const boost::json::object json, const Board* board, const Thread* thread, const FuzeHttp::Client client) {
+		Message::Validated validated;
+		if (auto thread_id_it = json.find("thread_id"); thread_id_it == json.end())
+			return std::unexpected("Missing JSON field: thread_id");
+		else if (!thread_id_it->value().is_int64())
+			return std::unexpected("JSON field 'thread_id' must be int64");
+		else {
+			validated.thread_id = thread_id_it->value().as_int64();
+			// if (!board->threadExists(validated.thread_id))
+			// 	return std::unexpected(std::format("Thread {} not found in board {}", validated.thread_id, board->getSlug()));
+			if (validated.thread_id != thread->getId())
+				return std::unexpected(std::format("Thread ID in JSON {} does not match thread ID in URL {}", validated.thread_id, thread->getId()));
+		}
+		return validateMessage(json, board, client, validated);
+	}
+	void sendToThread (std::string message, Board* board, int thread_id) {
 		// Put the message in a shared pointer so we can re-use it for each client
 		auto const ss = std::make_shared<std::string const>(std::move(message));
 
@@ -422,22 +567,6 @@ public:
 				sp->send(ss);
 		}
 	}
-	void sendToWebRTC(std::string message);
-	void clearWebsockets();
-	void setBoardSlug(int board_id, const std::string& new_slug) {
-		std::lock_guard<std::mutex> lock(mutex);
-		this->boards.at(board_id)->setSlug(new_slug);
-		this->slug_to_board_id.emplace(new_slug, board_id);
-	}
-
-	const int client_pwhash_opslimit = 2; // CPU cost for client-side password hashing.
-	const int client_pwhash_memlimit = 128 << 20; // Likewise, memory cost.
-
-	const std::filesystem::path& getMediaLocation() const { return media_location; }
-#ifdef WITH_WEBRTC
-	const std::vector<IceServer> getIceServers() const { return ice_servers; }
-#endif
-private:
 	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png"};
 	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;
 

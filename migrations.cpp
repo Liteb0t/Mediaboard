@@ -32,6 +32,8 @@ std::list<std::unique_ptr<Migration>> State::addMigrations() {
 		"ALTER TABLE _sequences ADD COLUMN board_id INTEGER DEFAULT 1;")));
 	migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2",
 		"CREATE TABLE ice_servers(type TEXT, hostname TEXT, port INTEGER, transport TEXT, shared_secret TEXT)")));
+	migrations.push_back(std::unique_ptr<Migration>(new SQLOnlyMigration("0.2.1",
+		"ALTER TABLE message ADD COLUMN highest_ranked_group_name TEXT")));
 	return migrations;
 }
 }

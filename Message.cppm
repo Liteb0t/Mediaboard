@@ -63,13 +63,14 @@ public:
 class Message {
 public:
 	// Cache message from database
-	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::string content, std::vector<File> files, bool deleted = false)
+	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::optional<std::string> highest_ranked_group_name, std::string content, std::vector<File> files, bool deleted = false)
 			: id(id),
 			thread_id(thread_id),
 			id_in_thread(id_in_thread),
 			created_at(created_at),
 			author_client_id(author_client_id),
 			author_username(author_username),
+			highest_ranked_group_name(highest_ranked_group_name),
 			content(content),
 			files(files),
 			deleted(deleted) {
@@ -81,6 +82,8 @@ public:
 			{"name", author_username},
 			{"content", content}
 		};
+		if (highest_ranked_group_name) // this is like ## JANNY after the name
+			post_as_json.emplace("highest_ranked_group_name", highest_ranked_group_name.value());
 	}
 
 	inline static const size_t MAX_NAME = 32;
@@ -89,60 +92,17 @@ public:
 	// Save message when JSON is received
 	struct Validated {
 		int thread_id;
+		std::optional<std::string> highest_ranked_group_name;
 		// int id_in_thread;
 		std::string name;
 		std::string content;
 		std::vector<File> files;
 	};
-	static std::expected<Message::Validated, std::string> validateInput(const boost::json::object json) {
-		Validated validated;
-		if (auto name_it = json.find("name"); name_it == json.end())
-			return std::unexpected("Missing JSON field: name");
-		else if (!name_it->value().is_string())
-			return std::unexpected("JSON field 'name' must be an string");
-		else {
-			validated.name = name_it->value().as_string();
-			if (validated.name.length() > Message::MAX_NAME)
-				return std::unexpected(std::format("Name length {} must be less than {}", validated.name.length(), Message::MAX_NAME));
-		}
-
-		size_t number_of_files;
-		if (auto files_it = json.find("files"); files_it == json.end())
-			return std::unexpected("Missing JSON field: files");
-		else if (!files_it->value().is_array())
-			return std::unexpected("JSON field 'files' must be an array");
-		else {
-			boost::json::array files_json = files_it->value().as_array();
-			number_of_files = files_json.size();
-			if (number_of_files > MAX_NUMBER_OF_FILES)
-				return std::unexpected(std::format("Cannot attach more than {} files", MAX_NUMBER_OF_FILES));
-			for (boost::json::value file_val : files_json) {
-				if (!file_val.is_object())
-					return std::unexpected("file_val must be an object");
-				boost::json::object& file_obj = file_val.as_object();
-				auto file_maybe = File::validateInput(file_obj);
-				if (!file_maybe)
-					return std::unexpected(file_maybe.error());
-				validated.files.push_back(file_maybe.value());
-			}
-		}
-
-		if (auto content_it = json.find("content"); content_it == json.end())
-			return std::unexpected("Missing JSON field: content");
-		else if (!content_it->value().is_string())
-			return std::unexpected("JSON field 'content' must be an string");
-		else {
-			validated.content = content_it->value().as_string();
-			if ((validated.content.length() < 1 && number_of_files == 0) || validated.content.length() > MAX_CONTENT)
-				return std::unexpected(std::format("Content length {} is not between 1 and {}", validated.content.length(), MAX_CONTENT));
-		}
-
-		return validated;
-	}
 	Message(FuzeDBI::Connection* db, Validated input, int author_client_id, int thread_id, int id_in_thread)
 			: id(db->incrementSequence("message_id")),
 			author_client_id(author_client_id),
 			author_username(input.name.length() == 0 ? "Anonymous" : input.name),
+			highest_ranked_group_name(input.highest_ranked_group_name),
 			content(input.content),
 			thread_id(thread_id),
 			id_in_thread(id_in_thread),
@@ -161,6 +121,10 @@ public:
 		};
 		// save shit to database
 		db->query<void>("INSERT INTO message(id, thread_id, id_in_thread, author_client_id, author_username, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->author_username, time_since_epoch, this->content);
+		if (highest_ranked_group_name) {// this is like ## JANNY after the name
+			post_as_json.emplace("highest_ranked_group_name", highest_ranked_group_name.value());
+			db->query<void>("UPDATE message SET highest_ranked_group_name = $1 WHERE id = $2",  highest_ranked_group_name.value(), id);
+		}
 		this->files_i = 0;
 		for (const File& file : files) {
 			if (file.width && file.height && file.thumbnail_file_extension) {
@@ -206,6 +170,7 @@ private:
 	short files_i;
 	int author_client_id;
 	std::string author_username;
+	std::optional<std::string> highest_ranked_group_name;
 	std::string content;
 	boost::json::object post_as_json;
 	std::chrono::time_point<std::chrono::system_clock> created_at;

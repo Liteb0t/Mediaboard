@@ -247,7 +247,10 @@ private:
 				if (it != self->peers.end()) {
 					if (auto sender = it->second.lock()) {
 						std::println("Requesting keyframe.");
-						sender->video_sending_track->requestKeyframe();
+						if (sender->video_sending_track && sender->video_sending_track->isOpen())
+							sender->video_sending_track->requestKeyframe();
+						else
+							std::println(std::cerr, "[Room::addRelayTrackToRelay] sender->video_sending_track is null or closed for peer {}", it->first);
 					}
 				}
 			});

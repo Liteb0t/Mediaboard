@@ -23,6 +23,7 @@
 			<form id="post_form" name="post" action="" autocomplete="post">
 			<div class="ToolBar">
 			<input type="text" id="name_field" class="Username" tabindex="1" name="username" placeholder="Username" maxlength="CONFIG_post_max_name" />
+			<div id="highest_ranked_group_container"><input id="highest_ranked_group_checkbox" type="checkbox"><label id="highest_ranked_group_label" for="highest_ranked_group_checkbox"></label></div>
 			<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned Button" onclick="postAction()">
 			</div>
 			<div contenteditable="plaintext-only" id="content_field" class="Content" tabindex="1" placeholder="Content"></div>
@@ -111,6 +112,11 @@ main {
 
 	.Username {
 		font-family: var(--name-font);
+	}
+	.UserRank {
+		font-family: var(--name-font);
+		color: var(--information-text);
+		padding-left: 0.5em;
 	}
 	.Timestamp {
 		float: right;
@@ -520,6 +526,14 @@ function createPost(data, client_permissions) {
 		let post_name_element = document.createElement("b");
 		post_name_element.classList.add("Username");
 		post_name_element.textContent = data.name;
+		post_header_element.appendChild(post_name_element);
+
+		if (data.highest_ranked_group_name) {
+			let user_rank_element = document.createElement("span");
+			user_rank_element.classList.add("UserRank");
+			user_rank_element.textContent = data.highest_ranked_group_name;
+			post_header_element.appendChild(user_rank_element);
+		}
 
 		let post_timestamp_element = document.createElement("time");
 		let post_date = new Date(data["created_at"] * 1000 - timezone_offset_seconds * 1000).toISOString();;
@@ -538,7 +552,6 @@ function createPost(data, client_permissions) {
 		}
 		post_id_element.textContent = post_id;
 
-		post_header_element.append(post_name_element /*, flex_separator.cloneNode()*/);
 		const right_aligned_toolbar_group = document.createElement("div");
 		right_aligned_toolbar_group.classList.add("ToolBar", "RightAligned");
 
@@ -730,6 +743,14 @@ function updateReplyContainer(selected_thread_id, permissions) {
 		else {
 			reply_container.style["display"] = "none";
 		}
+	}
+	if (state.highest_ranked_group) {
+		highest_ranked_group_container.style["display"] = "inherit";
+		highest_ranked_group_label.textContent = state.highest_ranked_group.name;
+	}
+	else {
+		highest_ranked_group_container.style["display"] = "none";
+		highest_ranked_group_checkbox.checked = false;
 	}
 	file_upload_fieldset.style["display"] = permissions["upload_file"] === true ? "inherit" : "none";
 }
@@ -1081,17 +1102,21 @@ async function postAction() {
 	}
 }
 
+function gatherPostData(thread_id = null) {
+	let data = {
+		name: name_field.value,
+		content: content_field.innerText.trim(),
+		files: getFiles()
+	};
+	if (thread_id !== null) data.thread_id = thread_id;
+	if (highest_ranked_group_checkbox.checked && state.highest_ranked_group)
+		data.highest_ranked_group_id = state.highest_ranked_group.id;
+	return data;
+}
+
 async function postMessage() {
 	console.log("posting message...");
-	let files = getFiles();
-	const data = {
-		post: {
-			name: name_field.value,
-			content: content_field.innerText.trim(),
-			files: files,
-			thread_id: state.selected_thread.id
-		}
-	};
+	const data = gatherPostData(state.selected_thread.id);
 	console.log(data);
 	const fetch_response = await fetch(`api/board/${state.selected_board.slug}/thread/${state.selected_thread.id}/message`, {method: "POST", body: JSON.stringify(data)});
 
@@ -1109,11 +1134,7 @@ async function postThread() {
 	let files = getFiles();
 	const data = {
 		thread: {
-			post_zero: {
-				name: name_field.value,
-				content: content_field.innerText.trim(),
-				files: files
-			}
+			post_zero: gatherPostData()
 		}
 	};
 	console.log(data)
@@ -1133,6 +1154,7 @@ async function getClientInfo() {
 					displayClientAsLoggedOut();
 				}
 				state.server_permissions = response_json["server_permissions"];
+				state.highest_ranked_group = response_json["highest_ranked_group"];
 				window.history.replaceState(state, null, ""); // Initial state
 				// manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
 				console.log(state);

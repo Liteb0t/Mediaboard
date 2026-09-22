@@ -268,7 +268,7 @@ FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req,
 		std::cerr << error_message << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
-	if (auto thread = board->createThread(thread_json, client.id)) {
+	if (auto thread = state->createThread(thread_json, board, client)) {
 		return FuzeHttp::Response{
 			.status = http::status::created,
 			.headers = {{
@@ -282,22 +282,18 @@ FuzeHttp::Response createThread(Mediaboard::State* state, FuzeHttp::Request req,
 
 FuzeHttp::Response createMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, Board* board, Thread* thread) {
 	boost::json::object message_json;
-	int thread_id;
 	try {
-		message_json = boost::json::parse(req.body()).at("post").as_object();
-		thread_id = message_json.at("thread_id").as_int64();
+		message_json = boost::json::parse(req.body()).as_object();
 	}
 	catch(const std::exception& e) {
 		std::string error_message = std::format("[createMessage] JSON error: {}", e.what());
 		std::cerr << error_message << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
-	if (const auto message = board->createMessage(message_json, client.id)) {
-		state->sendToThread(boost::json::serialize(message.value()->asJson()), board, thread->getId());
+	if (const auto message_maybe = state->createMessage(message_json, board, thread, client))
 		return FuzeHttp::Response{.status = http::status::created};
-	}
 	else
-		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = message.error()};
+		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = message_maybe.error()};
 }
 
 FuzeHttp::Response deleteMessage(Mediaboard::State* state, FuzeHttp::Request req, Client client, Board* board, Thread* thread, int message_id_in_thread) {
@@ -614,7 +610,7 @@ FuzeHttp::Response addGroupsToUser(Mediaboard::State* state, FuzeHttp::Request r
 		}
 	}
 	catch(const std::exception& e) {
-		std::string error_message = std::format("[createMessage] JSON error: {}", e.what());
+		std::string error_message = std::format("[addGroupsToUser] JSON error: {}", e.what());
 		std::cerr << error_message << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
@@ -648,7 +644,7 @@ FuzeHttp::Response updateIceServers(Mediaboard::State* state, FuzeHttp::Request 
 		ice_servers_json = boost::json::parse(req.body()).as_object().at("ice_servers").as_array();
 	}
 	catch(const std::exception& e) {
-		std::string error_message = std::format("[createMessage] JSON error: {}", e.what());
+		std::string error_message = std::format("[updateIceServers] JSON error: {}", e.what());
 		std::cerr << error_message << std::endl;
 		return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
 	}
@@ -772,22 +768,9 @@ FuzeHttp::Response deleteServerUserPermission(Mediaboard::State* state, FuzeHttp
 
 FuzeHttp::Response client(Mediaboard::State* state, FuzeHttp::Request req) {
 	std::optional<Client> client = state->getClientIfExists(req);
-	// if (client) {
-	// 	std::cout << "CLIENT FOUND ";
-	// 	if (client.value().account_id)
-	// 		std::cout << "ACCOUNT_ID FOUND ";
-	// }
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.json = {{
-			{"server_permissions", {
-				{"manage_permissions", state->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))}
-				// will be handled by Board-level perms
-				// {"create_thread", state->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_THREAD))},
-				// {"upload_file", state->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))}
-			}},
-			{"has_cookie", req.find("Cookie") != req.end()}
-		}}
+		.json = state->getClientAsJson(client, req.find("Cookie") != req.end())
 	};
 }
 

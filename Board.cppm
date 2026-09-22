@@ -146,37 +146,33 @@ public:
 		});
 	}
 #endif
-	std::expected<Thread*, std::string> createThread(boost::json::object thread_json, int author_client_id) {
+	Thread* createThread(Thread::Validated validated_thread, int author_client_id) {
 		// int new_thread_id_in_board = db->query<int>("SELECT thread_id_seq FROM board WHERE id = $1", this->id);
 		// db->query<void>("UPDATE board SET thread_id_seq = $1 WHERE id = $2", new_thread_id_in_board+1, this->id);
-		auto validated = Thread::validateInput(thread_json);
-		if (!validated)
-			return std::unexpected(validated.error());
+		std::lock_guard<std::mutex> board_lock(mutex);
 		int new_thread_id = db->incrementSequence("thread_id");
-		auto thread = std::make_unique<Thread>(this, db, validated.value(), author_client_id, this->id, new_thread_id);
+		auto post_zero = std::make_unique<Message>(db, validated_thread.post_zero_validated, author_client_id, new_thread_id, 0);
+		auto thread = std::make_unique<Thread>(this, db, std::move(post_zero), author_client_id, this->id, new_thread_id);
 		// int new_thread_id = thread->getId();
 		Thread* thread_ptr = thread.get();
-		{
-			std::lock_guard<std::mutex> lock(mutex);
-			this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count(), new_thread_id));
-			this->threads.emplace(new_thread_id, std::move(thread));
-		}
+		this->ordered_threads.insert(std::make_pair(std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count(), new_thread_id));
+		this->threads.emplace(new_thread_id, std::move(thread));
 		return thread_ptr;
 	}
-	std::expected<Message*, std::string> createMessage(boost::json::object message_json, int author_client_id) {
-		int thread_id = message_json["thread_id"].as_int64();
+	Message* createMessage(Message::Validated validated_message, int author_client_id) {
 		std::lock_guard<std::mutex> board_lock(mutex);
-		Thread* thread = this->getThread(thread_id);
+		Thread* thread = this->getThread(validated_message.thread_id);
 		std::lock_guard<std::mutex> thread_lock(thread->mutex);
 		std::time_t old_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
 		int new_post_id;
-		auto message_maybe = thread->createMessageFromJson(message_json, author_client_id);
-		if (!message_maybe)
-			return std::unexpected(message_maybe.error());
+
+		auto message = std::make_unique<Message>(db, validated_message, author_client_id, thread->getId(), thread->incrementMessageIdInThread()); // Key is deleted from message_json in its constructor
+		auto message_ptr = thread->insertMessage(std::move(message));
+
 		std::time_t new_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
-		this->ordered_threads.erase(std::make_pair(old_message_time, thread_id));
-		this->ordered_threads.insert(std::make_pair(new_message_time, thread_id));
-		return message_maybe;
+		this->ordered_threads.erase(std::make_pair(old_message_time, validated_message.thread_id));
+		this->ordered_threads.insert(std::make_pair(new_message_time, validated_message.thread_id));
+		return message_ptr;
 	}
 	std::chrono::time_point<std::chrono::system_clock> getLastPostTime() const {
 		return this->threads.at(this->ordered_threads.begin()->second)->getLastMessageTime();
