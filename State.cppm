@@ -402,8 +402,10 @@ public:
 		std::lock_guard<std::mutex> lock(mutex);
 		std::optional<const Group*> group_maybe;
 		if (client && client.value().account_id) {
-			int group_id = this->getOrderedGroupsContainingMemberUnlocked(client.value().account_id.value())[0];
-			group_maybe = this->getGroupUnlocked(group_id);
+			auto groups = this->getOrderedGroupsContainingMemberUnlocked(client.value().account_id.value());
+			std::println("[getHighestRankGroupForClient] number of groups: {}", groups.size());
+			if (groups.size() >= 1)
+				group_maybe = this->getGroupUnlocked(groups[0]);
 		}
 		return group_maybe;
 	}
