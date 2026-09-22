@@ -6,7 +6,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
 		<link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
-		<link rel="stylesheet" href=FILE_"static/styles.css">
+		<link rel="stylesheet" href="FILE_"static/styles.css"">
 	</head>
 	<body>
 		<main>
@@ -14,7 +14,9 @@
 #include "include/navbar.html"
 			<h3 id="location_indicator">List of boards</h3>
 			<div id="board_list_container"></div>
-			<a id="create_board_button" href="create_board.html" style="display: none">Create board</a>
+			<a id="create_board_button" href="create_board.html" style="display: none" class="Button">Create board</a>
+			<a href="board/g/" data-navigo>To board</a>
+			<div id="view_container"></div>
 		</main>
 		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="error_dialog" closedby="any">
@@ -28,16 +30,41 @@
 	</body>
 <style>
 </style>
+<script src="static/navigo.min.js"></script>
 <script>
 "use strict";
+const router = new Navigo('/', { hash: true });
+router.on(() => {
+	console.log("ROOT opened");
+});
+router.on("/boards", () => {
+	console.log("/boards/ opened");
+});
+router.on("/board/:board_slug", ({data}) => {
+	console.log(data);
+	getBoardTree();
+	// TODO load board.template.html into shadow DOM
+	// URL will be /#/board/g (hash-based routing)
+});
+router.resolve();
 loading_dialog.showModal();
-// const localDate = new Date();
-// const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
+const localDate = new Date();
+const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 const flex_separator = document.createElement("div");
 flex_separator.classList.add("FlexSeparator");
 let state = {
 	server_permissions: {}
 };
+async function getBoardTree() {
+	const response = await fetch("board.html");
+    if (!response.ok) {
+      throw new Error(`Response status: ${response.status}`);
+    }
+
+    const result = await response.text();
+	view_container.innerHTML = result;
+	console.log(result);
+}
 
 // For embedding Mediaboard within a webpage using an <iframe>.
 // Hides everything except messages.
@@ -91,7 +118,7 @@ function showAllBoards(response_json) {
 	const fragment = new DocumentFragment();
 	const table_element = document.createElement("table");
 	const headers_element = document.createElement("tr");
-	["slug", "title"].forEach((column_name) => {
+	["Slug", "Title", "Last post time"].forEach((column_name) => {
 		let header = document.createElement("th");
 		header.textContent = column_name;
 		headers_element.append(header);
@@ -105,25 +132,35 @@ function showAllBoards(response_json) {
 			col.textContent = board[column_name];
 			board_element.append(col);
 		});
-		board_element.append(flex_separator.cloneNode());
-		let col = document.createElement("td");
-		// if (board.client_permissions.manage_permissions) {
-		// 	const manage_permissions_link = document.createElement("a");
-		// 	manage_permissions_link.href = `manage_permissions.html?location=/board/${board.slug}`;
-		// 	manage_permissions_link.textContent = "Manage permissions";
-		// 	col.append(manage_permissions_link, document.createTextNode(" :: "));
-		// }
-		if (board["client_permissions"]["create_board"]) {
-			const edit_board_link = document.createElement("a");
-			edit_board_link.href = `edit_board.html?board=${board.slug}`;
-			edit_board_link.textContent = "Edit";
-			col.append(edit_board_link, document.createTextNode(" :: "));
+		{
+			let col = document.createElement("td");
+			let post_timestamp_element = document.createElement("time");
+			let post_date = new Date(board["last_post_time"] * 1000 - timezone_offset_seconds * 1000).toISOString();;
+			post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
+			post_timestamp_element.textContent = post_date;
+			col.appendChild(post_timestamp_element);
+			board_element.append(col);
 		}
-		const board_link = document.createElement("a");
-		board_link.href = `board.html?board=${board.slug}`;
-		board_link.textContent = "Open";
-		col.append(board_link);
-		board_element.append(col);
+		{
+			let col = document.createElement("td");
+			// if (board.client_permissions.manage_permissions) {
+			// 	const manage_permissions_link = document.createElement("a");
+			// 	manage_permissions_link.href = `manage_permissions.html?location=/board/${board.slug}`;
+			// 	manage_permissions_link.textContent = "Manage permissions";
+			// 	col.append(manage_permissions_link, document.createTextNode(" :: "));
+			// }
+			if (board["client_permissions"]["create_board"]) {
+				const edit_board_link = document.createElement("a");
+				edit_board_link.href = `edit_board.html?board=${board.slug}`;
+				edit_board_link.textContent = "Edit";
+				col.append(edit_board_link, document.createTextNode(" :: "));
+			}
+			const board_link = document.createElement("a");
+			board_link.href = `board.html?board=${board.slug}`;
+			board_link.textContent = "Open";
+			col.append(board_link);
+			board_element.append(col);
+		}
 
 		// const slug_element = document.createElement("td");
 		// slug_element.textContent = board.slug;

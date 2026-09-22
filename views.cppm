@@ -31,14 +31,11 @@ FuzeHttp::Response showDocument(Mediaboard::State* state, FuzeHttp::Request req)
 	};
 }
 
-// FuzeHttp::Response showBoardPage(Mediaboard::State* state, FuzeHttp::Request req, std::string board_slug) {
-// 	std::string target = std::string(FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target())).substr(1));
-// 	return {
-// 		.status = http::status::ok,
-// 		// .headers = {return_headers},
-// 		.file = state->getDocumentRoot() / "index.html"
-// 	};
-// }
+FuzeHttp::Response showMainPage(Mediaboard::State* state, FuzeHttp::Request req) {
+	return {.status = http::status::ok,
+		.file = state->getDocumentRoot()
+	};
+}
 
 FuzeHttp::Response createBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client) {
 	bool make_public;
@@ -116,10 +113,9 @@ FuzeHttp::Response editBoard(Mediaboard::State* state, FuzeHttp::Request req, Cl
 }
 
 FuzeHttp::Response deleteBoard(Mediaboard::State* state, FuzeHttp::Request req, Client client, Board* board) {
+	// permission to delete board has been checked by the Resolver
 	board->markAsDeleted();
-	return Response{
-		.status = http::status::no_content
-	};
+	return Response{.status = http::status::no_content};
 }
 
 FuzeHttp::Response getBoardPermissions(Mediaboard::State* state, FuzeHttp::Request req, Board* board) {

@@ -158,3 +158,16 @@ dialog {
 		align-self: center;
 	}
 }
+table {
+	border: 2px solid #ddd;
+	border-collapse: collapse;
+	margin: 1em 0;
+	th {
+		background-color: #ddd;
+		padding: 0.25em 0.5em;
+	}
+	td {
+		border: 2px solid #ddd;
+		padding: 0.5em;
+	}
+}

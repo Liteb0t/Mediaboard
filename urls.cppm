@@ -22,6 +22,7 @@ void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 	// Client{} is used when the function needs to identify the user via a cookie.
 	controller->addPatterns()
 	(verb::get, showDocument,						"*")
+	(verb::get, showMainPage,						"boards")
 	(verb::post, createBoard, Client{},				"api", "board")
 	(verb::get, getBoards,							"api", "boards")
 	(verb::get, getBoard, 							"api", "board", BoardResolver{})

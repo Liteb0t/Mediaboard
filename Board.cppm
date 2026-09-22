@@ -105,6 +105,7 @@ public:
 			{"id", id},
 			{"slug", slug},
 			{"title", title},
+			{"last_post_time", this->getLastPostEpoch()},
 			{"client_permissions", {
 				{"manage_permissions", this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))},
 				{"create_board", this->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_BOARD))},
@@ -176,6 +177,12 @@ public:
 		this->ordered_threads.erase(std::make_pair(old_message_time, thread_id));
 		this->ordered_threads.insert(std::make_pair(new_message_time, thread_id));
 		return message_maybe;
+	}
+	std::chrono::time_point<std::chrono::system_clock> getLastPostTime() const {
+		return this->threads.at(this->ordered_threads.begin()->second)->getLastMessageTime();
+	}
+	std::time_t getLastPostEpoch() const {
+		return std::chrono::duration_cast<std::chrono::seconds>(this->getLastPostTime().time_since_epoch()).count();
 	}
 	void deleteThread(int thread_id) {
 		std::lock_guard<std::mutex> lock(mutex);

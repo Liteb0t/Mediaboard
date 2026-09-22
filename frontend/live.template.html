@@ -17,7 +17,14 @@
 			</p>
 			<button id="create_room_button">Create room</button><br>
 			<h4>Rooms</h4>
-			<ul id="room_list" class="MetroList"></ul>
+			<table>
+  <thead>
+    <tr>
+      <th>Room ID</th>
+      <th>Peers</th>
+    </tr>
+  </thead>
+  <tbody id="room_list"></tbody></table>
 		</div>
 #include "room.html"
 	</main>
@@ -121,21 +128,23 @@ function showAllRooms(message_json) {
 	for (let room of message_json.rooms) {
 		// console.log(thread.id);
 		// console.log(thread.post_zero);
-			let room_element = document.createElement("li");
-			room_element.classList.add("ToolBar", "WithBorders");
+			let room_element = document.createElement("tr");
 			room_element.id = `room_${room.id}`;
 			// Toolbar at the bottom of each thread
 			const id_indicator = document.createElement("span");
-			id_indicator.textContent = `Room ${room.id}`;
+			id_indicator.textContent = room_element.id;
 			const number_of_peers = document.createElement("span");
 			number_of_peers.innerHTML = `<b>${room.number_of_peers}</b>&nbsp;connected`;
 			const connect_button = document.createElement("button");
-			connect_button.classList.add("ToolBarButton", "RightAligned");
 			connect_button.textContent = "Connect";
 			connect_button.onclick = () => {
 				connectClientToRoom(room.id);
 			}
-			room_element.append(id_indicator, number_of_peers, connect_button);
+			[id_indicator, number_of_peers, connect_button].forEach(element => {
+				const cell = document.createElement("td");
+				cell.appendChild(element);
+				room_element.appendChild(cell);
+			})
 
 			fragment.appendChild(room_element);
 	}
