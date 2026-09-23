@@ -275,5 +275,7 @@ Update submodules to the latest commit:<br>
 Dump PostgreSQL database:<br>
 <code>pg_dump fuze_mediaboard &gt; mediaboard_dump.sql</code><br>
 Restore PostgreSQL database backup:<br>
-<code>psql -X --set ON_ERROR_STOP=on fuze_mediaboard &lt; mediaboard_dump.sql</code>
+<code>psql -X --set ON_ERROR_STOP=on fuze_mediaboard &lt; mediaboard_dump.sql</code><br>
+<code>git config pull.recurseSubmodules true</code> - On git pull, update submodules to their specified commit<br>
+<code>cmake -B build -DFUZEDBI_USE_POSTGRES=ON -DWITH_MAGICK=ON -DWITH_WEBRTC=ON -G Ninja -DCMAKE_BUILD_TYPE=Release</br> - Full fat build
 </p>

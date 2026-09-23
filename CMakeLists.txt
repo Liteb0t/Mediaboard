@@ -62,6 +62,8 @@ target_sources(MediaboardServer
       State.cppm
       Thread.cppm
       urls.cppm
+      urls_media.cppm
+      urls_registration.cppm
       views.cppm
       views_media.cppm
       views_registration.cppm

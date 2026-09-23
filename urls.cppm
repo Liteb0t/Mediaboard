@@ -1,29 +1,29 @@
 // Copyright (c) 2026, Fuze.page
 // Fuze Human-oriented License v1
 module;
-#include <beast.hpp>
+#include <boost/beast/http.hpp>
 export module Mediaboard.URLs;
-// #include "views.hpp"
-// #include "views_media.hpp"
-// #include "views_registration.hpp"
+import :media;
+import :registration;
+
 import FuzeHttp.Controller;
 import Mediaboard.Permission;
 import Mediaboard.Resolvers;
 import Mediaboard.State;
 import Mediaboard.Views;
-import Mediaboard.Views_media;
-import Mediaboard.Views_registration;
 
 using namespace FuzeHttp;
-using namespace beast::http;
+using namespace boost::beast::http;
 
 export namespace Mediaboard {
 void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 	// C-style strings are immutable parts of the URL, and strings/ints are variables passed into the view.
 	// Client{} is used when the function needs to identify the user via a cookie.
+	addMediaURLsToController(controller);
+	addRegistrationURLsToController(controller);
+	// board patterns
 	controller->addPatterns()
-	(verb::get, showDocument,						"*")
-	(verb::get, showMainPage,						"boards")
+	// (verb::get, showMainPage,						"boards")
 	(verb::post, createBoard, Client{},				"api", "board")
 	(verb::get, getBoards,							"api", "boards")
 	(verb::get, getBoard, 							"api", "board", BoardResolver{})
@@ -53,6 +53,10 @@ void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 	(verb::put, updateThreadUserPermissions,		"api", "board", std::string{}, "thread", int(), "permissions", "user", int())
 	(verb::delete_, deleteThreadUserPermission,		"api", "board", std::string{}, "thread", int(), "permissions", "user", int())
 	(verb::get, getThreads, 						"api", "board", std::string{}, "threads")
+	;
+	// other
+	controller->addPatterns()
+	(verb::get, showDocument,						"*")
 	(verb::post, createGroup,						"api", "create_group") // TODO move to server/permissions
 	(verb::delete_, deleteGroup,					"api", "group", int())
 	(verb::delete_, removeMemberFromGroup,			"api", "group", int(), "member", int())
@@ -73,17 +77,7 @@ void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 	(verb::post, addGroupsToUser,					"api", "user", int(), "add_groups") // TODO move to server/permissions
 	(verb::get, client, 							"api", "user", "client")
 	(verb::get, getUsers,							"api", "users")
-	(verb::post, uploadFile,						"api", "upload")
 	(verb::get, acceptInvite,						"invite", std::string())
-	(verb::get, getMedia,							"media", std::string())
-	(verb::get, getThumbnail,						"media", "thumbnails", std::string())
-
-	(verb::post, requestNewAccountParameters, 		"registration", "request_new_account_parameters")
-	(verb::post, createNewAccount,  				"registration", "create_new_account")
-	(verb::post, requestLoginParameters,  			"registration", "request_login_parameters")
-	(verb::post, login, 							"registration", "login")
-	(verb::post, logout,							"registration", "logout")
-	(verb::post, changePassword,					"registration", "change_password")
 	;
 }
-}
+} // export namespace Mediaboard
