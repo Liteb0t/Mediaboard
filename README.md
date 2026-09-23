@@ -1,5 +1,5 @@
 <h1><img src="https://fuze.page/static/fuze-min-hover.png" style="max-width: 100%;" width="94" height="45" alt="FUZE"> Mediaboard</h1>
-Version <b>0.2</b><br>
+Version <b>0.2.1</b><br>
 View: <a href="https://github.com/Liteb0t/Mediaboard">Git</a>, <a href="https://fuze.page/software/mediaboard/documentation/">Documentation</a>, <a href="https://fuze.page/software/mediaboard/">Overview</a><br>
 <p>
 	<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard</a> is a self-hosted multimedia messaging platform, running on the <a href="https://github.com/Liteb0t/FuzeHttp">FuzeHttp</a> framework. It is written for humans, by humans.
@@ -140,11 +140,19 @@ Changes made to <code>config.ini</code> are read when the server starts. These o
 	Configure with <code>-DWITH_MAGICK=ON</code>.<br>
 	Note: To build without ImageMagick, add <code>-D WITH_MAGICK=OFF</code> instead to the <code>CMake -B</code> command.
 </p>
-<strong>ImageMagick may use significant amounts of memory, which can crash the program if system memory runs out. To set memory limits add these environment variables:</strong>
+<details><summary><h4>Using ImageMagick on a resource-constrained server</h4></summary>
+<p>
+<strong>ImageMagick may use significant amounts of memory, which can crash the program if system memory runs out.<br>
+To set memory limits at runtime add these environment variables:</strong>
 <pre class="notranslate"><code>MAGICK_MEMORY_LIMIT=512MiB
 MAGICK_MAP_LIMIT=1GiB
 MAGICK_DISK_LIMIT=2GiB
 </code></pre>
+Adjust depending on requirements.<br>
+<br>
+At build-time, you can configure with these options:
+<code>--with-quantum-depth=8</code>&nbsp;number of bits in a pixel quantum (default 16)<br>
+<code>--with-cache=THRESHOLD</code>&nbsp;set pixel cache memory threshold (default available memory)
 </p>
 <h2>Optional: WebRTC Live Rooms</h2>
 <p>
@@ -200,7 +208,7 @@ MAGICK_DISK_LIMIT=2GiB
 <p>
 	Contributions from any human are welcome. You are invited to use <a href="https://fuze.page/mediaboard/">Fuze.page Mediaboard</a> for any questions/discussion, or to e-mail me privately at <a href="mailto:mash@fuze.page">mash@fuze.page</a>.
 </p>
-<h3>AI policy</h3>
+<h3>AI glasnost</h3>
 <p>
 AI usage is not principally rejected, but any generated code must be marked with comments indicating the start and end of each AI-assisted section.
 <details>
@@ -244,7 +252,13 @@ AI usage is not principally rejected, but any generated code must be marked with
     # [AI glasnost] end AI-assisted section
   else()</code></pre>
 </details>
-<br>
+The following source files contain snippets of AI-generated code:
+<ul>
+	<li>CMakeLists.txt</li>
+	<li>MediaboardWebsocketSession.cppm</li>
+	<li>Room.cppm</li>
+	<li>dependencies/FuzeHttp/source/ViewPath.hpp</li>
+</ul>
 AI should not be used to make media assets (icons, sounds etc), period. Neither should it be used to generate documentation. Aside from that, feel free to use AI to help understand the code, find bugs, and receive guidance on solutions. Refer to the Fuze Human-oriented License for more info.
 </p>
 <h3>Creating an AppImage</h3>

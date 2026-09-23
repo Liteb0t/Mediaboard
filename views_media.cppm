@@ -145,6 +145,7 @@ FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 		try {
 			Magick::Image thumbnail;
 			if (create_thumbnail_for_image) {
+				std::print("Creating image thumnbail...");
 				thumbnail.read(out_file_path.string());
 				if (file_mime_type != "image/svg+xml") { // stripping image messes up svg files
 					Magick::Image image;
@@ -165,8 +166,10 @@ FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 				}
 			}
 			else {
+				std::print("Creating video thumnbail...");
 				thumbnail.read(std::format("{}[0]", out_file_path.string())); // read the first frame into ImageMagick ffmpeg delegate
 			}
+			std::println(" sizing...");
 			const Magick::Geometry size = thumbnail.size();
 			image_width = size.width();
 			image_height = size.height();
@@ -185,7 +188,9 @@ FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 			}
 			thumbnail.resize(thumbnail_dimensions);
 			thumbnail.quality(60);
+			std::print(" writing...");
 			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->config.thumbnail_file_extension));
+			std::println(" done.");
 			uploaded_file_has_thumbnail = true;
 			if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
 				std::filesystem::remove(out_file_path);

@@ -117,7 +117,7 @@ private:
 				// int new_room_id = board.value()->createRoom(this);
 
 				int new_room_id = board.value()->room_id_seq++;
-				auto room = std::make_shared<Room>(new_room_id/*, this->getExecutor()*/);
+				auto room = std::make_shared<Room>(getState(), new_room_id/*, this->getExecutor()*/);
 				this->tracking_room_ptr = room;
 				board.value()->rooms.emplace(new_room_id, room);
 				this->send({
@@ -145,9 +145,8 @@ private:
 				if (!tracking_room_ptr)
 					throw std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id);
 
-				this->own_peer_ptr = std::make_shared<RtcPeer>();
 				this->own_connection_id = tracking_room_ptr.value()->connection_id_counter++;
-				own_peer_ptr.value()->client_id = getClient() ? getClient()->id : -1;
+				this->own_peer_ptr = std::make_shared<RtcPeer>(own_connection_id, getClient());
 				own_peer_ptr.value()->send_message = [this](boost::json::object payload) { this->send(std::move(payload)); };
 				own_peer_ptr.value()->connection = std::make_shared<rtc::PeerConnection>(getRtcConfig());
 
@@ -260,9 +259,7 @@ private:
 			else if (request_type == "webrtc_sharing_status_update") {
 				if (!own_peer_ptr)
 					throw "No WebRTC peer associated with this session";
-				own_peer_ptr.value()->desktop_audio_sharing_enabled = buffer_as_json.at("payload").at("desktop_audio_sharing_enabled").as_bool();
-				own_peer_ptr.value()->mic_sharing_enabled = buffer_as_json.at("payload").at("mic_sharing_enabled").as_bool();
-				own_peer_ptr.value()->video_sharing_enabled = buffer_as_json.at("payload").at("video_sharing_enabled").as_bool();
+				this->own_peer_ptr.value()->updateStatusFromJson(buffer_as_json.at("payload").as_object());
 				this->tracking_room_ptr.value()->broadcastPeerList(this->own_connection_id, Room::ACTION::UPDATE);
 			}
 #endif

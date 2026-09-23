@@ -9,7 +9,7 @@
 	<button id="room_share_button" disabled>Share video</button>
 	</fieldset>
 	<h3>Peers</h3>
-	<div id="peers_list_container"><table><thead><tr><th>connection_id</th><th>client_id</th><th>mic</th><th>video</th></tr></thead><tbody id="peers_list"></tbody></table></div>
+	<div id="peers_list_container"><table><thead><tr><th>Peer ID</th><th>Name</th><th>Sharing audio</th><th>Sharing video</th></tr></thead><tbody id="peers_list"></tbody></table></div>
 	<div id="voice_chat_container"></div>
 	<div id="video_container" class="LiveVideoContainer"></div>
 </div>
@@ -18,6 +18,8 @@
 class PeerMedia {
 	constructor() {
 		this.audio_elements = {}; // keyed by MID because sender can send multiple audio tracks
+		this.video_element = null;
+		this.video_track = null;
 	}
 	setAudio(event, mid) {
 		const audio_element = document.createElement("audio");
@@ -27,13 +29,31 @@ class PeerMedia {
 		this.audio_elements[mid] = audio_element;
 		return this.audio_elements[mid];
 	}
-	setVideo(event) {
-		this.video_element = document.createElement("video");
-		this.video_element.autoplay = true;
-		this.video_element.playsInline = true;
-		this.video_element.srcObject = new MediaStream([event.track]);
+	showVideo(on_track_event = null) {
+		if (this.video_element)
+			return;
+		if (on_track_event) {
+			this.video_track = on_track_event.track;
+		}
+		if (this.video_track) {
+			this.video_element = document.createElement("video");
+			this.video_element.autoplay = true;
+			this.video_element.playsInline = true;
+			this.video_element.srcObject = new MediaStream([this.video_track]);
+			video_container.appendChild(this.video_element);
+		}
+		else {
+			console.log("[PeerMedia.showVideo()] There is no video_track from which to create a MediaStream.");
+		}
 		// this.video_element.dataset.senderConnectionId = sender_id;
-		return this.video_element;
+		// return this.video_element;
+	}
+	showVideoIfSharing(peer_info) {
+		peer_info.video_sharing_enabled ? this.showVideo() : this.hideVideo();
+	}
+	hideVideo() {
+		this.video_element?.parentNode.removeChild(this.video_element);
+		this.video_element = null;
 	}
 	onLeave() {
 		this.video_element?.parentNode.removeChild(this.video_element);
@@ -110,9 +130,9 @@ class RoomConnection {
 
 	showPeers(peers) {
 		const fragment = new DocumentFragment();
-		for (const peer of peers) {
+		for (const [id, peer] of Object.entries(peers)) {
 			let row_element = document.createElement("tr");
-			["connection_id", "client_id", "mic_sharing_enabled", "video_sharing_enabled"].forEach(column_name => {
+			["connection_id", "username", "mic_sharing_enabled", "video_sharing_enabled"].forEach(column_name => {
 				const cell_element = document.createElement("td");
 				cell_element.textContent = peer[column_name];
 				row_element.appendChild(cell_element);
@@ -128,7 +148,10 @@ class RoomConnection {
 		if (payload.action.type == "join") {
 			this.peer_media[payload.action.peer] = new PeerMedia();
 		}
-		if (payload.action.type == "leave") {
+		else if (payload.action.type == "update") {
+			this.peer_media[payload.action.peer]?.showVideoIfSharing(payload.peers[payload.action.peer]);
+		}
+		else if (payload.action.type == "leave") {
 			this.peer_media[payload.action.peer]?.onLeave();
 		}
 	}
@@ -149,7 +172,7 @@ class RoomConnection {
 		mic_toggle_button.textContent = "Stop sharing microphone audio";
 		mic_toggle_button.onclick = () => { this.disableMic(); }
 		mic_toggle_button.disabled = false;
-		this.syncSharingStatus();
+		this.broadcastSharingStatus();
 	}
 
 	async disableMic() {
@@ -162,7 +185,7 @@ class RoomConnection {
 		mic_toggle_button.textContent = "Share microphone audio";
 		mic_toggle_button.onclick = () => { this.enableMic(); }
 		mic_toggle_button.disabled = false;
-		this.syncSharingStatus();
+		this.broadcastSharingStatus();
 	}
 	disconnectFromRoom(room_id) {
 		this.sock.close();
@@ -199,7 +222,7 @@ class RoomConnection {
 			}
 			await this.video_sending_transceiver.sender.replaceTrack(this.video_sending_track);
 			await this.desktop_audio_transceiver.sender.replaceTrack(this.desktop_audio_track);
-			this.syncSharingStatus();
+			this.broadcastSharingStatus();
 			room_share_button.textContent = "Stop sharing video";
 			room_share_button.onclick = () => { this.disableShareVideo(); }
 		}
@@ -221,7 +244,7 @@ class RoomConnection {
 		room_share_button.textContent = "Share video";
 		room_share_button.onclick = () => { this.enableShareVideo(); }
 		room_share_button.disabled = false;
-		this.syncSharingStatus();
+		this.broadcastSharingStatus();
 	}
 
 	makeRtcConnection(room_id) {
@@ -300,20 +323,25 @@ class RoomConnection {
 		return Number(mid.substring(mid.lastIndexOf('-') + 1));
 	}
 	handleIncomingTrack(event) {
-		const mid = event.transceiver.mid;
-		const connection_id = this.getConnectionIdFromMid(mid);
-		if (!(connection_id in this.peer_media)) {
-			this.peer_media[connection_id] = new PeerMedia();
+		try {
+			const mid = event.transceiver.mid;
+			const connection_id = this.getConnectionIdFromMid(mid);
+			if (!(connection_id in this.peer_media)) {
+				this.peer_media[connection_id] = new PeerMedia();
+			}
+			console.log("Incoming track MID " + mid);
+			if (mid && mid.startsWith(RoomConnection.VIDEO_MID)) {
+				this.peer_media[connection_id].showVideo(event);
+			}
+			else if (mid && (mid.startsWith(RoomConnection.MIC_AUDIO_MID) || mid.startsWith(RoomConnection.DESKTOP_AUDIO_MID))) {
+				voice_chat_container.appendChild(this.peer_media[connection_id].setAudio(event, mid));
+			}
+			else {
+				throw "Unrecognized MID " + mid;
+			}
 		}
-		console.log("Incoming track MID " + mid);
-		if (mid && mid.startsWith(RoomConnection.VIDEO_MID)) {
-			video_container.appendChild(this.peer_media[connection_id].setVideo(event));
-		}
-		else if (mid && (mid.startsWith(RoomConnection.MIC_AUDIO_MID) || mid.startsWith(RoomConnection.DESKTOP_AUDIO_MID))) {
-			voice_chat_container.appendChild(this.peer_media[connection_id].setAudio(event, mid));
-		}
-		else {
-			this.handleMediaError("Unrecognized MID " + mid);
+		catch (err) {
+			RoomConnection.handleMediaError(err);
 		}
 	}
 
@@ -329,7 +357,7 @@ class RoomConnection {
 			}
 		}));
 	}
-	syncSharingStatus() {
+	broadcastSharingStatus() {
 		this.sock.send(JSON.stringify({
 			type: "webrtc_sharing_status_update",
 			payload: {

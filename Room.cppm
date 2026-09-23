@@ -22,8 +22,9 @@ export module Mediaboard.Room;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 
-export namespace Mediaboard {
-struct RtcPeer;
+using namespace FuzeHttp;
+
+namespace Mediaboard {
 struct RelaySlot {
 	std::shared_ptr<rtc::Track> track;
 	rtc::SSRC ssrc;
@@ -71,6 +72,9 @@ private:
 		return relay_media;
 	}
 };
+}
+
+export namespace Mediaboard {
 const std::string MIC_AUDIO_MID = "ma";
 const std::string DESKTOP_AUDIO_MID = "da";
 const std::string VIDEO_MID = "v";
@@ -84,7 +88,7 @@ struct Relay {
 	std::deque<int> pending_relay_additions;
 };
 struct RtcPeer {
-	RtcPeer() {
+	RtcPeer(int id, const std::optional<Client> client) : id(id), client(client) {
 		this->relays.emplace(MIC_AUDIO_MID,
 			std::make_unique<Relay>(new RelayFactory<rtc::Description::Audio>(MIC_AUDIO_MID)));
 		this->relays.emplace(VIDEO_MID,
@@ -93,7 +97,7 @@ struct RtcPeer {
 			std::make_unique<Relay>(new RelayFactory<rtc::Description::Audio>(DESKTOP_AUDIO_MID)));
 	}
 	std::function<void(boost::json::object)> send_message;
-	int client_id;
+	const std::optional<Client> client; // TODO replace with shared_ptr
 	// std::shared_ptr<FuzeHttp::WebsocketSession> session;
 	std::shared_ptr<rtc::PeerConnection> connection;
 	std::shared_ptr<rtc::DataChannel> keepalive_channel;
@@ -110,14 +114,24 @@ struct RtcPeer {
 		if (auto it = this->relays.find(relay_type); it != relays.end())
 			return it->second.get();
 		else
-			return std::unexpected(std::format("[getRelayFromString] relay {} not found for client {}", relay_type, client_id));
+			return std::unexpected(std::format("[getRelayFromString] relay {} not found for peer {}", relay_type, id));
+	}
+	const int id;
+	void updateStatusFromJson(boost::json::object json) {
+		bool video_sharing =  json.at("video_sharing_enabled").as_bool();
+		bool video_resumed = this->video_sending_track && !this->video_sharing_enabled && video_sharing;
+		this->desktop_audio_sharing_enabled = json.at("desktop_audio_sharing_enabled").as_bool();
+		this->mic_sharing_enabled = json.at("mic_sharing_enabled").as_bool();
+		this->video_sharing_enabled = video_sharing;
+		if (video_resumed)
+			this->video_sending_track->requestKeyframe();
 	}
 };
 
 class Room : public std::enable_shared_from_this<Room> /*: public FuzeHttp::PermissionManagedObject*/ {
 public:
-	Room(/*PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, */int id/*const ValidatedInput&& input*/)
-			: /*PermissionManagedObject(permission_parent, db), */id(id) {}
+	Room(FuzeHttp::StateBase* state_base, int id)
+			: /*PermissionManagedObject(permission_parent, db), */state_base(state_base), id(id) {}
 
 	enum struct ACTION : int {
 		JOIN,
@@ -125,12 +139,12 @@ public:
 		LEAVE
 	};
 	boost::json::object asJson() const {
-		boost::json::array peers_json;
+		boost::json::object peers_json;
 		for (auto& [id, weak_peer] : peers) {
 			if (auto peer = weak_peer.lock()) {
-				peers_json.push_back({
+				peers_json.emplace(std::to_string(id), boost::json::object{
 					{"connection_id", id},
-					{"client_id", peer->client_id},
+					{"username", state_base->getUsernameFromClient(peer->client)},
 					{"desktop_audio_sharing_enabled", peer->desktop_audio_sharing_enabled},
 					{"mic_sharing_enabled", peer->mic_sharing_enabled},
 					{"video_sharing_enabled", peer->video_sharing_enabled}
@@ -315,5 +329,6 @@ private:
 		else
 			throw "action not recognised";
 	}
+	FuzeHttp::StateBase* state_base;
 };
 }

@@ -2,7 +2,7 @@
 *.kate-swp
 .cache/
 .qtcreator/
-build/
+build*/
 install/
 AppDir/
 *.AppImage
