@@ -118,7 +118,7 @@ function showAllBoards(response_json) {
 	const fragment = new DocumentFragment();
 	const table_element = document.createElement("table");
 	const headers_element = document.createElement("tr");
-	["Slug", "Title", "Last post time"].forEach((column_name) => {
+	["Slug", "Title", "Last post time", "Action"].forEach((column_name) => {
 		let header = document.createElement("th");
 		header.textContent = column_name;
 		headers_element.append(header);
@@ -134,11 +134,16 @@ function showAllBoards(response_json) {
 		});
 		{
 			let col = document.createElement("td");
-			let post_timestamp_element = document.createElement("time");
-			let post_date = new Date(board["last_post_time"] * 1000 - timezone_offset_seconds * 1000).toISOString();;
-			post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
-			post_timestamp_element.textContent = post_date;
-			col.appendChild(post_timestamp_element);
+			if (board["last_post_time"]) {
+				let post_timestamp_element = document.createElement("time");
+				let post_date = new Date(board["last_post_time"] * 1000 - timezone_offset_seconds * 1000).toISOString();;
+				post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
+				post_timestamp_element.textContent = post_date;
+				col.appendChild(post_timestamp_element);
+			}
+			else {
+				col.appendChild(document.createTextNode("No posts yet."));
+			}
 			board_element.append(col);
 		}
 		{

@@ -385,8 +385,10 @@ public:
 		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::array boards_json = boost::json::array();
 		for (auto& [board_id, board] : this->boards) {
-			if (board->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD)) && !board->isDeleted()) {
-				boards_json.emplace_back(board->asJson(client));
+			if (!board->isDeleted()) {
+				if (board->clientHasPermission(client, static_cast<int>(PERMISSION::VIEW_BOARD)) && !board->isDeleted()) {
+					boards_json.emplace_back(board->asJson(client));
+				}
 			}
 		}
 		std::println("[State] Finished assembling boards list into JSON");

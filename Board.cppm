@@ -100,12 +100,12 @@ public:
 		std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 	}
 	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
+		std::lock_guard<std::mutex> lock(mutex);
 		// boost::json::object board_json = this->board_as_json;
 		boost::json::object board_json = {
 			{"id", id},
 			{"slug", slug},
 			{"title", title},
-			{"last_post_time", this->getLastPostEpoch()},
 			{"client_permissions", {
 				{"manage_permissions", this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))},
 				{"create_board", this->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_BOARD))},
@@ -115,6 +115,8 @@ public:
 				{"upload_file", this->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))},
 			}}
 		};
+		if (auto last_post_time = getLastPostTime())
+			board_json.emplace("last_post_time", toEpoch(last_post_time.value()));
 		return board_json;
 	}
 #ifdef WITH_WEBRTC
@@ -174,11 +176,14 @@ public:
 		this->ordered_threads.insert(std::make_pair(new_message_time, validated_message.thread_id));
 		return message_ptr;
 	}
-	std::chrono::time_point<std::chrono::system_clock> getLastPostTime() const {
-		return this->threads.at(this->ordered_threads.begin()->second)->getLastMessageTime();
+	std::optional<std::chrono::time_point<std::chrono::system_clock>> getLastPostTime() const {
+		if (this->threads.size() >= 1)
+			return this->threads.at(this->ordered_threads.begin()->second)->getLastMessageTime();
+		else
+			return {};
 	}
-	std::time_t getLastPostEpoch() const {
-		return std::chrono::duration_cast<std::chrono::seconds>(this->getLastPostTime().time_since_epoch()).count();
+	std::time_t toEpoch(std::chrono::time_point<std::chrono::system_clock> time) const {
+		return std::chrono::duration_cast<std::chrono::seconds>(time.time_since_epoch()).count();
 	}
 	void deleteThread(int thread_id) {
 		std::lock_guard<std::mutex> lock(mutex);
