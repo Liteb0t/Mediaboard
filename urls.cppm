@@ -1,11 +1,12 @@
 // Copyright (c) 2026, Fuze.page
 // Fuze Human-oriented License v1
 module;
-#include "Controller.hpp"
+#include <beast.hpp>
 export module Mediaboard.URLs;
 // #include "views.hpp"
 // #include "views_media.hpp"
 // #include "views_registration.hpp"
+import FuzeHttp.Controller;
 import Mediaboard.Permission;
 import Mediaboard.Resolvers;
 import Mediaboard.State;
@@ -14,7 +15,7 @@ import Mediaboard.Views_media;
 import Mediaboard.Views_registration;
 
 using namespace FuzeHttp;
-using namespace http;
+using namespace beast::http;
 
 export namespace Mediaboard {
 void addURLsToController(FuzeHttp::Controller<State*>* controller) {
