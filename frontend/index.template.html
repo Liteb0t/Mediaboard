@@ -15,8 +15,9 @@
 			<h3 id="location_indicator">List of boards</h3>
 			<div id="board_list_container"></div>
 			<a id="create_board_button" href="create_board.html" style="display: none" class="Button">Create board</a>
-			<a href="board/g/" data-navigo>To board</a>
-			<div id="view_container"></div>
+<!--
+<a href="board/g/" data-navigo>To board</a>
+			<div id="view_container"></div>-->
 		</main>
 		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="error_dialog" closedby="any">
@@ -30,10 +31,10 @@
 	</body>
 <style>
 </style>
-<script src="static/navigo.min.js"></script>
+<!--<script src="static/navigo.min.js"></script>-->
 <script>
 "use strict";
-const router = new Navigo('/', { hash: true });
+/*const router = new Navigo('/', { hash: true });
 router.on(() => {
 	console.log("ROOT opened");
 });
@@ -46,7 +47,7 @@ router.on("/board/:board_slug", ({data}) => {
 	// TODO load board.template.html into shadow DOM
 	// URL will be /#/board/g (hash-based routing)
 });
-router.resolve();
+router.resolve();*/
 loading_dialog.showModal();
 const localDate = new Date();
 const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
@@ -55,6 +56,7 @@ flex_separator.classList.add("FlexSeparator");
 let state = {
 	server_permissions: {}
 };
+/*
 async function getBoardTree() {
 	const response = await fetch("board.html");
     if (!response.ok) {
@@ -65,7 +67,7 @@ async function getBoardTree() {
 	view_container.innerHTML = result;
 	console.log(result);
 }
-
+*/
 // For embedding Mediaboard within a webpage using an <iframe>.
 // Hides everything except messages.
 const url_params = new URLSearchParams(location.search);

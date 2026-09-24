@@ -233,6 +233,7 @@ public:
 		else
 			std::cout << "[Board] Warning: could not add listener to thread " << thread_id << " because the thread does not exist." << std::endl;
 	}
+	/*
 	void removeListenerFromThread(FuzeHttp::WebsocketSession* listener, int thread_id) {
 		if (threadExists(thread_id)) {
 			this->threads.at(thread_id)->removeListener(listener);
@@ -241,13 +242,11 @@ public:
 		else
 			std::cout << "[Board] Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
 	}
-	void removeUnauthorizedListenersFromThread(int thread_id) {
-		this->threads.at(thread_id)->removeUnauthorizedListeners();
-	}
-	std::unordered_set<FuzeHttp::WebsocketSession*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id)->getListeners(); };
-	std::string dumpMessage(int thread_id, int message_id) const {
-		return this->threads.at(thread_id)->dumpMessage(message_id);
-	}
+	*/
+	// std::unordered_set<FuzeHttp::WebsocketSession*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id)->getListeners(); };
+	// std::string dumpMessage(int thread_id, int message_id) const {
+	// 	return this->threads.at(thread_id)->dumpMessage(message_id);
+	// }
 	struct thread_order_comparator {
 		bool operator() (std::pair<std::time_t, int> left, std::pair<std::time_t, int> right) const {
 			if (left.first > right.first)

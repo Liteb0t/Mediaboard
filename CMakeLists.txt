@@ -142,7 +142,16 @@ add_custom_target(frontend ALL
 )
 install(
   DIRECTORY ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/frontend
-  DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard/
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard
+)
+add_custom_command(TARGET MediaboardServer POST_BUILD
+  COMMAND ${CMAKE_BINARY_DIR}/bin/MediaboardServer --generate_manifest
+  COMMENT "Generating manifest.json"
+)
+install(
+  FILES ${CMAKE_BINARY_DIR}/share/FuzeMediaboard/manifest.json
+  DESTINATION ${CMAKE_INSTALL_DATADIR}/FuzeMediaboard
+  OPTIONAL
 )
 add_dependencies(MediaboardServer
   frontend

@@ -302,7 +302,7 @@ FuzeHttp::Response deleteMessage(Mediaboard::State* state, FuzeHttp::Request req
 		return FuzeHttp::Response{.status = http::status::ok};
 	}
 	else {
-		if (auto response = thread->deleteMessage(message_id_in_thread))
+		if (auto response = thread->deleteMessage(message_id_in_thread, client))
 			return FuzeHttp::Response{.status = http::status::ok};
 		else
 			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = response.error()};

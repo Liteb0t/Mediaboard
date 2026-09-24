@@ -138,8 +138,9 @@ public:
 	std::string dump() const {
 		return boost::json::serialize(this->post_as_json);
 	}
-	boost::json::object asJson() const {
+	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::object message_as_json = this->post_as_json;
+		message_as_json["is_author"] = client && client.value().id == author_client_id;
 		boost::json::array files_json;
 		for (File file : this->files) {
 			boost::json::object file_json = {{"filename", file.filename}};

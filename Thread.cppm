@@ -70,14 +70,15 @@ public:
 	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
 		return {
 			{"id", this->id},
-			{"post_zero", this->messages.at(0)->asJson()},
+			{"post_zero", this->messages.at(0)->asJson(client)},
 			{"reply_count", this->reply_count},
 			{"client_permissions", this->getPermissionsAsJson(client)}
 		};
 	}
 	boost::json::object asJsonWithMessages(const std::optional<FuzeHttp::Client>& client) const {
+		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::object thread_json = this->asJson(client);
-		thread_json.emplace("messages", this->getMessagesAsJson());
+		thread_json.emplace("messages", this->getMessagesAsJson(client));
 		return thread_json;
 	}
 	// int getNumberOfPosts() const { return this->posts.size(); };
@@ -104,11 +105,16 @@ public:
 	}
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
-	std::expected<void, std::string> deleteMessage(int id_in_thread) {
+	std::expected<void, std::string> deleteMessage(int id_in_thread, FuzeHttp::Client client) {
 		if (id_in_thread == 0)
 			return std::unexpected("Can't delete message 0 from thread");
 		std::lock_guard<std::mutex> lock(mutex);
-		this->messages.at(id_in_thread)->markAsDeleted();
+		if (!messages.contains(id_in_thread))
+			return std::unexpected(std::format("Attempted to delete message with id_in_thread {} which does not exist", id_in_thread));
+		Message* message = this->messages.at(id_in_thread).get();
+		if (!message->clientIsAuthor(client) && !clientHasPermission(client, static_cast<int>(PERMISSION::DELETE_POST)))
+			return std::unexpected(std::format("Client {} does not have permission to delete message {} in thread {}", client.id, message->getId(), id));
+		message->markAsDeleted();
 		db->query<void>("UPDATE message SET deleted = TRUE WHERE thread_id = $1 AND id_in_thread = $2", this->id, id_in_thread);
 		this->reply_count--;
 		std::cout << "Erased message " << id_in_thread << " from thread " << this->id << std::endl;
@@ -137,24 +143,23 @@ public:
 			return !this->clientHasPermission(ws->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD));
 		});
 	}
-	boost::json::array getMessagesAsJson() const {
-		std::lock_guard<std::mutex> lock(mutex);
+	boost::json::array getMessagesAsJson(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::array multiple_post_json = boost::json::array();
-		for (auto it = this->messages.begin(); it != this->messages.end(); ++it) {
-			if (!it->second->isDeleted()) {
+		for (auto& [id_in_thread, message] : this->messages) {
+			if (!message->isDeleted()) {
 				// std::cout << "Dumping post " << this->id << "/" << it->second.getIdInThread() << std::endl;
-				boost::json::object post_json = it->second->asJson();
-				// post_json["is_author"] = keyMatchesMessage(key, it->first);
+				boost::json::object post_json = message->asJson(client);
+				// post_json["is_author"] = it->(key, it->first);
 				multiple_post_json.push_back(post_json);
 			}
 		}
 		return multiple_post_json;
 	}
-	std::string dumpMessage(int message_id) const  {
-		std::lock_guard<std::mutex> lock(mutex);
-		boost::json::object message_json = this->messages.at(message_id)->asJson();
-		return boost::json::serialize(message_json);
-	}
+	// std::string dumpMessage(int message_id) const  {
+	// 	std::lock_guard<std::mutex> lock(mutex);
+	// 	boost::json::object message_json = this->messages.at(message_id)->asJson();
+	// 	return boost::json::serialize(message_json);
+	// }
 	// std::string dumpPermissions(int client_id) const;
 	void markAsDeleted() {
 		std::lock_guard<std::mutex> lock(mutex);

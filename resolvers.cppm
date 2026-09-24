@@ -4,6 +4,7 @@ module;
 #include <any>
 #include <expected>
 #include <format>
+#include <print>
 #include <string>
 export module Mediaboard.Resolvers;
 import FuzeHttp.Resolver;
@@ -36,6 +37,7 @@ template<PERMISSION permission>
 requires (permission != PERMISSION::NUMBER_OF_PERMISSIONS)
 struct BoardResolver<permission> : BoardResolver<PERMISSION::NUMBER_OF_PERMISSIONS> {
 	virtual std::expected<void, Response> validateExtraPermission(Board* board, const std::optional<Client>& client) const override {
+		std::println("Checking permission {}", static_cast<int>(permission));
 		if (!board->clientHasPermission(client, static_cast<int>(permission)))
 			return std::unexpected(Response{.status=http::status::forbidden, .error_message=std::format("Client does not have permission to perform this action on board `{}`", board->getSlug())});
 		return {}; // success
