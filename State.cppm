@@ -565,7 +565,7 @@ private:
 		// pointer. If successful, then send the message on that session.
 		for(auto const& weak_session : session_vec) {
 			if(auto strong_session = weak_session.lock()) {
-				strong_session->send(message->asJson(client));
+				strong_session->send(message->asJson(strong_session->getClient()));
 			}
 		}
 	}
