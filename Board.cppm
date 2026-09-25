@@ -7,8 +7,8 @@ module;
 #include "rtc/track.hpp"
 #endif
 #include <boost/json.hpp>
-#include <bits/unique_ptr.h>
-#include <bits/shared_ptr.h>
+#include <memory>
+#include <memory>
 #include <ctime>
 #include <expected>
 #include <iostream>

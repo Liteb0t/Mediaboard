@@ -12,7 +12,7 @@ module;
 #include <map>
 #include <print>
 #include <string>
-#include <bits/unique_ptr.h>
+#include <memory>
 #include <unordered_set>
 export module Mediaboard.Room;
 

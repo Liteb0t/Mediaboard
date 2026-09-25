@@ -140,7 +140,7 @@ Changes made to <code>config.ini</code> are read when the server starts. These o
 	Configure with <code>-DWITH_MAGICK=ON</code>.<br>
 	Note: To build without ImageMagick, add <code>-D WITH_MAGICK=OFF</code> instead to the <code>CMake -B</code> command.
 </p>
-<details><summary><h4>Using ImageMagick on a resource-constrained server</h4></summary>
+<details><summary>Using ImageMagick on a resource-constrained server</summary>
 <p>
 <strong>ImageMagick may use significant amounts of memory, which can crash the program if system memory runs out.<br>
 To set memory limits at runtime add these environment variables:</strong>
@@ -153,6 +153,7 @@ Adjust depending on requirements.<br>
 At build-time, you can configure with these options:
 <code>--with-quantum-depth=8</code>&nbsp;number of bits in a pixel quantum (default 16)<br>
 <code>--with-cache=THRESHOLD</code>&nbsp;set pixel cache memory threshold (default available memory)
+</details>
 </p>
 <h2>Optional: WebRTC Live Rooms</h2>
 <p>

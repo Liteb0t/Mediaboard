@@ -12,6 +12,11 @@
 #endif
 #include <print>
 #include <string>
+
+#include <signal.h>
+#include <csignal>
+#include <execinfo.h>
+#include <unistd.h>
 import Mediaboard.MediaboardWebsocketSession;
 import FuzeHttp.Server;
 import FuzeHttp.ProgramOptions;
@@ -28,6 +33,10 @@ using namespace Mediaboard;
 Mediaboard::StateConfig state_config;
 
 int main(int argc, char* argv[]) {
+	// try find the creash yos
+	setvbuf(stdout, nullptr, _IONBF, 0);
+	for (int s : {SIGSEGV, SIGABRT, SIGBUS, SIGFPE, SIGILL, SIGPIPE})
+		std::signal(s, crashHandler);
 #ifdef WITH_MAGICK
 	Magick::InitializeMagick(*argv);  // Required on Windows and MacOS
 #else

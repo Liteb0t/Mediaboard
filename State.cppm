@@ -27,7 +27,6 @@ import Mediaboard.Board;
 import Mediaboard.Permission;
 
 using namespace FuzeHttp;
-using namespace FuzeHttp::Migrations;
 
 // Forward declaration
 // class WebsocketSession;
@@ -177,7 +176,7 @@ public:
 		// this->boards.emplace(0, main_board);
 		// this->boards.at(0).cacheAllThreads();
 	}
-	std::list<std::unique_ptr<Migration>> addMigrations() override;
+	void addMigrations() override;
 	void setAdditionalImageFormatsFromConfig(const StateConfig& config) {
 		if (config.avif_thumbnails)
 			this->image_formats_to_create_thumbnails_for.emplace("image/avif");

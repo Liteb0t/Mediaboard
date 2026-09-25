@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.28 FATAL_ERROR)
 
 project(Mediaboard
-  VERSION 0.2.1
+  VERSION 0.2.2
   DESCRIPTION "Chat server with file-sharing and advanced permissions"
   LANGUAGES C CXX
   HOMEPAGE_URL "https://fuze.page/software/mediaboard"
@@ -18,6 +18,11 @@ set(SODIUM_DISABLE_TESTS ON)
 option(FUZEDBI_USE_POSTGRES "Use PostgreSQL interface instead of SQLite" OFF)
 option(WITH_MAGICK "Compile with ImageMagick support" ON)
 option(WITH_WEBRTC "Compile with libdatachannel" ON)
+option(WITH_ASAN "Build with AddressSanitizer" OFF)
+if(WITH_ASAN)
+  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address,undefined)
+endif()
 include(GNUInstallDirs)
 
 # Find dependencies sneeded by the project
@@ -41,6 +46,7 @@ if(WITH_WEBRTC)
   target_link_libraries(MediaboardServer PRIVATE datachannel-static tiny-HMAC-c)
   target_sources(MediaboardServer PUBLIC FILE_SET CXX_MODULES FILES Room.cppm)
 endif()
+
 target_link_libraries(MediaboardServer
   PRIVATE
     Boost::json
