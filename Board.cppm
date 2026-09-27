@@ -163,17 +163,21 @@ public:
 	}
 	Message* createMessage(Message::Validated validated_message, int author_client_id) {
 		std::lock_guard<std::mutex> board_lock(mutex);
+		std::println("[Board::createMessage] getting thread...");
 		Thread* thread = this->getThread(validated_message.thread_id);
 		std::lock_guard<std::mutex> thread_lock(thread->mutex);
 		std::time_t old_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
 		int new_post_id;
 
+		std::println("[Board::createMessage] creating message...");
 		auto message = std::make_unique<Message>(db, validated_message, author_client_id, thread->getId(), thread->incrementMessageIdInThread()); // Key is deleted from message_json in its constructor
+		std::println("[Board::createMessage] inserting message into thread...");
 		auto message_ptr = thread->insertMessage(std::move(message));
 
 		std::time_t new_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
 		this->ordered_threads.erase(std::make_pair(old_message_time, validated_message.thread_id));
 		this->ordered_threads.insert(std::make_pair(new_message_time, validated_message.thread_id));
+		std::println("[Board::createMessage] returning...");
 		return message_ptr;
 	}
 	std::optional<std::chrono::time_point<std::chrono::system_clock>> getLastPostTime() const {

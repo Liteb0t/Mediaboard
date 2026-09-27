@@ -5,4 +5,5 @@
 build*/
 install/
 AppDir/
+AppImage*/
 *.AppImage

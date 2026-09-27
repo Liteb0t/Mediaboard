@@ -30,6 +30,8 @@ cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoos
 find_package(Boost 1.88 COMPONENTS json program_options REQUIRED)
 
 add_executable(MediaboardServer)
+set_target_properties(MediaboardServer PROPERTIES ENABLE_EXPORTS ON)
+target_compile_options(MediaboardServer PRIVATE -fno-omit-frame-pointer)
 if(WITH_MAGICK)
   find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
   add_compile_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )

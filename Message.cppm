@@ -5,6 +5,7 @@ module;
 #include <boost/json.hpp>
 #include <expected>
 #include <iostream>
+#include <regex>
 #include <string>
 export module Mediaboard.Message;
 
@@ -163,6 +164,29 @@ public:
 	bool isDeleted() const { return this->deleted; }
 	bool clientIsAuthor(const FuzeHttp::Client& client) const { return client.id == this->author_client_id; }
 private:
+	// https://stackoverflow.com/a/5665377/18658154
+	static std::string escapeHTML(const std::string& data) {
+		std::string buffer;
+		buffer.reserve(data.size());
+		for(size_t pos = 0; pos != data.size(); ++pos) {
+			switch(data[pos]) {
+				case '&':  buffer.append("&amp;");       break;
+				case '\"': buffer.append("&quot;");      break;
+				case '\'': buffer.append("&apos;");      break;
+				case '<':  buffer.append("&lt;");        break;
+				case '>':  buffer.append("&gt;");        break;
+				default:   buffer.append(data[pos], 1);  break;
+			}
+		}
+		return buffer;
+	}
+	static std::string createProcessedMessageContent(const std::string& raw_content) {
+		std::string content = escapeHTML(raw_content);
+		std::regex word_regex(R"(https?://[^\s<]+)");
+		auto words_begin = std::sregex_iterator(content.begin(), content.end(), word_regex);
+		auto words_end = std::sregex_iterator();
+	}
+
 	int id;
 	int thread_id;
 	int id_in_thread;
