@@ -196,9 +196,9 @@ private:
 			return {};
 		for (std::sregex_iterator i = urls_begin; i != urls_end; ++i, ++number_of_matches) {
 			std::smatch match = *i;
-			result += content.substr(last_match_index, match.position());
+			result += content.substr(last_match_index, match.position() - last_match_index);
 			if (std::optional<std::string> embed = createEmbedIfMatchExistsForURL(match.str()))
-				result += embed.value();
+				result += createAnchorElementFromURL(match.str()) + embed.value();
 			else
 				result += createAnchorElementFromURL(match.str()); // <a href=whatever>
 			last_match_index = match.position() + match.length();
@@ -223,13 +223,24 @@ private:
 		std::function<std::optional<std::string>(const std::smatch&)> process;
 	};
 	inline static const std::vector<RegexProcessorSlot> url_embed_rules = {
-		{std::regex(R"-(\w+:\/\/(?:(?:www\.|old\.)?vocaroo\.com|voca\.ro)\/((?:i\/)?\w+))-"), [](const std::smatch& match)->std::optional<std::string>{
-			const std::string id = match[1];
+		{std::regex(R"-(\w+:\/\/(?:(?:www\.|old\.)?vocaroo\.com|voca\.ro)\/((?:i\/)?\w+))-"), [](const std::smatch& source)->std::optional<std::string>{
+			const std::string id = source[1];
 			if (!std::all_of(id.begin(), id.end(), [](char c){ return std::isalnum((unsigned char)c); }))
 				return {};
 			else {
-				return std::format(R"-(<iframe width="300" height="60" frameborder="0" src="https://vocaroo.com/embed/{}?autoplay=0"></iframe>)-", id);
+				return std::format(R"-(<br><figure data-iframe-src="https://vocaroo.com/embed/{}?autoplay=0" class="EmbedFigure"><figcaption class="EmbedIframe">Embed Vocaroo</figcaption><iframe style="display: none" width="300" height="60" frameborder="0" src=""></iframe></figure>)-", id);
 			}
+		}},
+		{std::regex(R"-(\w+:\/\/(?:youtu.be\/|[\w.]*youtube[\w.]*\/.*(?:v=|\bembed\/|\bv\/|live\/|shorts\/))([\w\-]{11})([\w&=?]*)\b)-"), [](const std::smatch& source)->std::optional<std::string>{
+			const std::string id = source[1];
+			if (!std::all_of(id.begin(), id.end(), [](char c){ return std::isalnum((unsigned char)c) || c == '_' || c == '-'; }))
+				return {};
+			const std::string parameters = source[2];
+			std::smatch start_match;
+			if (std::regex_search(parameters, start_match, std::regex(R"-("\b(?:star)?t\=(\d+))-"))) {
+				std::println("start_match: {}", start_match.str()); // from which to get video start time
+			}
+			return std::format(R"-(<br><figure data-iframe-src="//www.youtube.com/embed/{}?rel=0&wmode=opaque{}" class="EmbedFigure"><figcaption class="EmbedIframe">Embed YouTube video</figcaption><iframe style="display: none" allowfullscreen="true" src=""></iframe></figure>)-", id, start_match.empty() ? "" : std::format("&start={}", start_match.str()));
 		}}
 	};
 	// inline static const std::vector<RegexProcessorSlot> general_embed_rules = {
