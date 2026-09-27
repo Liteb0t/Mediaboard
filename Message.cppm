@@ -5,6 +5,7 @@ module;
 #include <boost/json.hpp>
 #include <expected>
 #include <iostream>
+#include <print>
 #include <regex>
 #include <string>
 export module Mediaboard.Message;
@@ -75,16 +76,7 @@ public:
 			content(content),
 			files(files),
 			deleted(deleted) {
-		this->post_as_json = {
-			{"id", id},
-			{"thread_id", thread_id},
-			{"id_in_thread", id_in_thread},
-			{"created_at", std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count()},
-			{"name", author_username},
-			{"content", content}
-		};
-		if (highest_ranked_group_name) // this is like ## JANNY after the name
-			post_as_json.emplace("highest_ranked_group_name", highest_ranked_group_name.value());
+		cacheInternalJSON();
 	}
 
 	inline static const size_t MAX_NAME = 32;
@@ -110,20 +102,11 @@ public:
 			files(input.files),
 			created_at(std::chrono::system_clock::now()),
 			deleted(false) {
+		cacheInternalJSON();
 		int time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count();
-		this->post_as_json = {
-			{"type", "post"},
-			{"id", id},
-			{"thread_id", thread_id},
-			{"id_in_thread", id_in_thread},
-			{"name", author_username},
-			{"created_at", time_since_epoch},
-			{"content", content}
-		};
 		// save shit to database
 		db->query<void>("INSERT INTO message(id, thread_id, id_in_thread, author_client_id, author_username, created_at, content) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->thread_id, this->id_in_thread, author_client_id, this->author_username, time_since_epoch, this->content);
 		if (highest_ranked_group_name) {// this is like ## JANNY after the name
-			post_as_json.emplace("highest_ranked_group_name", highest_ranked_group_name.value());
 			db->query<void>("UPDATE message SET highest_ranked_group_name = $1 WHERE id = $2",  highest_ranked_group_name.value(), id);
 		}
 		this->files_i = 0;
@@ -135,12 +118,8 @@ public:
 				db->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, file.filename.c_str());
 		}
 	}
-
-	std::string dump() const {
-		return boost::json::serialize(this->post_as_json);
-	}
 	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
-		boost::json::object message_as_json = this->post_as_json;
+		boost::json::object message_as_json = post_as_json ? post_as_json.value() : createJSON();
 		message_as_json["is_author"] = client && client.value().id == author_client_id;
 		boost::json::array files_json;
 		for (File file : this->files) {
@@ -157,36 +136,105 @@ public:
 	int getIdInThread() const { return this->id_in_thread; };
 	// std::string getKey() const { return this->key; }
 	std::chrono::time_point<std::chrono::system_clock> createdAt() const { return this->created_at; }
-	void createFromJSON(boost::json::object post_json);
 	void markAsDeleted() {
 		this->deleted = true;
+		uncacheInternalJSON();
 	}
 	bool isDeleted() const { return this->deleted; }
 	bool clientIsAuthor(const FuzeHttp::Client& client) const { return client.id == this->author_client_id; }
 private:
+	boost::json::object createJSON() const {
+		boost::json::object message_as_json;
+		int time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count();
+		std::optional<std::string> processed_message_content = createProcessedMessageContent(content);
+		message_as_json = {
+			{"type", "post"},
+			{"id", id},
+			{"thread_id", thread_id},
+			{"id_in_thread", id_in_thread},
+			{"name", author_username},
+			{"created_at", time_since_epoch},
+			{"content", processed_message_content ? processed_message_content.value() : content},
+			{"contains_html", processed_message_content ? true : false}
+		};
+		if (highest_ranked_group_name) // this is like ## JANNY after the name
+			message_as_json.emplace("highest_ranked_group_name", highest_ranked_group_name.value());
+		return message_as_json;
+	}
+	void cacheInternalJSON() {
+		this->post_as_json = createJSON();
+	}
+	void uncacheInternalJSON() {
+		this->post_as_json = {};
+	}
 	// https://stackoverflow.com/a/5665377/18658154
 	static std::string escapeHTML(const std::string& data) {
 		std::string buffer;
 		buffer.reserve(data.size());
 		for(size_t pos = 0; pos != data.size(); ++pos) {
 			switch(data[pos]) {
-				case '&':  buffer.append("&amp;");       break;
-				case '\"': buffer.append("&quot;");      break;
-				case '\'': buffer.append("&apos;");      break;
-				case '<':  buffer.append("&lt;");        break;
-				case '>':  buffer.append("&gt;");        break;
-				default:   buffer.append(data[pos], 1);  break;
+				case '&':  buffer += "&amp;";       break;
+				case '\"': buffer += "&quot;";      break;
+				case '\'': buffer += "&apos;";      break;
+				case '<':  buffer += "&lt;";        break;
+				case '>':  buffer += "&gt;";        break;
+				default:   buffer += data[pos];  break;
 			}
 		}
+		std::println("[escapeHTML] returning {}", buffer);
 		return buffer;
 	}
-	static std::string createProcessedMessageContent(const std::string& raw_content) {
+	static std::optional<std::string> createProcessedMessageContent(const std::string& raw_content) {
+		std::string result;
+		size_t number_of_matches = 0;
 		std::string content = escapeHTML(raw_content);
-		std::regex word_regex(R"(https?://[^\s<]+)");
-		auto words_begin = std::sregex_iterator(content.begin(), content.end(), word_regex);
-		auto words_end = std::sregex_iterator();
+		std::regex url_regex(R"(https?://[^\s<]+)");
+		auto urls_begin = std::sregex_iterator(content.begin(), content.end(), url_regex);
+		auto urls_end = std::sregex_iterator();
+		std::size_t last_match_index = 0;
+		if (std::distance(urls_begin, urls_end) == 0)
+			return {};
+		for (std::sregex_iterator i = urls_begin; i != urls_end; ++i, ++number_of_matches) {
+			std::smatch match = *i;
+			result += content.substr(last_match_index, match.position());
+			if (std::optional<std::string> embed = createEmbedIfMatchExistsForURL(match.str()))
+				result += embed.value();
+			else
+				result += createAnchorElementFromURL(match.str()); // <a href=whatever>
+			last_match_index = match.position() + match.length();
+		}
+		result += content.substr(last_match_index);
+		// std::println("Found {} URLs", number_of_matches);
+		return result;
 	}
-
+	static std::string createAnchorElementFromURL(const std::string& url) {
+		return std::format(R"-(<a href="{}" target="_blank" rel="noopener nofollow">{}</a>)-", url, url);
+	}
+	static std::optional<std::string> createEmbedIfMatchExistsForURL(const std::string& url) {
+		std::smatch match;
+		for (auto& rule : url_embed_rules) {
+			if (std::regex_search(url, match, rule.regex))
+				return rule.process(match);
+		}
+		return {};
+	}
+	struct RegexProcessorSlot {
+		std::regex regex;
+		std::function<std::optional<std::string>(const std::smatch&)> process;
+	};
+	inline static const std::vector<RegexProcessorSlot> url_embed_rules = {
+		{std::regex(R"-(\w+:\/\/(?:(?:www\.|old\.)?vocaroo\.com|voca\.ro)\/((?:i\/)?\w+))-"), [](const std::smatch& match)->std::optional<std::string>{
+			const std::string id = match[1];
+			if (!std::all_of(id.begin(), id.end(), [](char c){ return std::isalnum((unsigned char)c); }))
+				return {};
+			else {
+				return std::format(R"-(<iframe width="300" height="60" frameborder="0" src="https://vocaroo.com/embed/{}?autoplay=0"></iframe>)-", id);
+			}
+		}}
+	};
+	// inline static const std::vector<RegexProcessorSlot> general_embed_rules = {
+	// 	{std::regex(R"-(#\d*\/(\d+)\b)-"}, //TODO add reply link creation
+	// };
 	int id;
 	int thread_id;
 	int id_in_thread;
@@ -197,7 +245,7 @@ private:
 	std::string author_username;
 	std::optional<std::string> highest_ranked_group_name;
 	std::string content;
-	boost::json::object post_as_json;
+	std::optional<boost::json::object> post_as_json;
 	std::chrono::time_point<std::chrono::system_clock> created_at;
 	// std::string key;
 	bool deleted;

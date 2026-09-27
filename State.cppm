@@ -429,9 +429,7 @@ public:
 		if (auto message_maybe = validateMessageInThread(message_json, board, thread, client); !message_maybe)
 			return std::unexpected(message_maybe.error());
 		else {
-			Message* message = board->createMessage(message_maybe.value(), client.id);
-			thread->removeUnauthorizedListeners();
-			sendMessageToThread(message, thread, client);
+			Message* message = board->createMessage(message_maybe.value(), client);
 			return message;
 		}
 	}
@@ -548,49 +546,6 @@ private:
 		}
 		return validateMessage(json, board, client, validated);
 	}
-	void sendMessageToThread(Message* message, Thread* thread, const std::optional<Client>& client) {
-		// Make a local list of all the weak pointers representing
-		// the sessions, so we can do the actual sending without
-		// holding the mutex:
-		std::vector<std::weak_ptr<FuzeHttp::WebsocketSession>> session_vec;
-		{
-			std::lock_guard<std::mutex> lock(mutex);
-			session_vec.reserve(websocket_sessions.size());
-			for(auto p : thread->getListeners())
-				session_vec.emplace_back(p->weak_from_this());
-		}
-
-		// For each session in our local list, try to acquire a strong
-		// pointer. If successful, then send the message on that session.
-		for(auto const& weak_session : session_vec) {
-			if(auto strong_session = weak_session.lock()) {
-				strong_session->send(message->asJson(strong_session->getClient()));
-			}
-		}
-	}
-	// void sendToThread (std::string message, Board* board, int thread_id) {
-	// 	// Put the message in a shared pointer so we can re-use it for each client
-	// 	auto const ss = std::make_shared<std::string const>(std::move(message));
- //
-	// 	// Make a local list of all the weak pointers representing
-	// 	// the sessions, so we can do the actual sending without
-	// 	// holding the mutex:
-	// 	std::vector<std::weak_ptr<FuzeHttp::WebsocketSession>> v;
-	// 	{
-	// 		std::lock_guard<std::mutex> lock(mutex);
-	// 		v.reserve(websocket_sessions.size());
-	// 		board->removeUnauthorizedListenersFromThread(thread_id);
-	// 		for(auto p : board->getListenersFromThread(thread_id))
-	// 			v.emplace_back(p->weak_from_this());
-	// 	}
- //
-	// 	// For each session in our local list, try to acquire a strong
-	// 	// pointer. If successful, then send the message on that session.
-	// 	for(auto const&wp : v) {
-	// 		if(auto sp = wp.lock())
-	// 			sp->send(ss);
-	// 	}
-	// }
 	std::unordered_set<std::string> image_formats_to_create_thumbnails_for = {"image/bmp", "image/gif", "image/vnd.microsoft.icon", "image/jpeg", "image/jxl", "image/png"};
 	std::unordered_set<std::string> video_formats_to_create_thumbnails_for;
 

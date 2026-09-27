@@ -161,7 +161,7 @@ public:
 		this->threads.emplace(new_thread_id, std::move(thread));
 		return thread_ptr;
 	}
-	Message* createMessage(Message::Validated validated_message, int author_client_id) {
+	Message* createMessage(Message::Validated validated_message, const FuzeHttp::Client client) {
 		std::lock_guard<std::mutex> board_lock(mutex);
 		std::println("[Board::createMessage] getting thread...");
 		Thread* thread = this->getThread(validated_message.thread_id);
@@ -170,9 +170,10 @@ public:
 		int new_post_id;
 
 		std::println("[Board::createMessage] creating message...");
-		auto message = std::make_unique<Message>(db, validated_message, author_client_id, thread->getId(), thread->incrementMessageIdInThread()); // Key is deleted from message_json in its constructor
+		auto message = std::make_unique<Message>(db, validated_message, client.id, thread->getId(), thread->incrementMessageIdInThread()); // Key is deleted from message_json in its constructor
 		std::println("[Board::createMessage] inserting message into thread...");
 		auto message_ptr = thread->insertMessage(std::move(message));
+		thread->broadcastMessage(message_ptr, client);
 
 		std::time_t new_message_time = std::chrono::duration_cast<std::chrono::seconds>(thread->getLastMessageTime().time_since_epoch()).count();
 		this->ordered_threads.erase(std::make_pair(old_message_time, validated_message.thread_id));
@@ -229,28 +230,14 @@ public:
 		return threads.contains(thread_id);
 	};
 	bool messageExistsInThread(int message_id, int thread_id) const { return this->threads.at(thread_id)->messageExists(message_id); }
-	void addListenerToThread(FuzeHttp::WebsocketSession* listener, int thread_id) {
+	void addListenerToThread(std::weak_ptr<FuzeHttp::WebsocketSession> listener, int thread_id) {
 		if (threadExists(thread_id)) {
-			this->threads.at(thread_id)->addListener(listener);
+			this->threads.at(thread_id)->addListener(std::move(listener));
 			std::cout << "[Board] Listener added to thread " << thread_id << std::endl;
 		}
 		else
 			std::cout << "[Board] Warning: could not add listener to thread " << thread_id << " because the thread does not exist." << std::endl;
 	}
-	/*
-	void removeListenerFromThread(FuzeHttp::WebsocketSession* listener, int thread_id) {
-		if (threadExists(thread_id)) {
-			this->threads.at(thread_id)->removeListener(listener);
-			std::cout << "[Board] Listener removed from thread " << thread_id << std::endl;
-		}
-		else
-			std::cout << "[Board] Warning: did not remove listener from thread " << thread_id << " because the thread does not exist." << std::endl;
-	}
-	*/
-	// std::unordered_set<FuzeHttp::WebsocketSession*> getListenersFromThread(int thread_id) const { return this->threads.at(thread_id)->getListeners(); };
-	// std::string dumpMessage(int thread_id, int message_id) const {
-	// 	return this->threads.at(thread_id)->dumpMessage(message_id);
-	// }
 	struct thread_order_comparator {
 		bool operator() (std::pair<std::time_t, int> left, std::pair<std::time_t, int> right) const {
 			if (left.first > right.first)

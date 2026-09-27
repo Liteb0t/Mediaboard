@@ -105,7 +105,7 @@ public:
 	}
 	// int addPost(json post_json, int id_in_thread, bool save_to_database);
 	// int addPost(json post_json, bool save_to_database);
-	std::expected<void, std::string> deleteMessage(int id_in_thread, FuzeHttp::Client client) {
+	std::expected<void, std::string> deleteMessage(int id_in_thread, const FuzeHttp::Client client) {
 		if (id_in_thread == 0)
 			return std::unexpected("Can't delete message 0 from thread");
 		std::lock_guard<std::mutex> lock(mutex);
@@ -126,22 +126,9 @@ public:
 		return this->messages.contains(message_id_in_thread);
 	}
 	int getId() const { return this->id; };
-	void addListener(FuzeHttp::WebsocketSession* listener) {
+	void addListener(std::weak_ptr<FuzeHttp::WebsocketSession> listener) {
 		std::lock_guard<std::mutex> lock(mutex);
-		listeners.insert(listener);
-	}
-	void removeListener(FuzeHttp::WebsocketSession* listener) {
-		std::lock_guard<std::mutex> lock(mutex);
-		listeners.erase(listener);
-	}
-	std::unordered_set<FuzeHttp::WebsocketSession*> getListeners() const {
-		return this->listeners;
-	}
-	void removeUnauthorizedListeners() {
-		std::lock_guard<std::mutex> lock(mutex);
-		std::erase_if(this->listeners, [this](const FuzeHttp::WebsocketSession* ws)->bool{
-			return !this->clientHasPermission(ws->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD));
-		});
+		listeners.emplace(++listener_id_seq, listener);
 	}
 	boost::json::array getMessagesAsJson(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::array multiple_post_json = boost::json::array();
@@ -155,12 +142,6 @@ public:
 		}
 		return multiple_post_json;
 	}
-	// std::string dumpMessage(int message_id) const  {
-	// 	std::lock_guard<std::mutex> lock(mutex);
-	// 	boost::json::object message_json = this->messages.at(message_id)->asJson();
-	// 	return boost::json::serialize(message_json);
-	// }
-	// std::string dumpPermissions(int client_id) const;
 	void markAsDeleted() {
 		std::lock_guard<std::mutex> lock(mutex);
 		this->deleted = true;
@@ -181,16 +162,46 @@ public:
 		std::lock_guard<std::mutex> lock(mutex);
 		return this->messages.at(message_id_in_thread).get();
 	}
+	void broadcastMessage(const Message* message, const std::optional<FuzeHttp::Client>& client) {
+		removeUnauthorizedListeners();
+		// Make a local list of all the weak pointers representing
+		// the sessions, so we can do the actual sending without
+		// holding the mutex:
+		std::vector<std::weak_ptr<FuzeHttp::WebsocketSession>> weak_session_vec;
+		// std::lock_guard<std::mutex> lock(mutex);
+			weak_session_vec.reserve(listeners.size());
+			for(const auto& [id, weak_session] : listeners)
+				weak_session_vec.emplace_back(weak_session);
+		// }
+
+		// For each session in our local list, try to acquire a strong
+		// pointer. If successful, then send the message on that session.
+		for(auto const& weak_session : weak_session_vec) {
+			if(auto strong_session = weak_session.lock()) {
+				strong_session->send(message->asJson(strong_session->getClient()));
+			}
+		}
+	}
 	int board_id;
 	mutable std::mutex mutex;
 private:
+	void removeUnauthorizedListeners() {
+		// std::lock_guard<std::mutex> lock(mutex);
+		std::erase_if(this->listeners, [this](const auto& listener_pair)->bool{
+			if (std::shared_ptr<FuzeHttp::WebsocketSession> strong_session = listener_pair.second.lock())
+				return !this->clientHasPermission(strong_session->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD));
+			else
+				return true;
+		});
+	}
 	int id;
 	// int id_in_board;
 	std::chrono::time_point<std::chrono::system_clock> last_message_created_at;
 	// std::vector<Post> posts;
 	std::map<int, std::unique_ptr<Message>> messages;
 	int reply_count = -1;
-	std::unordered_set<FuzeHttp::WebsocketSession*> listeners;
+	int listener_id_seq = -1;
+	std::unordered_map<int, std::weak_ptr<FuzeHttp::WebsocketSession>> listeners;
 	// char subject[256];
 	bool deleted = false; // It is assumed new Thread object are not marked as deleted, because deleted threads are not retrieved from the database, nor can they be created through the API.
 }; // class Thread

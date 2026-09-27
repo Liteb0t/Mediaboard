@@ -357,6 +357,8 @@ document.body.onclick = (event) => {
 		expandEmbedFigure(target.parentNode);
 	else if (target.classList.contains("EmbedImage"))
 		contractEmbedFigure(target.parentNode);
+	else if (target.classList.contains("EmbedIframe"))
+		toggleEmbedFigure(target.parentNode);
 }
 
 const FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
@@ -607,18 +609,24 @@ function createPost(data, client_permissions) {
 
 	let post_content_element = document.createElement("div");
 	post_content_element.classList.add("Content");
-
-	// Highlight reply links by wrapping them in a <span> element
-	const message_content_split = data.content.split(/#\d*\/(\d+)\b/g);
-	for (let i = 0; i < message_content_split.length; i+=2) {
-		post_content_element.appendChild(document.createTextNode(message_content_split[i]));
-		if (i+1 !== message_content_split.length) {
-			let reply_link = document.createElement("span");
-			reply_link.classList.add("PostLink");
-			reply_link.textContent = `#${data.thread_id}/${message_content_split[i+1]}`;
-			post_content_element.appendChild(reply_link);
-		}
+	if (data.contains_html) {
+		const doc = new DOMParser().parseFromString(data.content, 'text/html');
+		console.log(doc.body.childNodes);
+		post_content_element.append(...doc.body.childNodes);
 	}
+	else
+		post_content_element.appendChild(document.createTextNode(data.content));
+	// Highlight reply links by wrapping them in a <span> element
+	// const message_content_split = data.content.split(/#\d*\/(\d+)\b/g);
+	// for (let i = 0; i < message_content_split.length; i+=2) {
+	// 	post_content_element.appendChild(document.createTextNode(message_content_split[i]));
+	// 	if (i+1 !== message_content_split.length) {
+	// 		let reply_link = document.createElement("span");
+	// 		reply_link.classList.add("PostLink");
+	// 		reply_link.textContent = `#${data.thread_id}/${message_content_split[i+1]}`;
+	// 		post_content_element.appendChild(reply_link);
+	// 	}
+	// }
 
 	let post_files_element = document.createElement("div");
 	post_files_element.classList.add("Files");

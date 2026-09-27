@@ -106,7 +106,7 @@ private:
 				if (!board.value()->getThread(thread_id)->clientHasPermission(this->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD)))
 					throw std::runtime_error("Client does not have VIEW_THREAD permission");
 				this->tracking_thread = thread_id;
-				board.value()->addListenerToThread(this, thread_id);
+				board.value()->addListenerToThread(this->weak_from_this(), thread_id);
 			}
 #ifdef WITH_WEBRTC
 			else if (request_type == "create_room") {
