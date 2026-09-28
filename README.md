@@ -1,5 +1,5 @@
 <h1><img src="https://fuze.page/static/fuze-min-hover.png" style="max-width: 100%;" width="94" height="45" alt="FUZE"> Mediaboard</h1>
-Version <b>0.2.1</b><br>
+Version <b>0.2.2</b><br>
 View: <a href="https://github.com/Liteb0t/Mediaboard">Git</a>, <a href="https://fuze.page/software/mediaboard/documentation/">Documentation</a>, <a href="https://fuze.page/software/mediaboard/">Overview</a><br>
 <p>
 	<a href="https://fuze.page/software/mediaboard/">Fuze Mediaboard</a> is a self-hosted multimedia messaging platform, running on the <a href="https://github.com/Liteb0t/FuzeHttp">FuzeHttp</a> framework. It is written for humans, by humans.
@@ -107,13 +107,13 @@ Changes made to <code>config.ini</code> are read when the server starts. These o
 <h2>Embedding into a webpage</h2>
 <p>
 	Fuze Mediaboard can be embedded inside of a page by using an iframe:<br>
-	<code>&lt;iframe src="http://localhost:8300/">&lt;/iframe></code>
+	<code>&lt;iframe src="http://localhost:8300/?board=board">&lt;/iframe></code>
 	<figure>
 		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_iframe.png">
 		<figcaption>Using Fuze Mediaboard inside of an iframe</figcaption>
 	</figure>
 	It can be shown with controls hidden by adding <code>display=embed</code> as a URL parameter:</br>
-	<pre><code>&lt;iframe src="http://localhost:8300/?display=embed">&lt;/iframe></code></pre>
+	<pre><code>&lt;iframe src="http://localhost:8300/?board=board&display=embed">&lt;/iframe></code></pre>
 	<figure>
 		<img src="https://fuze.page/static/Fuze_Mediaboard_0.1.3_iframe_embed.png">
 		<figcaption>Iframe with <code>display=embed</code></figcaption>
@@ -278,6 +278,6 @@ Dump PostgreSQL database:<br>
 Restore PostgreSQL database backup:<br>
 <code>psql -X --set ON_ERROR_STOP=on fuze_mediaboard &lt; mediaboard_dump.sql</code><br>
 <code>git config pull.recurseSubmodules true</code> - On git pull, update submodules to their specified commit<br>
-<code>cmake -B build -DFUZEDBI_USE_POSTGRES=ON -DWITH_MAGICK=ON -DWITH_WEBRTC=ON -G Ninja -DCMAKE_BUILD_TYPE=Release</br> - Full fat build<br>
+<code>cmake -B build -DFUZEDBI_USE_POSTGRES=ON -DWITH_MAGICK=ON -DWITH_WEBRTC=ON -G Ninja -DCMAKE_BUILD_TYPE=Release</code> - Full fat build<br>
 <code>cmake -B build_debugpg -DFUZEDBI_USE_POSTGRES=ON -DWITH_MAGICK=ON -DWITH_WEBRTC=ON -G Ninja -DCMAKE_BUILD_TYPE=Debug -DWITH_ASAN=ON</code>
 </p>

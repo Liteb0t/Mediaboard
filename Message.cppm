@@ -240,7 +240,7 @@ private:
 			if (std::regex_search(parameters, start_match, std::regex(R"-("\b(?:star)?t\=(\d+))-"))) {
 				std::println("start_match: {}", start_match.str()); // from which to get video start time
 			}
-			return std::format(R"-(<br><figure data-iframe-src="//www.youtube.com/embed/{}?rel=0&wmode=opaque{}" class="EmbedFigure"><figcaption class="EmbedIframe">Embed YouTube video</figcaption><iframe style="display: none" allowfullscreen="true" src=""></iframe></figure>)-", id, start_match.empty() ? "" : std::format("&start={}", start_match.str()));
+			return std::format(R"-(<br><figure data-iframe-src="//www.youtube.com/embed/{}?rel=0&wmode=opaque{}" class="EmbedFigure"><figcaption class="EmbedIframe">Embed YouTube video</figcaption><iframe style="display: none" allowfullscreen="true" width="360" height="240" src=""></iframe></figure>)-", id, start_match.empty() ? "" : std::format("&start={}", start_match.str()));
 		}}
 	};
 	// inline static const std::vector<RegexProcessorSlot> general_embed_rules = {

@@ -225,12 +225,12 @@ main {
 
 .EmbedFigure {
 	&[expanded] {
-		>figcaption:after {
+		>.EmbedIframe:after {
 			content: " \2bc6";
 		}
 	}
 	&:not([expanded]) {
-		>figcaption:after {
+		>.EmbedIframe:after {
 			content: " \2bc8";
 		}
 	}
