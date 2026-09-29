@@ -93,6 +93,13 @@ document.addEventListener("logout", () => {
 	getClientInfo();
 })
 
+refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
+async function refresh_send() {
+	loading_dialog.showModal();
+	await getAllBoards();
+	loading_dialog.close();
+}
+
 async function getAllBoards() {
 	try {
 		let response = await fetch("api/boards");
@@ -174,8 +181,12 @@ function showAllBoards(response_json) {
 		// slug_element.textContent = board.slug;
 		table_element.append(board_element);
 	}
-	fragment.appendChild(table_element);
-	board_list_container.replaceChildren(fragment);
+	if (response_json.boards.length === 0)
+		board_list_container.replaceChildren(document.createTextNode("No boards visible to this client."));
+	else {
+		fragment.appendChild(table_element);
+		board_list_container.replaceChildren(table_element);
+	}
 }
 
 // websocket = connectToServer();

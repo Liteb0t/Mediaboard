@@ -1,7 +1,9 @@
 <div id="header_bar" class="ToolBar WithBorders HeaderBar">
 	<div id="WebsiteName" class="WebsiteName"><b>CONFIG_site_name</b></div>
 
+#ifndef SERVER_LEVEL
 	<a class="Button ToolBarButton" href="index.html">Boards</a>
+#endif
 #ifdef BOARD
 	<button id="threads_button" class="ToolBarButton">Threads</button>
 #else
