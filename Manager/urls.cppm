@@ -17,6 +17,8 @@ namespace Manager {
 void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 
 	controller->addPatterns()
+	(verb::post, createServer,		"create", std::string{})
+	(verb::get, showDocument,						"*")
 	// (verb::get, showMainPage,						"boards")
 	;
 }

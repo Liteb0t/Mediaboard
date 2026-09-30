@@ -86,7 +86,6 @@ int main(int argc, char* argv[]) {
 	std::println("Finished adding config... adding URLs...");
 	addURLsToController(&server.controller);
 	std::println("Running server...");
-	server.run();
 
-	return EXIT_SUCCESS;
+	return server.run();
 }

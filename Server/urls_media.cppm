@@ -18,7 +18,8 @@ using namespace boost::beast::http;
 export namespace Mediaboard {
 void addMediaURLsToController(FuzeHttp::Controller<State*>* controller) {
 	controller->addPatterns()
-	(verb::post, uploadFile,						"api", "upload")
+	(verb::post, uploadFileInThread,				"api",  "board", BoardResolver{}, "thread", ThreadResolver{}, "upload")
+	(verb::post, uploadFileInBoard,					"api",  "board", BoardResolver{}, "upload")
 	(verb::get, getMedia,							"media", std::string())
 	(verb::get, getThumbnail,						"media", "thumbnails", std::string());
 }

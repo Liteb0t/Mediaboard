@@ -446,7 +446,7 @@ async function getAllThreads() {
 }
 
 function showAllThreads(message_json) {
-	location_indicator.textContent = "Threads in board " + state.selected_board.slug;
+	location_indicator.textContent = "Threads in " + state.selected_board.slug;
 	threads_button.disabled = true;
 	if (state.selected_board.permissions) {
 		updateReplyContainer(state.selected_thread.id, state.selected_board.permissions);
@@ -858,7 +858,7 @@ file_upload.onchange = (event) => {
 			try {
 				let new_file = new UploadedFile(chosen_file);
 				new_file.addFileToList(file_post_list);
-				new_file.upload();
+				new_file.upload(state.selected_thread.id);
 			}
 			catch (error) {
 				console.error(error);
@@ -918,7 +918,7 @@ class UploadedFile {
 			file_upload.disabled = false;
 		}
 	}
-	upload() {
+	upload(selected_thread_id) {
 		let formdata = new FormData();
 		formdata.append("File_1", this.file);
 		let received_error = false;
@@ -932,7 +932,7 @@ class UploadedFile {
 			}
 		});
 		request.responseType = "text";
-		request.open("POST", "./api/upload/");
+		request.open("POST", `./api/board/${state.selected_board.slug}/` + (selected_thread_id > -1 ? `thread/${selected_thread_id}/upload` : "upload/"));
 		request.timeout = 60*60*1000; // 1 hour
 		request.onreadystatechange = () => {
 			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
@@ -989,7 +989,7 @@ class UploadedFile {
 		upload_failed_indicator.classList.add("UploadFailedIndicator");
 		upload_failed_indicator.textContent = "Upload failed";
 		this.information_element.replaceChild(upload_failed_indicator, this.progress_element);
-		this.thumbnail_element.setAttribute("src", "static/x_icon.png");
+		this.thumbnail_element.setAttribute("src", "./static/x_icon.png");
 	}
 }
 

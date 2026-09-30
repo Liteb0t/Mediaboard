@@ -41,6 +41,9 @@ void addProgramOptions(ProgramOptions* options) {
 		std::filesystem::create_directories(install_version_location);
 		std::println("Will copy {} to {}", program_path.string(), install_version_location.string());
 		std::filesystem::copy(program_path, install_version_location, std::filesystem::copy_options::recursive);
+
+		std::filesystem::create_directories(install_parent_location / "servers");
+
 		std::println("Installation complete.");
 	}, "Testing extra callbacks");
 	;

@@ -6,6 +6,7 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<meta charset="utf-8">
 		<link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
+		<link rel="stylesheet" href="FILE_"static/styles.css"">
 	</head>
 	<body>
 		<main>
@@ -22,6 +23,7 @@
 		<noscript>
 			<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
 		</noscript>
+		<div><input id="server_name_input" type="text" placeholder="Server name"><button id="create_server_button">Create server</button></div>
 	</body>
 <style>
 </style>
@@ -29,13 +31,33 @@
 <script>
 "use strict";
 
-const localDate = new Date();
-const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
-const flex_separator = document.createElement("div");
-flex_separator.classList.add("FlexSeparator");
-let state = {
-	server_permissions: {}
-};
+// const localDate = new Date();
+// const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
+// const flex_separator = document.createElement("div");
+// flex_separator.classList.add("FlexSeparator");
+// let state = {
+// 	server_permissions: {}
+// };
+create_server_button.onclick = () => { createServer(); }
 
+async function createServer() {
+	try {
+		const server_name = server_name_input.value;
+		const response = await fetch(`./create/${server_name}`, {method: "POST"});
+		if (response.ok) {
+			alert("success");
+		}
+		else {
+			let error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to create server.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+}
 </script>
 </html>

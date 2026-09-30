@@ -1,0 +1,173 @@
+:root {
+	--monospace-font: Noto Mono, DejaVu Sans Mono, Consolas, Monaco, Liberation Mono, monospace;
+	--name-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
+	--interactive-font: Tahoma, Geneva, DejaVu Sans Condensed, Liberation Sans, sans-serif;
+	--content-font: DejaVu Serif, Cambria, Lucida Bright, Liberation Serif, serif;
+
+	--information-text: #008;
+	--success-text: #080;
+	--fail-text: #800;
+}
+
+body {
+	max-width: 80rem;
+	margin: 0 auto;
+	padding: 0 8px;
+	display: flex;
+	flex-flow: column;
+	height: 100vh;
+	font-family: var(--content-font);
+}
+
+.WebsiteName {
+	font-family: var(--name-font);
+}
+
+.HeaderBar {
+	border-top: 1px solid #888;
+	border-bottom: 1px solid #888;
+}
+
+.FlexSeparator {
+	flex-grow: 1;
+	padding: 0 !important;
+}
+
+input {
+	font-family: var(--interactive-font);
+}
+label {
+	font-family: var(--interactive-font);
+}
+
+button, input[type=file]::file-selector-button, input[type=button], .Button {
+	background-color: #EEE;
+	border: 2px outset #F8F8F8;
+	border-radius: 0;
+	font-size: 1rem;
+	font-family: var(--interactive-font);
+	padding: 0.15rem 0.5rem;
+	box-sizing: border-box;
+	text-decoration: none;
+	&:hover:not(:disabled) {
+		background-color: #CCC;
+		cursor: pointer;
+		&:active {
+			background-color: #BBB;
+			border-style: inset;
+			border-color: #EEE;
+		}
+	}
+}
+/* https://developer.mozilla.org/en-US/docs/Web/CSS/Nesting_selector#cannot_represent_pseudo-elements */
+input[type=file]::file-selector-button:hover {
+	background-color: #CCC;
+	cursor: pointer;
+}
+input[type=file]::file-selector-button:active {
+	background-color: #AAA;
+	border-style: inset;
+}
+
+input[type=text], input[type=password], div[contenteditable] {
+	font-size: inherit;
+	border-radius: 0;
+	border: 1px inset #bbb;
+	min-height: 1.5em;
+}
+
+dialog {
+	box-shadow: 8px 8px #0008;
+	width: min(25em, calc(90vw - 2em));
+	word-break: break-word;
+	>form {
+		margin: 16px 0;
+	}
+	>.ToolBar {
+		:first-child {
+			margin-left: auto;
+		}
+		>button:not(:first-child), >.Button:not(:first-child) {
+			margin-left: 16px;
+		}
+	}
+	>fieldset {
+		margin: 16px 0;
+	}
+}
+
+.ToolBar {
+	display: flex;
+	flex-wrap: wrap;
+	/*user-select: none;*/
+	
+	>* {
+		display: flex;
+		align-items: center;
+		min-height: 2rem;
+		word-wrap: anywhere;
+		box-sizing: border-box;
+		font-family: var(--name-font);
+		&:not(button)&:not(.Button) {
+			padding: 0 0.25rem;
+		}
+		time, span, b, i {
+			user-select: none;
+		}
+	}
+	&.WithBorders >* {
+		&:not(:first-child) {
+			border-left: 1px solid #888;
+		}
+	}
+	.RightAligned {
+		margin-left: auto;
+	}
+	input[type=radio] {
+		margin: 0 4px 0 0;
+	}
+}
+
+.MessageBoxButtons button {
+	margin-left: auto;
+	&:not(:first-child) {
+		margin-left: 0.5rem;
+	}
+}
+
+.ToolBarButton {
+	border-style: none;
+	/*padding: 0 1em;*/
+	&:hover:active {
+		border-style: none !important;
+		&:not(:first-child) {
+			border-left: 1px solid #888 !important;
+		}
+	}
+}
+.FormGrid {
+	display: grid;
+	grid-template-columns: auto auto auto;
+	gap: 0.25em 0.5em;
+	margin: 4px 0;
+	width: fit-content;
+	.FullWidth {
+		grid-column: 1 / 4;
+	}
+	>* {
+		align-self: center;
+	}
+}
+table {
+	border: 2px solid #ddd;
+	border-collapse: collapse;
+	margin: 1em 0;
+	th {
+		background-color: #ddd;
+		padding: 0.25em 0.5em;
+	}
+	td {
+		border: 2px solid #ddd;
+		padding: 0.5em;
+	}
+}

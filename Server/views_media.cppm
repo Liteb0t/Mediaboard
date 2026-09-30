@@ -18,19 +18,17 @@ export module Mediaboard.Views_media;
 
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
+import Mediaboard.Board;
+import Mediaboard.Thread;
 import Mediaboard.Message;
 import Mediaboard.Permission;
 import Mediaboard.State;
 
 using namespace FuzeHttp;
 
-export namespace Mediaboard {
+namespace Mediaboard {
 
-FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
-	std::optional<Client> client = state->getClientIfExists(req);
-	// TODO have UPLOAD_FILE permission modifiable for threads and boards.
-	if (!state->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE)))
-		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files."};
+FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
 	std::istringstream req_stream(req.body());
 	std::string req_line;
 	std::getline(req_stream, req_line);
@@ -213,10 +211,28 @@ FuzeHttp::Response uploadFile(Mediaboard::State* state, FuzeHttp::Request req) {
 	}
 #endif
 	return response;
+} // uploadFile()
+} // namespace Mediaboard
+
+export namespace Mediaboard {
+FuzeHttp::Response uploadFileInThread(State* state, FuzeHttp::Request req, Board* board, Thread* thread) {
+	std::optional<Client> client = state->getClientIfExists(req);
+	if (!thread->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE)))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files in this thread."};
+	else
+		return uploadFile(state, std::move(req));
+}
+
+FuzeHttp::Response uploadFileInBoard(State* state, FuzeHttp::Request req, Board* board) {
+	std::optional<Client> client = state->getClientIfExists(req);
+	if (!board->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE)))
+		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files in this board."};
+	else
+		return uploadFile(state, std::move(req));
 }
 
 // TODO find a way to handle multiple directories under one view
-FuzeHttp::Response getMedia(Mediaboard::State* state, FuzeHttp::Request req, std::string location) {
+FuzeHttp::Response getMedia(State* state, FuzeHttp::Request req, std::string location) {
 	std::cout << "Showing thru getMedia" << std::endl;
 	std::string file_name = location;
 	int filename_extension_index;
@@ -242,7 +258,7 @@ FuzeHttp::Response getMedia(Mediaboard::State* state, FuzeHttp::Request req, std
 	};
 }
 
-FuzeHttp::Response getThumbnail(Mediaboard::State* state, FuzeHttp::Request req, std::string file_path) {
+FuzeHttp::Response getThumbnail(State* state, FuzeHttp::Request req, std::string file_path) {
 	std::cout << "Showing thru getMedia" << std::endl;
 	std::string file_name = file_path;
 	int filename_extension_index;
@@ -257,4 +273,4 @@ FuzeHttp::Response getThumbnail(Mediaboard::State* state, FuzeHttp::Request req,
 		.file = std::format("{}/thumbnails/{}", state->getMediaLocation().string(), file_path)
 	};
 }
-} // namespace Mediaboard
+} // export namespace Mediaboard

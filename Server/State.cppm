@@ -469,6 +469,11 @@ private:
 			else
 				return std::unexpected(message.error());
 		}
+		if (validated.post_zero_validated.files.size() > 0) {
+			// TODO move permission checking to another place, and have customisable upload limits
+			if (!board->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE)))
+				return std::unexpected(std::format("Client {} does not have permission to upload files", client.id));
+		}
 		return validated;
 	}
 	std::expected<Message::Validated, std::string> validateMessage(const boost::json::object json, const Board* board, const FuzeHttp::Client client, Message::Validated validated = {}) {
@@ -543,6 +548,11 @@ private:
 			// 	return std::unexpected(std::format("Thread {} not found in board {}", validated.thread_id, board->getSlug()));
 			if (validated.thread_id != thread->getId())
 				return std::unexpected(std::format("Thread ID in JSON {} does not match thread ID in URL {}", validated.thread_id, thread->getId()));
+		}
+		if (validated.files.size() > 0) {
+			// TODO move permission checking to another place, and have customisable upload limits
+			if (!thread->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE)))
+				return std::unexpected(std::format("Client {} does not have permission to upload files", client.id));
 		}
 		return validateMessage(json, board, client, validated);
 	}

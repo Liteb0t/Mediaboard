@@ -17,7 +17,7 @@ using namespace FuzeHttp;
 
 export namespace Mediaboard {
 
-FuzeHttp::Response requestNewAccountParameters(Mediaboard::State* state, FuzeHttp::Request req) {
+FuzeHttp::Response requestNewAccountParameters(State* state, FuzeHttp::Request req) {
 	boost::json::object req_json;
 	boost::json::string username_j;
 	std::optional<std::string> invite_key;
@@ -81,7 +81,7 @@ FuzeHttp::Response requestNewAccountParameters(Mediaboard::State* state, FuzeHtt
 	};
 }
 
-FuzeHttp::Response createNewAccount(Mediaboard::State* state, FuzeHttp::Request req) {
+FuzeHttp::Response createNewAccount(State* state, FuzeHttp::Request req) {
 	boost::json::object req_json;
 	boost::json::string username_j, password_hash_base64, intermediate_salt_base64;
 	std::optional<std::string> invite_key;
@@ -149,7 +149,7 @@ FuzeHttp::Response createNewAccount(Mediaboard::State* state, FuzeHttp::Request 
 	};
 }
 
-FuzeHttp::Response requestLoginParameters(Mediaboard::State* state, FuzeHttp::Request req) {
+FuzeHttp::Response requestLoginParameters(State* state, FuzeHttp::Request req) {
 	boost::json::value req_json;
 	boost::json::string username_j;
 	try {
@@ -177,7 +177,7 @@ FuzeHttp::Response requestLoginParameters(Mediaboard::State* state, FuzeHttp::Re
 	return FuzeHttp::Response{.status = http::status::ok, .json = std::move(json)};
 }
 
-FuzeHttp::Response login(Mediaboard::State* state, FuzeHttp::Request req) {
+FuzeHttp::Response login(State* state, FuzeHttp::Request req) {
 	boost::json::value req_json;
 	boost::json::string username_j, password_hash_base64;
 	bool stay_logged_in;
@@ -229,7 +229,7 @@ FuzeHttp::Response login(Mediaboard::State* state, FuzeHttp::Request req) {
 	}
 }
 
-FuzeHttp::Response logout(Mediaboard::State* state, FuzeHttp::Request req) {
+FuzeHttp::Response logout(State* state, FuzeHttp::Request req) {
 	auto cookie_header = req.find("Cookie");
 	if (cookie_header == req.end())
 		return {};
@@ -242,7 +242,7 @@ FuzeHttp::Response logout(Mediaboard::State* state, FuzeHttp::Request req) {
 	};
 }
 
-FuzeHttp::Response changePassword(Mediaboard::State* state, FuzeHttp::Request req) {
+FuzeHttp::Response changePassword(State* state, FuzeHttp::Request req) {
 	boost::json::object req_json;
 	boost::json::string username_j, new_password_hash_base64, intermediate_salt_base64, old_password_hash_base64;
 	std::optional<std::string> invite_key;
