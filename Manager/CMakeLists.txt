@@ -2,52 +2,26 @@
 # Fuze Human-oriented License v1
 cmake_minimum_required(VERSION 3.28 FATAL_ERROR)
 
-add_executable(MediaboardServer)
-set_target_properties(MediaboardServer PROPERTIES ENABLE_EXPORTS ON)
-target_compile_options(MediaboardServer PRIVATE -fno-omit-frame-pointer)
-if(WITH_MAGICK)
-  find_package(ImageMagick COMPONENTS Magick++ REQUIRED)
-  add_compile_definitions( -DMAGICKCORE_QUANTUM_DEPTH=16 )
-  add_compile_definitions( -DMAGICKCORE_HDRI_ENABLE=0 )
-  include_directories(${ImageMagick_INCLUDE_DIRS})
-  target_compile_definitions(MediaboardServer PRIVATE WITH_MAGICK)
-  target_link_libraries(MediaboardServer PRIVATE ${ImageMagick_LIBRARIES})
-else()
-  message("Compiling without ImageMagick support. Certain features such as thumbnail creation will not work.")
-endif()
+add_executable(MediaboardManager)
 
-if(WITH_WEBRTC)
-  target_compile_definitions(MediaboardServer PRIVATE WITH_WEBRTC)
-  target_link_libraries(MediaboardServer PRIVATE datachannel-static tiny-HMAC-c)
-  target_sources(MediaboardServer PUBLIC FILE_SET CXX_MODULES FILES Room.cppm)
-endif()
-
-target_link_libraries(MediaboardServer
+target_link_libraries(MediaboardManager
   PRIVATE
     Boost::json
     Boost::program_options
     FuzeHttp
 )
-target_sources(MediaboardServer
+target_sources(MediaboardManager
   PRIVATE
     main.cpp
     migrations.cpp
   PUBLIC
     FILE_SET CXX_MODULES FILES
-      Board.cppm
       Config.cppm
-      MediaboardWebsocketSession.cppm
-      Message.cppm
-      Permission.cppm
+      HomeDirLibrary.cppm
       resolvers.cppm
       State.cppm
-      Thread.cppm
       urls.cppm
-      urls_media.cppm
-      urls_registration.cppm
       views.cppm
-      views_media.cppm
-      views_registration.cppm
 )
 set(frontend_list "") ## its a list which will be used as DEPENDS on add_custom_target
 set(FRONTEND_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/frontend)
@@ -67,7 +41,7 @@ foreach(file ${frontend_files})
     endif()
     # [AI glasnost] this section assisted by Claude Sonnet 5
     set(qualified_source ${FRONTEND_SOURCE_DIR}/${file})
-    set(qualified_destination ${CMAKE_BINARY_DIR}/share/MediaboardServer/frontend/${file})
+    set(qualified_destination ${CMAKE_BINARY_DIR}/share/MediaboardManager/frontend/${file})
     set(depfile ${CMAKE_BINARY_DIR}/frontend_deps/${file}.d)
 
     get_filename_component(destination_dir ${qualified_destination} DIRECTORY)
@@ -98,7 +72,7 @@ foreach(file ${frontend_files})
     # [AI glasnost] end AI-assisted section
   else()
     message("----is regular file")
-    set(qualified_destination ${CMAKE_BINARY_DIR}/share/MediaboardServer/frontend/${file})
+    set(qualified_destination ${CMAKE_BINARY_DIR}/share/MediaboardManager/frontend/${file})
     add_custom_command(
       OUTPUT ${qualified_destination}
       COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FRONTEND_SOURCE_DIR}/${file} ${qualified_destination}
@@ -109,39 +83,28 @@ foreach(file ${frontend_files})
   endif()
 endforeach()
 
-add_custom_target(frontend ALL
+add_custom_target(MediaboardManagerfrontend ALL
   DEPENDS
     ${frontend_list}
 )
-set(current_data_destination ${data_destination}/MediaboardServer)
+set(current_data_destination ${data_destination}/MediaboardManager)
 install(
-  TARGETS MediaboardServer RUNTIME
+  TARGETS MediaboardManager RUNTIME
   DESTINATION usr/bin
 )
 install(
-  DIRECTORY ${CMAKE_BINARY_DIR}/share/MediaboardServer/frontend
+  DIRECTORY ${CMAKE_BINARY_DIR}/share/MediaboardManager/frontend
   DESTINATION ${current_data_destination}
 )
-configure_file(config.ini ${CMAKE_BINARY_DIR}/share/MediaboardServer/config.ini COPYONLY)
-configure_file(database_template.sql ${CMAKE_BINARY_DIR}/share/MediaboardServer/database_template.sql COPYONLY)
-add_custom_command(TARGET MediaboardServer POST_BUILD
-  COMMAND ${CMAKE_BINARY_DIR}/bin/MediaboardServer --generate_manifest
+configure_file(config.ini ${CMAKE_BINARY_DIR}/share/MediaboardManager/config.ini COPYONLY)
+configure_file(database_template.sql ${CMAKE_BINARY_DIR}/share/MediaboardManager/database_template.sql COPYONLY)
+add_custom_command(TARGET MediaboardManager POST_BUILD
+  COMMAND ${CMAKE_BINARY_DIR}/bin/MediaboardManager --generate_manifest
   COMMENT "Generating manifest.json"
 )
-
-set(frontend_manifest_file ${CMAKE_BINARY_DIR}/share/MediaboardServer/manifest.json)
-add_custom_command(
-  OUTPUT ${frontend_manifest_file}
-  COMMAND $<TARGET_FILE:MediaboardServer> --generate_manifest
-  DEPENDS MediaboardServer ${frontend_list}
-  COMMENT "Generating manifest.json"
-  VERBATIM
-)
-add_custom_target(manifest ALL DEPENDS ${frontend_manifest_file})
-
 install(
   FILES
-    ${CMAKE_BINARY_DIR}/share/MediaboardServer/manifest.json
+    ${CMAKE_BINARY_DIR}/share/MediaboardManager/manifest.json
   DESTINATION ${current_data_destination}
   OPTIONAL
 )
@@ -151,6 +114,6 @@ install(
     database_template.sql
   DESTINATION ${current_data_destination}
 )
-add_dependencies(MediaboardServer
-  frontend
+add_dependencies(MediaboardManager
+  MediaboardManagerfrontend
 )

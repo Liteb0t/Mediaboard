@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
 
 	FuzeHttp::Server<Mediaboard::State, Mediaboard::WebsocketSession> server(current_version);
 	std::println("Finished Initialising server...");
-	if (int return_code; (return_code = server.processOptions(argc, argv, std::move(server_options), "FuzeMediaboard")) != -1)
+	if (int return_code; (return_code = server.processOptions(argc, argv, std::move(server_options), "MediaboardServer")) != -1)
 		return return_code;
 	std::println("Finished processing options... adding confuig...");
 	server.state->config = state_config;

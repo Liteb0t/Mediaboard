@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>CONFIG_site_name</title>
+		<meta name="description" content="Fuze Mediaboard is an imageboard engine with advanced permissions.">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<meta charset="utf-8">
+		<link rel="icon" type="image/x-icon" href="CONFIG_favicon_url">
+	</head>
+	<body>
+		<main>
+#define SERVER_LEVEL 1
+			<h1>MediaboardManager</h1>
+			<p><a href="https://fuze.page/software/mediaboard">Fuze Mediaboard</a> CONFIG_server_version</p>
+		</main>
+		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
+		<dialog id="error_dialog" closedby="any">
+			<h2>Error</h2>
+			<p id="error_message">Something happened.</p>
+			<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
+		</dialog>
+		<noscript>
+			<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
+		</noscript>
+	</body>
+<style>
+</style>
+
+<script>
+"use strict";
+
+const localDate = new Date();
+const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
+const flex_separator = document.createElement("div");
+flex_separator.classList.add("FlexSeparator");
+let state = {
+	server_permissions: {}
+};
+
+</script>
+</html>

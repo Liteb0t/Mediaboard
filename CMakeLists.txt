@@ -29,14 +29,11 @@ include(GNUInstallDirs)
 cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
 find_package(Boost 1.88 COMPONENTS json program_options REQUIRED)
 
+set(data_destination "usr/share")
+add_subdirectory(Manager)
 add_subdirectory(Server)
 add_subdirectory(assets)
 # add_subdirectory(frontend)
 add_subdirectory(dependencies)
 
-install(
-  TARGETS MediaboardServer
-  FILE_SET HEADERS
-  # RUNTIME DESTINATION bin
-)
 # unset(FUZEDBI_USE_POSTGRES CACHE)
