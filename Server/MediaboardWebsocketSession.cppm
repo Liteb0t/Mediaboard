@@ -15,7 +15,7 @@ module;
 export module Mediaboard.MediaboardWebsocketSession;
 
 import FuzeHttp.PermissionObject;
-import FuzeHttp.State;
+import FuzeHttp.WebsocketSession;
 import Mediaboard.Board;
 #ifdef WITH_WEBRTC
 import Mediaboard.Room;
@@ -26,7 +26,7 @@ import Mediaboard.State;
 export namespace Mediaboard {
 class WebsocketSession : public FuzeHttp::WebsocketSession {
 public:
-	WebsocketSession(boost::asio::ip::tcp::socket&& socket, FuzeHttp::StateBase* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
+	WebsocketSession(boost::asio::ip::tcp::socket&& socket, State* state) : FuzeHttp::WebsocketSession(std::move(socket), state) {}
 #ifdef WITH_WEBRTC
 	~WebsocketSession() {
 		if (own_peer_ptr) {

@@ -17,7 +17,7 @@ export import Mediaboard.Message;
 import Mediaboard.Permission;
 import FuzeDBI;
 import FuzeHttp.PermissionObject;
-import FuzeHttp.State;
+import FuzeHttp.WebsocketSession;
 
 export namespace Mediaboard {
 class Thread : public FuzeHttp::PermissionManagedObject {

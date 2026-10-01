@@ -31,7 +31,7 @@ import Mediaboard.Config;
 import Mediaboard.State;
 import Mediaboard.URLs;
 
-const std::string current_version = "0.2.2";
+const std::string current_version = "0.2.3";
 
 using namespace FuzeHttp;
 using namespace Mediaboard;

@@ -24,13 +24,19 @@
 			<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
 		</noscript>
 		<div><input id="server_name_input" type="text" placeholder="Server name"><button id="create_server_button">Create server</button></div>
+		<div><button id="update_servers_button">Update servers</button><button id="list_servers_button">List servers</button></div>
+		<div id="server_list_container"></div>
 	</body>
 <style>
+.Invalid {
+	background-color: #FCC;
+}
 </style>
 
 <script>
 "use strict";
 
+loading_dialog.showModal();
 // const localDate = new Date();
 // const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 // const flex_separator = document.createElement("div");
@@ -39,6 +45,8 @@
 // 	server_permissions: {}
 // };
 create_server_button.onclick = () => { createServer(); }
+update_servers_button.onclick = () => { updateServers(); }
+list_servers_button.onclick = () => { getServers(); }
 
 async function createServer() {
 	try {
@@ -46,6 +54,7 @@ async function createServer() {
 		const response = await fetch(`./create/${server_name}`, {method: "POST"});
 		if (response.ok) {
 			alert("success");
+			await updateServers();
 		}
 		else {
 			let error_message = response.headers.get("message");
@@ -59,5 +68,90 @@ async function createServer() {
 		error_dialog.showModal();
 	}
 }
+async function updateServers() {
+	try {
+		const response = await fetch("./update/", {method: "POST"});
+		if (response.ok) {
+			await getServers();
+		}
+		else {
+			let error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to update servers.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+}
+
+async function getServers() {
+	try {
+		let response = await fetch("list");
+		console.log(response);
+		if (response.ok) {
+			await response.json().then(response_obj => {
+				console.log(response_obj);
+				showServers(response_obj);
+			});
+		}
+		else {
+			let error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to fetch servers.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+}
+
+async function showServers(response_json) {
+	const fragment = new DocumentFragment();
+	const table_element = document.createElement("table");
+	const headers_element = document.createElement("tr");
+	["Name", "Path", "Port"].forEach((column_name) => {
+		let header = document.createElement("th");
+		header.textContent = column_name;
+		headers_element.append(header);
+	});
+	table_element.append(headers_element);
+	for (let server of response_json.mediaboard_servers) {
+		console.log(server);
+		const server_element = document.createElement("tr");
+		["site_name", "data_directory", "server_port"].forEach((column_name) => {
+			let col = document.createElement("td");
+			col.textContent = server[column_name];
+			server_element.append(col);
+		});
+		if (!server.is_valid)
+			server_element.classList.add("Invalid");
+		if (server.additional_information.length > 0) {
+			let col = document.createElement("td");
+			let list = document.createElement("ul");
+			for (const information of server.additional_information) {
+				let li = document.createElement("li");
+				li.textContent = information;
+				list.append(li);
+			}
+			col.append(list);
+			server_element.append(col);
+		}
+		table_element.append(server_element);
+	}
+	if (response_json.mediaboard_servers.length === 0)
+		server_list_container.replaceChildren(document.createTextNode("None."));
+	else {
+		fragment.appendChild(table_element);
+		server_list_container.replaceChildren(table_element);
+	}
+}
+getServers().then(() => {
+	loading_dialog.close();
+})
 </script>
 </html>

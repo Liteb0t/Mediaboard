@@ -18,7 +18,9 @@ target_sources(MediaboardManager
     FILE_SET CXX_MODULES FILES
       Config.cppm
       HomeDirLibrary.cppm
+      MediaboardServerInformation.cppm
       resolvers.cppm
+      Operations.cppm
       State.cppm
       urls.cppm
       views.cppm
