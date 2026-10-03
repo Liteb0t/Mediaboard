@@ -130,8 +130,14 @@ async function showServers(response_json) {
 		});
 		if (!server.is_valid)
 			server_element.classList.add("Invalid");
+		let col = document.createElement("td");
+		let start_button = document.createElement("button");
+		start_button.textContent = "Start";
+		start_button.onclick = () => {
+			startServer(server["site_name"])
+		}
+		col.appendChild(start_button);
 		if (server.additional_information.length > 0) {
-			let col = document.createElement("td");
 			let list = document.createElement("ul");
 			for (const information of server.additional_information) {
 				let li = document.createElement("li");
@@ -139,8 +145,8 @@ async function showServers(response_json) {
 				list.append(li);
 			}
 			col.append(list);
-			server_element.append(col);
 		}
+		server_element.append(col);
 		table_element.append(server_element);
 	}
 	if (response_json.mediaboard_servers.length === 0)
@@ -148,6 +154,25 @@ async function showServers(response_json) {
 	else {
 		fragment.appendChild(table_element);
 		server_list_container.replaceChildren(table_element);
+	}
+}
+async function startServer(site_name) {
+	try {
+		const response = await fetch(`./server/${site_name}/start`, {method: "POST"});
+		if (response.ok) {
+			// pass
+			alert("Started server :)");
+		}
+		else {
+			let error_message = response.headers.get("message");
+			error_message ??= "An unknown error occured when attempting to update servers.";
+			throw error_message;
+		}
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
 	}
 }
 getServers().then(() => {

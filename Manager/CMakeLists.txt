@@ -7,6 +7,7 @@ add_executable(MediaboardManager)
 target_link_libraries(MediaboardManager
   PRIVATE
     Boost::json
+    Boost::process
     Boost::program_options
     FuzeHttp
 )

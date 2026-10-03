@@ -6,6 +6,10 @@ module;
 #endif
 #include "beast.hpp"
 #include <boost/json.hpp>
+#include <boost/process/v2/environment.hpp>
+#include <boost/process/v2/process.hpp>
+#include <boost/process/v2/start_dir.hpp>
+#include <boost/process/v2/stdio.hpp>
 #include <boost/smart_ptr.hpp>
 #include <sodium.h>
 #include <expected>
@@ -28,6 +32,7 @@ import Mediaboard.Manager.Operations;
 import Mediaboard.Manager.MediaboardServerInformation;
 
 using namespace FuzeHttp;
+namespace broc = boost::process::v2;
 
 export namespace Mediaboard::Manager {
 
@@ -75,6 +80,30 @@ public:
 			return std::unexpected(std::format("[updateServers] An exception was thrown: {}", exception.what()));
 		}
 		std::println("[updateServers] Scan complete.");
+		return {};
+	}
+	std::expected<void, Response> runServer(const std::string server_name) {
+		std::lock_guard<std::mutex> lock(mutex);
+		std::filesystem::path mediaboard_binary_path = this->program_location / "MediaboardServer";
+		std::println("[runServer] mediaboard_binary_path: {}", mediaboard_binary_path.string());
+
+		if (!this->mediaboard_servers.contains(server_name))
+			return std::unexpected(Response{.status=http::status::bad_request, .error_message=std::format("Server with name \"{}\" does not exist.", server_name)});
+
+		MediaboardServerInformation* server = this->mediaboard_servers.at(server_name).get();
+		FILE* log = std::fopen(server->getLogFilePath().string().c_str(), "a"); // maybe use std::filesoystem or ofstream if possible; i don't like C shit
+		broc::process server_process(
+			this->io_context->get_executor(), // asio::io_context
+			mediaboard_binary_path.string(), // filesystem::path (to string because arg takes BOOOST::filesystem)
+			{std::format("--config={}", server->getConfigFilePath().string())},
+			broc::process_start_dir(server->data_directory.string()),
+			broc::process_stdio{nullptr /*stdin*/, log /*stdout*/, log /*stderr*/},
+			broc::process_environment{getCleanEnvironment()}
+			// If children should outlive a daemon close, then:
+			// broc::windows::process_creation_flags<DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB>{}
+		);
+		server_process.detach();
+		std::fclose(log);
 		return {};
 	}
 	boost::json::array getServersAsJson() {
@@ -138,7 +167,7 @@ public:
 	// const std::filesystem::path& getMediaLocation() const { return media_location; }
 private:
 	int getFreePort() const {
-		int port = 8300;
+		int port = 8301;
 		while (serverWithPortExists(port))
 			++port;
 		return port;
@@ -149,6 +178,15 @@ private:
 			used_ports.emplace(server->server_port);
 		}
 		return used_ports.contains(port);
+	}
+	std::unordered_map<broc::environment::key, broc::environment::value> getCleanEnvironment() {
+		static const std::unordered_set<std::string> banned_variables = {"APPDIR", "APPIMAGE", "ARGV0", "OWD", "LD_LIBRARY_PATH"}; // APPDIR in child process would fuck us up. idk what the others are for.
+		std::unordered_map<broc::environment::key, broc::environment::value> clean_environment;
+		for (const auto& pair : broc::environment::current()) {
+			if (!banned_variables.contains(pair.key().string()))
+				clean_environment.emplace(pair.key(), pair.value());
+		}
+		return clean_environment;
 	}
 	std::unordered_map<std::string, std::unique_ptr<MediaboardServerInformation>> mediaboard_servers;
 }; // class State

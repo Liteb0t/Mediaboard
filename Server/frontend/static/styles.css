@@ -7,8 +7,18 @@
 	--information-text: #008;
 	--success-text: #080;
 	--fail-text: #800;
+
+	--background-color: #FFF;
+	--main-text-color: #000;
+	@media (prefers-color-scheme: dark) {
+		--background-color: #000;
+		--main-text-color: #FFF;
+	}
 }
 
+html {
+	background-color: var(--backround-color);
+}
 body {
 	max-width: 80rem;
 	margin: 0 auto;
@@ -17,6 +27,7 @@ body {
 	flex-flow: column;
 	height: 100vh;
 	font-family: var(--content-font);
+	color: var(--main-text-color);
 }
 
 .WebsiteName {

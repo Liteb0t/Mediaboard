@@ -27,7 +27,7 @@ include(GNUInstallDirs)
 
 # Find dependencies sneeded by the project
 cmake_policy(SET CMP0167 NEW) # use BoostConfig.cmake instead of legacy FindBoost, for CMake < 3.30
-find_package(Boost 1.88 COMPONENTS json program_options REQUIRED)
+find_package(Boost 1.88 COMPONENTS json process program_options REQUIRED)
 
 set(data_destination "usr/share")
 add_subdirectory(Manager)

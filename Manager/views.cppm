@@ -48,4 +48,11 @@ Response listServers(State* state, Request req) {
 		.json = {{{"mediaboard_servers", state->getServersAsJson()}}}
 	};
 }
+
+Response startServer(State* state, Request req, std::string server_name) {
+	if (auto res = state->runServer(server_name))
+		return {.status = http::status::ok};
+	else
+		return res.error();
+}
 } // namespace Mediaboard::Manager

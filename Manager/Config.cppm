@@ -36,8 +36,15 @@ void addProgramOptions(ProgramOptions* options) {
 		if (!user_input.empty())
 			install_parent_location = user_input;
 		std::filesystem::path install_version_location = install_parent_location / "versions" / state->server_version;
-		if (std::filesystem::exists(install_version_location))
-			throw std::format("Version is already installed at {}", install_version_location.string());
+		if (std::filesystem::exists(install_version_location)) {
+			std::println("Version is already installed at {}.", install_version_location.string());
+			std::print("Overwrite? (y/N) ");
+			std::string response;
+			std::getline(std::cin, response);
+			if (response.empty() || std::tolower(response[0]) == 'n')
+				throw "Aborted installation";
+			std::filesystem::remove_all(install_version_location);
+		}
 		std::filesystem::create_directories(install_version_location);
 		std::println("Will copy {} to {}", program_path.string(), install_version_location.string());
 		std::filesystem::copy(program_path, install_version_location, std::filesystem::copy_options::recursive);

@@ -1,3 +1,5 @@
+// Copyright (c) 2026, Fuze.page
+// Fuze Human-oriented License v1
 module;
 #include <boost/program_options.hpp>
 #include <expected>
@@ -33,6 +35,7 @@ std::expected<std::unique_ptr<MediaboardServerInformation>, std::string> parseSe
 	catch (const boost::program_options::error& error) {
 		return std::unexpected("boost::program_options error");
 	}
+	// boost::program_options::collect_unrecognized
 	auto server_info = std::make_unique<MediaboardServerInformation>();
 	server_info->data_directory = server_directory;
 	if (variable_map.count("site_name"))

@@ -17,11 +17,11 @@ namespace Manager {
 void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 
 	controller->addPatterns()
+	(verb::get, showDocument,						"*")
 	(verb::post, createServer,		"create", std::string{})
 	(verb::post, updateServers,		"update")
 	(verb::get, listServers,		"list")
-	(verb::get, showDocument,						"*")
-	// (verb::get, showMainPage,						"boards")
+	(verb::post, startServer,		"server", std::string{}, "start")
 	;
 }
 }

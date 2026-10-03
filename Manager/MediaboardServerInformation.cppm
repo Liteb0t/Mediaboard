@@ -1,3 +1,5 @@
+// Copyright (c) 2026, Fuze.page
+// Fuze Human-oriented License v1
 module;
 #include <boost/json.hpp>
 #include <filesystem>
@@ -20,6 +22,12 @@ struct MediaboardServerInformation {
 			{"is_valid", is_valid},
 			{"additional_information", additional_information}
 		}};
+	}
+	std::filesystem::path getConfigFilePath() const {
+		return this->data_directory / "config.ini";
+	}
+	std::filesystem::path getLogFilePath() const {
+		return this->data_directory / "log.txt";
 	}
 };
 }
