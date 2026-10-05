@@ -54,6 +54,9 @@ public:
 			for (const auto& dir_entry : std::filesystem::directory_iterator{servers_folder}) {
 				if (auto server_info_maybe = parseServerDirectory(dir_entry.path())) {
 					MediaboardServerInformation* server = server_info_maybe.value().get();
+					// boost::interprocess::file_lock file_lock(server->getLockFilePath().string().c_str());
+					// server->lock_is_held = !file_lock.try_lock();
+
 					std::string site_name = server->site_name;
 					site_names.emplace(site_name);
 					if (this->mediaboard_servers.contains(site_name))
@@ -91,6 +94,11 @@ public:
 			return std::unexpected(Response{.status=http::status::bad_request, .error_message=std::format("Server with name \"{}\" does not exist.", server_name)});
 
 		MediaboardServerInformation* server = this->mediaboard_servers.at(server_name).get();
+		if (server->isRunning())
+			return std::unexpected(Response{.status=http::status::bad_request, .error_message="Server is already running"});
+		// if (auto lock_res = server->tryLock(); !lock_res)
+		// 	return std::unexpected(Response{.status=http::status::internal_server_error, .error_message=lock_res.error()});
+
 		FILE* log = std::fopen(server->getLogFilePath().string().c_str(), "a"); // maybe use std::filesoystem or ofstream if possible; i don't like C shit
 		broc::process server_process(
 			this->io_context->get_executor(), // asio::io_context
@@ -102,6 +110,7 @@ public:
 			// If children should outlive a daemon close, then:
 			// broc::windows::process_creation_flags<DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_BREAKAWAY_FROM_JOB>{}
 		);
+		server->is_running = true;
 		server_process.detach();
 		std::fclose(log);
 		return {};

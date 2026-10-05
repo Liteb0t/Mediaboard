@@ -36,8 +36,8 @@ std::expected<std::unique_ptr<MediaboardServerInformation>, std::string> parseSe
 		return std::unexpected("boost::program_options error");
 	}
 	// boost::program_options::collect_unrecognized
-	auto server_info = std::make_unique<MediaboardServerInformation>();
-	server_info->data_directory = server_directory;
+	auto server_info = std::make_unique<MediaboardServerInformation>(server_directory);
+	// server_info->data_directory = server_directory;
 	if (variable_map.count("site_name"))
 		server_info->site_name = variable_map["site_name"].as<std::string>();
 	else {

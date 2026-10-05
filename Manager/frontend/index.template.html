@@ -114,7 +114,7 @@ async function showServers(response_json) {
 	const fragment = new DocumentFragment();
 	const table_element = document.createElement("table");
 	const headers_element = document.createElement("tr");
-	["Name", "Path", "Port"].forEach((column_name) => {
+	["Name", "Path", "Port", "Is running?"].forEach((column_name) => {
 		let header = document.createElement("th");
 		header.textContent = column_name;
 		headers_element.append(header);
@@ -123,7 +123,7 @@ async function showServers(response_json) {
 	for (let server of response_json.mediaboard_servers) {
 		console.log(server);
 		const server_element = document.createElement("tr");
-		["site_name", "data_directory", "server_port"].forEach((column_name) => {
+		["site_name", "data_directory", "server_port", "is_running"].forEach((column_name) => {
 			let col = document.createElement("td");
 			col.textContent = server[column_name];
 			server_element.append(col);
@@ -162,6 +162,7 @@ async function startServer(site_name) {
 		if (response.ok) {
 			// pass
 			alert("Started server :)");
+			updateServers();
 		}
 		else {
 			let error_message = response.headers.get("message");
