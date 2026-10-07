@@ -1,0 +1,13 @@
+Mediaboard::Installer class
+- is a singleton
+- Working directory relative to program location. (FuzeMediaboard)/usr/bin/Installer InstallerGUI
+Then prompts for install destination, taking ~/.local/share/Fuze Mediaboard as a default.
+Then installing /usr contents in /versions/0.3 or something, warning user if there is an existing installation.
+State held in class. Can be used as library by thin CLI or a Qt guI.
+
+class {
+	fs::path program_location_usr
+	fs::path install_location_root
+	fs::path install_location_version
+}
+
