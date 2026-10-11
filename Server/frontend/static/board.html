@@ -1,0 +1,255 @@
+<div class=".Main">
+	<h3 id="location_indicator"></h3>
+	<noscript>
+		<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
+	</noscript>
+	<div id="post_container" style="border-bottom: 2px solid #000;"></div>
+</div>
+<div id="body_separator" class="FlexSeparator"></div>
+<details id="reply_container" class="ReplyContainer" style="display: none" open="">
+	<summary><div><span id="reply_heading_text"></span>&#x2002;<span id="content_length_indicator" class="ContentLengthIndicator"></span></div></summary>
+	<form id="post_form" name="post" action="" autocomplete="post">
+	<div class="ToolBar">
+	<input type="text" id="name_field" class="Username" tabindex="1" name="username" placeholder="Username" maxlength="CONFIG_post_max_name" />
+	<div id="highest_ranked_group_container"><input id="highest_ranked_group_checkbox" type="checkbox"><label id="highest_ranked_group_label" for="highest_ranked_group_checkbox"></label></div>
+	<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned Button">
+	</div>
+	<div contenteditable="plaintext-only" id="content_field" class="Content" tabindex="1" placeholder="Content"></div>
+	<fieldset id="file_upload_fieldset" style="display: none;">
+		<legend>Upload up to four files</legend>
+		<input type="file" id="file_upload" tabindex="1" autocomplete="off" multiple>
+		<div id="file_post_list" class="FilePostList"></div>
+	</fieldset>
+	</form>
+</details>
+<div id="bottom_marker"></div>
+<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
+<dialog id="thread_posted_dialog" closedby="any">
+	<h2>Thread posted!</h2>
+	<p>Click outside this box or hit the <kbd>Esc</kbd> key to close this dialog.</p>
+	<div class="ToolBar"><button id="thread_posted_dialog_open_thread_button">&#x21E8; Open thread</button><button onclick="thread_posted_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<dialog id="thread_not_found_dialog" closedby="any">
+	<h2>Error: Thread not found</h2>
+	<p>It may have been deleted.</p>
+	<div class="ToolBar"><button onclick="openThreadList();thread_not_found_dialog.close()">&#x1F5D0; Threads</button><button onclick="thread_not_found_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<dialog id="post_failed_dialog" closedby="any">
+	<h2>Error: <span id="post_failed_dialog_error_title"></span></h2>
+	<p><span id="post_failed_dialog_error_body"></span></p>
+	<div class="ToolBar"><button onclick="post_failed_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<dialog id="post_content_empty_dialog" closedby="any">
+	<h2>Error</h2>
+	<p>Cannot post with empty content and no files.</p>
+	<div class="ToolBar"><button onclick="post_content_empty_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<dialog id="post_content_too_long_dialog" closedby="any">
+	<h2>Error</h2>
+	<p>Content too long. Limit: 5000.<br>This post: <span id="post_content_too_long_dialog_content_length"></span></p>
+	<div class="ToolBar"><button onclick="post_content_too_long_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<dialog id="post_name_too_long_dialog" closedby="any">
+	<h2>Error</h2>
+	<p>Name too long. Limit: CONFIG_post_max_name<br>This post: <span id="post_name_too_long_dialog_name_length"></span></p>
+	<div class="ToolBar"><button onclick="post_name_too_long_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<dialog id="post_file_upload_not_complete_dialog" closedby="any">
+	<h2>Warning</h2>
+	<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attachments.</p>
+	<div class="ToolBar"><button onclick="post_file_upload_not_complete_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<dialog id="error_dialog" closedby="any">
+	<h2>Error</h2>
+	<p id="error_message">Something happened.</p>
+	<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<dialog id="file_upload_error_dialog" closedby="any">
+	<h2>Error: could not upload file</h2>
+	<p id="file_upload_error_dialog_message">Something happened.</p>
+	<div class="ToolBar"><button onclick="file_upload_error_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<style>
+html {
+	scrollbar-gutter: stable;
+}
+
+.Main {
+	margin: 0;
+	overflow: auto;
+	flex: 0 0 auto;
+}
+
+.Thread {
+	border-right: 2px solid #000;
+	margin-top: 1rem;
+	&:not(:last-child) {
+		border-bottom: 2px solid #000;
+		margin-bottom: 0.5rem;
+	}
+}
+
+.Post {
+	margin-top: 0.25rem;
+	word-wrap: anywhere;
+	&:not(:last-child) {
+		border-bottom: 1px solid #000;
+	}
+
+	.Username {
+		font-family: var(--name-font);
+	}
+	.UserRank {
+		font-family: var(--name-font);
+		color: var(--information-text);
+		padding-left: 0.5em;
+	}
+	.Timestamp {
+		float: right;
+		font-family: var(--monospace-font);
+	}
+	.ID {
+		float: right;
+	}
+
+	.Content {
+		margin: 0.25rem 0;
+		padding: 0 0.25rem;
+		white-space: pre-wrap;
+	}
+
+	.Files {
+		display: flex;
+		gap: 2rem;
+		flex-wrap: wrap;
+		margin: 0.25rem 0;
+		padding: 0 0.25rem;
+
+	}
+	&.Deleted {
+		text-decoration: line-through;
+		opacity: 0.73;
+	}
+}
+
+.ReplyContainer {
+	position: sticky;
+	bottom: 0;
+	background: #fffA;
+	backdrop-filter: blur(4px);
+	summary {
+		border-top: 3px double #000;
+		font-family: var(--interactive-font);
+		padding: 6px 2px;
+		cursor: pointer;
+		user-select: none;
+		&:hover {
+			background: #DDDB;
+		}
+		>div {
+			display: inline-flex;
+		}
+	}
+	>.ContentLengthIndicator {
+		color: #880;
+		&.LimitExceeded {
+			color: #B00;
+		}
+	}
+	>form {
+		max-height: 60vh;
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-gutter: stable;
+		word-wrap: anywhere;
+		>.Username {
+			font-family: var(--name-font);
+		}
+		input[type=text], div[contenteditable] {
+			background: #FFF8;
+			backdrop-filter: blur(10px);
+			padding: 0 4px;
+
+			&.Content {
+				min-height: 4em;
+				margin-bottom: 4px;
+				white-space: -moz-pre-space;
+				&:empty:before {
+					content: attr(placeholder);
+					cursor: text;
+					color: #0008;
+					display: block;
+				}
+			}
+		}
+		>* {
+			margin: 2px 2px 4px;
+			margin-inline: 2px;
+		}
+		>fieldset {
+			min-width: 0;
+			input[type="file"] {
+				max-width: 100%;
+			}
+		}
+		.FilePostList {
+			>* {
+				display: flex;
+				.UploadCompleteIndicator {
+					color: green;
+				}
+				.UploadFailedIndicator {
+					color: red;
+				}
+				&.Errored {
+					image-rendering: pixelated;
+				}
+			}
+		}
+	}
+}
+
+.EmbedFigure {
+	&[expanded] {
+		>.EmbedIframe:after {
+			content: " \2bc6";
+		}
+	}
+	&:not([expanded]) {
+		>.EmbedIframe:after {
+			content: " \2bc8";
+		}
+	}
+	display: inline-block;
+	margin: 0;
+	.EmbedIframe:hover {
+		text-decoration: underline;
+	}
+	.EmbedImage, .EmbedVideo {
+		max-width: 100%;
+		max-height: 90vh;
+		width: auto;
+		height: auto;
+	}
+	.EmbedThumbnail, .EmbedImage {
+		cursor: pointer;
+	}
+}
+.PostLink {
+	color: #FFF;
+	background: #22D;
+}
+
+.Watermark {
+	position: fixed;
+	bottom: 0;
+	right: 0;
+	color: #FFF;
+	font-size: 12px;
+	font-family: var(--interactive-font);
+	background-color: #000D;
+	padding: 0.25em;
+	opacity: 0.37;
+	text-decoration: none;
+}
+</style>
