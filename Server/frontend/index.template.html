@@ -9,12 +9,12 @@
 		<link rel="stylesheet" href="FILE_"static/styles.css"">
 	</head>
 	<body>
-		<main>
 #define SERVER_LEVEL 1
 #include "include/navbar.html"
-			<h3 id="location_indicator">List of boards</h3>
+		<main id="view_container">
+			<!--<h3 id="location_indicator">List of boards</h3>
 			<div id="view_container"></div>
-			<p><a href="https://fuze.page/software/mediaboard">Fuze Mediaboard</a> CONFIG_server_version</p>
+			<p><a href="https://fuze.page/software/mediaboard">Fuze Mediaboard</a> CONFIG_server_version</p>-->
 		</main>
 		<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
 		<dialog id="error_dialog" closedby="any">
@@ -26,10 +26,10 @@
 			<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
 		</noscript>
 	</body>
-<template id="board-list-template">
+<template id="board-list-template" class="TestClassForTemplate">
 #include "include/board_list.html"
 </template>
-<template id="thread-list-template">
+<template id="thread-list-template" class="TestClassForTemplate">
 <!--Loses some efficiency because we're parsing the same stylesheet as in the homepage, but eh, good enough-->
 <!--<link rel="stylesheet" href="FILE_"static/styles.css"">-->
 #include "include/board.html"
@@ -37,9 +37,9 @@
 <style>
 </style>
 <script src="static/navigo.min.js"></script>
-<script type="module" src="static/board.js"></script>
+<script type="module" src="modules/board.js"></script>
 <script type="module">
-import { global_styles } from "./static/styles.js";
+import { global_styles } from "./modules/styles.js";
 
 #include "include/board_list.js"
 
@@ -142,7 +142,7 @@ const url_params = new URLSearchParams(location.search);
 window.url_params_display_as_embed = null;
 if (url_params.get("display") === "embed") {
 	header_bar.style["display"] = "none";
-	location_indicator.style["display"] = "none";
+	// location_indicator.style["display"] = "none";
 	window.url_params_display_as_embed = true;
 }
 else window.url_params_display_as_embed = false;
@@ -170,6 +170,7 @@ document.addEventListener("logout", () => {
 
 
 // websocket = connectToServer();
+/*
 async function getClientInfo() {
 	try {
 		const response = await fetch("api/user/client");
@@ -199,6 +200,7 @@ async function getClientInfo() {
 	}
 }
 getClientInfo(); // runs asynchronously
+*/
 // getAllBoards().then(() => {
 // 	loading_dialog.close();
 // })

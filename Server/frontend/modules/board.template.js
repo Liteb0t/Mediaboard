@@ -1,4 +1,5 @@
 import { global_styles } from "./styles.js";
+import { session } from "./session.js";
 
 class Format {
 	static IMAGE = 0;
@@ -43,7 +44,7 @@ class ThreadListElement extends HTMLElement {
 	};
 	selected_thread = {
 		id: null,
-		client_permissions: {}
+		permissions: {}
 	};
 	server_permissions = {};
 
@@ -77,12 +78,17 @@ class ThreadListElement extends HTMLElement {
 	connectedCallback() {
 		console.log("Custom element added to page.");
 		this.post_button.onclick = () => this.postAction();
+		session.addEventListener("change", () => {this.updateReplyContainerAuto()});
+		session.refresh(); // fetches client info asynchronously
 // threads_button.onclick = () => { openThreadList(); } // included in navbar.html
 // refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
 	}
 
 	disconnectedCallback() {
 	console.log("Custom element removed from page.");
+		this.selected_thread.id = -1;
+		this.closeWebsocket();
+		session.removeEventListener("change");
 	}
 
 	connectedMoveCallback() {
@@ -91,6 +97,13 @@ class ThreadListElement extends HTMLElement {
 
 	adoptedCallback() {
 	console.log("Custom element moved to new page.");
+	}
+
+	closeWebsocket() {
+		if (this.websocket) {
+			this.websocket.close();
+		}
+		this.websocket_connected = false;
 	}
 
 	// attributeChangedCallback(name, oldValue, newValue) {
@@ -124,8 +137,26 @@ class ThreadListElement extends HTMLElement {
 	*/
 
 	async getBoard(board_slug) {
+		this.selected_thread.id = -1;
+		this.selected_thread.permissions = {};
 		this.selected_board.slug = board_slug;
 		// let response = await fetch(`./api/board/${this.selected_board.slug}/threads`);
+		fetch(`api/board/${board_slug}`).then(async(response) => { // runs in parallel
+			if (response.ok) {
+				await response.json().then(response_json => {
+					console.log(response_json);
+					this.selected_board.permissions = response_json["client_permissions"];
+					if (this.selected_thread.id == -1) {
+						this.updateReplyContainer(-1, this.selected_board.permissions);
+					}
+				});
+			}
+			else {
+				let error_message = response.headers.get("message");
+				error_message ??= "An unknown error occured when attempting to fetch board info.";
+				throw error_message;
+			}
+		})
 		let response = await fetch(`./api/board/${board_slug}/threads`);
 		console.log(response);
 		if (response.ok) {
@@ -142,7 +173,7 @@ class ThreadListElement extends HTMLElement {
 	}
 
 	showAllThreads(board_slug, message_json) {
-		location_indicator.textContent = "Threads in " + board_slug;
+		this.location_indicator.textContent = "Threads in " + board_slug;
 		// threads_button.disabled = true;
 		// if (this.selected_board.permissions) {
 			// this.updateReplyContainer(this.selected_thread.id, this.selected_board.permissions);
@@ -231,7 +262,7 @@ class ThreadListElement extends HTMLElement {
 	}
 
 	showThread(board_slug, thread_id, thread_json) {
-		location_indicator.textContent = `Viewing thread ${thread_id}`;
+		this.location_indicator.textContent = `Viewing thread ${thread_id}`;
 		// threads_button.disabled = false;
 		this.selected_thread.permissions = thread_json["client_permissions"]; // Needed for websocket posts coming in
 		this.updateReplyContainer(thread_id, thread_json["client_permissions"]);
@@ -459,12 +490,23 @@ class ThreadListElement extends HTMLElement {
 		return post_box_element;
 	}
 
+	updateReplyContainerAuto() {
+		if (this.selected_thread.id === -1 && this.selected_board.permissions !== {}) {
+			this.updateReplyContainer(-1, this.selected_board.permissions);
+		}
+		else if (this.selected_thread.permissions !== {}) {
+			this.updateReplyContainer(this.selected_thread.id, this.selected_thread.permissions);
+		}
+	}
 	updateReplyContainer(selected_thread_id, permissions) {
+		console.log("updateReplyContainer called");
+		console.log("with selected thread ID " + selected_thread_id + " and permissions below");
+		console.log(permissions);
 		if (window.url_params_display_as_embed) {
 			reply_container.style["display"] = "none";
 			return;
 		}
-		if (selected_thread_id >= 0) {
+		if (selected_thread_id != -1) {
 			if (permissions["send_message"] ) {
 				this.reply_heading_text.textContent = "Leave a reply";
 				this.reply_container.style["display"] = "";
@@ -482,9 +524,9 @@ class ThreadListElement extends HTMLElement {
 				this.reply_container.style["display"] = "none";
 			}
 		}
-		if (this.highest_ranked_group) {
+		if (session.highest_ranked_group) {
 			this.highest_ranked_group_container.style["display"] = "inherit";
-			this.highest_ranked_group_label.textContent = this.highest_ranked_group.name;
+			this.highest_ranked_group_label.textContent = session.highest_ranked_group.name;
 		}
 		else {
 			this.highest_ranked_group_container.style["display"] = "none";
@@ -575,8 +617,8 @@ class ThreadListElement extends HTMLElement {
 			files: this.getFiles()
 		};
 		if (thread_id !== null) data.thread_id = thread_id;
-		if (this.highest_ranked_group_checkbox.checked && this.highest_ranked_group)
-			data.highest_ranked_group_id = this.highest_ranked_group.id;
+		if (this.highest_ranked_group_checkbox.checked && session.highest_ranked_group)
+			data.highest_ranked_group_id = session.highest_ranked_group.id;
 		return data;
 	}
 
@@ -608,6 +650,7 @@ class ThreadListElement extends HTMLElement {
 	}
 
 	// websocket = connectToServer();
+	/*
 	async getClientInfo() {
 		try {
 			const response = await fetch("api/user/client");
@@ -641,33 +684,7 @@ class ThreadListElement extends HTMLElement {
 			error_dialog.showModal();
 		}
 	}
-	async getBoardInfo() {
-		try {
-			const response = await fetch(`api/board/${this.selected_board.slug}`);
-			console.log(response);
-			if (response.ok) {
-				await response.json().then(response_json => {
-					console.log(response_json);
-					this.selected_board.permissions = response_json["client_permissions"];
-					window.history.replaceState(state, null, ""); // Initial state
-					console.log(state);
-					if (!(this.selected_thread.id >= 0)) {
-						this.updateReplyContainer(this.selected_thread.id, this.selected_board.permissions);
-					}
-				});
-			}
-			else {
-				let error_message = response.headers.get("message");
-				error_message ??= "An unknown error occured when attempting to fetch board info.";
-				throw error_message;
-			}
-		}
-		catch (error) {
-			console.error(error);
-			error_message.textContent = error;
-			error_dialog.showModal();
-		}
-	}
+	*/
 
 	decode_utf8(s) {
 		return decodeURIComponent(escape(s));
@@ -708,7 +725,7 @@ class ThreadListElement extends HTMLElement {
 				let do_scroll = window.scrollY >= document.body.scrollHeight - document.body.clientHeight - 10;
 
 				// A little dodgy using selected_thread since its not proven correct, worst case scenario you get live messages from the wrong thread
-				this.post_container.appendChild(this.createPost(this.selected_board.slug, this.selected_thread.id, JSON.parse(event.data), this.selected_thread.client_permissions));
+				this.post_container.appendChild(this.createPost(this.selected_board.slug, this.selected_thread.id, JSON.parse(event.data), this.selected_thread.permissions));
 
 				if (do_scroll) {
 					window.scrollTo(0, this.post_container.scrollHeight);
@@ -778,7 +795,7 @@ const url_params = new URLSearchParams(location.search);
 let window.url_params_display_as_embed;
 if (url_params.get("display") === "embed") {
 	header_bar.style["display"] = "none";
-	location_indicator.style["display"] = "none";
+	this.location_indicator.style["display"] = "none";
 	reply_container.style["display"] = "none";
 	window.url_params_display_as_embed = true;
 }

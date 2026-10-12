@@ -1,4 +1,4 @@
-<div id="header_bar" class="ToolBar WithBorders HeaderBar">
+<nav id="header_bar" class="ToolBar WithBorders HeaderBar">
 	<div id="WebsiteName" class="WebsiteName"><b>CONFIG_site_name</b></div>
 
 	<!--TODO fix slow loading; maybe try data-navigo property-->
@@ -24,7 +24,13 @@
 	</div>
 	<a id="change_password_link" class="Button ToolBarButton" href="change_password.html" style="display: none">Change password</a>
 	<button id="logout_button" onclick="logoutAction()" class="ToolBarButton" style="display: none">Logout</button>
-</div>
+</nav>
+<style>
+.HeaderBar {
+	border-top: 1px solid #888;
+	border-bottom: 1px solid #888;
+}
+</style>
 <script>
 "use strict";
 // depends on getClient to fire displayClientAsLoggedIn()

@@ -34,11 +34,6 @@ body {
 	font-family: var(--name-font);
 }
 
-.HeaderBar {
-	border-top: 1px solid #888;
-	border-bottom: 1px solid #888;
-}
-
 .FlexSeparator {
 	flex-grow: 1;
 	padding: 0 !important;
