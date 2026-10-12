@@ -23,11 +23,11 @@
 	</form>
 </details>
 <div id="bottom_marker"></div>
-<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>
+<!--<dialog id="loading_dialog"><p>Loading. Please wait...</p></dialog>-->
 <dialog id="thread_posted_dialog" closedby="any">
 	<h2>Thread posted!</h2>
 	<p>Click outside this box or hit the <kbd>Esc</kbd> key to close this dialog.</p>
-	<div class="ToolBar"><button id="thread_posted_dialog_open_thread_button">&#x21E8; Open thread</button><button onclick="thread_posted_dialog.close()">&#x1F5D9; Close</button></div>
+	<div class="ToolBar"><a id="thread_posted_dialog_open_thread_link" class="Button">&#x21E8; Open thread</a><button onclick="thread_posted_dialog.close()">&#x1F5D9; Close</button></div>
 </dialog>
 <dialog id="thread_not_found_dialog" closedby="any">
 	<h2>Error: Thread not found</h2>

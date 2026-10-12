@@ -1,4 +1,4 @@
-"use strict";
+import { global_styles } from "./styles.js";
 
 class Format {
 	static IMAGE = 0;
@@ -35,13 +35,37 @@ class Format {
 // Create a class for the element
 class ThreadListElement extends HTMLElement {
 	// static observedAttributes = ["color", "size"];
+	// board_slug = null;
+	// thread_id = null;
+	selected_board = {
+		slug: null,
+		permissions: {}
+	};
+	selected_thread = {
+		id: null,
+		client_permissions: {}
+	};
+	server_permissions = {};
+
+	media_url = "./media/";
+	thumbnail_url = "./media/thumbnails/";
+	websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
+	// const thumbnail_size = CONFIG_thumbnail_size;
+	// const file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
+	media_uuid_len = 36;
+	// localDate = new Date();
+	// timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
+	// flex_separator = document.createElement("div").classList.add("FlexSeparator");
+	websocket = null; // set in getThread()
+	websocket_connected = false;
+	content_field_text_encoder = new TextEncoder();
 
 	constructor() {
 		// Always call super first in constructor
 		super();
-		this.selected_board_slug = null;
 		const template = document.getElementById("thread-list-template");
 		const shadow = this.attachShadow({ mode: "open" });
+		shadow.adoptedStyleSheets = [global_styles]; // imported at the top there
 		shadow.appendChild(template.content.cloneNode(true));
 
 		// TODO explicitly map elements post_container etc
@@ -81,7 +105,7 @@ class ThreadListElement extends HTMLElement {
 			websocket.close();
 		}
 		try {
-			if (state.selected_thread.id === -1) {
+			if (this.selected_thread.id === -1) {
 				await getAllThreads(); // TODO scroll to previously viewed thread
 			}
 			else {
@@ -99,9 +123,9 @@ class ThreadListElement extends HTMLElement {
 	}
 	*/
 
-	async loadBoard(board_slug) {
-		this.selected_board_slug = board_slug;
-		// let response = await fetch(`./api/board/${state.selected_board.slug}/threads`);
+	async getBoard(board_slug) {
+		this.selected_board.slug = board_slug;
+		// let response = await fetch(`./api/board/${this.selected_board.slug}/threads`);
 		let response = await fetch(`./api/board/${board_slug}/threads`);
 		console.log(response);
 		if (response.ok) {
@@ -120,16 +144,16 @@ class ThreadListElement extends HTMLElement {
 	showAllThreads(board_slug, message_json) {
 		location_indicator.textContent = "Threads in " + board_slug;
 		// threads_button.disabled = true;
-		// if (state.selected_board.permissions) {
-			// this.updateReplyContainer(state.selected_thread.id, state.selected_board.permissions);
+		// if (this.selected_board.permissions) {
+			// this.updateReplyContainer(this.selected_thread.id, this.selected_board.permissions);
 		// }
 
 		const fragment = new DocumentFragment();
 		for (let thread of message_json.threads) {
 			// console.log(thread.id);
 			// console.log(thread.post_zero);
-			let post_zero_element = this.createPost(board_slug, -1, thread.post_zero, {/*...state.selected_board.permissions,*/ ...thread.client_permissions});
-			if (url_params_display_as_embed) {
+			let post_zero_element = this.createPost(board_slug, -1, thread.post_zero, {/*...this.selected_board.permissions,*/ ...thread.client_permissions});
+			if (window.url_params_display_as_embed) {
 				fragment.appendChild(post_zero_element);
 			}
 			else {
@@ -145,7 +169,7 @@ class ThreadListElement extends HTMLElement {
 				reply_count.textContent = "Replies: " + (thread["reply_count"]);
 				reply_count_container.appendChild(reply_count);
 
-				thread_toolbar.append(reply_count_container, flex_separator.cloneNode());
+				thread_toolbar.append(reply_count_container, window.flex_separator.cloneNode());
 
 				if (thread.client_permissions["manage_permissions"]) {
 					let manage_thread_permissions_button = document.createElement("a");
@@ -155,14 +179,19 @@ class ThreadListElement extends HTMLElement {
 					thread_toolbar.append(manage_thread_permissions_button);
 				}
 
-				let open_thread_button = document.createElement("button");
-				open_thread_button.classList.add("ToolBarButton");
-				open_thread_button.textContent = "\u21E8 Open thread";
-				open_thread_button.onclick = (event) => {
-					this.openThread(board_slug, thread.id);
-				}
+				// TODO also change thread created popup button to link
+				let open_thread_link = document.createElement("a");
+				open_thread_link.classList.add("Button", "ToolBarButton");
+				open_thread_link.textContent = "\u21E8 Open thread";
+				open_thread_link.href = this.makeLinkToThread(board_slug, thread.id);
+				// let open_thread_button = document.createElement("button");
+				// open_thread_button.classList.add("ToolBarButton");
+				// open_thread_button.textContent = "\u21E8 Open thread";
+				// open_thread_button.onclick = (event) => {
+				// 	this.openThread(board_slug, thread.id);
+				// }
 
-				thread_toolbar.append(open_thread_button);
+				thread_toolbar.append(open_thread_link);
 				// thread_toolbar.appendChild(open_thread_button);
 				thread_element.appendChild(thread_toolbar);
 				fragment.appendChild(thread_element);
@@ -174,21 +203,25 @@ class ThreadListElement extends HTMLElement {
 			this.post_container.replaceChildren(fragment);
 	}
 
+	makeLinkToThread(board_slug, thread_id) { return `#/board/${board_slug}/thread/${thread_id}`; }
 	openThread(board_slug, thread_id) {
-		// state.selected_thread.id = thread_id;
+		this.router.navigate(`#/board/${board_slug}/thread/${thread_id}`);
+		// this.selected_thread.id = thread_id;
 		// TODO use url_params.toString() if need bee
-		history.pushState(state, "", window.location.pathname + `?board=${board_slug}&thread=${thread_id}`);
-		this.getThread(board_slug, thread_id);
+		// history.pushState(state, "", window.location.pathname + `?board=${board_slug}&thread=${thread_id}`);
+		// this.getThread(board_slug, thread_id);
 	}
 
 	async getThread(board_slug, thread_id) {
+		this.selected_board.slug = board_slug;
+		this.selected_thread.id = thread_id;
 		let response = await fetch(`./api/board/${board_slug}/thread/${thread_id}`);
 		if (response.ok) {
 			await response.json().then(response_obj => {
 				console.log(response_obj);
 				this.showThread(board_slug, thread_id, response_obj);
 			});
-			websocket = connectToServer();
+			this.websocket = this.connectToServer();
 		}
 		else {
 			let error_message = response.headers.get("message");
@@ -200,8 +233,9 @@ class ThreadListElement extends HTMLElement {
 	showThread(board_slug, thread_id, thread_json) {
 		location_indicator.textContent = `Viewing thread ${thread_id}`;
 		// threads_button.disabled = false;
+		this.selected_thread.permissions = thread_json["client_permissions"]; // Needed for websocket posts coming in
 		this.updateReplyContainer(thread_id, thread_json["client_permissions"]);
-		// state.selected_thread.client_permissions = thread_json["client_permissions"]; // Needed for websocket posts coming in
+		// this.selected_thread.client_permissions = thread_json["client_permissions"];
 		// header_bar.scrollIntoView(false); // Scroll back to top
 		const fragment = new DocumentFragment();
 		for (let message of thread_json["messages"]) {
@@ -216,7 +250,7 @@ class ThreadListElement extends HTMLElement {
 		post_box_element.classList.add("Post");
 
 		let post_header_element
-		if (!url_params_display_as_embed) {
+		if (!window.url_params_display_as_embed) {
 			post_header_element = document.createElement("div");
 			// post_header_element.classList.add("PostHeader");
 			post_header_element.classList.add("ToolBar");
@@ -234,7 +268,7 @@ class ThreadListElement extends HTMLElement {
 			}
 
 			let post_timestamp_element = document.createElement("time");
-			let post_date = new Date(data["created_at"] * 1000 - timezone_offset_seconds * 1000).toISOString();;
+			let post_date = new Date(data["created_at"] * 1000 - window.timezone_offset_seconds * 1000).toISOString();;
 			post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
 			post_timestamp_element.textContent = post_date;
 			post_timestamp_element.classList.add("Timestamp");
@@ -258,7 +292,7 @@ class ThreadListElement extends HTMLElement {
 				let delete_button_element = document.createElement("button");
 				delete_button_element.textContent = "\u{1F5D1} Delete";
 				delete_button_element.onclick = async() => {
-					let server_response = await this.deleteMessage(selected_board_slug, data.thread_id, data.id_in_thread);
+					let server_response = await this.deleteMessage(board_slug, data.thread_id, data.id_in_thread);
 					console.log(server_response);
 					if (server_response.ok) {
 						post_box_element.classList.add("Deleted");
@@ -280,13 +314,13 @@ class ThreadListElement extends HTMLElement {
 					// Add reply tag at caret position, if focused on content_field
 					let range, selection;
 					selection = window.getSelection();
-					if (content_field.contains(selection.focusNode)) {
+					if (this.content_field.contains(selection.focusNode)) {
 						range = selection.getRangeAt(0);
 						// console.log(range);
 						range.insertNode(reply_link_node);
 					}
 					else
-						content_field.append(reply_link_node);
+						this.content_field.append(reply_link_node);
 
 					// Move caret position to end of reply tag
 					range = document.createRange();
@@ -295,7 +329,7 @@ class ThreadListElement extends HTMLElement {
 					range.collapse(true);
 					selection.removeAllRanges();
 					selection.addRange(range);
-					// content_field.focus();
+					// this.content_field.focus();
 				}
 				right_aligned_toolbar_group.appendChild(reply_button);
 			}
@@ -416,7 +450,7 @@ class ThreadListElement extends HTMLElement {
 			post_files_element.appendChild(figure_element);
 		}
 
-		if (!url_params_display_as_embed) {
+		if (!window.url_params_display_as_embed) {
 			post_box_element.appendChild(post_header_element);
 		}
 		post_box_element.appendChild(post_content_element);
@@ -426,7 +460,7 @@ class ThreadListElement extends HTMLElement {
 	}
 
 	updateReplyContainer(selected_thread_id, permissions) {
-		if (url_params_display_as_embed) {
+		if (window.url_params_display_as_embed) {
 			reply_container.style["display"] = "none";
 			return;
 		}
@@ -448,9 +482,9 @@ class ThreadListElement extends HTMLElement {
 				this.reply_container.style["display"] = "none";
 			}
 		}
-		if (state.highest_ranked_group) {
+		if (this.highest_ranked_group) {
 			this.highest_ranked_group_container.style["display"] = "inherit";
-			this.highest_ranked_group_label.textContent = state.highest_ranked_group.name;
+			this.highest_ranked_group_label.textContent = this.highest_ranked_group.name;
 		}
 		else {
 			this.highest_ranked_group_container.style["display"] = "none";
@@ -460,7 +494,7 @@ class ThreadListElement extends HTMLElement {
 	}
 	getFiles() {
 		let files = [];
-		for (let file_element of file_post_list.children) {
+		for (let file_element of this.file_post_list.children) {
 			if (!file_element.classList.contains("Errored")) {
 				let file_data = {"filename": file_element.id.slice(5, file_element.id.length)};
 				const width = file_element.getAttribute("data-image-width");
@@ -482,10 +516,10 @@ class ThreadListElement extends HTMLElement {
 
 	async postAction() {
 		try {
-			let name_length_bytes = (new TextEncoder().encode(name_field.value)).length;
-			let content_length_bytes = (content_field_text_encoder.encode(content_field.innerText)).length;
+			let name_length_bytes = (new TextEncoder().encode(this.name_field.value)).length;
+			let content_length_bytes = (this.content_field_text_encoder.encode(this.content_field.innerText)).length;
 			console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
-			if (content_field.textContent.length === 0 && file_post_list.childElementCount === 0) {
+			if (this.content_field.textContent.length === 0 && this.file_post_list.childElementCount === 0) {
 				post_content_empty_dialog.showModal();
 			}
 			else if (name_length_bytes > CONFIG_post_max_name) {
@@ -496,25 +530,26 @@ class ThreadListElement extends HTMLElement {
 				post_content_too_long_dialog_content_length.textContent = content_length_bytes;
 				post_content_too_long_dialog.showModal();
 			}
-			else if (file_post_list.querySelector("progress")) {
+			else if (this.file_post_list.querySelector("progress")) {
 				post_file_upload_not_complete_dialog.showModal();
 			}
 			else {
 				let response;
-				if (state.selected_thread.id === -1) {
-					response = await postThread();
+				if (this.selected_thread.id === -1) {
+					response = await this.postThread();
 				}
 				else {
-					response = await postMessage();
+					response = await this.postMessage();
 				}
 				if (response.ok) {
-					content_field.textContent = "";
-					file_upload.value = "";
-					file_post_list.textContent = "";
-					content_length_indicator.style["display"] = "none";
-					if (state.selected_thread.id === -1) {
+					this.content_field.textContent = "";
+					this.file_upload.value = "";
+					this.file_post_list.textContent = "";
+					this.content_length_indicator.style["display"] = "none";
+					if (this.selected_thread.id === -1) {
 						let new_thread_id = Number(response.headers.get("new-thread-id"));
-						thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
+						// thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
+						thread_posted_dialog_open_thread_link.href = this.makeLinkToThread(board_slug, thread_id);
 						thread_posted_dialog.showModal();
 					}
 				}
@@ -523,7 +558,7 @@ class ThreadListElement extends HTMLElement {
 					error_message ??= "An unknown error occured when attempting to post message.";
 					throw error_message;
 				}
-				localStorage.setItem("name", name_field.value);
+				localStorage.setItem("name", this.name_field.value);
 			}
 		}
 		catch (error) {
@@ -535,21 +570,21 @@ class ThreadListElement extends HTMLElement {
 
 	gatherPostData(thread_id = null) {
 		let data = {
-			name: name_field.value,
-			content: content_field.innerText.trim(),
-			files: getFiles()
+			name: this.name_field.value,
+			content: this.content_field.innerText.trim(),
+			files: this.getFiles()
 		};
 		if (thread_id !== null) data.thread_id = thread_id;
-		if (highest_ranked_group_checkbox.checked && state.highest_ranked_group)
-			data.highest_ranked_group_id = state.highest_ranked_group.id;
+		if (this.highest_ranked_group_checkbox.checked && this.highest_ranked_group)
+			data.highest_ranked_group_id = this.highest_ranked_group.id;
 		return data;
 	}
 
 	async postMessage() {
 		console.log("posting message...");
-		const data = gatherPostData(state.selected_thread.id);
+		const data = this.gatherPostData(this.selected_thread.id);
 		console.log(data);
-		const fetch_response = await fetch(`api/board/${state.selected_board.slug}/thread/${state.selected_thread.id}/message`, {method: "POST", body: JSON.stringify(data)});
+		const fetch_response = await fetch(`api/board/${this.selected_board.slug}/thread/${this.selected_thread.id}/message`, {method: "POST", body: JSON.stringify(data)});
 
 		return fetch_response;
 	}
@@ -562,14 +597,13 @@ class ThreadListElement extends HTMLElement {
 
 	async postThread() {
 		console.log("posting thread...");
-		let files = getFiles();
 		const data = {
 			thread: {
-				post_zero: gatherPostData()
+				post_zero: this.gatherPostData()
 			}
 		};
 		console.log(data)
-		const fetch_response = await fetch(`api/board/${state.selected_board.slug}/thread`, {method: "POST", body: JSON.stringify(data)});
+		const fetch_response = await fetch(`api/board/${this.selected_board.slug}/thread`, {method: "POST", body: JSON.stringify(data)});
 		return fetch_response;
 	}
 
@@ -584,13 +618,13 @@ class ThreadListElement extends HTMLElement {
 					if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
 						displayClientAsLoggedOut();
 					}
-					state.server_permissions = response_json["server_permissions"];
-					state.highest_ranked_group = response_json["highest_ranked_group"];
+					this.server_permissions = response_json["server_permissions"];
+					this.highest_ranked_group = response_json["highest_ranked_group"];
 					window.history.replaceState(state, null, ""); // Initial state
 					// manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
 					console.log(state);
-					// if (!(state.selected_thread.id >= 0)) {
-					// 	this.updateReplyContainer(state.selected_thread.id, state.server_permissions);
+					// if (!(this.selected_thread.id >= 0)) {
+					// 	this.updateReplyContainer(this.selected_thread.id, this.server_permissions);
 					// }
 					// reply_container.style["display"] = response_json["server_permissions"]["create_thread"] === true ? "inherit" : "none";
 				});
@@ -609,16 +643,16 @@ class ThreadListElement extends HTMLElement {
 	}
 	async getBoardInfo() {
 		try {
-			const response = await fetch(`api/board/${state.selected_board.slug}`);
+			const response = await fetch(`api/board/${this.selected_board.slug}`);
 			console.log(response);
 			if (response.ok) {
 				await response.json().then(response_json => {
 					console.log(response_json);
-					state.selected_board.permissions = response_json["client_permissions"];
+					this.selected_board.permissions = response_json["client_permissions"];
 					window.history.replaceState(state, null, ""); // Initial state
 					console.log(state);
-					if (!(state.selected_thread.id >= 0)) {
-						this.updateReplyContainer(state.selected_thread.id, state.selected_board.permissions);
+					if (!(this.selected_thread.id >= 0)) {
+						this.updateReplyContainer(this.selected_thread.id, this.selected_board.permissions);
 					}
 				});
 			}
@@ -637,6 +671,71 @@ class ThreadListElement extends HTMLElement {
 
 	decode_utf8(s) {
 		return decodeURIComponent(escape(s));
+	}
+
+	// Websocket
+	connectToServer() {
+		let listening_to_thread = this.selected_thread.id;
+		let sock;
+		if (!this.websocket_connected) {
+			sock = new WebSocket(this.websocket_url);
+			this.websocket_connected = true;
+		}
+		else {
+			return this.websocket;
+		}
+		sock.onopen = (event) => {
+			// connection_status.textContent = "Connected 🙂";
+			console.log("Websocket connected.");
+			this.websocket_connected = true;
+			// clearInterval(reconnect_websocket_interval);
+			// reconnect_websocket_interval = null;
+			if (this.selected_thread.id > -1) {
+				sock.send(JSON.stringify({
+					"type": "listen_to_thread",
+					"board": this.selected_board.slug,
+					"thread_id": this.selected_thread.id
+				}));
+			}
+		}
+
+		sock.onmessage = (event) => {
+			console.log("Message received: " + event.data);
+			let message_json = JSON.parse(event.data);
+			if (message_json.type === "post") {
+				// auto-scroll to new message if window was scrolled near the bottom already
+				// would be nice if window.scrollMaxY was standard! document.body.scrollHeight - document.body.clientHeight will be used instead
+				let do_scroll = window.scrollY >= document.body.scrollHeight - document.body.clientHeight - 10;
+
+				// A little dodgy using selected_thread since its not proven correct, worst case scenario you get live messages from the wrong thread
+				this.post_container.appendChild(this.createPost(this.selected_board.slug, this.selected_thread.id, JSON.parse(event.data), this.selected_thread.client_permissions));
+
+				if (do_scroll) {
+					window.scrollTo(0, this.post_container.scrollHeight);
+				}
+			}
+			else {
+				console.error("message_json type " + message_json.type + " not recognised.");
+			}
+		}
+
+		// sock.onerror = (event) => {
+			// connection_status.textContent = "Errored 😤"
+		// }
+
+		sock.onclose = (event) => {
+			// connection_status.textContent = "Closed \u{1F634}"
+			this.websocket_connected = false;
+			// if (this.selected_thread.id === listening_to_thread) {
+			// 	console.log("Websocket connection closed. Re-connecting will be attempted in 30 seconds.");
+			// 	setTimeout(() => {
+			// 		if (this.selected_thread.id === listening_to_thread) {
+			// 			this.websocket = this.connectToServer();
+			// 		}
+			// 	}, 30000);
+			// }
+		}
+		return sock;
 	}
 }
 
@@ -676,18 +775,18 @@ const content_field_text_encoder = new TextEncoder();
 // Hides everything except messages.
 /*
 const url_params = new URLSearchParams(location.search);
-let url_params_display_as_embed;
+let window.url_params_display_as_embed;
 if (url_params.get("display") === "embed") {
 	header_bar.style["display"] = "none";
 	location_indicator.style["display"] = "none";
 	reply_container.style["display"] = "none";
-	url_params_display_as_embed = true;
+	window.url_params_display_as_embed = true;
 }
-else url_params_display_as_embed = false;
-state.selected_board.slug = url_params.get("board") ? url_params.get("board") : -1;
-state.selected_thread.id = url_params.get("thread") ? Number(url_params.get("thread")) : -1;
+else window.url_params_display_as_embed = false;
+this.selected_board.slug = url_params.get("board") ? url_params.get("board") : -1;
+this.selected_thread.id = url_params.get("thread") ? Number(url_params.get("thread")) : -1;
 #ifdef WITH_WEBRTC
-navlink_live.href = `live.html?board=${state.selected_board.slug}`;
+navlink_live.href = `live.html?board=${this.selected_board.slug}`;
 navlink_live.style["display"] = "inherit";
 #endif
 window.onpopstate = function(event) {
@@ -700,10 +799,10 @@ window.onpopstate = function(event) {
 
 
 // The value in the name field is set to the name used in the most recent post, if any.
-// name_field.value = localStorage.getItem("name");
+// this.name_field.value = localStorage.getItem("name");
 //
 // document.addEventListener("logout", () => {
-// 	state.server_permissions = undefined;
+// 	this.server_permissions = undefined;
 // 	refresh_send();
 // 	getClientInfo();
 // })
@@ -746,38 +845,38 @@ window.onpopstate = function(event) {
 // }
 
 // function openThreadList() {
-// 	state.selected_thread.id = -1;
-// 	history.pushState(state, "", window.location.pathname + `?board=${state.selected_board.slug}`);
+// 	this.selected_thread.id = -1;
+// 	history.pushState(state, "", window.location.pathname + `?board=${this.selected_board.slug}`);
 // 	refresh_send();
 // }
 
 /*
-content_field.oninput = () => {
+this.content_field.oninput = () => {
 	// Remove leftover <br> tag from contenteditable so the 'Content' placeholder appears again
-	if (content_field.childElementCount === 1 && content_field.children[0].tagName === "BR" && content_field.textContent.length === 0) {
-		content_field.removeChild(content_field.children[0]);
+	if (this.content_field.childElementCount === 1 && this.content_field.children[0].tagName === "BR" && this.content_field.textContent.length === 0) {
+		this.content_field.removeChild(this.content_field.children[0]);
 	}
 
-	let content_field_length = (content_field_text_encoder.encode(content_field.innerText)).length;
+	let content_field_length = (content_field_text_encoder.encode(this.content_field.innerText)).length;
 	if (content_field_length > Math.round(CONFIG_post_max_content * 0.8)) {
-		if (content_length_indicator.style["display"] === "none") {
-			content_length_indicator.style["display"] = "inherit";
+		if (this.content_length_indicator.style["display"] === "none") {
+			this.content_length_indicator.style["display"] = "inherit";
 		}
-		content_length_indicator.textContent = `${content_field_length}/${CONFIG_post_max_content}`;
+		this.content_length_indicator.textContent = `${content_field_length}/${CONFIG_post_max_content}`;
 		if (content_field_length > CONFIG_post_max_content) {
-			if (!content_length_indicator.classList.contains("LimitExceeded")) {
-				content_length_indicator.classList.add("LimitExceeded");
+			if (!this.content_length_indicator.classList.contains("LimitExceeded")) {
+				this.content_length_indicator.classList.add("LimitExceeded");
 			}
 		}
 		else {
-			if (content_length_indicator.classList.contains("LimitExceeded")) {
-				content_length_indicator.classList.remove("LimitExceeded");
+			if (this.content_length_indicator.classList.contains("LimitExceeded")) {
+				this.content_length_indicator.classList.remove("LimitExceeded");
 			}
 		}
 	}
 	else {
-		if (content_length_indicator.style["display"] !== "none") {
-			content_length_indicator.style["display"] = "none";
+		if (this.content_length_indicator.style["display"] !== "none") {
+			this.content_length_indicator.style["display"] = "none";
 		}
 	}
 }
@@ -798,7 +897,7 @@ const options = {
 };
 const callback = (entries, observer) => {
 	for (let entry of entries) {
-		if (entry.target === bottom_marker && state.selected_thread.id > -1) {
+		if (entry.target === bottom_marker && this.selected_thread.id > -1) {
 			lock_scroll_to_bottom = entry.isIntersecting;
 		}
 	}
@@ -809,19 +908,19 @@ const scrolled_to_bottom_observer = new IntersectionObserver(callback, options);
 */
 
 /*
-file_upload.onchange = (event) => {
+this.file_upload.onchange = (event) => {
 	console.log("file changed.");
-	if (file_upload.files.length + file_post_list.childNodes.length > 4) {
+	if (this.file_upload.files.length + this.file_post_list.childNodes.length > 4) {
 		error_message.textContent = "Cannot attach more than 4 files.";
 		error_dialog.showModal();
-		file_upload.value = "";
+		this.file_upload.value = "";
 	}
 	else {
-		for (let chosen_file of file_upload.files) {
+		for (let chosen_file of this.file_upload.files) {
 			try {
 				let new_file = new UploadedFile(chosen_file);
-				new_file.addFileToList(file_post_list);
-				new_file.upload(state.selected_thread.id);
+				new_file.addFileToList(this.file_post_list);
+				new_file.upload(this.selected_thread.id);
 			}
 			catch (error) {
 				console.error(error);
@@ -834,14 +933,14 @@ file_upload.onchange = (event) => {
 
 class UploadedFile {
 	constructor(file_object) {
-		this.file = file_object; // derived from file_upload.files
+		this.file = file_object; // derived from this.file_upload.files
 		this.container_element = null;
 		this.thumbnail_element = null;
 		this.information_element = null;
 		this.progress_element = null;
 		this.filename = file_object.name;
 		if (file_object.size > file_size_limit) {
-			file_upload.value = "";
+			this.file_upload.value = "";
 			throw new Error(`The file ${file_object.name} exceeds the CONFIG_file_size_limit_mb megabyte limit. <br>
 				<code>${file_object.size}</code> - this file (bytes)<br>
 				<code>${file_size_limit}</code> - limit (bytes)`);
@@ -878,7 +977,7 @@ class UploadedFile {
 			// Add delete to server later
 			// file_upload_list_element.removeChild(document.getElementById("file_" + server_filename));
 			file_upload_list_element.removeChild(this.container_element);
-			file_upload.disabled = false;
+			this.file_upload.disabled = false;
 		}
 	}
 	upload(selected_thread_id) {
@@ -895,7 +994,7 @@ class UploadedFile {
 			}
 		});
 		request.responseType = "text";
-		request.open("POST", `./api/board/${state.selected_board.slug}/` + (selected_thread_id > -1 ? `thread/${selected_thread_id}/upload` : "upload/"));
+		request.open("POST", `./api/board/${this.selected_board.slug}/` + (selected_thread_id > -1 ? `thread/${selected_thread_id}/upload` : "upload/"));
 		request.timeout = 60*60*1000; // 1 hour
 		request.onreadystatechange = () => {
 			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
@@ -957,68 +1056,7 @@ class UploadedFile {
 }
 */
 /*
-function connectToServer() {
-	let listening_to_thread = state.selected_thread.id;
-	let sock;
-	if (!websocket_connected) {
-		sock = new WebSocket(websocket_url);
-		websocket_connected = true;
-	}
-	else {
-		return websocket;
-	}
-	sock.onopen = (event) => {
-		// connection_status.textContent = "Connected 🙂";
-		console.log("Websocket connected.");
-		websocket_connected = true;
-		clearInterval(reconnect_websocket_interval);
-		reconnect_websocket_interval = null;
-		if (state.selected_thread.id > -1) {
-			sock.send(JSON.stringify({
-				"type": "listen_to_thread",
-				"board": state.selected_board.slug,
-				"thread_id": state.selected_thread.id
-			}));
-		}
-	}
 
-	sock.onmessage = (event) => {
-		console.log("Message received: " + event.data);
-		let message_json = JSON.parse(event.data);
-		if (message_json.type === "post") {
-			// auto-scroll to new message if window was scrolled near the bottom already
-			// would be nice if window.scrollMaxY was standard! document.body.scrollHeight - document.body.clientHeight will be used instead
-			let do_scroll = window.scrollY >= document.body.scrollHeight - document.body.clientHeight - 10;
-
-			this.post_container.appendChild(createPost(JSON.parse(event.data), state.selected_thread.client_permissions));
-
-			if (do_scroll) {
-				window.scrollTo(0, this.post_container.scrollHeight);
-			}
-		}
-		else {
-			console.error("message_json type " + message_json.type + " not recognised.");
-		}
-	}
-
-	// sock.onerror = (event) => {
-		// connection_status.textContent = "Errored 😤"
-	// }
-
-	sock.onclose = (event) => {
-		// connection_status.textContent = "Closed \u{1F634}"
-		websocket_connected = false;
-		if (state.selected_thread.id === listening_to_thread) {
-			console.log("Websocket connection closed. Re-connecting will be attempted in 30 seconds.");
-			setTimeout(() => {
-				if (state.selected_thread.id === listening_to_thread) {
-					websocket = connectToServer();
-				}
-			}, 30000);;
-		}
-	}
-	return sock
-}
 */
 
 // getClientInfo(); // runs asynchronously

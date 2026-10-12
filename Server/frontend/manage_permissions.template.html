@@ -54,7 +54,6 @@
 loading_dialog.showModal();
 
 const url_params = new URLSearchParams(location.search);
-let url_params_display_as_embed;
 let api_location = url_params.get("location");
 if (api_location === null) {
 	error_message.textContent = "\"location\" not found in URL search params";

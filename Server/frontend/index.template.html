@@ -13,9 +13,6 @@
 #define SERVER_LEVEL 1
 #include "include/navbar.html"
 			<h3 id="location_indicator">List of boards</h3>
-			<div id="board_list_container"></div>
-			<a id="create_board_button" href="create_board.html" style="display: none" class="Button">Create board</a>
-			<a href="board/board/" data-navigo>To board</a>
 			<div id="view_container"></div>
 			<p><a href="https://fuze.page/software/mediaboard">Fuze Mediaboard</a> CONFIG_server_version</p>
 		</main>
@@ -29,46 +26,83 @@
 			<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
 		</noscript>
 	</body>
+<template id="board-list-template">
+#include "include/board_list.html"
+</template>
 <template id="thread-list-template">
 <!--Loses some efficiency because we're parsing the same stylesheet as in the homepage, but eh, good enough-->
-<link rel="stylesheet" href="FILE_"static/styles.css"">
-#include "static/board.html"
+<!--<link rel="stylesheet" href="FILE_"static/styles.css"">-->
+#include "include/board.html"
 </template>
 <style>
 </style>
 <script src="static/navigo.min.js"></script>
-<script type="module" src="FILE_"static/board.js""></script>
-<script>
-"use strict";
+<script type="module" src="static/board.js"></script>
+<script type="module">
+import { global_styles } from "./static/styles.js";
+
+#include "include/board_list.js"
 
 const router = new Navigo('/', { hash: true });
-router.on(() => {
+router.on(async() => {
 	console.log("ROOT opened");
+	try {
+		loading_dialog.showModal();
+		let board_list = await mountBoardListIfNotThere();
+		await board_list.getAllBoards();
+		loading_dialog.close();
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
 });
-router.on("/boards", () => {
-	console.log("/boards/ opened");
-});
-router.on("/board/:board_slug", ({data}) => {
-	console.log(data);
-	getThreadList(data);
+// router.on("/boards", () => {
+// 	console.log("/boards/ opened");
+// });
+router.on("/board/:board_slug", async({data}) => {
+	try {
+		console.log(data);
+		let thread_list = await mountThreadListIfNotThere(data);
+		await thread_list.getBoard(data.board_slug);
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
 	// getBoardTree();
 	// TODO load board.template.html into shadow DOM
 	// URL will be /#/board/g (hash-based routing)
 });
-router.resolve();
+router.on("/board/:board_slug/thread/:thread_id", async({data}) => {
+	try {
+		console.log(data);
+		let thread_list = await mountThreadListIfNotThere(data);
+		await thread_list.getThread(data.board_slug, Number(data.thread_id));
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+	// getBoardTree();
+	// TODO load board.template.html into shadow DOM
+	// URL will be /#/board/g (hash-based routing)
+});
 
-loading_dialog.showModal();
-const localDate = new Date();
-const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
-const flex_separator = document.createElement("div");
-flex_separator.classList.add("FlexSeparator");
-let state = {
-	server_permissions: {}
-};
+window.localDate = new Date();
+window.timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
+window.flex_separator = document.createElement("div");
+window.flex_separator.classList.add("FlexSeparator");
+// let state = {
+// 	server_permissions: {}
+// };
 
-// TODO wait for board.js module to parse
-// TODO fix websocket and everything else in that module
-async function getThreadList(data) {
+// TODO everything else in that module
+async function mountThreadListIfNotThere(data) {
+	await customElements.whenDefined("thread-list"); // wait for component to be loaded and defined, since JS module deferred loading will process sooner than router resolution, or however the deer hits the fence
 	// thread-list is custom element defined in board.js
 	let element = view_container.querySelector("thread-list");
 	if (!element) {
@@ -76,7 +110,18 @@ async function getThreadList(data) {
 		view_container.replaceChildren(element);
 	}
 	console.log(element);
-	element.loadBoard(data.board_slug);
+	return element;
+}
+
+async function mountBoardListIfNotThere() {
+	await customElements.whenDefined("board-list");
+	let element = view_container.querySelector("board-list");
+	if (!element) {
+		element = document.createElement("board-list");
+		view_container.replaceChildren(element);
+	}
+	console.log(element);
+	return element;
 }
 /*
 async function getBoardTree() {
@@ -94,13 +139,13 @@ async function getBoardTree() {
 // For embedding Mediaboard within a webpage using an <iframe>.
 // Hides everything except messages.
 const url_params = new URLSearchParams(location.search);
-let url_params_display_as_embed;
+window.url_params_display_as_embed = null;
 if (url_params.get("display") === "embed") {
 	header_bar.style["display"] = "none";
 	location_indicator.style["display"] = "none";
-	url_params_display_as_embed = true;
+	window.url_params_display_as_embed = true;
 }
-else url_params_display_as_embed = false;
+else window.url_params_display_as_embed = false;
 
 // window.onpopstate = function(event) {
 // 	if (event.state) {
@@ -110,106 +155,19 @@ else url_params_display_as_embed = false;
 // }
 
 document.addEventListener("logout", () => {
-	state.server_permissions = undefined;
+	// state.server_permissions = undefined;
 	getAllBoards();
 	getClientInfo();
 })
 
-refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
-async function refresh_send() {
-	loading_dialog.showModal();
-	await getAllBoards();
-	loading_dialog.close();
-}
+// threads_button.onclick = () => { openThreadList(); } // included in navbar.html
+// refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
+// async function refresh_send() {
+// 	loading_dialog.showModal();
+// 	// await getAllBoards();
+// 	loading_dialog.close();
+// }
 
-async function getAllBoards() {
-	try {
-		let response = await fetch("api/boards");
-		console.log(response);
-		if (response.ok) {
-			await response.json().then(response_obj => {
-				console.log(response_obj);
-				showAllBoards(response_obj);
-			});
-		}
-		else {
-			let error_message = response.headers.get("message");
-			error_message ??= "An unknown error occured when attempting to fetch boards.";
-			throw error_message;
-		}
-	}
-	catch (error) {
-		console.error(error);
-		error_message.textContent = error;
-		error_dialog.showModal();
-	}
-}
-
-function showAllBoards(response_json) {
-	create_board_button.style["display"] = response_json["client_permissions"]["create_board"] ? "initial" : "none";
-	const fragment = new DocumentFragment();
-	const table_element = document.createElement("table");
-	const headers_element = document.createElement("tr");
-	["Slug", "Title", "Last post time", "Action"].forEach((column_name) => {
-		let header = document.createElement("th");
-		header.textContent = column_name;
-		headers_element.append(header);
-	});
-	table_element.append(headers_element);
-	for (let board of response_json.boards) {
-		console.log(board);
-		const board_element = document.createElement("tr");
-		["slug", "title"].forEach((column_name) => {
-			let col = document.createElement("td");
-			col.textContent = board[column_name];
-			board_element.append(col);
-		});
-		{
-			let col = document.createElement("td");
-			if (board["last_post_time"]) {
-				let post_timestamp_element = document.createElement("time");
-				let post_date = new Date(board["last_post_time"] * 1000 - timezone_offset_seconds * 1000).toISOString();;
-				post_date = post_date.substring(0, 10) + " " + post_date.substring(11, 19);
-				post_timestamp_element.textContent = post_date;
-				col.appendChild(post_timestamp_element);
-			}
-			else {
-				col.appendChild(document.createTextNode("No posts yet."));
-			}
-			board_element.append(col);
-		}
-		{
-			let col = document.createElement("td");
-			// if (board.client_permissions.manage_permissions) {
-			// 	const manage_permissions_link = document.createElement("a");
-			// 	manage_permissions_link.href = `manage_permissions.html?location=/board/${board.slug}`;
-			// 	manage_permissions_link.textContent = "Manage permissions";
-			// 	col.append(manage_permissions_link, document.createTextNode(" :: "));
-			// }
-			if (board["client_permissions"]["create_board"]) {
-				const edit_board_link = document.createElement("a");
-				edit_board_link.href = `edit_board.html?board=${board.slug}`;
-				edit_board_link.textContent = "Edit";
-				col.append(edit_board_link, document.createTextNode(" :: "));
-			}
-			const board_link = document.createElement("a");
-			board_link.href = `board.html?board=${board.slug}`;
-			board_link.textContent = "Open";
-			col.append(board_link);
-			board_element.append(col);
-		}
-
-		// const slug_element = document.createElement("td");
-		// slug_element.textContent = board.slug;
-		table_element.append(board_element);
-	}
-	if (response_json.boards.length === 0)
-		board_list_container.replaceChildren(document.createTextNode("No boards visible to this client."));
-	else {
-		fragment.appendChild(table_element);
-		board_list_container.replaceChildren(table_element);
-	}
-}
 
 // websocket = connectToServer();
 async function getClientInfo() {
@@ -222,10 +180,10 @@ async function getClientInfo() {
 				if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
 					displayClientAsLoggedOut();
 				}
-				state.server_permissions = response_json["server_permissions"];
-				window.history.replaceState(state, null, ""); // Initial state
+				// state.server_permissions = response_json["server_permissions"];
+				// window.history.replaceState(state, null, ""); // Initial state
 				manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
-				console.log(state);
+				// console.log(state);
 			});
 		}
 		else {
@@ -241,8 +199,10 @@ async function getClientInfo() {
 	}
 }
 getClientInfo(); // runs asynchronously
-getAllBoards().then(() => {
-	loading_dialog.close();
-})
+// getAllBoards().then(() => {
+// 	loading_dialog.close();
+// })
+
+router.resolve();
 </script>
 </html>
