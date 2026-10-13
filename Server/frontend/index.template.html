@@ -30,11 +30,17 @@
 #include "include/board_list.html"
 </template>
 <template id="thread-list-template" class="TestClassForTemplate">
-<!--Loses some efficiency because we're parsing the same stylesheet as in the homepage, but eh, good enough-->
-<!--<link rel="stylesheet" href="FILE_"static/styles.css"">-->
 #include "include/board.html"
 </template>
 <style>
+main {
+	flex-grow: 1;
+	>thread-list { /* thread list*/
+		display: flex;
+		flex-flow: column;
+		height: 100%;
+	}
+}
 </style>
 <script src="static/navigo.min.js"></script>
 <script type="module" src="modules/board.js"></script>
@@ -58,47 +64,34 @@ router.on(async() => {
 		error_dialog.showModal();
 	}
 });
-// router.on("/boards", () => {
-// 	console.log("/boards/ opened");
-// });
 router.on("/board/:board_slug", async({data}) => {
 	try {
 		console.log(data);
 		let thread_list = await mountThreadListIfNotThere(data);
-		await thread_list.getBoard(data.board_slug);
+		await thread_list.render(data.board_slug);
 	}
 	catch (error) {
 		console.error(error);
 		error_message.textContent = error;
 		error_dialog.showModal();
 	}
-	// getBoardTree();
-	// TODO load board.template.html into shadow DOM
-	// URL will be /#/board/g (hash-based routing)
 });
 router.on("/board/:board_slug/thread/:thread_id", async({data}) => {
 	try {
 		console.log(data);
 		let thread_list = await mountThreadListIfNotThere(data);
-		await thread_list.getThread(data.board_slug, Number(data.thread_id));
+		await thread_list.render(data.board_slug, Number(data.thread_id));
 	}
 	catch (error) {
 		console.error(error);
 		error_message.textContent = error;
 		error_dialog.showModal();
 	}
-	// getBoardTree();
-	// TODO load board.template.html into shadow DOM
-	// URL will be /#/board/g (hash-based routing)
 });
 
 window.localDate = new Date();
 window.timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 window.flex_separator = document.createElement("div");
-window.flex_separator.classList.add("FlexSeparator");
-// let state = {
-// 	server_permissions: {}
-// };
 
 // TODO everything else in that module
 async function mountThreadListIfNotThere(data) {
@@ -147,63 +140,11 @@ if (url_params.get("display") === "embed") {
 }
 else window.url_params_display_as_embed = false;
 
-// window.onpopstate = function(event) {
-// 	if (event.state) {
-// 		state = event.state;
-// 	}
-// 	getAllBoards();
-// }
-
 document.addEventListener("logout", () => {
 	// state.server_permissions = undefined;
 	getAllBoards();
 	getClientInfo();
 })
-
-// threads_button.onclick = () => { openThreadList(); } // included in navbar.html
-// refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
-// async function refresh_send() {
-// 	loading_dialog.showModal();
-// 	// await getAllBoards();
-// 	loading_dialog.close();
-// }
-
-
-// websocket = connectToServer();
-/*
-async function getClientInfo() {
-	try {
-		const response = await fetch("api/user/client");
-		console.log(response);
-		if (response.ok) {
-			await response.json().then(response_json => {
-				console.log(response_json);
-				if (!response_json["has_cookie"] && localStorage.getItem("logged_in") === "true") {
-					displayClientAsLoggedOut();
-				}
-				// state.server_permissions = response_json["server_permissions"];
-				// window.history.replaceState(state, null, ""); // Initial state
-				manage_server_button.style["display"] = response_json["server_permissions"]["manage_permissions"] === true ? "inherit" : "none";
-				// console.log(state);
-			});
-		}
-		else {
-			let error_message = response.headers.get("message");
-			error_message ??= "An unknown error occured when attempting to fetch client.";
-			throw error_message;
-		}
-	}
-	catch (error) {
-		console.error(error);
-		error_message.textContent = error;
-		error_dialog.showModal();
-	}
-}
-getClientInfo(); // runs asynchronously
-*/
-// getAllBoards().then(() => {
-// 	loading_dialog.close();
-// })
 
 router.resolve();
 </script>

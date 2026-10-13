@@ -110,74 +110,61 @@ class ThreadListElement extends HTMLElement {
 	// console.log(`Attribute ${name} has changed.`);
 	// }
 
-	/*
-	async refresh_send() {
-		loading_dialog.showModal();
-		lock_scroll_to_bottom = false;
-		if (typeof websocket !== "undefined") {
-			websocket.close();
-		}
-		try {
-			if (this.selected_thread.id === -1) {
-				await getAllThreads(); // TODO scroll to previously viewed thread
-			}
-			else {
-				await getThread();
-				lock_scroll_to_bottom = true;
-			}
-			loading_dialog.close();
-		}
-		catch (error) {
-			loading_dialog.close();
-			console.error(error);
-			error_message.textContent = error;
-			error_dialog.showModal();
-		}
-	}
-	*/
-
-	async getBoard(board_slug) {
-		this.selected_thread.id = -1;
-		this.selected_thread.permissions = {};
-		this.selected_board.slug = board_slug;
-		// let response = await fetch(`./api/board/${this.selected_board.slug}/threads`);
-		fetch(`api/board/${board_slug}`).then(async(response) => { // runs in parallel
-			if (response.ok) {
-				await response.json().then(response_json => {
-					console.log(response_json);
-					this.selected_board.permissions = response_json["client_permissions"];
-					if (this.selected_thread.id == -1) {
-						this.updateReplyContainer(-1, this.selected_board.permissions);
-					}
-				});
-			}
-			else {
-				let error_message = response.headers.get("message");
-				error_message ??= "An unknown error occured when attempting to fetch board info.";
-				throw error_message;
-			}
-		})
-		let response = await fetch(`./api/board/${board_slug}/threads`);
-		console.log(response);
+	async fetchJson(location, args, thing = "something") {
+		const response = await fetch(location, args);
 		if (response.ok) {
-			await response.json().then(response_obj => {
-				console.log(response_obj);
-				this.showAllThreads(board_slug, response_obj);
-			});
+			const response_json = await response.json();
+			return response_json;
 		}
 		else {
-			let error_message = response.headers.get("message");
-			error_message ??= "An unknown error occured when attempting to fetch threads.";
+			const error_message = response.headers.get("message") ?? `An unknown error occured when attempting to fetch ${thing}.`;
 			throw error_message;
 		}
+	}
+
+	async render(board_slug, thread_id = -1) {
+		this._abort_controller?.abort();
+		this._abort_controller = new AbortController();
+		const signal = this._abort_controller.signal;
+
+		this.selected_board.slug = board_slug;
+		this.selected_thread.id = thread_id;
+		this.closeWebsocket();
+		if (thread_id === -1) {
+			// could use Promise.allSettled
+			// https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled
+			await Promise.all([
+				this.getBoardInfoAndUpdateReplyContainer(board_slug, signal),
+				this.getThreadList(board_slug, signal)
+			]);
+		}
+		else {
+			const thread_json = await this.fetchJson(`api/board/${board_slug}/thread/${thread_id}`, {signal: signal}, "thread");
+			if (signal.aborted)
+				return;
+			this.showThread(board_slug, thread_id, thread_json);
+			this.websocket = this.wsListenToThread(board_slug, thread_id, signal);
+		}
+	}
+	async getBoardInfoAndUpdateReplyContainer(board_slug, signal) {
+		const board_json = await this.fetchJson(`api/board/${board_slug}`, {signal: signal}, "board info");
+		if (signal.aborted)
+			return;
+		this.selected_board.permissions = board_json["client_permissions"];
+		this.updateReplyContainer(-1, this.selected_board.permissions);
+	}
+
+	async getThreadList(board_slug, signal) {
+		const threads_json = await this.fetchJson(`api/board/${board_slug}/threads`, {signal: signal}, "threads")
+		console.log(threads_json);
+		if (signal.aborted)
+			return;
+		this.showAllThreads(board_slug, threads_json);
 	}
 
 	showAllThreads(board_slug, message_json) {
 		this.location_indicator.textContent = "Threads in " + board_slug;
 		// threads_button.disabled = true;
-		// if (this.selected_board.permissions) {
-			// this.updateReplyContainer(this.selected_thread.id, this.selected_board.permissions);
-		// }
 
 		const fragment = new DocumentFragment();
 		for (let thread of message_json.threads) {
@@ -243,16 +230,15 @@ class ThreadListElement extends HTMLElement {
 		// this.getThread(board_slug, thread_id);
 	}
 
-	async getThread(board_slug, thread_id) {
+	async fetchThread(board_slug, thread_id) {
 		this.selected_board.slug = board_slug;
 		this.selected_thread.id = thread_id;
 		let response = await fetch(`./api/board/${board_slug}/thread/${thread_id}`);
 		if (response.ok) {
 			await response.json().then(response_obj => {
 				console.log(response_obj);
-				this.showThread(board_slug, thread_id, response_obj);
+				return response_obj;
 			});
-			this.websocket = this.connectToServer();
 		}
 		else {
 			let error_message = response.headers.get("message");
@@ -267,7 +253,7 @@ class ThreadListElement extends HTMLElement {
 		this.selected_thread.permissions = thread_json["client_permissions"]; // Needed for websocket posts coming in
 		this.updateReplyContainer(thread_id, thread_json["client_permissions"]);
 		// this.selected_thread.client_permissions = thread_json["client_permissions"];
-		// header_bar.scrollIntoView(false); // Scroll back to top
+		// header_bar.scrollIntoView(false); // Scroll back to top TODO find another way!
 		const fragment = new DocumentFragment();
 		for (let message of thread_json["messages"]) {
 			fragment.appendChild(this.createPost(board_slug, thread_id, message, thread_json["client_permissions"]));
@@ -691,8 +677,10 @@ class ThreadListElement extends HTMLElement {
 	}
 
 	// Websocket
-	connectToServer() {
-		let listening_to_thread = this.selected_thread.id;
+	wsListenToThread(board_slug, thread_id, signal) {
+		if (thread_id === -1)
+			throw "Attempted to connect websocket to thread list";
+		let listening_to_thread = thread_id;
 		let sock;
 		if (!this.websocket_connected) {
 			sock = new WebSocket(this.websocket_url);
@@ -707,13 +695,14 @@ class ThreadListElement extends HTMLElement {
 			this.websocket_connected = true;
 			// clearInterval(reconnect_websocket_interval);
 			// reconnect_websocket_interval = null;
-			if (this.selected_thread.id > -1) {
-				sock.send(JSON.stringify({
-					"type": "listen_to_thread",
-					"board": this.selected_board.slug,
-					"thread_id": this.selected_thread.id
-				}));
-			}
+			if (signal.aborted)
+				return;
+
+			sock.send(JSON.stringify({
+				"type": "listen_to_thread",
+				"board": board_slug,
+				"thread_id": thread_id
+			}));
 		}
 
 		sock.onmessage = (event) => {
