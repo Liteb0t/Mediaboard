@@ -1,6 +1,7 @@
 import { global_styles } from "./styles.js";
 import { session } from "./session.js";
 
+
 class Format {
 	static IMAGE = 0;
 	static AUDIO = 1;
@@ -32,6 +33,140 @@ class Format {
 	}
 }
 
+
+class UploadedFile {
+	file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
+	static media_url = "./media/";
+
+	static decode_utf8(s) {
+		return decodeURIComponent(escape(s));
+	}
+
+	constructor(file_upload_element, file_object) {
+		this.file_upload = file_upload_element;
+		this.file = file_object; // derived from this.file_upload.files
+		this.container_element = null;
+		this.thumbnail_element = null;
+		this.information_element = null;
+		this.progress_element = null;
+		this.filename = file_object.name;
+		if (file_object.size > this.file_size_limit) {
+			this.file_upload.value = "";
+			throw new Error(`The file ${file_object.name} exceeds the CONFIG_this.file_size_limit_mb megabyte limit. <br>
+				<code>${file_object.size}</code> - this file (bytes)<br>
+				<code>${this.file_size_limit}</code> - limit (bytes)`);
+		}
+		const file_name_size = (new TextEncoder().encode(file_object.name)).length;
+		if (file_name_size > CONFIG_post_max_file_name) {
+			throw new Error(`File name "${file_object.name}" exceeds the limit of CONFIG_post_max_file_name bytes.<br>
+				This file name: ${file_name_size} bytes.`);
+		}
+		console.log("UploadedFile test passed...");
+		// uploadFile(chosen_file);
+	}
+	addFileToList(file_upload_list_element) {
+		this.container_element = document.createElement("div");
+		this.thumbnail_element = document.createElement("img");
+		this.thumbnail_element.setAttribute("src", "static/placeholder.png");
+		this.thumbnail_element.setAttribute("width", "100px");
+		this.thumbnail_element.setAttribute("height", "100px");
+		this.information_element = document.createElement("div");
+		this.information_element.classList.add("FileInformation");
+		this.file_title_element = document.createElement("span");
+		this.status_element = document.createElement("span");
+		this.status_element.textContent = "Uploading...";
+		// file_title.classList.add("FileTitle");
+		this.file_title_element.textContent = this.filename;
+		let file_delete_button = document.createElement("button");
+		file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
+		this.progress_element = document.createElement("progress");
+		this.progress_element.value = 0;
+		this.information_element.append(this.file_title_element, document.createElement("br"), this.status_element, this.progress_element, document.createElement("br"), file_delete_button);
+		this.container_element.append(this.thumbnail_element, this.information_element);
+		file_upload_list_element.appendChild(this.container_element);
+		file_delete_button.onclick = (event) => {
+			// Add delete to server later
+			// file_upload_list_element.removeChild(document.getElementById("file_" + server_filename));
+			file_upload_list_element.removeChild(this.container_element);
+			this.file_upload.disabled = false;
+		}
+	}
+	upload(board_slug, thread_id) {
+		let formdata = new FormData();
+		formdata.append("File_1", this.file);
+		let received_error = false;
+		let request = new XMLHttpRequest();
+		this.progress_element.max = this.file.size;
+		console.log(this.file);
+		request.upload.addEventListener("progress", (event) => {
+			this.progress_element.value = event.loaded;
+			if (event.loaded === event.total) {
+				this.status_element.textContent = "Processing...";
+			}
+		});
+		request.responseType = "text";
+		request.open("POST", `./api/board/${board_slug}/` + (thread_id > -1 ? `thread/${thread_id}/upload` : "upload/"));
+		request.timeout = 60*60*1000; // 1 hour
+		request.onreadystatechange = () => {
+			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
+			if (!(request.status >= 200 && request.status < 300) && request.status != 0 && !received_error) {
+				received_error = true;
+				request.abort();
+				this.showHttpError(request);
+			}
+		}
+		request.send(formdata);
+		request.onload = () => {
+			console.log("Request onLoad fired");
+			if (request.readyState === request.DONE) {
+				console.log("Received response");
+				if (request.status >= 200 && request.status < 300) {
+					const server_filename = request.getResponseHeader("File-Name");
+					console.log("server_filename: " + server_filename);
+					let decoded_filename = UploadedFile.decode_utf8(server_filename);
+					console.log("server_filename decoded: " + decoded_filename);
+					// const utf8array = new TextEncoder().encode(server_filename);
+					// var newdecoded = new TextDecoder().decode(utf8array);
+					// console.log("server_filename dec new: " + newdecoded);
+					this.container_element.setAttribute("id", "file_" + decoded_filename);
+					// this.file_title_element.textContent = decoded_filename;
+					const width = request.getResponseHeader("Image-Width");
+					const height = request.getResponseHeader("Image-Height");
+					if (width && height) {
+						this.container_element.setAttribute("data-image-width", width);
+						this.container_element.setAttribute("data-image-height", height);
+					}
+					const thumbnail_file_extension = request.getResponseHeader("Thumbnail-File-Extension");
+					if (thumbnail_file_extension) {
+						this.container_element.setAttribute("data-thumbnail-file-extension", thumbnail_file_extension);
+						this.thumbnail_element.setAttribute("src", UploadedFile.media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
+					}
+					this.status_element.textContent = "Upload complete";
+					this.status_element.classList.add("UploadCompleteIndicator");
+					this.information_element.removeChild(this.progress_element);
+				}
+				else {
+					this.showHttpError(request);
+				}
+			}
+		}
+	}
+	showHttpError(request) {
+		const error_message = request.getResponseHeader("message");
+		this.container_element.classList.add("Errored");
+		file_upload_error_dialog_message.innerText =
+			`Status: ${request.status} ${request.statusText}\n` +
+			(error_message || "An unknown error occured.");
+		file_upload_error_dialog.showModal();
+		const upload_failed_indicator = document.createElement("span");
+		upload_failed_indicator.classList.add("UploadFailedIndicator");
+		upload_failed_indicator.textContent = "Upload failed";
+		this.information_element.replaceChild(upload_failed_indicator, this.progress_element);
+		this.thumbnail_element.setAttribute("src", "./static/x_icon.png");
+	}
+}
+
+
 // https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks
 // Create a class for the element
 class ThreadListElement extends HTMLElement {
@@ -40,26 +175,29 @@ class ThreadListElement extends HTMLElement {
 	// thread_id = null;
 	selected_board = {
 		slug: null,
+		title: null,
 		permissions: {}
 	};
 	selected_thread = {
-		id: null,
+		id: -1,
 		permissions: {}
 	};
 	server_permissions = {};
 
-	media_url = "./media/";
 	thumbnail_url = "./media/thumbnails/";
 	websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
-	// const thumbnail_size = CONFIG_thumbnail_size;
-	// const file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
 	media_uuid_len = 36;
+	thumbnail_size = CONFIG_thumbnail_size;
 	// localDate = new Date();
 	// timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 	// flex_separator = document.createElement("div").classList.add("FlexSeparator");
 	websocket = null; // set in getThread()
 	websocket_connected = false;
 	content_field_text_encoder = new TextEncoder();
+	lock_scroll_to_bottom = false;
+	scrolled_to_bottom_observer = null;
+	static FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
+	static FIGURE_THUMBNAIL = 1;
 
 	constructor() {
 		// Always call super first in constructor
@@ -73,22 +211,135 @@ class ThreadListElement extends HTMLElement {
 		for (const element of shadow.querySelectorAll("[id]")) {
 			this[element.id] = element;
 		}
-	}
 
+
+		// The value in the name field is set to the name used in the most recent post, if any.
+		this.name_field.value = localStorage.getItem("name");
+
+		this.content_field.oninput = () => {
+			// Remove leftover <br> tag from contenteditable so the 'Content' placeholder appears again
+			if (this.content_field.childElementCount === 1 && this.content_field.children[0].tagName === "BR" && this.content_field.textContent.length === 0) {
+				this.content_field.removeChild(this.content_field.children[0]);
+			}
+
+			let content_field_length = (this.content_field_text_encoder.encode(this.content_field.innerText)).length;
+			if (content_field_length > Math.round(CONFIG_post_max_content * 0.8)) {
+				if (this.content_length_indicator.style["display"] === "none") {
+					this.content_length_indicator.style["display"] = "inherit";
+				}
+				this.content_length_indicator.textContent = `${content_field_length}/${CONFIG_post_max_content}`;
+				if (content_field_length > CONFIG_post_max_content) {
+					if (!this.content_length_indicator.classList.contains("LimitExceeded")) {
+						this.content_length_indicator.classList.add("LimitExceeded");
+					}
+				}
+				else {
+					if (this.content_length_indicator.classList.contains("LimitExceeded")) {
+						this.content_length_indicator.classList.remove("LimitExceeded");
+					}
+				}
+			}
+			else {
+				if (this.content_length_indicator.style["display"] !== "none") {
+					this.content_length_indicator.style["display"] = "none";
+				}
+			}
+		}
+		this.file_upload.onchange = (event) => {
+			console.log("file changed.");
+			if (this.file_upload.files.length + this.file_post_list.childNodes.length > 4) {
+				error_message.textContent = "Cannot attach more than 4 files.";
+				error_dialog.showModal();
+				this.file_upload.value = "";
+			}
+			else {
+				for (let chosen_file of this.file_upload.files) {
+					try {
+						let new_file = new UploadedFile(this.file_upload, chosen_file);
+						new_file.addFileToList(this.file_post_list);
+						new_file.upload(this.selected_board.slug, this.selected_thread.id);
+					}
+					catch (error) {
+						console.error(error);
+						error_message.innerHTML = error.message ? error.message : "An unknown error occured when attempting to upload file.";
+						error_dialog.showModal();
+					}
+				}
+			}
+		}
+		// "Scroll-lock" feature - when a user is scrolled to the bottom of the messages list, adding content in the reply container will push the messages up so that the latest messages are not obstructed.
+		const reply_container_resize_observer = new ResizeObserver(() => {
+			if (this.lock_scroll_to_bottom === true) {
+				this.bottom_marker.scrollIntoView(false);
+			}
+		});
+		reply_container_resize_observer.observe(this.reply_container);
+		const options = {
+			// root: document.body,
+			rootMargin: "5px",
+			scrollMargin: "5px",
+			threshold: 0.5,
+		};
+		const callback = (entries, observer) => {
+			for (let entry of entries) {
+				if (entry.target === this.bottom_marker && this.selected_thread.id > -1) {
+					this.lock_scroll_to_bottom = entry.isIntersecting;
+				}
+			}
+
+			console.log(entries);
+		}
+		this.scrolled_to_bottom_observer = new IntersectionObserver(callback, options);
+
+	} // constructor()
+	onclickHandler = (event) => {
+		let target = event.target;
+		console.log(target);
+		if (target.classList.contains("EmbedThumbnail"))
+			ThreadListElement.expandEmbedFigure(target.parentNode);
+		else if (target.classList.contains("EmbedImage"))
+			ThreadListElement.contractEmbedFigure(target.parentNode);
+		else if (target.classList.contains("EmbedIframe"))
+			ThreadListElement.toggleEmbedIframe(target.parentNode);
+	}
+	static toggleEmbedIframe(figure_element) {
+		let iframe_element = figure_element.querySelector("iframe");
+		if (figure_element.getAttribute("expanded") === "") {
+			iframe_element.style["display"]="none";
+			figure_element.removeAttribute("expanded");
+			iframe_element.src = "";
+		}
+		else {
+			iframe_element.style["display"]="inherit";
+			figure_element.setAttribute("expanded", "");
+			iframe_element.src = figure_element.getAttribute("data-iframe-src");
+		}
+	}
+	static expandEmbedFigure(figure_element) {
+		figure_element.children[ThreadListElement.FIGURE_EMBED].setAttribute("src", UploadedFile.media_url + figure_element.getAttribute("filename"));
+		figure_element.children[ThreadListElement.FIGURE_EMBED].style["display"] = "inherit";
+		figure_element.children[ThreadListElement.FIGURE_THUMBNAIL].style["display"] = "none";
+	}
+	static contractEmbedFigure(figure_element) {
+		figure_element.children[ThreadListElement.FIGURE_EMBED].style["display"] = "none";
+		figure_element.children[ThreadListElement.FIGURE_THUMBNAIL].style["display"] = "inherit";
+	}
 	connectedCallback() {
 		console.log("Custom element added to page.");
 		this.post_button.onclick = () => this.postAction();
-		session.addEventListener("change", () => {this.updateReplyContainerAuto()});
+		// session.addEventListener("change", this.updateReplyContainerAuto);
 		session.refresh(); // fetches client info asynchronously
 // threads_button.onclick = () => { openThreadList(); } // included in navbar.html
 // refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
+		this.shadowRoot.addEventListener("click", this.onclickHandler);
 	}
 
 	disconnectedCallback() {
 	console.log("Custom element removed from page.");
 		this.selected_thread.id = -1;
 		this.closeWebsocket();
-		session.removeEventListener("change");
+		// session.removeEventListener("change", this.updateReplyContainerAuto);
+		this.shadowRoot.removeEventListener("click", this.onclickHandler);
 	}
 
 	connectedMoveCallback() {
@@ -103,7 +354,7 @@ class ThreadListElement extends HTMLElement {
 		if (this.websocket) {
 			this.websocket.close();
 		}
-		this.websocket_connected = false;
+		this.websocket = null;
 	}
 
 	// attributeChangedCallback(name, oldValue, newValue) {
@@ -152,6 +403,20 @@ class ThreadListElement extends HTMLElement {
 			return;
 		this.selected_board.permissions = board_json["client_permissions"];
 		this.updateReplyContainer(-1, this.selected_board.permissions);
+		this.selected_board.title = board_json["title"];
+		this.updateLocationIndicatorAndBackButton(board_slug, this.selected_board.title, this.selected_thread.id);
+	}
+	updateLocationIndicatorAndBackButton(board_slug, board_title, thread_id) {
+		if (thread_id === -1) {
+			this.location_indicator.textContent = `Threads in ${board_slug} - ${this.selected_board.title}`;
+			this.location_indicator.style["display"] = "inherit";
+			this.back_to_threads_button.style["display"] = "none";
+		}
+		else {
+			this.back_to_threads_button.href = ThreadListElement.makeLink(board_slug);
+			this.back_to_threads_button.style["display"] = "inherit";
+			this.location_indicator.style["display"] = "none";
+		}
 	}
 
 	async getThreadList(board_slug, signal) {
@@ -163,7 +428,6 @@ class ThreadListElement extends HTMLElement {
 	}
 
 	showAllThreads(board_slug, message_json) {
-		this.location_indicator.textContent = "Threads in " + board_slug;
 		// threads_button.disabled = true;
 
 		const fragment = new DocumentFragment();
@@ -184,7 +448,7 @@ class ThreadListElement extends HTMLElement {
 
 				const reply_count_container = document.createElement("div");
 				const reply_count = document.createElement("span");
-				reply_count.textContent = "Replies: " + (thread["reply_count"]);
+				reply_count.textContent = (thread["reply_count"] > 0 ? thread["reply_count"] : "No") + " repl" + (thread["reply_count"] === 1 ? "y" : "ies");
 				reply_count_container.appendChild(reply_count);
 
 				thread_toolbar.append(reply_count_container, window.flex_separator.cloneNode());
@@ -197,20 +461,12 @@ class ThreadListElement extends HTMLElement {
 					thread_toolbar.append(manage_thread_permissions_button);
 				}
 
-				// TODO also change thread created popup button to link
 				let open_thread_link = document.createElement("a");
 				open_thread_link.classList.add("Button", "ToolBarButton");
 				open_thread_link.textContent = "\u21E8 Open thread";
-				open_thread_link.href = this.makeLinkToThread(board_slug, thread.id);
-				// let open_thread_button = document.createElement("button");
-				// open_thread_button.classList.add("ToolBarButton");
-				// open_thread_button.textContent = "\u21E8 Open thread";
-				// open_thread_button.onclick = (event) => {
-				// 	this.openThread(board_slug, thread.id);
-				// }
+				open_thread_link.href = ThreadListElement.makeLink(board_slug, thread.id);
 
 				thread_toolbar.append(open_thread_link);
-				// thread_toolbar.appendChild(open_thread_button);
 				thread_element.appendChild(thread_toolbar);
 				fragment.appendChild(thread_element);
 			}
@@ -221,7 +477,12 @@ class ThreadListElement extends HTMLElement {
 			this.post_container.replaceChildren(fragment);
 	}
 
-	makeLinkToThread(board_slug, thread_id) { return `#/board/${board_slug}/thread/${thread_id}`; }
+	static makeLink(board_slug, thread_id = -1) {
+		if (thread_id === -1)
+			return `#/board/${board_slug}`;
+		else
+			return `#/board/${board_slug}/thread/${thread_id}`;
+	}
 	openThread(board_slug, thread_id) {
 		this.router.navigate(`#/board/${board_slug}/thread/${thread_id}`);
 		// this.selected_thread.id = thread_id;
@@ -230,27 +491,12 @@ class ThreadListElement extends HTMLElement {
 		// this.getThread(board_slug, thread_id);
 	}
 
-	async fetchThread(board_slug, thread_id) {
-		this.selected_board.slug = board_slug;
-		this.selected_thread.id = thread_id;
-		let response = await fetch(`./api/board/${board_slug}/thread/${thread_id}`);
-		if (response.ok) {
-			await response.json().then(response_obj => {
-				console.log(response_obj);
-				return response_obj;
-			});
-		}
-		else {
-			let error_message = response.headers.get("message");
-			error_message ??= "An unknown error occured when attempting to load thread.";
-			throw error_message;
-		}
-	}
-
 	showThread(board_slug, thread_id, thread_json) {
-		this.location_indicator.textContent = `Viewing thread ${thread_id}`;
+		// this.location_indicator.textContent = `Viewing thread ${thread_id}`;
 		// threads_button.disabled = false;
 		this.selected_thread.permissions = thread_json["client_permissions"]; // Needed for websocket posts coming in
+
+		this.updateLocationIndicatorAndBackButton(board_slug, this.selected_board.title, thread_id);
 		this.updateReplyContainer(thread_id, thread_json["client_permissions"]);
 		// this.selected_thread.client_permissions = thread_json["client_permissions"];
 		// header_bar.scrollIntoView(false); // Scroll back to top TODO find another way!
@@ -259,6 +505,7 @@ class ThreadListElement extends HTMLElement {
 			fragment.appendChild(this.createPost(board_slug, thread_id, message, thread_json["client_permissions"]));
 		}
 		this.post_container.replaceChildren(fragment);
+		this.scrolled_to_bottom_observer.observe(this.bottom_marker);
 	}
 
 	createPost(board_slug, selected_thread_id, data, client_permissions) {
@@ -325,7 +572,7 @@ class ThreadListElement extends HTMLElement {
 				reply_button.style["margin-left"] = "0.5em";
 				reply_button.textContent = "\u{2BA9} Reply";
 				reply_button.onclick = () => {
-					reply_container.open = true;
+					this.reply_container.open = true;
 
 					let reply_link_node = document.createTextNode(post_id + " ");
 					// Add reply tag at caret position, if focused on content_field
@@ -408,23 +655,23 @@ class ThreadListElement extends HTMLElement {
 				let thumbnail_element = document.createElement("img");
 				thumbnail_element.classList.add("EmbedThumbnail");
 				let thumbnail_filename = file.thumbnail_file_extension ? `THUMBNAIL_${file.filename}.${file.thumbnail_file_extension}` : "THUMBNAIL_" + file["filename"] + ".CONFIG_thumbnail_file_extension";
-				thumbnail_element.setAttribute("src", thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+				thumbnail_element.setAttribute("src", this.thumbnail_url + thumbnail_filename.replace(" ", "%20"));
 				if (file["width"] && file["height"]) {
 					if (file["width"] < file["height"]) {
-						thumbnail_element.width = file["width"] < file["height"]>>1 ? Math.ceil(thumbnail_size / 2) : Math.ceil(thumbnail_size * (file["width"]/file["height"]));
-						thumbnail_element.height = thumbnail_size;
+						thumbnail_element.width = file["width"] < file["height"]>>1 ? Math.ceil(this.thumbnail_size / 2) : Math.ceil(this.thumbnail_size * (file["width"]/file["height"]));
+						thumbnail_element.height = this.thumbnail_size;
 					}
 					else if (file["height"] < file["width"]) {
-						thumbnail_element.width = thumbnail_size;
-						thumbnail_element.height = file["height"] < file["width"]>>1 ? Math.ceil(thumbnail_size / 2) : Math.ceil(thumbnail_size * (file["height"]/file["width"]));
+						thumbnail_element.width = this.thumbnail_size;
+						thumbnail_element.height = file["height"] < file["width"]>>1 ? Math.ceil(this.thumbnail_size / 2) : Math.ceil(this.thumbnail_size * (file["height"]/file["width"]));
 					}
 					else {
-						thumbnail_element.width = thumbnail_size;
-						thumbnail_element.height = thumbnail_size;
+						thumbnail_element.width = this.thumbnail_size;
+						thumbnail_element.height = this.thumbnail_size;
 					}
 				}
 				else { // Legacy: images uploaded before 0.1.1 don't have width and height saved
-					thumbnail_element.width = thumbnail_element.height = thumbnail_size;
+					thumbnail_element.width = thumbnail_element.height = this.thumbnail_size;
 				}
 				thumbnail_element.setAttribute("loading", "lazy");
 				figure_element.append(thumbnail_element);
@@ -433,22 +680,22 @@ class ThreadListElement extends HTMLElement {
 				let audio_element = document.createElement("audio");
 				audio_element.controls = true;
 				audio_element.setAttribute("controlslist", "nofullscreen nodownload");
-				audio_element.setAttribute("src", media_url + file["filename"].replace(" ", "%20"));
+				audio_element.setAttribute("src", UploadedFile.media_url + file["filename"].replace(" ", "%20"));
 				figure_element.appendChild(audio_element);
 			}
 			let download_filename, caption_filename;
 			if (filename_extension_i == -1) {
-				download_filename = file["filename"].slice(0, file["filename"].length - media_uuid_len);
+				download_filename = file["filename"].slice(0, file["filename"].length - this.media_uuid_len);
 				caption_filename = download_filename.length < 32 ? download_filename : (download_filename.substr(0, 28) + "(...)");
 			}
 			else {
-				download_filename = file["filename"].slice(0, filename_extension_i - media_uuid_len);
+				download_filename = file["filename"].slice(0, filename_extension_i - this.media_uuid_len);
 				caption_filename = download_filename.length < 32 ? download_filename : (download_filename.substr(0, 28) + "(...)");
 				download_filename += file["filename"].slice(filename_extension_i, file["filename"].length);
 				caption_filename += file["filename"].slice(filename_extension_i, file["filename"].length);
 			}
 			let figcaption_element = document.createElement("figcaption");
-			let media_src = media_url + file["filename"].replace(" ", "%20");
+			let media_src = UploadedFile.media_url + file["filename"].replace(" ", "%20");
 			let figcaption_element_a = document.createElement("a");
 			figcaption_element_a.setAttribute("href", media_src);
 			figcaption_element_a.setAttribute("target", "_blank");
@@ -476,6 +723,7 @@ class ThreadListElement extends HTMLElement {
 		return post_box_element;
 	}
 
+	/*
 	updateReplyContainerAuto() {
 		if (this.selected_thread.id === -1 && this.selected_board.permissions !== {}) {
 			this.updateReplyContainer(-1, this.selected_board.permissions);
@@ -484,6 +732,7 @@ class ThreadListElement extends HTMLElement {
 			this.updateReplyContainer(this.selected_thread.id, this.selected_thread.permissions);
 		}
 	}
+	*/
 	updateReplyContainer(selected_thread_id, permissions) {
 		console.log("updateReplyContainer called");
 		console.log("with selected thread ID " + selected_thread_id + " and permissions below");
@@ -577,8 +826,9 @@ class ThreadListElement extends HTMLElement {
 					if (this.selected_thread.id === -1) {
 						let new_thread_id = Number(response.headers.get("new-thread-id"));
 						// thread_posted_dialog_open_thread_button.onclick = () => { openThread(new_thread_id); thread_posted_dialog.close(); }
-						thread_posted_dialog_open_thread_link.href = this.makeLinkToThread(board_slug, thread_id);
-						thread_posted_dialog.showModal();
+						this.thread_posted_dialog_open_thread_link.href = ThreadListElement.makeLink(this.selected_board.slug, new_thread_id);
+						this.thread_posted_dialog_open_thread_link.onclick = () => { this.thread_posted_dialog.close();}
+						this.thread_posted_dialog.showModal();
 					}
 				}
 				else {
@@ -671,20 +921,14 @@ class ThreadListElement extends HTMLElement {
 		}
 	}
 	*/
-
-	decode_utf8(s) {
-		return decodeURIComponent(escape(s));
-	}
-
 	// Websocket
 	wsListenToThread(board_slug, thread_id, signal) {
 		if (thread_id === -1)
 			throw "Attempted to connect websocket to thread list";
 		let listening_to_thread = thread_id;
 		let sock;
-		if (!this.websocket_connected) {
+		if (!this.websocket) {
 			sock = new WebSocket(this.websocket_url);
-			this.websocket_connected = true;
 		}
 		else {
 			return this.websocket;
@@ -692,7 +936,7 @@ class ThreadListElement extends HTMLElement {
 		sock.onopen = (event) => {
 			// connection_status.textContent = "Connected 🙂";
 			console.log("Websocket connected.");
-			this.websocket_connected = true;
+			// this.websocket_connected = true;
 			// clearInterval(reconnect_websocket_interval);
 			// reconnect_websocket_interval = null;
 			if (signal.aborted)
@@ -731,7 +975,7 @@ class ThreadListElement extends HTMLElement {
 
 		sock.onclose = (event) => {
 			// connection_status.textContent = "Closed \u{1F634}"
-			this.websocket_connected = false;
+			// this.websocket_connected = false;
 			// if (this.selected_thread.id === listening_to_thread) {
 			// 	console.log("Websocket connection closed. Re-connecting will be attempted in 30 seconds.");
 			// 	setTimeout(() => {
@@ -746,328 +990,3 @@ class ThreadListElement extends HTMLElement {
 }
 
 customElements.define("thread-list", ThreadListElement);
-
-
-// loading_dialog.showModal();
-/*
-const media_url = "./media/";
-const thumbnail_url = "./media/thumbnails/";
-const websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
-const thumbnail_size = CONFIG_thumbnail_size;
-const file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
-const media_uuid_len = 36;
-const localDate = new Date();
-const timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
-const flex_separator = document.createElement("div");
-flex_separator.classList.add("FlexSeparator");
-let state = {
-	selected_board: {
-		slug: null,
-		permissions: {}
-	},
-	selected_thread: {
-		id: null,
-		client_permissions: {}
-	},
-	server_permissions: {}
-};
-let websocket;
-let websocket_connected = false;
-let reconnect_websocket_interval;
-const content_field_text_encoder = new TextEncoder();
-*/
-
-// For embedding Mediaboard within a webpage using an <iframe>.
-// Hides everything except messages.
-/*
-const url_params = new URLSearchParams(location.search);
-let window.url_params_display_as_embed;
-if (url_params.get("display") === "embed") {
-	header_bar.style["display"] = "none";
-	this.location_indicator.style["display"] = "none";
-	reply_container.style["display"] = "none";
-	window.url_params_display_as_embed = true;
-}
-else window.url_params_display_as_embed = false;
-this.selected_board.slug = url_params.get("board") ? url_params.get("board") : -1;
-this.selected_thread.id = url_params.get("thread") ? Number(url_params.get("thread")) : -1;
-#ifdef WITH_WEBRTC
-navlink_live.href = `live.html?board=${this.selected_board.slug}`;
-navlink_live.style["display"] = "inherit";
-#endif
-window.onpopstate = function(event) {
-	if (event.state) {
-		state = event.state;
-	}
-	refresh_send();
-}
-*/
-
-
-// The value in the name field is set to the name used in the most recent post, if any.
-// this.name_field.value = localStorage.getItem("name");
-//
-// document.addEventListener("logout", () => {
-// 	this.server_permissions = undefined;
-// 	refresh_send();
-// 	getClientInfo();
-// })
-//
-// document.body.onclick = (event) => {
-// 	let target = event.target;
-// 	// console.log(target);
-// 	if (target.classList.contains("EmbedThumbnail"))
-// 		expandEmbedFigure(target.parentNode);
-// 	else if (target.classList.contains("EmbedImage"))
-// 		contractEmbedFigure(target.parentNode);
-// 	else if (target.classList.contains("EmbedIframe"))
-// 		toggleEmbedIframe(target.parentNode);
-// }
-
-// function toggleEmbedIframe(figure_element) {
-// 	let iframe_element = figure_element.querySelector("iframe");
-// 	if (figure_element.getAttribute("expanded") === "") {
-// 		iframe_element.style["display"]="none";
-// 		figure_element.removeAttribute("expanded");
-// 		iframe_element.src = "";
-// 	}
-// 	else {
-// 		iframe_element.style["display"]="inherit";
-// 		figure_element.setAttribute("expanded", "");
-// 		iframe_element.src = figure_element.getAttribute("data-iframe-src");
-// 	}
-// }
-
-// const FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
-// const FIGURE_THUMBNAIL = 1;
-// function expandEmbedFigure(figure_element) {
-// 	figure_element.children[FIGURE_EMBED].setAttribute("src", media_url + figure_element.getAttribute("filename"));
-// 	figure_element.children[FIGURE_EMBED].style["display"] = "inherit";
-// 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "none";
-// }
-// function contractEmbedFigure(figure_element) {
-// 	figure_element.children[FIGURE_EMBED].style["display"] = "none";
-// 	figure_element.children[FIGURE_THUMBNAIL].style["display"] = "inherit";
-// }
-
-// function openThreadList() {
-// 	this.selected_thread.id = -1;
-// 	history.pushState(state, "", window.location.pathname + `?board=${this.selected_board.slug}`);
-// 	refresh_send();
-// }
-
-/*
-this.content_field.oninput = () => {
-	// Remove leftover <br> tag from contenteditable so the 'Content' placeholder appears again
-	if (this.content_field.childElementCount === 1 && this.content_field.children[0].tagName === "BR" && this.content_field.textContent.length === 0) {
-		this.content_field.removeChild(this.content_field.children[0]);
-	}
-
-	let content_field_length = (content_field_text_encoder.encode(this.content_field.innerText)).length;
-	if (content_field_length > Math.round(CONFIG_post_max_content * 0.8)) {
-		if (this.content_length_indicator.style["display"] === "none") {
-			this.content_length_indicator.style["display"] = "inherit";
-		}
-		this.content_length_indicator.textContent = `${content_field_length}/${CONFIG_post_max_content}`;
-		if (content_field_length > CONFIG_post_max_content) {
-			if (!this.content_length_indicator.classList.contains("LimitExceeded")) {
-				this.content_length_indicator.classList.add("LimitExceeded");
-			}
-		}
-		else {
-			if (this.content_length_indicator.classList.contains("LimitExceeded")) {
-				this.content_length_indicator.classList.remove("LimitExceeded");
-			}
-		}
-	}
-	else {
-		if (this.content_length_indicator.style["display"] !== "none") {
-			this.content_length_indicator.style["display"] = "none";
-		}
-	}
-}
-
-// "Scroll-lock" feature - when a user is scrolled to the bottom of the messages list, adding content in the reply container will push the messages up so that the latest messages are not obstructed.
-let lock_scroll_to_bottom = false;
-const reply_container_resize_observer = new ResizeObserver(() => {
-	if (lock_scroll_to_bottom === true) {
-		bottom_marker.scrollIntoView(false);
-	}
-});
-reply_container_resize_observer.observe(reply_container);
-const options = {
-	// root: document.body,
-	rootMargin: "5px",
-	scrollMargin: "5px",
-	threshold: 0.5,
-};
-const callback = (entries, observer) => {
-	for (let entry of entries) {
-		if (entry.target === bottom_marker && this.selected_thread.id > -1) {
-			lock_scroll_to_bottom = entry.isIntersecting;
-		}
-	}
-
-	console.log(entries);
-}
-const scrolled_to_bottom_observer = new IntersectionObserver(callback, options);
-*/
-
-/*
-this.file_upload.onchange = (event) => {
-	console.log("file changed.");
-	if (this.file_upload.files.length + this.file_post_list.childNodes.length > 4) {
-		error_message.textContent = "Cannot attach more than 4 files.";
-		error_dialog.showModal();
-		this.file_upload.value = "";
-	}
-	else {
-		for (let chosen_file of this.file_upload.files) {
-			try {
-				let new_file = new UploadedFile(chosen_file);
-				new_file.addFileToList(this.file_post_list);
-				new_file.upload(this.selected_thread.id);
-			}
-			catch (error) {
-				console.error(error);
-				error_message.innerHTML = error.message ? error.message : "An unknown error occured when attempting to upload file.";
-				error_dialog.showModal();
-			}
-		}
-	}
-}
-
-class UploadedFile {
-	constructor(file_object) {
-		this.file = file_object; // derived from this.file_upload.files
-		this.container_element = null;
-		this.thumbnail_element = null;
-		this.information_element = null;
-		this.progress_element = null;
-		this.filename = file_object.name;
-		if (file_object.size > file_size_limit) {
-			this.file_upload.value = "";
-			throw new Error(`The file ${file_object.name} exceeds the CONFIG_file_size_limit_mb megabyte limit. <br>
-				<code>${file_object.size}</code> - this file (bytes)<br>
-				<code>${file_size_limit}</code> - limit (bytes)`);
-		}
-		const file_name_size = (new TextEncoder().encode(file_object.name)).length;
-		if (file_name_size > CONFIG_post_max_file_name) {
-			throw new Error(`File name "${file_object.name}" exceeds the limit of CONFIG_post_max_file_name bytes.<br>
-				This file name: ${file_name_size} bytes.`);
-		}
-		console.log("UploadedFile test passed...");
-		// uploadFile(chosen_file);
-	}
-	addFileToList(file_upload_list_element) {
-		this.container_element = document.createElement("div");
-		this.thumbnail_element = document.createElement("img");
-		this.thumbnail_element.setAttribute("src", "static/placeholder.png");
-		this.thumbnail_element.setAttribute("width", "100px");
-		this.thumbnail_element.setAttribute("height", "100px");
-		this.information_element = document.createElement("div");
-		this.information_element.classList.add("FileInformation");
-		this.file_title_element = document.createElement("span");
-		this.status_element = document.createElement("span");
-		this.status_element.textContent = "Uploading...";
-		// file_title.classList.add("FileTitle");
-		this.file_title_element.textContent = this.filename;
-		let file_delete_button = document.createElement("button");
-		file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
-		this.progress_element = document.createElement("progress");
-		this.progress_element.value = 0;
-		this.information_element.append(this.file_title_element, document.createElement("br"), this.status_element, this.progress_element, document.createElement("br"), file_delete_button);
-		this.container_element.append(this.thumbnail_element, this.information_element);
-		file_upload_list_element.appendChild(this.container_element);
-		file_delete_button.onclick = (event) => {
-			// Add delete to server later
-			// file_upload_list_element.removeChild(document.getElementById("file_" + server_filename));
-			file_upload_list_element.removeChild(this.container_element);
-			this.file_upload.disabled = false;
-		}
-	}
-	upload(selected_thread_id) {
-		let formdata = new FormData();
-		formdata.append("File_1", this.file);
-		let received_error = false;
-		let request = new XMLHttpRequest();
-		this.progress_element.max = this.file.size;
-		console.log(this.file);
-		request.upload.addEventListener("progress", (event) => {
-			this.progress_element.value = event.loaded;
-			if (event.loaded === event.total) {
-				this.status_element.textContent = "Processing...";
-			}
-		});
-		request.responseType = "text";
-		request.open("POST", `./api/board/${this.selected_board.slug}/` + (selected_thread_id > -1 ? `thread/${selected_thread_id}/upload` : "upload/"));
-		request.timeout = 60*60*1000; // 1 hour
-		request.onreadystatechange = () => {
-			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
-			if (!(request.status >= 200 && request.status < 300) && request.status != 0 && !received_error) {
-				received_error = true;
-				request.abort();
-				this.showHttpError(request);
-			}
-		}
-		request.send(formdata);
-		request.onload = () => {
-			console.log("Request onLoad fired");
-			if (request.readyState === request.DONE) {
-				console.log("Received response");
-				if (request.status >= 200 && request.status < 300) {
-					const server_filename = request.getResponseHeader("File-Name");
-					console.log("server_filename: " + server_filename);
-					let decoded_filename = decode_utf8(server_filename);
-					console.log("server_filename decoded: " + decoded_filename);
-					// const utf8array = new TextEncoder().encode(server_filename);
-					// var newdecoded = new TextDecoder().decode(utf8array);
-					// console.log("server_filename dec new: " + newdecoded);
-					this.container_element.setAttribute("id", "file_" + decoded_filename);
-					// this.file_title_element.textContent = decoded_filename;
-					const width = request.getResponseHeader("Image-Width");
-					const height = request.getResponseHeader("Image-Height");
-					if (width && height) {
-						this.container_element.setAttribute("data-image-width", width);
-						this.container_element.setAttribute("data-image-height", height);
-					}
-					const thumbnail_file_extension = request.getResponseHeader("Thumbnail-File-Extension");
-					if (thumbnail_file_extension) {
-						this.container_element.setAttribute("data-thumbnail-file-extension", thumbnail_file_extension);
-						this.thumbnail_element.setAttribute("src", media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
-					}
-					this.status_element.textContent = "Upload complete";
-					this.status_element.classList.add("UploadCompleteIndicator");
-					this.information_element.removeChild(this.progress_element);
-				}
-				else {
-					this.showHttpError(request);
-				}
-			}
-		}
-	}
-	showHttpError(request) {
-		const error_message = request.getResponseHeader("message");
-		this.container_element.classList.add("Errored");
-		file_upload_error_dialog_message.innerText =
-			`Status: ${request.status} ${request.statusText}\n` +
-			(error_message || "An unknown error occured.");
-		file_upload_error_dialog.showModal();
-		const upload_failed_indicator = document.createElement("span");
-		upload_failed_indicator.classList.add("UploadFailedIndicator");
-		upload_failed_indicator.textContent = "Upload failed";
-		this.information_element.replaceChild(upload_failed_indicator, this.progress_element);
-		this.thumbnail_element.setAttribute("src", "./static/x_icon.png");
-	}
-}
-*/
-/*
-
-*/
-
-// getClientInfo(); // runs asynchronously
-// getBoardInfo();
-// refresh_send().then(() => {
-// 	loading_dialog.close();
-// 	scrolled_to_bottom_observer.observe(bottom_marker);
-// });

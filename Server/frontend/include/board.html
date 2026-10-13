@@ -1,8 +1,6 @@
 <div class=".Main">
-	<h3 id="location_indicator"></h3>
-	<noscript>
-		<dialog open style="margin-top: 20vh"><h2>Error</h2><p>This page requires <b>Javascript</b> to function. Enable Javascript in browser settings.</p></dialog>
-	</noscript>
+	<h3 id="location_indicator" style="display: none;">Threads</h3>
+	<a id="back_to_threads_button" href="#/" class="Button" style="display: none;">Back to threads</a>
 	<div id="post_container" style="border-bottom: 2px solid #000;"></div>
 </div>
 <div id="body_separator" class="FlexSeparator"></div>
@@ -150,8 +148,8 @@ html {
 			display: inline-flex;
 		}
 	}
-	>.ContentLengthIndicator {
-		color: #880;
+	.ContentLengthIndicator {
+		color: #660;
 		&.LimitExceeded {
 			color: #B00;
 		}

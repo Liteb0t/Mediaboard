@@ -46,6 +46,7 @@ main {
 <script type="module" src="modules/board.js"></script>
 <script type="module">
 import { global_styles } from "./modules/styles.js";
+import { session } from "./modules/session.js";
 
 #include "include/board_list.js"
 
@@ -88,10 +89,10 @@ router.on("/board/:board_slug/thread/:thread_id", async({data}) => {
 		error_dialog.showModal();
 	}
 });
-
 window.localDate = new Date();
 window.timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 window.flex_separator = document.createElement("div");
+window.flex_separator.classList.add("FlexSeparator");
 
 // TODO everything else in that module
 async function mountThreadListIfNotThere(data) {
@@ -141,9 +142,8 @@ if (url_params.get("display") === "embed") {
 else window.url_params_display_as_embed = false;
 
 document.addEventListener("logout", () => {
-	// state.server_permissions = undefined;
-	getAllBoards();
-	getClientInfo();
+	session.refresh();
+	router.resolve();
 })
 
 router.resolve();
