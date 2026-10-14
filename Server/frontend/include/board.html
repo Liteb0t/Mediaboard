@@ -166,25 +166,8 @@ html {
 			margin: 2px 2px 4px;
 			margin-inline: 2px;
 		}
-		>fieldset {
-			min-width: 0;
-			input[type="file"] {
-				max-width: 100%;
-			}
-		}
-		.FilePostList {
-			>* {
-				display: flex;
-				.UploadCompleteIndicator {
-					color: green;
-				}
-				.UploadFailedIndicator {
-					color: red;
-				}
-				&.Errored {
-					image-rendering: pixelated;
-				}
-			}
+		>file-upload {
+			display: block;
 		}
 	}
 }

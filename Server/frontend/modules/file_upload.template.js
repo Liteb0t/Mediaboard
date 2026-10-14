@@ -9,8 +9,9 @@ export class UploadedFile {
 		return decodeURIComponent(escape(s));
 	}
 
-	constructor(file_upload_element, file_object) {
-		this.file_upload = file_upload_element;
+	constructor(parent, file_object) {
+		this.parent = parent;
+		this.file_upload = parent.file_upload_element;
 		this.file = file_object; // derived from this.file_upload.files
 		this.container_element = null;
 		this.thumbnail_element = null;
@@ -56,7 +57,7 @@ export class UploadedFile {
 			this.file_upload.disabled = false;
 		}
 	}
-	upload(board_slug, thread_id) {
+	upload(destination) {
 		let formdata = new FormData();
 		formdata.append("File_1", this.file);
 		let received_error = false;
@@ -70,14 +71,14 @@ export class UploadedFile {
 			}
 		});
 		request.responseType = "text";
-		request.open("POST", `./api/board/${board_slug}/` + (thread_id > -1 ? `thread/${thread_id}/upload` : "upload/"));
+		request.open("POST", destination);
 		request.timeout = 60*60*1000; // 1 hour
 		request.onreadystatechange = () => {
 			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
 			if (!(request.status >= 200 && request.status < 300) && request.status != 0 && !received_error) {
+				this.showHttpError(request);
 				received_error = true;
 				request.abort();
-				this.showHttpError(request);
 			}
 		}
 		request.send(formdata);
@@ -114,15 +115,18 @@ export class UploadedFile {
 					this.showHttpError(request);
 				}
 			}
+			else if (!request.ok) {
+				this.showHttpError(request);
+			}
 		}
 	}
 	showHttpError(request) {
 		const error_message = request.getResponseHeader("message");
 		this.container_element.classList.add("Errored");
-		file_upload_error_dialog_message.innerText =
+		this.parent.file_upload_error_dialog_message.innerText =
 			`Status: ${request.status} ${request.statusText}\n` +
 			(error_message || "An unknown error occured.");
-		file_upload_error_dialog.showModal();
+		this.parent.file_upload_error_dialog.showModal();
 		const upload_failed_indicator = document.createElement("span");
 		upload_failed_indicator.classList.add("UploadFailedIndicator");
 		upload_failed_indicator.textContent = "Upload failed";
@@ -132,6 +136,7 @@ export class UploadedFile {
 }
 
 class FileUploadElement extends HTMLElement {
+	_file_count_limit = null;
 	constructor() {
 		// Always call super first in constructor
 		super();
@@ -140,29 +145,36 @@ class FileUploadElement extends HTMLElement {
 		shadow.adoptedStyleSheets = [global_styles]; // imported at the top there
 		shadow.appendChild(template.content.cloneNode(true));
 
-		for (const element of shadow.querySelectorAll(["#file_upload", "#file_post_list", "#file_upload_fieldset"])) {
+		for (const element of shadow.querySelectorAll(["[id]"])) {
 			this[element.id] = element;
 		}
-
-		this.file_upload.onchange = (event) => {
-			console.log("file changed.");
-			if (this.file_upload.files.length + this.file_post_list.childNodes.length > 4) {
-				error_message.textContent = "Cannot attach more than 4 files.";
-				error_dialog.showModal();
-				this.file_upload.value = "";
-			}
-			else {
-				for (let chosen_file of this.file_upload.files) {
-					this.addFile(chosen_file);
-				}
+	}
+	allUploadsAreCompleted() {
+		return this.querySelector("progress") ? true : false;
+	}
+	getFileCountLimit() { return this._file_count_limit === null ? Number.MAX_SAFE_INTEGER : this._file_count_limit; }
+	setFileCountLimit(limit) { this._file_count_limit = limit; }
+	addFiles(files, destination) {
+		console.log("numberOfFiles: " + this.numberOfFiles() + "\nfiles.length: " + files.length + "\ngetFileCountLimit(): " + this.getFileCountLimit());
+		if (this.numberOfFiles() + files.length > this.getFileCountLimit()) {
+			error_message.textContent = "Cannot attach more than " + this.getFileCountLimit() + " file" + (this.getFileCountLimit() === 1 ? "." : "s.");
+			error_dialog.showModal();
+			this.file_upload.value = "";
+		}
+		else {
+			for (let file of files) {
+				this._addFile(file, destination);
 			}
 		}
 	}
-	addFile(file) { // must be File object
+	numberOfFiles() {
+		return this.file_post_list.childNodes.length;
+	}
+	_addFile(file, destination) { // must be File object
 		try {
-			let new_file = new UploadedFile(this.file_upload, file);
+			let new_file = new UploadedFile(this, file);
 			new_file.addFileToList(this.file_post_list);
-			new_file.upload(this.selected_board.slug, this.selected_thread.id); // TODO find way to get upload destination
+			new_file.upload(destination); // TODO find way to get upload destination
 		}
 		catch (error) {
 			console.error(error);
@@ -170,8 +182,33 @@ class FileUploadElement extends HTMLElement {
 			error_dialog.showModal();
 		}
 	}
+	getFiles() {
+		let files = [];
+		for (let file_element of this.file_post_list.children) {
+			if (!file_element.classList.contains("Errored")) {
+				let file_data = {"filename": file_element.id.slice(5, file_element.id.length)};
+				const width = file_element.getAttribute("data-image-width");
+				if (width) {
+					const height = file_element.getAttribute("data-image-height");
+					if (height) {
+						file_data["width"] = Number(width);
+						file_data["height"] = Number(height);
+					}
+				}
+				const thumbnail_file_extension = file_element.getAttribute("data-thumbnail-file-extension");
+				if (thumbnail_file_extension)
+					file_data["thumbnail_file_extension"] = thumbnail_file_extension;
+				files.push(file_data);
+			}
+		}
+		return files;
+	}
+	clear() {
+		this.file_upload.value = "";
+		this.file_post_list.textContent = "";
+	}
 	updateVisibilityByPermissions(permissions) {
-		this.file_upload_fieldset.style["display"] = permissions["upload_file"] === true ? "inherit" : "none";
+		this.file_upload_fieldset.style["display"] = permissions["upload_file"] === true ? "" : "none";
 	}
 }
 

@@ -1,4 +1,4 @@
-<fieldset id="file_upload_fieldset" style="display: none;">
+<fieldset id="file_upload_fieldset" class="FileUploadFieldset" style="display: none;">
 	<legend>Upload up to four files</legend>
 	<input type="file" id="file_upload" tabindex="1" autocomplete="off" multiple>
 	<div id="file_post_list" class="FilePostList"></div>
@@ -6,15 +6,37 @@
 <dialog id="post_file_upload_not_complete_dialog" closedby="any">
 	<h2>Warning</h2>
 	<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attachments.</p>
-	<div class="ToolBar"><button onclick="post_file_upload_not_complete_dialog.close()">&#x1F5D9; Close</button></div>
+	<div class="ToolBar"><button onclick="this.parentElement.parentElement.close()">&#x1F5D9; Close</button></div>
 </dialog>
 <dialog id="error_dialog" closedby="any">
 	<h2>Error</h2>
 	<p id="error_message">Something happened.</p>
-	<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
+	<div class="ToolBar"><button onclick="this.parentElement.parentElement.close()">&#x1F5D9; Close</button></div>
 </dialog>
 <dialog id="file_upload_error_dialog" closedby="any">
 	<h2>Error: could not upload file</h2>
 	<p id="file_upload_error_dialog_message">Something happened.</p>
-	<div class="ToolBar"><button onclick="file_upload_error_dialog.close()">&#x1F5D9; Close</button></div>
+	<div class="ToolBar"><button onclick="this.parentElement.parentElement.close()">&#x1F5D9; Close</button></div>
 </dialog>
+<style>
+.FileUploadFieldset {
+	min-width: 0;
+	input[type="file"] {
+		max-width: 100%;
+	}
+}
+.FilePostList {
+	>* {
+		display: flex;
+		.UploadCompleteIndicator {
+			color: green;
+		}
+		.UploadFailedIndicator {
+			color: red;
+		}
+		&.Errored {
+			image-rendering: pixelated;
+		}
+	}
+}
+</style>

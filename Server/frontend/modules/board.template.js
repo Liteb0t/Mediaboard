@@ -114,8 +114,15 @@ class ThreadListElement extends HTMLElement {
 			}
 		}
 
-
 		this.file_upload_component_promise = this.mountFileUploadIfNotThere(); // async. module FileUploadElement from file_upload.js
+		this.file_upload_component_promise.then(component => {
+			this.file_upload_component = component;
+			component.setFileCountLimit(4);
+			component.file_upload.onchange = (event) => {
+				console.log("file changed.");
+				component.addFiles(component.file_upload.files, this.buildUploadDestination(this.selected_board.slug, this.selected_thread.id));
+			}
+		});
 
 		// "Scroll-lock" feature - when a user is scrolled to the bottom of the messages list, adding content in the reply container will push the messages up so that the latest messages are not obstructed.
 		const reply_container_resize_observer = new ResizeObserver(() => {
@@ -173,16 +180,14 @@ class ThreadListElement extends HTMLElement {
 		if ([...event.dataTransfer.items].some((item) => item.kind === "file")) {
 			event.preventDefault();
 			const files = [...event.dataTransfer.items]
-				.map((item) => item.getAsFile())
-				.filter((file) => file)
-				.forEach(file => {
-					this.file_upload_component_promise.then(component => {
-						component.addFile(file);
-					});
-				}); // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/getAsFile
+				.map((item) => item.getAsFile()) // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/getAsFile
+				.filter((file) => file);
+			this.file_upload_component?.addFiles(files, this.buildUploadDestination(this.selected_board.slug, this.selected_thread.id));
 			console.log(files);
-			// displayImages(files);
 		}
+	}
+	buildUploadDestination(board_slug, thread_id = -1) {
+		return `./api/board/${board_slug}/` + (thread_id > -1 ? `thread/${thread_id}/` : "") + "upload/";
 	}
 	static toggleEmbedIframe(figure_element) {
 		let iframe_element = figure_element.querySelector("iframe");
@@ -648,7 +653,7 @@ class ThreadListElement extends HTMLElement {
 			}
 		}
 		if (session.highest_ranked_group) {
-			this.highest_ranked_group_container.style["display"] = "inherit";
+			this.highest_ranked_group_container.style["display"] = "";
 			this.highest_ranked_group_label.textContent = session.highest_ranked_group.name;
 		}
 		else {
@@ -657,34 +662,13 @@ class ThreadListElement extends HTMLElement {
 		}
 		this.file_upload_component_promise.then(element => {element.updateVisibilityByPermissions(permissions);});
 	}
-	getFiles() {
-		let files = [];
-		for (let file_element of this.file_post_list.children) {
-			if (!file_element.classList.contains("Errored")) {
-				let file_data = {"filename": file_element.id.slice(5, file_element.id.length)};
-				const width = file_element.getAttribute("data-image-width");
-				if (width) {
-					const height = file_element.getAttribute("data-image-height");
-					if (height) {
-						file_data["width"] = Number(width);
-						file_data["height"] = Number(height);
-					}
-				}
-				const thumbnail_file_extension = file_element.getAttribute("data-thumbnail-file-extension");
-				if (thumbnail_file_extension)
-					file_data["thumbnail_file_extension"] = thumbnail_file_extension;
-				files.push(file_data);
-			}
-		}
-		return files;
-	}
 
 	async postAction() {
 		try {
 			let name_length_bytes = (new TextEncoder().encode(this.name_field.value)).length;
 			let content_length_bytes = (this.content_field_text_encoder.encode(this.content_field.innerText)).length;
 			console.log("Name length: " + name_length_bytes + "\nContent length: " + content_length_bytes);
-			if (this.content_field.textContent.length === 0 && this.file_post_list.childElementCount === 0) {
+			if (this.content_field.textContent.length === 0 && this.file_upload_component?.numberOfFiles() === 0) {
 				post_content_empty_dialog.showModal();
 			}
 			else if (name_length_bytes > CONFIG_post_max_name) {
@@ -695,7 +679,7 @@ class ThreadListElement extends HTMLElement {
 				post_content_too_long_dialog_content_length.textContent = content_length_bytes;
 				post_content_too_long_dialog.showModal();
 			}
-			else if (this.file_post_list.querySelector("progress")) {
+			else if (this.file_upload_component?.allUploadsAreCompleted()) {
 				post_file_upload_not_complete_dialog.showModal();
 			}
 			else {
@@ -708,8 +692,7 @@ class ThreadListElement extends HTMLElement {
 				}
 				if (response.ok) {
 					this.content_field.textContent = "";
-					this.file_upload.value = "";
-					this.file_post_list.textContent = "";
+					this.file_upload_component?.clear();
 					this.content_length_indicator.style["display"] = "none";
 					if (this.selected_thread.id === -1) {
 						let new_thread_id = Number(response.headers.get("new-thread-id"));
@@ -738,7 +721,7 @@ class ThreadListElement extends HTMLElement {
 		let data = {
 			name: this.name_field.value,
 			content: this.content_field.innerText.trim(),
-			files: this.getFiles()
+			files: this.file_upload_component?.getFiles()
 		};
 		if (thread_id !== null) data.thread_id = thread_id;
 		if (this.highest_ranked_group_checkbox.checked && session.highest_ranked_group)
