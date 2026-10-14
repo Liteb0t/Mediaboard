@@ -1,6 +1,6 @@
 import { global_styles } from "./styles.js";
 import { session } from "./session.js";
-
+import { UploadedFile } from "./file_upload.js";
 
 class Format {
 	static IMAGE = 0;
@@ -34,139 +34,6 @@ class Format {
 }
 
 
-class UploadedFile {
-	file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
-	static media_url = "./media/";
-
-	static decode_utf8(s) {
-		return decodeURIComponent(escape(s));
-	}
-
-	constructor(file_upload_element, file_object) {
-		this.file_upload = file_upload_element;
-		this.file = file_object; // derived from this.file_upload.files
-		this.container_element = null;
-		this.thumbnail_element = null;
-		this.information_element = null;
-		this.progress_element = null;
-		this.filename = file_object.name;
-		if (file_object.size > this.file_size_limit) {
-			this.file_upload.value = "";
-			throw new Error(`The file ${file_object.name} exceeds the CONFIG_this.file_size_limit_mb megabyte limit. <br>
-				<code>${file_object.size}</code> - this file (bytes)<br>
-				<code>${this.file_size_limit}</code> - limit (bytes)`);
-		}
-		const file_name_size = (new TextEncoder().encode(file_object.name)).length;
-		if (file_name_size > CONFIG_post_max_file_name) {
-			throw new Error(`File name "${file_object.name}" exceeds the limit of CONFIG_post_max_file_name bytes.<br>
-				This file name: ${file_name_size} bytes.`);
-		}
-		console.log("UploadedFile test passed...");
-		// uploadFile(chosen_file);
-	}
-	addFileToList(file_upload_list_element) {
-		this.container_element = document.createElement("div");
-		this.thumbnail_element = document.createElement("img");
-		this.thumbnail_element.setAttribute("src", "static/placeholder.png");
-		this.thumbnail_element.setAttribute("width", "100px");
-		this.thumbnail_element.setAttribute("height", "100px");
-		this.information_element = document.createElement("div");
-		this.information_element.classList.add("FileInformation");
-		this.file_title_element = document.createElement("span");
-		this.status_element = document.createElement("span");
-		this.status_element.textContent = "Uploading...";
-		// file_title.classList.add("FileTitle");
-		this.file_title_element.textContent = this.filename;
-		let file_delete_button = document.createElement("button");
-		file_delete_button.textContent = "\u{1F5D1} Delete"; // 1F5D1 = смітник
-		this.progress_element = document.createElement("progress");
-		this.progress_element.value = 0;
-		this.information_element.append(this.file_title_element, document.createElement("br"), this.status_element, this.progress_element, document.createElement("br"), file_delete_button);
-		this.container_element.append(this.thumbnail_element, this.information_element);
-		file_upload_list_element.appendChild(this.container_element);
-		file_delete_button.onclick = (event) => {
-			// Add delete to server later
-			// file_upload_list_element.removeChild(document.getElementById("file_" + server_filename));
-			file_upload_list_element.removeChild(this.container_element);
-			this.file_upload.disabled = false;
-		}
-	}
-	upload(board_slug, thread_id) {
-		let formdata = new FormData();
-		formdata.append("File_1", this.file);
-		let received_error = false;
-		let request = new XMLHttpRequest();
-		this.progress_element.max = this.file.size;
-		console.log(this.file);
-		request.upload.addEventListener("progress", (event) => {
-			this.progress_element.value = event.loaded;
-			if (event.loaded === event.total) {
-				this.status_element.textContent = "Processing...";
-			}
-		});
-		request.responseType = "text";
-		request.open("POST", `./api/board/${board_slug}/` + (thread_id > -1 ? `thread/${thread_id}/upload` : "upload/"));
-		request.timeout = 60*60*1000; // 1 hour
-		request.onreadystatechange = () => {
-			console.log(`Ready state changed. Status: ${request.status}\nreadyState: ${request.readyState}`);
-			if (!(request.status >= 200 && request.status < 300) && request.status != 0 && !received_error) {
-				received_error = true;
-				request.abort();
-				this.showHttpError(request);
-			}
-		}
-		request.send(formdata);
-		request.onload = () => {
-			console.log("Request onLoad fired");
-			if (request.readyState === request.DONE) {
-				console.log("Received response");
-				if (request.status >= 200 && request.status < 300) {
-					const server_filename = request.getResponseHeader("File-Name");
-					console.log("server_filename: " + server_filename);
-					let decoded_filename = UploadedFile.decode_utf8(server_filename);
-					console.log("server_filename decoded: " + decoded_filename);
-					// const utf8array = new TextEncoder().encode(server_filename);
-					// var newdecoded = new TextDecoder().decode(utf8array);
-					// console.log("server_filename dec new: " + newdecoded);
-					this.container_element.setAttribute("id", "file_" + decoded_filename);
-					// this.file_title_element.textContent = decoded_filename;
-					const width = request.getResponseHeader("Image-Width");
-					const height = request.getResponseHeader("Image-Height");
-					if (width && height) {
-						this.container_element.setAttribute("data-image-width", width);
-						this.container_element.setAttribute("data-image-height", height);
-					}
-					const thumbnail_file_extension = request.getResponseHeader("Thumbnail-File-Extension");
-					if (thumbnail_file_extension) {
-						this.container_element.setAttribute("data-thumbnail-file-extension", thumbnail_file_extension);
-						this.thumbnail_element.setAttribute("src", UploadedFile.media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
-					}
-					this.status_element.textContent = "Upload complete";
-					this.status_element.classList.add("UploadCompleteIndicator");
-					this.information_element.removeChild(this.progress_element);
-				}
-				else {
-					this.showHttpError(request);
-				}
-			}
-		}
-	}
-	showHttpError(request) {
-		const error_message = request.getResponseHeader("message");
-		this.container_element.classList.add("Errored");
-		file_upload_error_dialog_message.innerText =
-			`Status: ${request.status} ${request.statusText}\n` +
-			(error_message || "An unknown error occured.");
-		file_upload_error_dialog.showModal();
-		const upload_failed_indicator = document.createElement("span");
-		upload_failed_indicator.classList.add("UploadFailedIndicator");
-		upload_failed_indicator.textContent = "Upload failed";
-		this.information_element.replaceChild(upload_failed_indicator, this.progress_element);
-		this.thumbnail_element.setAttribute("src", "./static/x_icon.png");
-	}
-}
-
-
 // https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks
 // Create a class for the element
 class ThreadListElement extends HTMLElement {
@@ -196,6 +63,7 @@ class ThreadListElement extends HTMLElement {
 	content_field_text_encoder = new TextEncoder();
 	lock_scroll_to_bottom = false;
 	scrolled_to_bottom_observer = null;
+	file_upload_component = null;
 	static FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
 	static FIGURE_THUMBNAIL = 1;
 
@@ -245,28 +113,10 @@ class ThreadListElement extends HTMLElement {
 				}
 			}
 		}
-		this.file_upload.onchange = (event) => {
-			console.log("file changed.");
-			if (this.file_upload.files.length + this.file_post_list.childNodes.length > 4) {
-				error_message.textContent = "Cannot attach more than 4 files.";
-				error_dialog.showModal();
-				this.file_upload.value = "";
-			}
-			else {
-				for (let chosen_file of this.file_upload.files) {
-					try {
-						let new_file = new UploadedFile(this.file_upload, chosen_file);
-						new_file.addFileToList(this.file_post_list);
-						new_file.upload(this.selected_board.slug, this.selected_thread.id);
-					}
-					catch (error) {
-						console.error(error);
-						error_message.innerHTML = error.message ? error.message : "An unknown error occured when attempting to upload file.";
-						error_dialog.showModal();
-					}
-				}
-			}
-		}
+
+
+		this.file_upload_component_promise = this.mountFileUploadIfNotThere(); // async. module FileUploadElement from file_upload.js
+
 		// "Scroll-lock" feature - when a user is scrolled to the bottom of the messages list, adding content in the reply container will push the messages up so that the latest messages are not obstructed.
 		const reply_container_resize_observer = new ResizeObserver(() => {
 			if (this.lock_scroll_to_bottom === true) {
@@ -292,6 +142,17 @@ class ThreadListElement extends HTMLElement {
 		this.scrolled_to_bottom_observer = new IntersectionObserver(callback, options);
 
 	} // constructor()
+	async mountFileUploadIfNotThere(data) {
+		await customElements.whenDefined("file-upload"); // wait for component to be loaded and defined, since JS module deferred loading will process sooner than router resolution, or however the deer hits the fence
+		// thread-list is custom element defined in board.js
+		let element = view_container.querySelector("file-upload");
+		if (!element) {
+			element = document.createElement("file-upload");
+			this.file_upload_container.replaceChildren(element);
+		}
+		console.log(element);
+		return element;
+	}
 	onclickHandler = (event) => {
 		let target = event.target;
 		console.log(target);
@@ -301,6 +162,27 @@ class ThreadListElement extends HTMLElement {
 			ThreadListElement.contractEmbedFigure(target.parentNode);
 		else if (target.classList.contains("EmbedIframe"))
 			ThreadListElement.toggleEmbedIframe(target.parentNode);
+	}
+	ondragoverhandler = (event) => { // on window
+		if ([...event.dataTransfer.items].some((item) => item.kind === "file")) {
+			event.preventDefault();
+		}
+	}
+	// https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop
+	ondrophandler = (event) => { // on window
+		if ([...event.dataTransfer.items].some((item) => item.kind === "file")) {
+			event.preventDefault();
+			const files = [...event.dataTransfer.items]
+				.map((item) => item.getAsFile())
+				.filter((file) => file)
+				.forEach(file => {
+					this.file_upload_component_promise.then(component => {
+						component.addFile(file);
+					});
+				}); // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/getAsFile
+			console.log(files);
+			// displayImages(files);
+		}
 	}
 	static toggleEmbedIframe(figure_element) {
 		let iframe_element = figure_element.querySelector("iframe");
@@ -332,6 +214,10 @@ class ThreadListElement extends HTMLElement {
 // threads_button.onclick = () => { openThreadList(); } // included in navbar.html
 // refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
 		this.shadowRoot.addEventListener("click", this.onclickHandler);
+		console.log(this);
+		console.log(this.shadowRoot);
+		window.addEventListener("drop", this.ondrophandler);
+		window.addEventListener("dragover", this.ondragoverhandler);
 	}
 
 	disconnectedCallback() {
@@ -340,6 +226,8 @@ class ThreadListElement extends HTMLElement {
 		this.closeWebsocket();
 		// session.removeEventListener("change", this.updateReplyContainerAuto);
 		this.shadowRoot.removeEventListener("click", this.onclickHandler);
+		window.removeEventListener("drop", this.ondrophandler);
+		window.removeEventListener("dragover", this.ondragoverhandler);
 	}
 
 	connectedMoveCallback() {
@@ -767,7 +655,7 @@ class ThreadListElement extends HTMLElement {
 			this.highest_ranked_group_container.style["display"] = "none";
 			this.highest_ranked_group_checkbox.checked = false;
 		}
-		this.file_upload_fieldset.style["display"] = permissions["upload_file"] === true ? "inherit" : "none";
+		this.file_upload_component_promise.then(element => {element.updateVisibilityByPermissions(permissions);});
 	}
 	getFiles() {
 		let files = [];

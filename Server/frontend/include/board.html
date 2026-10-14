@@ -13,11 +13,7 @@
 	<input type="button" value="&#x1F585; Post" id="post_button" tabindex="2" class="RightAligned Button">
 	</div>
 	<div contenteditable="plaintext-only" id="content_field" class="Content" tabindex="1" placeholder="Content"></div>
-	<fieldset id="file_upload_fieldset" style="display: none;">
-		<legend>Upload up to four files</legend>
-		<input type="file" id="file_upload" tabindex="1" autocomplete="off" multiple>
-		<div id="file_post_list" class="FilePostList"></div>
-	</fieldset>
+	<div id="file_upload_container"></div>
 	</form>
 </details>
 <div id="bottom_marker"></div>
@@ -52,21 +48,7 @@
 	<p>Name too long. Limit: CONFIG_post_max_name<br>This post: <span id="post_name_too_long_dialog_name_length"></span></p>
 	<div class="ToolBar"><button onclick="post_name_too_long_dialog.close()">&#x1F5D9; Close</button></div>
 </dialog>
-<dialog id="post_file_upload_not_complete_dialog" closedby="any">
-	<h2>Warning</h2>
-	<p>One or more files has not finished uploading.<br>Wait for uploading to complete, or delete the attachments.</p>
-	<div class="ToolBar"><button onclick="post_file_upload_not_complete_dialog.close()">&#x1F5D9; Close</button></div>
-</dialog>
-<dialog id="error_dialog" closedby="any">
-	<h2>Error</h2>
-	<p id="error_message">Something happened.</p>
-	<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
-</dialog>
-<dialog id="file_upload_error_dialog" closedby="any">
-	<h2>Error: could not upload file</h2>
-	<p id="file_upload_error_dialog_message">Something happened.</p>
-	<div class="ToolBar"><button onclick="file_upload_error_dialog.close()">&#x1F5D9; Close</button></div>
-</dialog>
+
 <style>
 html {
 	scrollbar-gutter: stable;
