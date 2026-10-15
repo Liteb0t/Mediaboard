@@ -9,7 +9,7 @@ module;
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
-#include "Request.hpp"
+// #include "Request.hpp"
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -18,6 +18,7 @@ export module Mediaboard.Views_media;
 
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
+import FuzeHttp.Request;
 import Mediaboard.Board;
 import Mediaboard.File;
 import Mediaboard.Thread;

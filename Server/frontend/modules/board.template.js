@@ -1,37 +1,8 @@
 import { global_styles } from "./styles.js";
 import { session } from "./session.js";
 import { UploadedFile } from "./file_upload.js";
+import { Format, Media } from "./embed_media.js";
 
-class Format {
-	static IMAGE = 0;
-	static AUDIO = 1;
-	static VIDEO = 2;
-	static OTHER = -1;
-	static image_formats = ["avif", "gif", "jpe", "jpeg", "jpg", "jxl", "png", "heic", "webp"];
-	static audio_formats = ["aac", "flac", "m4a", "mid", "midi", "mp3", "oga", "ogg", "ogx", "opus", "wav"];
-	static video_formats = ["mp4", "webm"];
-	static fromFileName(file_name) {
-		let dot_index = file_name.lastIndexOf('.');
-		if (dot_index !== -1) {
-			let file_extension = file_name.substring(dot_index+1).toLowerCase();
-			if (Format.image_formats.indexOf(file_extension) !== -1) {
-				return Format.IMAGE;
-			}
-			else if (Format.audio_formats.indexOf(file_extension) !== -1) {
-				return Format.AUDIO;
-			}
-			else if (Format.video_formats.indexOf(file_extension) !== -1) {
-				return Format.VIDEO;
-			}
-			else {
-				return Format.OTHER;
-			}
-		}
-		else {
-			return Format.OTHER;
-		}
-	}
-}
 
 
 // https://developer.mozilla.org/en-US/docs/Web/API/Web_components/Using_custom_elements#custom_element_lifecycle_callbacks
@@ -51,10 +22,7 @@ class ThreadListElement extends HTMLElement {
 	};
 	server_permissions = {};
 
-	thumbnail_url = "./media/thumbnails/";
 	websocket_url = (window.location.protocol === "http:" ? "ws://" : "wss://") + window.location.host + window.location.pathname;
-	media_uuid_len = 36;
-	thumbnail_size = CONFIG_thumbnail_size;
 	// localDate = new Date();
 	// timezone_offset_seconds = localDate.getTimezoneOffset() * 60;
 	// flex_separator = document.createElement("div").classList.add("FlexSeparator");
@@ -64,8 +32,6 @@ class ThreadListElement extends HTMLElement {
 	lock_scroll_to_bottom = false;
 	scrolled_to_bottom_observer = null;
 	file_upload_component = null;
-	static FIGURE_EMBED = 0; // Main <img> or <video> is child 0 of <figure>, thumbnail is child 1.
-	static FIGURE_THUMBNAIL = 1;
 
 	constructor() {
 		// Always call super first in constructor
@@ -160,16 +126,7 @@ class ThreadListElement extends HTMLElement {
 		console.log(element);
 		return element;
 	}
-	onclickHandler = (event) => {
-		let target = event.target;
-		console.log(target);
-		if (target.classList.contains("EmbedThumbnail"))
-			ThreadListElement.expandEmbedFigure(target.parentNode);
-		else if (target.classList.contains("EmbedImage"))
-			ThreadListElement.contractEmbedFigure(target.parentNode);
-		else if (target.classList.contains("EmbedIframe"))
-			ThreadListElement.toggleEmbedIframe(target.parentNode);
-	}
+	onclickHandler = (event) => { Media.handleOnClick(event); }
 	ondragoverhandler = (event) => { // on window
 		if ([...event.dataTransfer.items].some((item) => item.kind === "file")) {
 			event.preventDefault();
@@ -188,28 +145,6 @@ class ThreadListElement extends HTMLElement {
 	}
 	buildUploadDestination(board_slug, thread_id = -1) {
 		return `./api/board/${board_slug}/` + (thread_id > -1 ? `thread/${thread_id}/` : "") + "upload/";
-	}
-	static toggleEmbedIframe(figure_element) {
-		let iframe_element = figure_element.querySelector("iframe");
-		if (figure_element.getAttribute("expanded") === "") {
-			iframe_element.style["display"]="none";
-			figure_element.removeAttribute("expanded");
-			iframe_element.src = "";
-		}
-		else {
-			iframe_element.style["display"]="inherit";
-			figure_element.setAttribute("expanded", "");
-			iframe_element.src = figure_element.getAttribute("data-iframe-src");
-		}
-	}
-	static expandEmbedFigure(figure_element) {
-		figure_element.children[ThreadListElement.FIGURE_EMBED].setAttribute("src", UploadedFile.media_url + figure_element.getAttribute("filename"));
-		figure_element.children[ThreadListElement.FIGURE_EMBED].style["display"] = "inherit";
-		figure_element.children[ThreadListElement.FIGURE_THUMBNAIL].style["display"] = "none";
-	}
-	static contractEmbedFigure(figure_element) {
-		figure_element.children[ThreadListElement.FIGURE_EMBED].style["display"] = "none";
-		figure_element.children[ThreadListElement.FIGURE_THUMBNAIL].style["display"] = "inherit";
 	}
 	connectedCallback() {
 		console.log("Custom element added to page.");
@@ -518,93 +453,7 @@ class ThreadListElement extends HTMLElement {
 		let post_files_element = document.createElement("div");
 		post_files_element.classList.add("Files");
 		for (const file of data.files) {
-			let figure_element = document.createElement("figure");
-			figure_element.classList.add("EmbedFigure");
-			figure_element.setAttribute("filename", file["filename"].replace(" ", "%20"));
-			let filename_extension_i = file["filename"].lastIndexOf(".");
-			let file_format = Format.fromFileName(file["filename"]); // Format enum
-			if (file.thumbnail_file_extension) {
-				if (file_format === Format.IMAGE) {
-					let img_element = document.createElement("img");
-					img_element.classList.add("EmbedImage");
-					if (file["width"] && file["height"]) {
-						img_element.width = file["width"];
-						img_element.height = file["height"];
-					}
-					img_element.style["display"] = "none";
-					figure_element.appendChild(img_element);
-				}
-				else if (file_format === Format.VIDEO) {
-					let video_element = document.createElement("video");
-					video_element.classList.add("EmbedVideo");
-					video_element.controls = true;
-					video_element.disablePictureInPicture = true;
-					video_element.setAttribute("controlslist", "nofullscreen nodownload");
-					video_element.style["display"] = "none";
-					figure_element.appendChild(video_element);
-				}
-
-				// Thumbnail
-				let thumbnail_element = document.createElement("img");
-				thumbnail_element.classList.add("EmbedThumbnail");
-				let thumbnail_filename = file.thumbnail_file_extension ? `THUMBNAIL_${file.filename}.${file.thumbnail_file_extension}` : "THUMBNAIL_" + file["filename"] + ".CONFIG_thumbnail_file_extension";
-				thumbnail_element.setAttribute("src", this.thumbnail_url + thumbnail_filename.replace(" ", "%20"));
-				if (file["width"] && file["height"]) {
-					if (file["width"] < file["height"]) {
-						thumbnail_element.width = file["width"] < file["height"]>>1 ? Math.ceil(this.thumbnail_size / 2) : Math.ceil(this.thumbnail_size * (file["width"]/file["height"]));
-						thumbnail_element.height = this.thumbnail_size;
-					}
-					else if (file["height"] < file["width"]) {
-						thumbnail_element.width = this.thumbnail_size;
-						thumbnail_element.height = file["height"] < file["width"]>>1 ? Math.ceil(this.thumbnail_size / 2) : Math.ceil(this.thumbnail_size * (file["height"]/file["width"]));
-					}
-					else {
-						thumbnail_element.width = this.thumbnail_size;
-						thumbnail_element.height = this.thumbnail_size;
-					}
-				}
-				else { // Legacy: images uploaded before 0.1.1 don't have width and height saved
-					thumbnail_element.width = thumbnail_element.height = this.thumbnail_size;
-				}
-				thumbnail_element.setAttribute("loading", "lazy");
-				figure_element.append(thumbnail_element);
-			}
-			else if (file_format === Format.AUDIO) {
-				let audio_element = document.createElement("audio");
-				audio_element.controls = true;
-				audio_element.setAttribute("controlslist", "nofullscreen nodownload");
-				audio_element.setAttribute("src", UploadedFile.media_url + file["filename"].replace(" ", "%20"));
-				figure_element.appendChild(audio_element);
-			}
-			let download_filename, caption_filename;
-			if (filename_extension_i == -1) {
-				download_filename = file["filename"].slice(0, file["filename"].length - this.media_uuid_len);
-				caption_filename = download_filename.length < 32 ? download_filename : (download_filename.substr(0, 28) + "(...)");
-			}
-			else {
-				download_filename = file["filename"].slice(0, filename_extension_i - this.media_uuid_len);
-				caption_filename = download_filename.length < 32 ? download_filename : (download_filename.substr(0, 28) + "(...)");
-				download_filename += file["filename"].slice(filename_extension_i, file["filename"].length);
-				caption_filename += file["filename"].slice(filename_extension_i, file["filename"].length);
-			}
-			let figcaption_element = document.createElement("figcaption");
-			let media_src = UploadedFile.media_url + file["filename"].replace(" ", "%20");
-			let figcaption_element_a = document.createElement("a");
-			figcaption_element_a.setAttribute("href", media_src);
-			figcaption_element_a.setAttribute("target", "_blank");
-			figcaption_element_a.textContent = caption_filename;
-			if (caption_filename.length !== download_filename.length)
-				figcaption_element_a.title = download_filename;
-
-			let file_download_button = document.createElement("a");
-			file_download_button.setAttribute("href", media_src);
-			file_download_button.setAttribute("download", download_filename);
-			file_download_button.setAttribute("title", "Download");
-			file_download_button.innerText = "\ud83d\udce5\ufe0e";
-
-			figcaption_element.append(figcaption_element_a, document.createTextNode("\u00A0"), file_download_button);
-			figure_element.appendChild(figcaption_element);
-			post_files_element.appendChild(figure_element);
+			post_files_element.appendChild(document.createElement("media-embed").render(file));
 		}
 
 		if (!window.url_params_display_as_embed) {

@@ -7,12 +7,13 @@ module;
 #include <filesystem>
 #include <iostream>
 #include <print>
-#include "Request.hpp"
+// #include "Request.hpp"
 #include <unordered_set>
 export module Mediaboard.Manager.Views;
 
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
+import FuzeHttp.Request;
 import FuzeHttp.Utils;
 import Mediaboard.Manager.State;
 

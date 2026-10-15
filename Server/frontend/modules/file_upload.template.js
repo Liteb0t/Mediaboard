@@ -1,9 +1,8 @@
 import { global_styles } from "./styles.js";
-
+import { Media } from "./embed_media.js";
 
 export class UploadedFile {
 	file_size_limit = CONFIG_file_size_limit_mb*1024*1024;
-	static media_url = "./media/";
 
 	static decode_utf8(s) {
 		return decodeURIComponent(escape(s));
@@ -105,7 +104,7 @@ export class UploadedFile {
 					const thumbnail_file_extension = request.getResponseHeader("Thumbnail-File-Extension");
 					if (thumbnail_file_extension) {
 						this.container_element.setAttribute("data-thumbnail-file-extension", thumbnail_file_extension);
-						this.thumbnail_element.setAttribute("src", UploadedFile.media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
+						this.thumbnail_element.setAttribute("src", Media.media_url + `thumbnails/THUMBNAIL_${decoded_filename}.${thumbnail_file_extension}`);
 					}
 					this.status_element.textContent = "Upload complete";
 					this.status_element.classList.add("UploadCompleteIndicator");

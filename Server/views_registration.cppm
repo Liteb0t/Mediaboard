@@ -4,13 +4,14 @@ module;
 // #include "views_registration.hpp"
 #include <boost/beast/http/status.hpp>
 #include <boost/json.hpp>
-#include "Request.hpp"
+// #include "Request.hpp"
 #include <sodium.h>
 #include <iostream>
 export module Mediaboard.Views_registration;
 
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
+import FuzeHttp.Request;
 import Mediaboard.State;
 
 using namespace FuzeHttp;

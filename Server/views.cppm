@@ -6,12 +6,13 @@ module;
 #include <boost/json.hpp>
 #include <iostream>
 #include <print>
-#include "Request.hpp"
+// #include "Request.hpp"
 #include <unordered_set>
 export module Mediaboard.Views;
 
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
+import FuzeHttp.Request;
 import FuzeHttp.Utils;
 import Mediaboard.Board;
 import Mediaboard.Permission;
