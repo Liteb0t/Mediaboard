@@ -148,6 +148,60 @@ FuzeHttp::Response addBoardUserPermission(State* state, FuzeHttp::Request req, B
 		.status = http::status::created
 	};
 }
+/*
+class ClassBasedView {
+public:
+	virtual get(FuzeHttp::NewRequest req, PERMISSIONOBJECT* , int account_id) { }
+}
+class PermissionObjectViews : ClassBasedView {
+public:
+	POST: FuzeHttp::Response addUserPermissionToObject(FuzeHttp::NewRequest req, PERMISSIONOBJECT* , int account_id) override {
+		if (!PERMISSIONOBJECT->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
+			return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this account in this PERMISSIONOBJECTNAME."};
+		else if (PERMISSIONOBJECT->permissionCollectionExistsForAccount(account_id))
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Permissions for this account are already set. Use PUT request instead."};
+		PERMISSIONOBJECT->addAccountPermissionCollection(account_id);
+		return FuzeHttp::Response{
+			.status = http::status::created
+		};
+	}
+
+	PUT: FuzeHttp::Response updateBoardUserPermissions(FuzeHttp::NewRequest req, PERMISSIONOBJECT* , int account_id) override {
+		boost::json::object request_json;
+		int permission_number, permission_setting;
+		try {
+			request_json = boost::json::parse(req.body()).as_object();
+			permission_number = request_json["permission"].as_int64();
+			permission_setting = request_json["setting"].as_int64();
+		}
+		catch(const std::exception& e) {
+			std::string error_message = std::format("[updateBoardUserPermissions] JSON error: {}", e.what());
+			std::cerr << error_message << std::endl;
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = error_message};
+		}
+		if (permission_number < 0 || permission_number >= static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS))
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Invalid permission number in JSON"};
+		if (permission_setting < 0 || permission_setting >= 3)
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "Invalid permission setting in JSON"};
+		if (!PERMISSIONOBJECT->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
+			return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to update permissions for this account."};
+		board->setAccountPermission(account_id, permission_number, static_cast<THREE_STATE_SETTING>(permission_setting));
+		return FuzeHttp::Response{
+			.status = http::status::ok
+		};
+	}
+	DELETE: FuzeHttp::Response deleteBoardUserPermission(FuzeHttp::NewRequest req, PERMISSIONOBJECT* , int account_id) override {
+		if (!PERMISSIONOBJECT->permissionCollectionExistsForAccount(account_id))
+			return FuzeHttp::Response{.status = http::status::bad_request, .error_message = "No permissions set for this account."};
+		if (!PERMISSIONOBJECT->clientHasPermissionForAccount(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS), account_id))
+			return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to manage permissions for this account."};
+		PERMISSIONOBJECT->removeAccountPermissionCollection(account_id);
+		return FuzeHttp::Response{
+			.status = http::status::ok
+		};
+	}
+}
+*/
 
 FuzeHttp::Response updateBoardGroupPermissions(State* state, FuzeHttp::Request req, Board* board, int group_id) {
 	std::optional<Client> client = state->getClientIfExists(req);

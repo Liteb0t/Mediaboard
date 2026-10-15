@@ -12,60 +12,13 @@ export module Mediaboard.Message;
 
 import FuzeDBI;
 import FuzeHttp.Core;
+import Mediaboard.File;
 
 export namespace Mediaboard {
-class File {
-public:
-	static std::expected<File, std::string> validateInput(const boost::json::object json) {
-		File file;
-		if (auto filename_it = json.find("filename"); filename_it == json.end())
-			return std::unexpected("Missing JSON field: filename");
-		else if (!filename_it->value().is_string())
-			return std::unexpected("JSON field 'filename' must be an string");
-		else {
-			file.filename = filename_it->value().as_string();
-			if (file.filename.size() < 1 || file.filename.size() > static_cast<size_t>(MAX_FILE_NAME_WITH_UUID))
-				return std::unexpected(std::format("Filename length {} is not between 1 and {}", file.filename.length(), MAX_FILE_NAME_WITH_UUID));
-		}
-
-		if (json.contains("width") || json.contains("height") || json.contains("thumbnail_file_extension")) {
-			if (auto width_it = json.find("width"); width_it == json.end())
-				return std::unexpected("Missing JSON field: width");
-			else if (!width_it->value().is_int64())
-				return std::unexpected("JSON field 'width' must be an int");
-			else
-				file.width = width_it->value().as_int64();
-			if (auto height_it = json.find("height"); height_it == json.end())
-				return std::unexpected("Missing JSON field: height");
-			else if (!height_it->value().is_int64())
-				return std::unexpected("JSON field 'height' must be an int");
-			else
-				file.height = height_it->value().as_int64();
-
-			if (auto thumbnail_file_extension_it = json.find("thumbnail_file_extension"); thumbnail_file_extension_it == json.end())
-				return std::unexpected("Missing JSON field: thumbnail_file_extension");
-			else if (!thumbnail_file_extension_it->value().is_string())
-				return std::unexpected("JSON field 'thumbnail_file_extension' must be an string");
-			else {
-				file.thumbnail_file_extension = thumbnail_file_extension_it->value().as_string();
-				// TODO check if file extension is in supported formats
-				// TODO sanitise filename. Frontend handles this but not if the API is used directly
-				if (file.thumbnail_file_extension->length() < 1 || file.thumbnail_file_extension->length() > MAX_FILE_NAME)
-					return std::unexpected(std::format("thumbnail_file_extension length {} is not between 1 and {}", file.thumbnail_file_extension->length(), MAX_FILE_NAME));
-			}
-		}
-		return file;
-	}
-	inline static const size_t MAX_FILE_NAME = 205;
-	inline static const size_t MAX_FILE_NAME_WITH_UUID = 205+36;
-	std::string filename;
-	std::optional<int> width, height;
-	std::optional<std::string> thumbnail_file_extension;
-};
 class Message {
 public:
 	// Cache message from database
-	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::optional<std::string> highest_ranked_group_name, std::string content, std::vector<File> files, bool deleted = false)
+	Message(int id, int thread_id, int id_in_thread, std::chrono::time_point<std::chrono::system_clock> created_at, int author_client_id,  std::string author_username, std::optional<std::string> highest_ranked_group_name, std::string content, bool deleted = false)
 			: id(id),
 			thread_id(thread_id),
 			id_in_thread(id_in_thread),
@@ -74,9 +27,9 @@ public:
 			author_username(author_username),
 			highest_ranked_group_name(highest_ranked_group_name),
 			content(content),
-			files(files),
+			// files(files),
 			deleted(deleted) {
-		cacheInternalJSON();
+		// cacheInternalJSON();
 	}
 
 	inline static const size_t MAX_NAME = 32;
@@ -89,7 +42,7 @@ public:
 		// int id_in_thread;
 		std::string name;
 		std::string content;
-		std::vector<File> files;
+		std::vector<File*> files;
 	};
 	Message(FuzeDBI::Connection* db, Validated input, int author_client_id, int thread_id, int id_in_thread)
 			: id(db->incrementSequence("message_id")),
@@ -110,28 +63,21 @@ public:
 			db->query<void>("UPDATE message SET highest_ranked_group_name = $1 WHERE id = $2",  highest_ranked_group_name.value(), id);
 		}
 		this->files_i = 0;
-		for (const File& file : files) {
-			if (file.width && file.height && file.thumbnail_file_extension) {
-				db->query<void>("INSERT INTO message_file(message_id, file_name, width, height, thumbnail_file_extension) VALUES ($1, $2, $3, $4, $5)", this->id, file.filename.c_str(), file.width.value(), file.height.value(), file.thumbnail_file_extension.value());
-			}
-			else
-				db->query<void>("INSERT INTO message_file(message_id, file_name) VALUES ($1, $2)", this->id, file.filename.c_str());
+		for (File* file : input.files) {
+			file->coupleToPost(this->id);
 		}
 	}
 	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
 		boost::json::object message_as_json = post_as_json ? post_as_json.value() : createJSON();
 		message_as_json["is_author"] = client && client.value().id == author_client_id;
 		boost::json::array files_json;
-		for (File file : this->files) {
-			boost::json::object file_json = {{"filename", file.filename}};
-			if (file.width) file_json.emplace("width", file.width.value());
-			if (file.height) file_json.emplace("height", file.height.value());
-			if (file.thumbnail_file_extension) file_json.emplace("thumbnail_file_extension", file.thumbnail_file_extension.value());
-			files_json.emplace_back(file_json);
+		for (File* file : this->files) {
+			files_json.emplace_back(file->asJson());
 		}
 		message_as_json.emplace("files", files_json);
 		return message_as_json;
 	}
+	void addFile(File* file) { this->files.push_back(file); }
 	int getId() const { return this->id; };
 	int getIdInThread() const { return this->id_in_thread; };
 	// std::string getKey() const { return this->key; }
@@ -250,7 +196,7 @@ private:
 	int thread_id;
 	int id_in_thread;
 	// char upload_timestamp[20];
-	std::vector<File> files;
+	std::vector<File*> files;
 	short files_i;
 	int author_client_id;
 	std::string author_username;

@@ -19,8 +19,8 @@ export module Mediaboard.Views_media;
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
 import Mediaboard.Board;
+import Mediaboard.File;
 import Mediaboard.Thread;
-import Mediaboard.Message;
 import Mediaboard.Permission;
 import Mediaboard.State;
 
@@ -28,7 +28,7 @@ using namespace FuzeHttp;
 
 namespace Mediaboard {
 
-FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
+FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req, std::optional<Board*> board_opt = {}, std::optional<Thread*> thread_opt = {}) {
 	std::istringstream req_stream(req.body());
 	std::string req_line;
 	std::getline(req_stream, req_line);
@@ -137,9 +137,11 @@ FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
 	bool create_thumbnail_for_image = state->canCreateThumbnailForImageFormat(file_mime_type);
 	bool create_thumbnail_for_video = state->canCreateThumbnailForVideoFormat(file_mime_type);
 	std::println(" - create thumbnail? {}", create_thumbnail_for_image || create_thumbnail_for_video);
-	unsigned int image_width = 100, image_height = 100;
+	std::optional<int> image_width, image_height;
+	std::optional<std::string> thumbnail_file_extension;
 	bool uploaded_file_has_thumbnail = false;
 	if (create_thumbnail_for_image || create_thumbnail_for_video) {
+		thumbnail_file_extension = state->config.thumbnail_file_extension;
 		try {
 			Magick::Image thumbnail;
 			if (create_thumbnail_for_image) {
@@ -163,7 +165,7 @@ FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
 						image.write(out_file_path.string());
 				}
 			}
-			else {
+			else { // create_thumbnail_for_video
 				std::print("Creating video thumnbail...");
 				thumbnail.read(std::format("{}[0]", out_file_path.string())); // read the first frame into ImageMagick ffmpeg delegate
 			}
@@ -187,28 +189,27 @@ FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
 			thumbnail.resize(thumbnail_dimensions);
 			thumbnail.quality(60);
 			std::print(" writing...");
-			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, state->config.thumbnail_file_extension));
+			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, thumbnail_file_extension.value()));
 			std::println(" done.");
-			uploaded_file_has_thumbnail = true;
-			if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
-				std::filesystem::remove(out_file_path);
-			}
 		}
 		catch( Magick::Warning& magick_warning ) {
 			std::cerr << "[Magick++] WARNING: " << magick_warning.what() << std::endl << "Image might not be made." << std::endl;
+			return Response{.status = http::status::internal_server_error};
 		}
 		catch (Magick::Error& magick_error) {
 			std::cerr << "[Magick++] ERROR: " << magick_error.what() << std::endl << "Image will therefore not be made." << std::endl;
+			return Response{.status = http::status::internal_server_error};
 		}
-	}
-	if (create_thumbnail_for_image || create_thumbnail_for_video) {
-		if (create_thumbnail_for_image || (create_thumbnail_for_video && uploaded_file_has_thumbnail)) {
-			response.headers.emplace("Image-Width", std::to_string(image_width));
-			response.headers.emplace("Image-Height", std::to_string(image_height));
+		uploaded_file_has_thumbnail = true;
+		if (state->config.convert_heic_to_jpg && file_mime_type == "image/heic") {
+			std::filesystem::remove(out_file_path);
 		}
-		if (uploaded_file_has_thumbnail)
-			response.headers.emplace("Thumbnail-File-Extension", state->config.thumbnail_file_extension);
+		response.headers.emplace("Image-Width", std::to_string(image_width.value()));
+		response.headers.emplace("Image-Height", std::to_string(image_height.value()));
+		response.headers.emplace("Thumbnail-File-Extension", thumbnail_file_extension.value());
 	}
+	auto file = std::make_unique<File>(state, state->db, out_filename, image_width, image_height, thumbnail_file_extension);
+	state->insertFile(std::move(file));
 #endif
 	return response;
 } // uploadFile()
@@ -220,7 +221,7 @@ FuzeHttp::Response uploadFileInThread(State* state, FuzeHttp::Request req, Board
 	if (!thread->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE)))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files in this thread."};
 	else
-		return uploadFile(state, std::move(req));
+		return uploadFile(state, std::move(req), board, thread);
 }
 
 FuzeHttp::Response uploadFileInBoard(State* state, FuzeHttp::Request req, Board* board) {
@@ -228,7 +229,7 @@ FuzeHttp::Response uploadFileInBoard(State* state, FuzeHttp::Request req, Board*
 	if (!board->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE)))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files in this board."};
 	else
-		return uploadFile(state, std::move(req));
+		return uploadFile(state, std::move(req), board);
 }
 
 // TODO find a way to handle multiple directories under one view

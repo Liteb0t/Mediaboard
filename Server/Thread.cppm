@@ -14,6 +14,7 @@ module;
 export module Mediaboard.Thread;
 
 export import Mediaboard.Message;
+import Mediaboard.File;
 import Mediaboard.Permission;
 import FuzeDBI;
 import FuzeHttp.PermissionObject;
@@ -37,16 +38,8 @@ public:
 			int seconds_since_epoch = std::get<3>(message_tuple); // TODO use long instead of int
 			std::chrono::seconds sec(seconds_since_epoch);
 			std::chrono::time_point<std::chrono::system_clock> created_at(sec);
-			std::vector<File> message_files;
-			for (auto file_tuple : db->queryRows<std::tuple<std::string, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT file_name, width, height, thumbnail_file_extension FROM message_file WHERE message_id = $1", message_id)) {
-				message_files.push_back(File{
-					.filename = std::get<0>(file_tuple),
-					.width = std::get<1>(file_tuple),
-					.height = std::get<2>(file_tuple),
-					.thumbnail_file_extension = std::get<3>(file_tuple)
-				});
-			}
-			auto message = std::make_unique<Message>(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), std::get<7>(message_tuple), message_files);
+			// std::vector<File*> message_files;
+			auto message = std::make_unique<Message>(message_id, thread_id, id_in_thread, created_at, std::get<4>(message_tuple), std::get<5>(message_tuple), std::get<6>(message_tuple), std::get<7>(message_tuple));
 			this->cacheMessage(std::move(message));
 			std::print(", ");
 		}
@@ -64,6 +57,12 @@ public:
 		this->insertMessage(std::move(post_zero));
 		incrementMessageIdInThread(); // Leftover because we can't change default value of message_id_seq in SQLite
 		// this->insertMessage(std::make_unique<Message>(db, input.post_zero_validated, author_client_id, this->id, incrementMessageIdInThread()));
+	}
+	void bindFileToMessage(File* file, int message_id_in_thread) {
+		if (auto message_it = messages.find(message_id_in_thread); message_it == messages.end())
+			std::println("Did not bind file {}::{} to message {} in thread {} because message was not found", file->getId(), file->name(), message_id_in_thread, id);
+		else
+			message_it->second->addFile(file);
 	}
 	// Thread(PermissionObjectBase* permission_parent, struct db_thread_struct* thread_struct, FuzeDBI::Connection* db);
 	// std::string dumpThread() const;

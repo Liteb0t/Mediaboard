@@ -1,6 +1,7 @@
 // Copyright (c) 2026, Fuze.page
 // Fuze Human-oriented License v1
 module;
+#include <chrono>
 #include <list>
 #include <memory>
 #include <print>
@@ -26,5 +27,26 @@ void State::addMigrations() {
 	("0.2", "CREATE TABLE ice_servers(type TEXT, hostname TEXT, port INTEGER, transport TEXT, shared_secret TEXT)")
 	;
 	this->migrations.add("0.2.1", "ALTER TABLE message ADD COLUMN highest_ranked_group_name TEXT");
+	this->migrations.addMigrations()
+	("0.3", "ALTER TABLE message_file RENAME TO stored_file")
+	("0.3", "ALTER TABLE stored_file ADD COLUMN id INTEGER")
+	("0.3", "ALTER TABLE stored_file RENAME COLUMN message_id TO coupled_post_id")
+	("0.3", "ALTER TABLE stored_file RENAME COLUMN file_name TO filename")
+	("0.3", "ALTER TABLE stored_file ADD COLUMN created_at INTEGER")
+	("0.3", "ALTER TABLE _sequences ADD COLUMN stored_file_id INTEGER DEFAULT 0")
+	("0.3", "ALTER TABLE stored_file ADD COLUMN permission_object_id INTEGER")
+	("0.3", this, [](FuzeDBI::Connection* db, Mediaboard::State* state){
+		for (std::string filename : db->queryRows<std::string>("SELECT filename FROM stored_file")) {
+			int file_id = db->incrementSequence("stored_file_id");
+			int permission_object_id = db->incrementSequence("permission_object_id");
+			db->query<void>("UPDATE stored_file SET id = $1 WHERE filename = $2", file_id, filename);
+			std::chrono::time_point<std::chrono::system_clock> created_at = std::chrono::system_clock::now();
+			int time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(created_at.time_since_epoch()).count();
+			db->query<void>("UPDATE stored_file SET created_at = $1 WHERE id = $2", time_since_epoch, file_id);
+			db->query<void>("UPDATE stored_file SET permission_object_id = $1 WHERE id = $2", permission_object_id, file_id);
+		}
+	})
+	("0.3", "CREATE TABLE file_view(file_id INTEGER PRIMARY KEY, viewed_at INTEGER NOT NULL, client_id INTEGER)")
+	;
 }
 }

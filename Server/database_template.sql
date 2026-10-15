@@ -1,7 +1,7 @@
 CREATE TABLE _info(version TEXT);
 CREATE TABLE _owner(account_id INTEGER NOT NULL);
-CREATE TABLE _sequences(account_id INTEGER, board_id INTEGER, client_id INTEGER, message_id INTEGER, permission_collection_id INTEGER, permission_group_id INTEGER, permission_object_id INTEGER, permission_setting_id INTEGER, thread_id INTEGER);
-INSERT INTO _sequences VALUES (0, 0, 0, 0, 3, 3, 2, 0, 0);
+CREATE TABLE _sequences(account_id INTEGER, board_id INTEGER, client_id INTEGER, message_id INTEGER, permission_collection_id INTEGER, permission_group_id INTEGER, permission_object_id INTEGER, permission_setting_id INTEGER, thread_id INTEGER, stored_file_id INTEGER);
+INSERT INTO _sequences VALUES (0, 0, 0, 0, 3, 3, 2, 0, 0, 0);
 CREATE TABLE account(id INTEGER PRIMARY KEY, username TEXT, password_hash_hash_base64 TEXT, intermediate_salt_base64 TEXT);
 CREATE TABLE client(id INTEGER PRIMARY KEY, account_id INTEGER);
 CREATE TABLE permission_collection(id INTEGER PRIMARY KEY, permission_object_id INTEGER, account_id INTEGER, permission_group_id INTEGER);
@@ -12,7 +12,8 @@ CREATE TABLE permission_setting(id INTEGER PRIMARY KEY, permission_collection_id
 CREATE TABLE session(client_id INTEGER, key TEXT, created_at INTEGER);
 CREATE TABLE ice_servers(type TEXT, hostname TEXT, port INTEGER, transport TEXT, shared_secret TEXT);
 CREATE TABLE message(id INTEGER PRIMARY KEY, thread_id INTEGER, id_in_thread INTEGER, board_id INTEGER, author_client_id INTEGER, author_username TEXT, highest_ranked_group_name TEXT, created_at INTEGER, content TEXT, deleted BOOLEAN DEFAULT FALSE);
-CREATE TABLE message_file(message_id INTEGER, file_name TEXT, width INTEGER, height INTEGER, thumbnail_file_extension TEXT);
+CREATE TABLE stored_file(id INTEGER PRIMARY KEY, filename TEXT NOT NULL, permission_object_id INTEGER NOT NULL, created_at INTEGER, coupled_post_id INTEGER, width INTEGER, height INTEGER, thumbnail_file_extension TEXT);
+CREATE TABLE file_view(file_id INTEGER PRIMARY KEY, viewed_at INTEGER NOT NULL, client_id INTEGER);
 CREATE TABLE thread(id INTEGER PRIMARY KEY, deleted BOOLEAN DEFAULT FALSE, board_id INTEGER, id_in_board INTEGER, message_id_seq INTEGER DEFAULT 0, permission_object_id INTEGER);
 CREATE TABLE board(id INTEGER PRIMARY KEY, slug TEXT, title TEXT, thread_id_seq INTEGER DEFAULT 0, permission_object_id INTEGER, deleted BOOLEAN DEFAULT FALSE);
 INSERT INTO board(id, slug, title, permission_object_id) VALUES (0, 'board', 'Board', 1);

@@ -36,6 +36,7 @@ target_sources(MediaboardServer
     FILE_SET CXX_MODULES FILES
       Board.cppm
       Config.cppm
+      File.cppm
       MediaboardWebsocketSession.cppm
       Message.cppm
       Permission.cppm

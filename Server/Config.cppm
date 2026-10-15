@@ -5,6 +5,7 @@ module;
 #include <string>
 export module Mediaboard.Config;
 import Mediaboard.Board;
+import Mediaboard.File;
 import Mediaboard.Message;
 import Mediaboard.State;
 import FuzeHttp.PermissionObject;

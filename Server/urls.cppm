@@ -79,5 +79,10 @@ void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 	(verb::get, getUsers,							"api", "users")
 	(verb::get, acceptInvite,						"invite", std::string())
 	;
+	// TODO proposed new syntax:
+	// controller->addNewPattern(&State::getThreads, Method::GET / "api" / "board" / Resolve<Board> / "threads")
+	// TODO class-based views (as defined in views.cppm)
+	// TODO new FuzeHttp::Response which includes Client, Session, and parsed URL params.
+	{}
 }
 } // export namespace Mediaboard

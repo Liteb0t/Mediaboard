@@ -24,6 +24,7 @@ import FuzeHttp.Migrations;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.State;
 import Mediaboard.Board;
+import Mediaboard.File;
 import Mediaboard.Permission;
 
 using namespace FuzeHttp;
@@ -169,6 +170,7 @@ public:
 	void start() override {
 		this->setAdditionalImageFormatsFromConfig(this->config);
 		this->cacheAllBoards();
+		this->cacheAllFiles();
 #ifdef WITH_WEBRTC
 		this->addIceServers();
 #endif
@@ -246,17 +248,58 @@ public:
 #endif
 	void cacheAllBoards() { // no mutex needed because it's run once at startup
 		std::print("[State] Retrieving boards from database...");
-		for (auto thread_tuple : db->queryRows<std::tuple<int, int, std::string, std::string>>("SELECT id, permission_object_id, slug, title FROM board WHERE deleted = FALSE")) {
-			// Board board(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), std::get<2>(thread_tuple), std::get<3>(thread_tuple));
-			auto board = std::make_unique<Board>(this, db, std::get<0>(thread_tuple), std::get<1>(thread_tuple), std::get<2>(thread_tuple), std::get<3>(thread_tuple));
+		for (auto board_tuple : db->queryRows<std::tuple<int, int, std::string, std::string>>("SELECT id, permission_object_id, slug, title FROM board WHERE deleted = FALSE")) {
+			auto board = std::make_unique<Board>(this, db, std::get<0>(board_tuple), std::get<1>(board_tuple), std::get<2>(board_tuple), std::get<3>(board_tuple));
 			std::print("{}, ", board->getId());
 			board->cacheAllThreads();
-			this->slug_to_board_id.emplace(std::get<2>(thread_tuple), board->getId());
+			this->slug_to_board_id.emplace(std::get<2>(board_tuple), board->getId());
 			this->boards.insert(std::make_pair(board->getId(), std::move(board)));
 		}
 		std::println("done. final list of boards:");
 		for (const std::pair<std::string, int>& slug_board_id : slug_to_board_id)
 			std::println("{} - {}", slug_board_id.first, slug_board_id.second);
+	}
+	void cacheAllFiles() {
+		std::print("[State] Retrieving file references from database...");
+		for (auto file_tuple : db->queryRows<std::tuple<int, int, std::string, int, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT id, permission_object_id, filename, created_at, coupled_post_id, width, height, thumbnail_file_extension FROM stored_file")) {
+			int file_id = std::get<0>(file_tuple);
+			std::string filename = std::get<2>(file_tuple);
+			int seconds_since_epoch = std::get<3>(file_tuple); // TODO use long instead of int
+			std::chrono::seconds sec(seconds_since_epoch);
+			std::chrono::time_point<std::chrono::system_clock> created_at(sec);
+			std::optional<int> coupled_post_id = std::get<4>(file_tuple);
+			auto file = std::make_unique<File>(this, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_post_id, std::get<5>(file_tuple), std::get<6>(file_tuple), std::get<7>(file_tuple));
+			std::print("{}, ", file_id);
+			File* inserted_file = this->insertFile(std::move(file));
+
+			if (coupled_post_id) {
+				int thread_id = db->query<int>("SELECT thread_id FROM message WHERE id = $1", coupled_post_id.value());
+				std::print("Fetched thread {} from message {}", thread_id, coupled_post_id.value());
+				int id_in_thread = db->query<int>("SELECT id_in_thread FROM message WHERE id = $1", coupled_post_id.value());
+				std::print("Fetched id_in_thread {} from message {}", id_in_thread, coupled_post_id.value());
+				int board_id = db->query<int>("SELECT board_id FROM thread WHERE id = $1", thread_id);
+				std::print("Fetched board {} from thread {}", board_id, thread_id);
+				if (auto board_it = boards.find(board_id); board_it == boards.end()) {
+					std::print("Skipping (board {} not found)", board_id);
+				}
+				else {
+					if (!board_it->second->threadExists(thread_id)) {
+						std::print("Skipping (thread {} not found)", thread_id);
+					}
+					else {
+						board_it->second->getThread(thread_id)->bindFileToMessage(inserted_file, id_in_thread);
+					}
+				}
+			}
+		}
+		std::println("done.");
+	}
+	File* insertFile(std::unique_ptr<File>&& file) {
+		std::lock_guard<std::mutex> lock(mutex);
+		int file_id = file->getId();
+		this->filename_to_file_id.emplace(file->name(), file_id);
+		this->files.emplace(file_id, std::move(file));
+		return this->files.at(file_id).get();
 	}
 	template<bool locked = true>
 	std::optional<Board*> getBoardIfExists(int board_id) {
@@ -439,6 +482,55 @@ public:
 		else
 			return board->createThread(thread_maybe.value(), client.id);
 	}
+	std::expected<File*, std::string> validateFile(const boost::json::object json) {
+		File::Validated validated_file;
+		if (auto filename_it = json.find("filename"); filename_it == json.end())
+			return std::unexpected("Missing JSON field: filename");
+		else if (!filename_it->value().is_string())
+			return std::unexpected("JSON field 'filename' must be an string");
+		else {
+			validated_file.filename = filename_it->value().as_string();
+			if (validated_file.filename.size() < 1 || validated_file.filename.size() > static_cast<size_t>(File::MAX_FILE_NAME_WITH_UUID))
+				return std::unexpected(std::format("Filename length {} is not between 1 and {}", validated_file.filename.length(), File::MAX_FILE_NAME_WITH_UUID));
+			if (auto it = filename_to_file_id.find(validated_file.filename); it == filename_to_file_id.end()) {
+				return std::unexpected(std::format("File {} not found", validated_file.filename));
+			}
+			else
+				validated_file.id = it->second;
+		}
+
+		if (json.contains("width") || json.contains("height") || json.contains("thumbnail_file_extension")) {
+			if (auto width_it = json.find("width"); width_it == json.end())
+				return std::unexpected("Missing JSON field: width");
+			else if (!width_it->value().is_int64())
+				return std::unexpected("JSON field 'width' must be an int");
+			else
+				validated_file.width = width_it->value().as_int64();
+			if (auto height_it = json.find("height"); height_it == json.end())
+				return std::unexpected("Missing JSON field: height");
+			else if (!height_it->value().is_int64())
+				return std::unexpected("JSON field 'height' must be an int");
+			else
+				validated_file.height = height_it->value().as_int64();
+
+			if (auto thumbnail_file_extension_it = json.find("thumbnail_file_extension"); thumbnail_file_extension_it == json.end())
+				return std::unexpected("Missing JSON field: thumbnail_file_extension");
+			else if (!thumbnail_file_extension_it->value().is_string())
+				return std::unexpected("JSON field 'thumbnail_file_extension' must be an string");
+			else {
+				validated_file.thumbnail_file_extension = thumbnail_file_extension_it->value().as_string();
+				// TODO check if file extension is in supported formats
+				// TODO sanitise filename. Frontend handles this but not if the API is used directly
+				if (validated_file.thumbnail_file_extension->length() < 1 || validated_file.thumbnail_file_extension->length() > File::MAX_FILE_NAME)
+					return std::unexpected(std::format("thumbnail_file_extension length {} is not between 1 and {}", validated_file.thumbnail_file_extension->length(), File::MAX_FILE_NAME));
+			}
+		}
+		if (auto file_it = files.find(validated_file.id); file_it == files.end())
+			return std::unexpected(std::format("File with ID {} not found from filename {}", validated_file.id, validated_file.filename));
+		else
+			return file_it->second.get();
+		// return validated_file;
+	}
 	void sendToWebRTC(std::string message);
 	void clearWebsockets();
 	void setBoardSlug(int board_id, const std::string& new_slug) {
@@ -517,7 +609,7 @@ private:
 				if (!file_val.is_object())
 					return std::unexpected("file_val must be an object");
 				boost::json::object& file_obj = file_val.as_object();
-				auto file_maybe = File::validateInput(file_obj);
+				auto file_maybe = validateFile(file_obj);
 				if (!file_maybe)
 					return std::unexpected(file_maybe.error());
 				validated.files.push_back(file_maybe.value());
@@ -530,7 +622,7 @@ private:
 			return std::unexpected("JSON field 'content' must be an string");
 		else {
 			validated.content = content_it->value().as_string();
-			if ((validated.content.length() < 1 && number_of_files == 0) || validated.content.length() > Message::MAX_CONTENT)
+			if ((validated.content.length() < 1/* && number_of_files == 0*/) || validated.content.length() > Message::MAX_CONTENT)
 				return std::unexpected(std::format("Content length {} is not between 1 and {}", validated.content.length(), Message::MAX_CONTENT));
 		}
 
@@ -568,6 +660,8 @@ private:
 #endif
 	std::unordered_map<int, std::unique_ptr<Board>> boards;
 	std::unordered_map<std::string, int> slug_to_board_id; // when slug changes, old assosiation is not removed until reboot
+	std::unordered_map<int, std::unique_ptr<File>> files;
+	std::unordered_map<std::string, int> filename_to_file_id;
 	// std::vector<int> ordered_boards;
 	// HTTP sessions. Client validates using a cookie
 }; // class State
