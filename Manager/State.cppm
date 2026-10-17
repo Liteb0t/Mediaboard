@@ -27,6 +27,7 @@ import FuzeDBI;
 import FuzeHttp.Core;
 import FuzeHttp.Migrations;
 import FuzeHttp.PermissionObject;
+import FuzeHttp.Response;
 import FuzeHttp.State;
 import Mediaboard.Manager.Operations;
 import Mediaboard.Manager.MediaboardServerInformation;

@@ -14,6 +14,7 @@ export module Mediaboard.Manager.Views;
 import FuzeHttp.Core;
 import FuzeHttp.PermissionObject;
 import FuzeHttp.Request;
+import FuzeHttp.Response;
 import FuzeHttp.Utils;
 import Mediaboard.Manager.State;
 
@@ -28,8 +29,7 @@ FuzeHttp::Response createServer(State* state, Request req, std::string new_serve
 }
 
 FuzeHttp::Response showDocument(State* state, FuzeHttp::Request req) {
-	// TODO handle target decoding in FuzeHttp
-	std::string target = std::string(FuzeHttp::getPathName(FuzeHttp::getDecodedURL(req.target())).substr(1));
+	std::string target = std::string(req.pathName()).substr(1);
 	return {
 		.status = http::status::ok,
 		.file = state->getDocumentRoot() / target

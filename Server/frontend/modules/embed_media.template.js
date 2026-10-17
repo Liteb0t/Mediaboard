@@ -68,7 +68,7 @@ export class Media {
 		figure_element.children[Media.FIGURE_EMBED].style["display"] = "none";
 		figure_element.children[Media.FIGURE_THUMBNAIL].style["display"] = "inherit";
 	}
-	static createMediaEmbed() {
+	static createMediaEmbed(file) {
 		return document.createElement("media-embed").render(file);
 	}
 }

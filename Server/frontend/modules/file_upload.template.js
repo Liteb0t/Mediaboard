@@ -134,7 +134,7 @@ export class UploadedFile {
 	}
 }
 
-class FileUploadElement extends HTMLElement {
+export class FileUploadElement extends HTMLElement {
 	_file_count_limit = null;
 	constructor() {
 		// Always call super first in constructor
@@ -146,6 +146,21 @@ class FileUploadElement extends HTMLElement {
 
 		for (const element of shadow.querySelectorAll(["[id]"])) {
 			this[element.id] = element;
+		}
+	}
+	static onDragOverHandler() {
+		if ([...event.dataTransfer.items].some((item) => item.kind === "file")) {
+			event.preventDefault();
+		}
+	}
+	static onDropHandler(file_upload_component, destination) {
+		if ([...event.dataTransfer.items].some((item) => item.kind === "file")) {
+			event.preventDefault();
+			const files = [...event.dataTransfer.items]
+				.map((item) => item.getAsFile()) // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/getAsFile
+				.filter((file) => file);
+			file_upload_component?.addFiles(files, destination);
+			console.log(files);
 		}
 	}
 	allUploadsAreCompleted() {

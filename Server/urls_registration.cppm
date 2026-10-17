@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Fuze.page
 // Fuze Human-oriented License v1
 module;
-#include <boost/beast/http.hpp>
+#include "beast.hpp"
 export module Mediaboard.URLs:registration;
 // #include "views.hpp"
 // #include "views_media.hpp"

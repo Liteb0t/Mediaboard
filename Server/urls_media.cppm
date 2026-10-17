@@ -1,7 +1,7 @@
 // Copyright (c) 2026, Fuze.page
 // Fuze Human-oriented License v1
 module;
-#include <boost/beast/http.hpp>
+#include "beast.hpp"
 export module Mediaboard.URLs:media;
 // #include "views.hpp"
 // #include "views_media.hpp"
@@ -21,7 +21,9 @@ void addMediaURLsToController(FuzeHttp::Controller<State*>* controller) {
 	(verb::post, uploadFileInThread,				"api",  "board", BoardResolver{}, "thread", ThreadResolver{}, "upload")
 	(verb::post, uploadFileInBoard,					"api",  "board", BoardResolver{}, "upload")
 	(verb::get, getMedia,							"media", std::string())
-	(verb::get, getThumbnail,						"media", "thumbnails", std::string());
+	(verb::get, getThumbnail,						"media", "thumbnails", std::string())
+	(verb::get, getFiles,							"api", "files")
+	;
 }
 
 } // export namespace Mediaboard

@@ -99,7 +99,7 @@ router.on("/board/:board_slug/thread/:thread_id", async({data}) => {
 router.on("/media", async({data}) => {
 	try {
 		console.log(data);
-		let media_manager_element = await mountThreadListIfNotThere("media-manager");
+		let media_manager_element = await mountElementIfNotThere("media-manager");
 		await media_manager_element.render();
 	}
 	catch (error) {

@@ -1,6 +1,6 @@
 import { global_styles } from "./styles.js";
 import { session } from "./session.js";
-import { UploadedFile } from "./file_upload.js";
+import { UploadedFile, FileUploadElement } from "./file_upload.js";
 import { Format, Media } from "./embed_media.js";
 
 
@@ -128,20 +128,11 @@ class ThreadListElement extends HTMLElement {
 	}
 	onclickHandler = (event) => { Media.handleOnClick(event); }
 	ondragoverhandler = (event) => { // on window
-		if ([...event.dataTransfer.items].some((item) => item.kind === "file")) {
-			event.preventDefault();
-		}
+		FileUploadElement.onDragOverHandler();
 	}
 	// https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop
 	ondrophandler = (event) => { // on window
-		if ([...event.dataTransfer.items].some((item) => item.kind === "file")) {
-			event.preventDefault();
-			const files = [...event.dataTransfer.items]
-				.map((item) => item.getAsFile()) // https://developer.mozilla.org/en-US/docs/Web/API/DataTransferItem/getAsFile
-				.filter((file) => file);
-			this.file_upload_component?.addFiles(files, this.buildUploadDestination(this.selected_board.slug, this.selected_thread.id));
-			console.log(files);
-		}
+		FileUploadElement.onDropHandler(this.file_upload_component, this.buildUploadDestination(this.selected_board.slug, this.selected_thread.id));
 	}
 	buildUploadDestination(board_slug, thread_id = -1) {
 		return `./api/board/${board_slug}/` + (thread_id > -1 ? `thread/${thread_id}/` : "") + "upload/";

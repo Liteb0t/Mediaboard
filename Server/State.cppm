@@ -442,6 +442,17 @@ public:
 			}}
 		};
 	}
+	boost::json::object getFilesAsJson() const {
+		std::lock_guard<std::mutex> lock(mutex);
+		boost::json::array files_json = boost::json::array();
+		for (auto& [file_id, file] : this->files) {
+			files_json.emplace_back(file->asJson());
+		}
+		std::println("[State] Finished assembling files list into JSON");
+		return {
+			{"files", files_json}
+		};
+	}
 	std::optional<const Group*> getHighestRankGroupForClient(const std::optional<FuzeHttp::Client>& client) const {
 		std::lock_guard<std::mutex> lock(mutex);
 		std::optional<const Group*> group_maybe;
