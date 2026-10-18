@@ -194,6 +194,10 @@ dialog {
 	.EmbedThumbnail, .EmbedImage {
 		cursor: pointer;
 	}
+	.Selected {
+		background-color: #06F8;
+		opacity: 0.73;
+	}
 }
 
 .ToolBar {

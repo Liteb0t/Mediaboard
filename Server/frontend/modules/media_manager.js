@@ -108,7 +108,7 @@ class MediaManagerElement extends HTMLElement {
 			if (MediaManagerElement.valid_search_parameters.indexOf(param) === -1) {
 				params.remove(param);
 			}
-		})
+		});
 		const params_string = params.toString();
 		console.log("params_string: " + params_string);
 		const files_json = await this.fetchJson(`api/files?${params_string}`, {signal: signal}, "files");

@@ -32,7 +32,7 @@ export class UploadedFile {
 	addFileToList(file_upload_list_element) {
 		this.container_element = document.createElement("div");
 		this.thumbnail_element = document.createElement("img");
-		this.thumbnail_element.setAttribute("src", "static/placeholder.png");
+		this.thumbnail_element.setAttribute("src", "static/file_icon.png");
 		this.thumbnail_element.setAttribute("width", "100px");
 		this.thumbnail_element.setAttribute("height", "100px");
 		this.information_element = document.createElement("div");
