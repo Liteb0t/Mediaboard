@@ -261,14 +261,15 @@ public:
 	}
 	void cacheAllFiles() {
 		std::print("[State] Retrieving file references from database...");
-		for (auto file_tuple : db->queryRows<std::tuple<int, int, std::string, int, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT id, permission_object_id, filename, created_at, coupled_post_id, width, height, thumbnail_file_extension FROM stored_file")) {
+		for (auto file_tuple : db->queryRows<std::tuple<int, int, std::string, int, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT id, permission_object_id, filename, created_at, coupled_board_id, coupled_post_id, width, height, thumbnail_file_extension FROM stored_file")) {
 			int file_id = std::get<0>(file_tuple);
 			std::string filename = std::get<2>(file_tuple);
 			int seconds_since_epoch = std::get<3>(file_tuple); // TODO use long instead of int
 			std::chrono::seconds sec(seconds_since_epoch);
 			std::chrono::time_point<std::chrono::system_clock> created_at(sec);
-			std::optional<int> coupled_post_id = std::get<4>(file_tuple);
-			auto file = std::make_unique<File>(this, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_post_id, std::get<5>(file_tuple), std::get<6>(file_tuple), std::get<7>(file_tuple));
+			std::optional<int> coupled_board_id = std::get<4>(file_tuple);
+			std::optional<int> coupled_post_id = std::get<5>(file_tuple);
+			auto file = std::make_unique<File>(this, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_board_id, coupled_post_id, std::get<6>(file_tuple), std::get<7>(file_tuple), std::get<8>(file_tuple));
 			std::print("{}, ", file_id);
 			File* inserted_file = this->insertFile(std::move(file));
 
@@ -278,6 +279,8 @@ public:
 				int id_in_thread = db->query<int>("SELECT id_in_thread FROM message WHERE id = $1", coupled_post_id.value());
 				std::print("Fetched id_in_thread {} from message {}", id_in_thread, coupled_post_id.value());
 				int board_id = db->query<int>("SELECT board_id FROM thread WHERE id = $1", thread_id);
+				if (board_id != coupled_board_id)
+					throw std::format("Consistency check failed: coupled_board_id {} of stored_file {} is invalid", coupled_board_id.value(), file_id);
 				std::print("Fetched board {} from thread {}", board_id, thread_id);
 				if (auto board_it = boards.find(board_id); board_it == boards.end()) {
 					std::print("Skipping (board {} not found)", board_id);
@@ -287,7 +290,7 @@ public:
 						std::print("Skipping (thread {} not found)", thread_id);
 					}
 					else {
-						board_it->second->getThread(thread_id)->bindFileToMessage(inserted_file, id_in_thread);
+						board_it->second->bindFileToPost(inserted_file, thread_id, id_in_thread);
 					}
 				}
 			}
@@ -311,9 +314,9 @@ public:
 		else
 			return {};
 	}
-	std::optional<Board*> getBoardIfExists(const std::string& slug) {
+	std::optional<Board*> getBoardIfExists(const std::string_view slug) {
 		std::lock_guard<std::mutex> lock(mutex);
-		if (auto it = slug_to_board_id.find(slug); it == slug_to_board_id.end())
+		if (auto it = slug_to_board_id.find(std::string(slug)); it == slug_to_board_id.end())
 			return {};
 		else {
 			mutex.unlock();
@@ -442,10 +445,12 @@ public:
 			}}
 		};
 	}
-	boost::json::object getFilesAsJson() const {
+	boost::json::object getFilesAsJson(std::optional<Board*> board) const {
 		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::array files_json = boost::json::array();
 		for (auto& [file_id, file] : this->files) {
+			if (board && !file->isCoupledToBoard(board.value()->getId()))
+				continue;
 			files_json.emplace_back(file->asJson());
 		}
 		std::println("[State] Finished assembling files list into JSON");
@@ -467,10 +472,10 @@ public:
 	boost::json::object getClientAsJson(const std::optional<Client> client, bool has_cookie) const {
 		boost::json::object client_json = {{
 			{"server_permissions", {
-				{"manage_permissions", this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))}
+				{"manage_permissions", this->clientHasPermission(client, static_cast<int>(PERMISSION::MANAGE_PERMISSIONS))},
 				// will be handled by Board-level perms
 				// {"create_thread", state->clientHasPermission(client, static_cast<int>(PERMISSION::CREATE_THREAD))},
-				// {"upload_file", state->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))}
+				{"upload_file", this->clientHasPermission(client, static_cast<int>(PERMISSION::UPLOAD_FILE))}
 			}},
 			{"has_cookie", has_cookie}
 		}};

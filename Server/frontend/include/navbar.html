@@ -4,14 +4,6 @@
 	<a class="Button ToolBarButton" href="" data-navigo>Boards</a>
 	<a id="navlink_threads" class="Button ToolBarButton" href="board.html" style="display: none;">Threads</a>
 
-	<!--<button id="refresh_button" class="ToolBarButton">Refresh</button>-->
-#ifdef SERVER_LEVEL
-	<a id="manage_server_button" class="Button ToolBarButton" href="manage_server.html" style="display: none;">Manage server</a>
-#elifdef WITH_WEBRTC
-#ifndef LIVE
-	<a id="navlink_live" class="Button ToolBarButton" href="live.html" style="display: none;">Live</a>
-#endif
-#endif
 	<div class="FlexSeparator"></div>
 	<div id="warning_outdated_browser" style="color: #D00; display: none">Warning: outdated browser</div>
 	<!--
@@ -30,8 +22,9 @@
 	border-bottom: 1px solid #888;
 }
 </style>
-<script>
-"use strict";
+<script type="module">
+import { session } from "./modules/session.js";
+// "use strict";
 // depends on getClient to fire displayClientAsLoggedIn()
 
 // exposes "logout" event
@@ -39,7 +32,6 @@ const logout_event = new Event("logout");
 
 async function logoutAction() {
 	displayClientAsLoggedOut();
-	// manage_server_button.style["display"] = "none";
 	// localStorage.removeItem("server_permissions");
 	const fetch_response = await fetch("./registration/logout", {method: "POST"});
 	if (fetch_response && fetch_response.ok) {
@@ -49,13 +41,16 @@ async function logoutAction() {
 		console.error("Couldn't log out for one reason or another");
 	}
 }
-
-if (localStorage.getItem("logged_in") === "true") {
-	displayClientAsLoggedIn();
-}
-else {
-	registration_link.style["display"] = "inherit";
-}
+session.addEventListener("change", () => {
+	session.logged_in ? displayClientAsLoggedIn() : displayClientAsLoggedOut();
+});
+session.refresh();
+// if (localStorage.getItem("logged_in") === "true") {
+// 	displayClientAsLoggedIn();
+// }
+// else {
+// 	registration_link.style["display"] = "inherit";
+// }
 
 function displayClientAsLoggedIn() {
 	let account_username = localStorage.getItem("account_username");

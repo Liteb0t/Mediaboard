@@ -31,7 +31,7 @@ find_package(Boost 1.88 COMPONENTS json process program_options REQUIRED)
 
 set(data_destination "usr/share")
 add_subdirectory(Installer)
-add_subdirectory(Manager)
+# add_subdirectory(Manager)
 add_subdirectory(Server)
 add_subdirectory(assets)
 # add_subdirectory(frontend)

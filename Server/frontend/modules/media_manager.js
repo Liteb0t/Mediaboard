@@ -1,9 +1,11 @@
 import { global_styles } from "./styles.js";
 import { Format, Media } from "./embed_media.js";
+import { session } from "./session.js";
 
 class MediaManagerElement extends HTMLElement {
 	server_permissions = {};
 	file_upload_component = null;
+	static upload_destination = "/api/upload";
 
 	constructor() {
 		// Always call super first in constructor
@@ -23,7 +25,7 @@ class MediaManagerElement extends HTMLElement {
 			component.setFileCountLimit(4);
 			component.file_upload.onchange = (event) => {
 				console.log("file changed.");
-				component.addFiles(component.file_upload.files, this.buildUploadDestination(this.selected_board.slug, this.selected_thread.id));
+				component.addFiles(component.file_upload.files, MediaManagerElement.upload_destination);
 			}
 		});
 	} // constructor()
@@ -44,13 +46,12 @@ class MediaManagerElement extends HTMLElement {
 	}
 	// https://developer.mozilla.org/en-US/docs/Web/API/HTML_Drag_and_Drop_API/File_drag_and_drop
 	ondrophandler = (event) => { // on window
-		FileUploadElement.onDropHandler(this.file_upload_component, this.buildUploadDestination(this.selected_board.slug, this.selected_thread.id));
+		FileUploadElement.onDropHandler(this.file_upload_component, MediaManagerElement.upload_destination);
 	}
 	connectedCallback() {
 		console.log("Custom element added to page.");
-		// session.refresh(); // fetches client info asynchronously
-// threads_button.onclick = () => { openThreadList(); } // included in navbar.html
-// refresh_button.onclick = () => {refresh_send();} // imported from navbar.html
+		session.addEventListener("change", () => { this.updateUploadContainer(session.server_permissions); });
+		session.refresh();
 		this.shadowRoot.addEventListener("click", this.onclickHandler);
 		console.log(this);
 		console.log(this.shadowRoot);
@@ -96,12 +97,21 @@ class MediaManagerElement extends HTMLElement {
 		}
 	}
 
+	static valid_search_parameters = ["board"];
 	async render() {
 		this._abort_controller?.abort();
 		this._abort_controller = new AbortController();
 		const signal = this._abort_controller.signal;
 
-		const files_json = await this.fetchJson(`api/files`, {signal: signal}, "files");
+		let params = new URLSearchParams(window.location.search);
+		params.forEach(param => {
+			if (MediaManagerElement.valid_search_parameters.indexOf(param) === -1) {
+				params.remove(param);
+			}
+		})
+		const params_string = params.toString();
+		console.log("params_string: " + params_string);
+		const files_json = await this.fetchJson(`api/files?${params_string}`, {signal: signal}, "files");
 		if (signal.aborted)
 			return;
 		console.log(files_json);
@@ -117,6 +127,21 @@ class MediaManagerElement extends HTMLElement {
 			this.media_container.replaceChildren(document.createTextNode("None."));
 		else
 			this.media_container.replaceChildren(fragment);
+	}
+	updateUploadContainer(permissions) {
+		console.log("updateUploadContainer called");
+		console.log(permissions);
+		if (window.url_params_display_as_embed) {
+			this.upload_container.style["display"] = "none";
+			return;
+		}
+		if (permissions["upload_file"]) {
+			this.upload_container.style["display"] = "";
+		}
+		else {
+			this.upload_container.style["display"] = "none";
+		}
+		this.file_upload_component_promise.then(element => {element.updateVisibilityByPermissions(permissions);});
 	}
 }
 customElements.define("media-manager", MediaManagerElement);

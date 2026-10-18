@@ -36,11 +36,12 @@ public:
 			db->query<void>("INSERT INTO stored_file(id, permission_object_id, filename, created_at) VALUES ($1, $2, $3, $4)", this->id, this->getPermissionObjectId(), filename.c_str(), time_since_epoch);
 		}
 	}
-	File(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int permission_object_id, std::string filename, std::chrono::time_point<std::chrono::system_clock> created_at, std::optional<int> coupled_post_id, std::optional<int> width, std::optional<int> height, std::optional<std::string> thumbnail_file_extension)
+	File(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int permission_object_id, std::string filename, std::chrono::time_point<std::chrono::system_clock> created_at, std::optional<int> coupled_board_id, std::optional<int> coupled_post_id, std::optional<int> width, std::optional<int> height, std::optional<std::string> thumbnail_file_extension)
 			: PermissionManagedObject(permission_parent, permission_object_id, db),
 			id(id),
 			filename(filename),
 			created_at(created_at),
+			coupled_board_id(coupled_board_id),
 			coupled_post_id(coupled_post_id),
 			width(width),
 			height(height),
@@ -53,7 +54,10 @@ public:
 		if (thumbnail_file_extension) file_json.emplace("thumbnail_file_extension", thumbnail_file_extension.value());
 		return file_json;
 	}
-	void coupleToPost(int post_id) { // called from Message.cppm
+	bool isCoupledToBoard(int board_id) const { return coupled_board_id && board_id == coupled_board_id.value(); }
+	void coupleToPost(int board_id, int post_id) { // called from Message.cppm
+		db->query<void>("UPDATE stored_file SET coupled_board_id = $1 WHERE id = $2", board_id, this->id);
+		this->coupled_board_id = board_id;
 		db->query<void>("UPDATE stored_file SET coupled_post_id = $1 WHERE id = $2", post_id, this->id);
 		this->coupled_post_id = post_id;
 	}
@@ -63,8 +67,9 @@ public:
 	int getId() const { return this->id; }
 	std::chrono::time_point<std::chrono::system_clock> createdAt() const { return this->created_at; }
 private:
-	std::optional<int> coupled_post_id;
 	int id;
+	std::optional<int> coupled_board_id;
+	std::optional<int> coupled_post_id;
 	std::optional<int> width, height;
 	std::optional<std::string> thumbnail_file_extension;
 	std::chrono::time_point<std::chrono::system_clock> created_at;

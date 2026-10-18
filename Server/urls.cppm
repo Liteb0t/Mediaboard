@@ -83,6 +83,6 @@ void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 	// controller->addNewPattern(&State::getThreads, Method::GET / "api" / "board" / Resolve<Board> / "threads")
 	// TODO class-based views (as defined in views.cppm)
 	// TODO new FuzeHttp::Response which includes Client, Session, and parsed URL params.
-	{}
+
 }
 } // export namespace Mediaboard

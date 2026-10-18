@@ -784,10 +784,10 @@ class PermissionSettings {
 			enabled_permissions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 		}
 		else if (slash_count === 2) { // board/g/
-			enabled_permissions = [1, 2, 3, 4, 5, 6, 7, 8, 9]; // TODO: allow "manage permissions" on board but disallow setting allow on permissions client lacks
+			enabled_permissions = [1, 2, 3, 4, 6, 7, 8, 9]; // TODO: allow "manage permissions" on board but disallow setting allow on permissions client lacks
 		}
 		else { // This is a thread
-			enabled_permissions = [1, 3, 4, 5];
+			enabled_permissions = [1, 3, 4]; // TODO bring back thread-level "Upload file" permission or maybe instead "embed media"
 		}
 		this.permission_collection = new PermissionCollection(this, _permission_list_element, enabled_permissions); // PermissionCollection
 		this.permission_list_element = _permission_list_element;

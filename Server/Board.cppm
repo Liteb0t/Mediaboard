@@ -18,6 +18,7 @@ module;
 export module Mediaboard.Board;
 
 export import Mediaboard.Thread;
+import Mediaboard.File;
 #ifdef WITH_WEBRTC
 import Mediaboard.Room;
 #endif
@@ -98,6 +99,15 @@ public:
 
 		std::cout << "[Board] Finished retreiving threads and posts from the database." << std::endl;
 	}
+
+	void bindFileToPost(File* file, int thread_id, int message_id_in_thread) {
+		std::lock_guard<std::mutex> board_lock(mutex);
+		if (auto thread_it = threads.find(thread_id); thread_it != threads.end())
+			thread_it->second->bindFileToMessage(file, message_id_in_thread);
+		else
+			throw std::format("[Board::bindFileToPost] thread {} not found (from file {})", thread_id, file->getId());
+	}
+
 	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
 		std::lock_guard<std::mutex> lock(mutex);
 		// boost::json::object board_json = this->board_as_json;
@@ -152,7 +162,7 @@ public:
 		// db->query<void>("UPDATE board SET thread_id_seq = $1 WHERE id = $2", new_thread_id_in_board+1, this->id);
 		std::lock_guard<std::mutex> board_lock(mutex);
 		int new_thread_id = db->incrementSequence("thread_id");
-		auto post_zero = std::make_unique<Message>(db, validated_thread.post_zero_validated, author_client_id, new_thread_id, 0);
+		auto post_zero = std::make_unique<Message>(db, validated_thread.post_zero_validated, author_client_id, new_thread_id, 0, this->id);
 		auto thread = std::make_unique<Thread>(this, db, std::move(post_zero), author_client_id, this->id, new_thread_id);
 		// int new_thread_id = thread->getId();
 		Thread* thread_ptr = thread.get();
@@ -169,7 +179,7 @@ public:
 		int new_post_id;
 
 		std::println("[Board::createMessage] creating message...");
-		auto message = std::make_unique<Message>(db, validated_message, client.id, thread->getId(), thread->incrementMessageIdInThread()); // Key is deleted from message_json in its constructor
+		auto message = std::make_unique<Message>(db, validated_message, client.id, thread->getId(), thread->incrementMessageIdInThread(), this->id);
 		std::println("[Board::createMessage] inserting message into thread...");
 		auto message_ptr = thread->insertMessage(std::move(message));
 		thread->broadcastMessage(message_ptr, client);

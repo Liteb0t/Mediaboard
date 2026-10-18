@@ -29,9 +29,9 @@ import Mediaboard.State;
 
 using namespace FuzeHttp;
 
-namespace Mediaboard {
+export namespace Mediaboard {
 
-FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req, std::optional<Board*> board_opt = {}, std::optional<Thread*> thread_opt = {}) {
+FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
 	std::istringstream req_stream(req.message.body());
 	std::string req_line;
 	std::getline(req_stream, req_line);
@@ -216,21 +216,19 @@ FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req, std::optional
 #endif
 	return response;
 } // uploadFile()
-} // namespace Mediaboard
 
-export namespace Mediaboard {
 FuzeHttp::Response uploadFileInThread(State* state, FuzeHttp::Request req, Board* board, Thread* thread) {
 	if (!thread->clientHasPermission(req.client(), static_cast<int>(PERMISSION::UPLOAD_FILE)))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files in this thread."};
 	else
-		return uploadFile(state, req, board, thread);
+		return uploadFile(state, req);
 }
 
 FuzeHttp::Response uploadFileInBoard(State* state, FuzeHttp::Request req, Board* board) {
 	if (!board->clientHasPermission(req.client(), static_cast<int>(PERMISSION::UPLOAD_FILE)))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files in this board."};
 	else
-		return uploadFile(state, req, board);
+		return uploadFile(state, req);
 }
 
 // TODO find a way to handle multiple directories under one view
@@ -279,6 +277,11 @@ FuzeHttp::Response getThumbnail(State* state, FuzeHttp::Request req, std::string
 Response getFiles(State* state, FuzeHttp::Request req) {
 	// std::optional<Client> client = state->getClientIfExists(req);
 	// if (!state->clientHasPermission())
-	return Response{.status=http::status::ok, .json=state->getFilesAsJson()};
+	std::optional<Board*> board;
+	if (auto board_param_it = req.searchParameters().find("board"); board_param_it != req.searchParameters().end()) {
+		std::println("Found board param: {}", board_param_it->second);
+		board = state->getBoardIfExists(board_param_it->second);
+	}
+	return Response{.status=http::status::ok, .json=state->getFilesAsJson(board)};
 }
 } // export namespace Mediaboard

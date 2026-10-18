@@ -32,6 +32,7 @@ void State::addMigrations() {
 	("0.3", "ALTER TABLE stored_file ADD COLUMN id INTEGER")
 	("0.3", "ALTER TABLE stored_file RENAME COLUMN message_id TO coupled_post_id")
 	("0.3", "ALTER TABLE stored_file RENAME COLUMN file_name TO filename")
+	("0.3", "ALTER TABLE stored_file ADD COLUMN coupled_board_id INTEGER")
 	("0.3", "ALTER TABLE stored_file ADD COLUMN created_at INTEGER")
 	("0.3", "ALTER TABLE _sequences ADD COLUMN stored_file_id INTEGER DEFAULT 0")
 	("0.3", "ALTER TABLE stored_file ADD COLUMN permission_object_id INTEGER")
@@ -44,6 +45,14 @@ void State::addMigrations() {
 			int time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(created_at.time_since_epoch()).count();
 			db->query<void>("UPDATE stored_file SET created_at = $1 WHERE id = $2", time_since_epoch, file_id);
 			db->query<void>("UPDATE stored_file SET permission_object_id = $1 WHERE id = $2", permission_object_id, file_id);
+
+			int coupled_post_id = db->query<int>("SELECT coupled_post_id FROM stored_file WHERE id = $1", file_id);
+			std::print("Fetched post {} from file {}", coupled_post_id, file_id);
+			int thread_id = db->query<int>("SELECT thread_id FROM message WHERE id = $1", coupled_post_id);
+			std::print("Fetched thread {} from message {}", thread_id, coupled_post_id);
+			int board_id = db->query<int>("SELECT board_id FROM thread WHERE id = $1", thread_id);
+			std::print("Fetched board {} from thread {}", board_id, thread_id);
+			db->query<void>("UPDATE stored_file SET coupled_board_id = $1 WHERE id = $2", board_id, file_id);
 		}
 	})
 	("0.3", "CREATE TABLE file_view(file_id INTEGER PRIMARY KEY, viewed_at INTEGER NOT NULL, client_id INTEGER)")

@@ -1,3 +1,5 @@
+// import { session } from "./session.js";
+
 class BoardListElement extends HTMLElement {
 	constructor() {
 		// Always call super first in constructor
@@ -10,9 +12,20 @@ class BoardListElement extends HTMLElement {
 		// for (const element of shadow.querySelectorAll("[id]")) {
 		// 	this[element.id] = element;
 		// }
-		for (const element of shadow.querySelectorAll(["#create_board_button", "#board_list_container"])) {
+		for (const element of shadow.querySelectorAll(["#create_board_button", "#board_list_container", "#manage_server_button"])) {
 			this[element.id] = element;
 		}
+	}
+	connectedCallback() {
+		session.addEventListener("change", this.updateInterface);
+		session.refresh(); // fetches client info asynchronously
+	}
+
+	disconnectedCallback() {
+		session.removeEventListener("change", this.updateInterface);
+	}
+	updateInterface = () => {
+		this.manage_server_button.style["display"] = session.server_permissions["manage_permissions"] ? "" : "none";
 	}
 	async getAllBoards() {
 		// try {

@@ -471,7 +471,7 @@ class ThreadListElement extends HTMLElement {
 		console.log("with selected thread ID " + selected_thread_id + " and permissions below");
 		console.log(permissions);
 		if (window.url_params_display_as_embed) {
-			reply_container.style["display"] = "none";
+			this.reply_container.style["display"] = "none";
 			return;
 		}
 		if (selected_thread_id != -1) {

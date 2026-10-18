@@ -44,7 +44,7 @@ public:
 		std::string content;
 		std::vector<File*> files;
 	};
-	Message(FuzeDBI::Connection* db, Validated input, int author_client_id, int thread_id, int id_in_thread)
+	Message(FuzeDBI::Connection* db, Validated input, int author_client_id, int thread_id, int id_in_thread, int board_id)
 			: id(db->incrementSequence("message_id")),
 			author_client_id(author_client_id),
 			author_username(input.name.length() == 0 ? "Anonymous" : input.name),
@@ -64,7 +64,7 @@ public:
 		}
 		this->files_i = 0;
 		for (File* file : input.files) {
-			file->coupleToPost(this->id);
+			file->coupleToPost(board_id, this->id);
 		}
 	}
 	boost::json::object asJson(const std::optional<FuzeHttp::Client>& client) const {
