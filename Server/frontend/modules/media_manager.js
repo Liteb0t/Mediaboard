@@ -1,10 +1,12 @@
 import { global_styles } from "./styles.js";
 import { Format, Media } from "./embed_media.js";
 import { session } from "./session.js";
+import { MultipleSelectorElement } from "./MultipleSelector.js";
 
 class MediaManagerElement extends HTMLElement {
 	server_permissions = {};
 	file_upload_component = null;
+	multuple_selector_component = null;
 	static upload_destination = "/api/upload";
 
 	constructor() {
@@ -19,7 +21,7 @@ class MediaManagerElement extends HTMLElement {
 			this[element.id] = element;
 		}
 
-		this.file_upload_component_promise = this.mountFileUploadIfNotThere(); // async. module FileUploadElement from file_upload.js
+		this.file_upload_component_promise = MediaManagerElement.mountElementIfNotThere(this.file_upload_container, "file-upload"); // async. module FileUploadElement from file_upload.js
 		this.file_upload_component_promise.then(component => {
 			this.file_upload_component = component;
 			component.setFileCountLimit(4);
@@ -28,19 +30,33 @@ class MediaManagerElement extends HTMLElement {
 				component.addFiles(component.file_upload.files, MediaManagerElement.upload_destination);
 			}
 		});
+		MediaManagerElement.mountElementIfNotThere(this.multiple_selector_container, "multiple-selector").then(element => {
+			this.multuple_selector_component = element;
+			// element.registerSelectableQuery("[selectable]");
+			element.noun = "file";
+			element.registerVerb("Delete");
+			element.render();
+			element.addEventListener("action", (event) => {
+				console.log(event.detail);
+			});
+		});
 	} // constructor()
-	async mountFileUploadIfNotThere(data) {
-		await customElements.whenDefined("file-upload"); // wait for component to be loaded and defined, since JS module deferred loading will process sooner than router resolution, or however the deer hits the fence
+	static async mountElementIfNotThere(container, element_name) {
+		await customElements.whenDefined(element_name); // wait for component to be loaded and defined, since JS module deferred loading will process sooner than router resolution, or however the deer hits the fence
 		// thread-list is custom element defined in board.js
-		let element = view_container.querySelector("file-upload");
+		let element = view_container.querySelector(element_name);
 		if (!element) {
-			element = document.createElement("file-upload");
-			this.file_upload_container.replaceChildren(element);
+			element = document.createElement(element_name);
+			container.replaceChildren(element);
 		}
 		console.log(element);
 		return element;
 	}
-	onclickHandler = (event) => { Media.handleOnClick(event); }
+	onclickHandler = (event) => {
+		if (this.multuple_selector_component?.handleOnClick(event))
+			return;
+		Media.handleOnClick(event);
+	}
 	ondragoverhandler = (event) => { // on window
 		FileUploadElement.onDragOverHandler();
 	}
@@ -57,7 +73,9 @@ class MediaManagerElement extends HTMLElement {
 		console.log(this.shadowRoot);
 		window.addEventListener("drop", this.ondrophandler);
 		window.addEventListener("dragover", this.ondragoverhandler);
+		window.addEventListener("selectionstart", this.ondragoverhandler);
 	}
+	selection_start = () => {}
 
 	disconnectedCallback() {
 	console.log("Custom element removed from page.");
@@ -121,7 +139,9 @@ class MediaManagerElement extends HTMLElement {
 	showAllFiles(files_json) {
 		const fragment = new DocumentFragment();
 		for (let file of files_json.files) {
-			fragment.appendChild(Media.createMediaEmbed(file));
+			const embed = Media.createMediaEmbed(file);
+			embed.setAttribute("selectable", "");
+			fragment.appendChild(embed);
 		}
 		if (fragment.children.length === 0)
 			this.media_container.replaceChildren(document.createTextNode("None."));

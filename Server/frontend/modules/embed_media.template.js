@@ -39,7 +39,7 @@ export class Media {
 	static FIGURE_THUMBNAIL = 1;
 	static handleOnClick = (event) => {
 		let target = event.target;
-		console.log(target);
+		// console.log(target);
 		if (target.classList.contains("EmbedThumbnail"))
 			Media.expandEmbedFigure(target.parentNode);
 		else if (target.classList.contains("EmbedImage"))
