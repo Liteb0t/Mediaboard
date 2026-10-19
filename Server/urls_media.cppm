@@ -24,6 +24,7 @@ void addMediaURLsToController(FuzeHttp::Controller<State*>* controller) {
 	(verb::get, getMedia,							"media", std::string())
 	(verb::get, getThumbnail,						"media", "thumbnails", std::string())
 	(verb::get, getFiles,							"api", "files")
+	(verb::delete_, deleteFiles,					"api", "files")
 	;
 }
 

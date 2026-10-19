@@ -66,16 +66,6 @@ export class MultipleSelectorElement extends HTMLElement {
 	updateSelectionIndicator() {
 		this.selection_indicator.textContent = `${this.selected_elements.length} ${this.noun}` + (this.selected_elements.length !== 1 ? "s" : "") + " selected";
 	}
-	&[selectable] {
-		&:hover {
-			background-color: #06F4;
-			cursor: pointer;
-		}
-		&.Selected {
-			background-color: #06F8;
-			opacity: 0.73;
-		}
-	}
 	beginSelection() {
 		this.updateSelectionIndicator();
 		this.select_button.style["display"] = "none";
@@ -83,7 +73,7 @@ export class MultipleSelectorElement extends HTMLElement {
 		this.clear_button.style["display"] = "";
 		this.action_button_container.style["display"] = "";
 		this.is_active = true;
-		document.dispatchEvent(this.selection_start_event);
+		this.dispatchEvent(this.selection_start_event);
 	}
 	clearSelection() {
 		for (let element of this.selected_elements) {
@@ -95,7 +85,7 @@ export class MultipleSelectorElement extends HTMLElement {
 		this.selected_elements = [];
 		this.action_button_container.style["display"] = "none";
 		this.is_active = false;
-		document.dispatchEvent(this.selection_clear_event);
+		this.dispatchEvent(this.selection_clear_event);
 	}
 	registerVerb(verb) {
 		const doAction = new CustomEvent("action", {

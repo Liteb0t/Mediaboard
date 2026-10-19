@@ -34,6 +34,7 @@ void State::addMigrations() {
 	("0.3", "ALTER TABLE stored_file RENAME COLUMN file_name TO filename")
 	("0.3", "ALTER TABLE stored_file ADD COLUMN coupled_board_id INTEGER")
 	("0.3", "ALTER TABLE stored_file ADD COLUMN created_at INTEGER")
+	("0.3", "ALTER TABLE stored_file ADD COLUMN deleted_at INTEGER")
 	("0.3", "ALTER TABLE _sequences ADD COLUMN stored_file_id INTEGER DEFAULT 0")
 	("0.3", "ALTER TABLE stored_file ADD COLUMN permission_object_id INTEGER")
 	("0.3", this, [](FuzeDBI::Connection* db, Mediaboard::State* state){

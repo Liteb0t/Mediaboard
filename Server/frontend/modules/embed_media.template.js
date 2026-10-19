@@ -40,34 +40,9 @@ export class Media {
 	static handleOnClick = (event) => {
 		let target = event.target;
 		// console.log(target);
-		if (target.classList.contains("EmbedThumbnail"))
-			Media.expandEmbedFigure(target.parentNode);
-		else if (target.classList.contains("EmbedImage"))
-			Media.contractEmbedFigure(target.parentNode);
-		else if (target.classList.contains("EmbedIframe"))
-			Media.toggleEmbedIframe(target.parentNode);
-	}
-	static toggleEmbedIframe(figure_element) {
-		let iframe_element = figure_element.querySelector("iframe");
-		if (figure_element.getAttribute("expanded") === "") {
-			iframe_element.style["display"]="none";
-			figure_element.removeAttribute("expanded");
-			iframe_element.src = "";
-		}
-		else {
-			iframe_element.style["display"]="inherit";
-			figure_element.setAttribute("expanded", "");
-			iframe_element.src = figure_element.getAttribute("data-iframe-src");
-		}
-	}
-	static expandEmbedFigure(figure_element) {
-		figure_element.embed_element.setAttribute("src", Media.media_url + figure_element.getAttribute("filename"));
-		figure_element.embed_element.style["display"] = "";
-		figure_element.thumbnail_element.style["display"] = "none";
-	}
-	static contractEmbedFigure(figure_element) {
-		figure_element.embed_element.style["display"] = "none";
-		figure_element.thumbnail_element.style["display"] = "";
+		let element = event.target.closest("media-embed");
+		if (element)
+			element.whenClicked(event.target);
 	}
 	static createMediaEmbed(file) {
 		return document.createElement("media-embed").render(file);
@@ -181,13 +156,35 @@ class MediaEmbed extends HTMLElement {
 		this.appendChild(figcaption_element);
 		return this;
 	}
-	/*
-	onThumbnailClick() => {
+	whenClicked(target) {
+		if (target.classList.contains("EmbedThumbnail"))
+			this.expandEmbedFigure();
+		else if (target.classList.contains("EmbedImage"))
+			this.contractEmbedFigure();
+		else if (target.classList.contains("EmbedIframe"))
+			this.toggleEmbedIframe();
 	}
-	onImageClick() => {
+	toggleEmbedIframe() {
+		let iframe_element = this.querySelector("iframe");
+		if (this.getAttribute("expanded") === "") {
+			iframe_element.style["display"]="none";
+			this.removeAttribute("expanded");
+			iframe_element.src = "";
+		}
+		else {
+			iframe_element.style["display"]="inherit";
+			this.setAttribute("expanded", "");
+			iframe_element.src = this.getAttribute("data-iframe-src");
+		}
 	}
-	onIframeClick() => {
+	expandEmbedFigure() {
+		this.embed_element.setAttribute("src", Media.media_url + this.getAttribute("filename"));
+		this.embed_element.style["display"] = "";
+		this.thumbnail_element.style["display"] = "none";
 	}
-	*/
+	contractEmbedFigure() {
+		this.embed_element.style["display"] = "none";
+		this.thumbnail_element.style["display"] = "";
+	}
 }
 customElements.define("media-embed", MediaEmbed)

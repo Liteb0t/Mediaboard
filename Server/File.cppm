@@ -36,7 +36,7 @@ public:
 			db->query<void>("INSERT INTO stored_file(id, permission_object_id, filename, created_at) VALUES ($1, $2, $3, $4)", this->id, this->getPermissionObjectId(), filename.c_str(), time_since_epoch);
 		}
 	}
-	File(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int permission_object_id, std::string filename, std::chrono::time_point<std::chrono::system_clock> created_at, std::optional<int> coupled_board_id, std::optional<int> coupled_post_id, std::optional<int> width, std::optional<int> height, std::optional<std::string> thumbnail_file_extension)
+	File(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int permission_object_id, std::string filename, std::chrono::time_point<std::chrono::system_clock> created_at, std::optional<int> coupled_board_id, std::optional<int> coupled_post_id, std::optional<int> width, std::optional<int> height, std::optional<std::string> thumbnail_file_extension, std::optional<std::chrono::time_point<std::chrono::system_clock>> deleted_at)
 			: PermissionManagedObject(permission_parent, permission_object_id, db),
 			id(id),
 			filename(filename),
@@ -45,7 +45,8 @@ public:
 			coupled_post_id(coupled_post_id),
 			width(width),
 			height(height),
-			thumbnail_file_extension(thumbnail_file_extension) {
+			thumbnail_file_extension(thumbnail_file_extension),
+			deleted_at(deleted_at) {
 	}
 	boost::json::object asJson() const {
 		boost::json::object file_json = {{"filename", filename}};
@@ -61,6 +62,15 @@ public:
 		db->query<void>("UPDATE stored_file SET coupled_post_id = $1 WHERE id = $2", post_id, this->id);
 		this->coupled_post_id = post_id;
 	}
+	void markAsDeleted() {
+		this->deleted_at = std::chrono::system_clock::now();
+		int time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(deleted_at->time_since_epoch()).count();
+		db->query<void>("UPDATE stored_file SET deleted_at = $1 WHERE id = $2", time_since_epoch, id);
+		// this->recently_deleted = true;
+	}
+	bool isDeleted() {
+		return deleted_at ? true : false;
+	}
 	std::string name() const { return this->filename; }
 	inline static const size_t MAX_FILE_NAME = 205;
 	inline static const size_t MAX_FILE_NAME_WITH_UUID = 205+36;
@@ -73,6 +83,8 @@ private:
 	std::optional<int> width, height;
 	std::optional<std::string> thumbnail_file_extension;
 	std::chrono::time_point<std::chrono::system_clock> created_at;
+	std::optional<std::chrono::time_point<std::chrono::system_clock>> deleted_at;
 	std::string filename;
+	// bool recently_deleted = false;
 }; // class File
 } // export namespace Mediaboard

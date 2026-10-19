@@ -12,7 +12,7 @@ CREATE TABLE permission_setting(id INTEGER PRIMARY KEY, permission_collection_id
 CREATE TABLE session(client_id INTEGER, key TEXT, created_at INTEGER);
 CREATE TABLE ice_servers(type TEXT, hostname TEXT, port INTEGER, transport TEXT, shared_secret TEXT);
 CREATE TABLE message(id INTEGER PRIMARY KEY, thread_id INTEGER, id_in_thread INTEGER, board_id INTEGER, author_client_id INTEGER, author_username TEXT, highest_ranked_group_name TEXT, created_at INTEGER, content TEXT, deleted BOOLEAN DEFAULT FALSE);
-CREATE TABLE stored_file(id INTEGER PRIMARY KEY, filename TEXT NOT NULL, permission_object_id INTEGER NOT NULL, created_at INTEGER, coupled_board_id INTEGER, coupled_post_id INTEGER, width INTEGER, height INTEGER, thumbnail_file_extension TEXT);
+CREATE TABLE stored_file(id INTEGER PRIMARY KEY, filename TEXT NOT NULL, permission_object_id INTEGER NOT NULL, created_at INTEGER, coupled_board_id INTEGER, coupled_post_id INTEGER, width INTEGER, height INTEGER, thumbnail_file_extension TEXT, deleted_at INTEGER);
 CREATE TABLE file_view(file_id INTEGER PRIMARY KEY, viewed_at INTEGER NOT NULL, client_id INTEGER);
 CREATE TABLE thread(id INTEGER PRIMARY KEY, deleted BOOLEAN DEFAULT FALSE, board_id INTEGER, id_in_board INTEGER, message_id_seq INTEGER DEFAULT 0, permission_object_id INTEGER);
 CREATE TABLE board(id INTEGER PRIMARY KEY, slug TEXT, title TEXT, thread_id_seq INTEGER DEFAULT 0, permission_object_id INTEGER, deleted BOOLEAN DEFAULT FALSE);

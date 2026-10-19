@@ -231,6 +231,22 @@ public:
 		}
 		return ice_servers_json;
 	}
+	std::expected<void, std::string> markFilesAsDeleted(boost::json::object& json, const std::optional<Client>& client) {
+		boost::json::array files_json = json.at("files").as_array();
+		for (auto& filename : files_json) {
+			std::string filename_str = std::string(filename.as_string().c_str());
+			if (auto file_id_it = filename_to_file_id.find(filename_str); file_id_it != filename_to_file_id.end()) {
+				File* file = files.at(file_id_it->second).get();
+				if (!file->clientHasPermission(client, static_cast<int>(PERMISSION::NON_AUTHOR_DELETE_FILE)))
+					return std::unexpected(std::format("Permission denied to delete file `{}`", filename_str));
+				else
+					file->markAsDeleted();
+			}
+			else
+				return std::unexpected(std::format("File `{}` not found", filename_str));
+		}
+		return {}; // success
+	}
 	[[nodiscard]]std::expected<void, std::string> setIceServers(boost::json::array ice_servers_json) {
 		std::lock_guard<std::mutex> lock(mutex);
 		ice_servers.clear();
@@ -259,17 +275,23 @@ public:
 		for (const std::pair<std::string, int>& slug_board_id : slug_to_board_id)
 			std::println("{} - {}", slug_board_id.first, slug_board_id.second);
 	}
+	static std::chrono::time_point<std::chrono::system_clock> getTimePointFromEpoch(int seconds_since_epoch) {
+		std::chrono::seconds seconds(seconds_since_epoch);
+		std::chrono::time_point<std::chrono::system_clock> time_point(seconds);
+		return time_point;
+	}
 	void cacheAllFiles() {
 		std::print("[State] Retrieving file references from database...");
-		for (auto file_tuple : db->queryRows<std::tuple<int, int, std::string, int, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<std::string>>>("SELECT id, permission_object_id, filename, created_at, coupled_board_id, coupled_post_id, width, height, thumbnail_file_extension FROM stored_file")) {
+		for (auto file_tuple : db->queryRows<std::tuple<int, int, std::string, int, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<std::string>, std::optional<int>>>("SELECT id, permission_object_id, filename, created_at, coupled_board_id, coupled_post_id, width, height, thumbnail_file_extension, deleted_at FROM stored_file")) {
 			int file_id = std::get<0>(file_tuple);
 			std::string filename = std::get<2>(file_tuple);
-			int seconds_since_epoch = std::get<3>(file_tuple); // TODO use long instead of int
-			std::chrono::seconds sec(seconds_since_epoch);
-			std::chrono::time_point<std::chrono::system_clock> created_at(sec);
+			std::chrono::time_point<std::chrono::system_clock> created_at = getTimePointFromEpoch(std::get<3>(file_tuple));
 			std::optional<int> coupled_board_id = std::get<4>(file_tuple);
 			std::optional<int> coupled_post_id = std::get<5>(file_tuple);
-			auto file = std::make_unique<File>(this, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_board_id, coupled_post_id, std::get<6>(file_tuple), std::get<7>(file_tuple), std::get<8>(file_tuple));
+			std::optional<std::chrono::time_point<std::chrono::system_clock>> deleted_at;
+			if (std::get<9>(file_tuple))
+				deleted_at = getTimePointFromEpoch(std::get<9>(file_tuple).value());
+			auto file = std::make_unique<File>(this, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_board_id, coupled_post_id, std::get<6>(file_tuple), std::get<7>(file_tuple), std::get<8>(file_tuple), deleted_at);
 			std::print("{}, ", file_id);
 			File* inserted_file = this->insertFile(std::move(file));
 
@@ -445,13 +467,14 @@ public:
 			}}
 		};
 	}
-	boost::json::object getFilesAsJson(std::optional<Board*> board) const {
+	boost::json::object getFilesAsJson(std::optional<Board*> board, bool get_recently_deleted) const {
 		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::array files_json = boost::json::array();
 		for (auto& [file_id, file] : this->files) {
 			if (board && !file->isCoupledToBoard(board.value()->getId()))
 				continue;
-			files_json.emplace_back(file->asJson());
+			if (file->isDeleted() == get_recently_deleted)
+				files_json.emplace_back(file->asJson());
 		}
 		std::println("[State] Finished assembling files list into JSON");
 		return {

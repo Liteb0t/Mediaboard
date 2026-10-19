@@ -282,6 +282,18 @@ Response getFiles(State* state, FuzeHttp::Request req) {
 		std::println("Found board param: {}", board_param_it->second);
 		board = state->getBoardIfExists(board_param_it->second);
 	}
-	return Response{.status=http::status::ok, .json=state->getFilesAsJson(board)};
+	bool get_recently_deleted = false;
+	if (auto type_param_it = req.searchParameters().find("type"); type_param_it != req.searchParameters().end()) {
+		if (type_param_it->second == "deleted")
+			get_recently_deleted = true;
+	}
+	return Response{.status=http::status::ok, .json=state->getFilesAsJson(board, get_recently_deleted)};
+}
+
+Response deleteFiles(State* state, FuzeHttp::Request req) {
+	if (auto res = state->markFilesAsDeleted(req.json(), req.client()))
+		return Response{.status=http::status::ok};
+	else
+		return Response{.status=http::status::bad_request, .error_message=res.error()};
 }
 } // export namespace Mediaboard

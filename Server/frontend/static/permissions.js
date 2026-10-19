@@ -713,7 +713,8 @@ class PermissionCollection {
 		6: "View board",
 		7: "Create/edit board",
 		8: "Delete board",
-		9: "Share video/audio in room"
+		9: "Share video/audio in room",
+		10:"Delete file"
 	};
 	static three_state_settings = {
 		0: "Deny",
@@ -781,7 +782,7 @@ class PermissionSettings {
 			api_location += '/';
 		const slash_count = (api_location.match(/\//g) || []).length;
 		if (slash_count === 1) { // server/
-			enabled_permissions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+			enabled_permissions = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 		}
 		else if (slash_count === 2) { // board/g/
 			enabled_permissions = [1, 2, 3, 4, 6, 7, 8, 9]; // TODO: allow "manage permissions" on board but disallow setting allow on permissions client lacks

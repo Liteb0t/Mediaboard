@@ -52,7 +52,7 @@ class BoardListElement extends HTMLElement {
 
 	showAllBoards(response_json) {
 		this.create_board_button.style["display"] = response_json["client_permissions"]["create_board"] ? "initial" : "none";
-		const fragment = new DocumentFragment();
+		// const fragment = new DocumentFragment();
 		const table_element = document.createElement("table");
 		const headers_element = document.createElement("tr");
 		["Slug", "Title", "Last post time", "Action"].forEach((column_name) => {
@@ -111,7 +111,7 @@ class BoardListElement extends HTMLElement {
 		if (response_json.boards.length === 0)
 			this.board_list_container.replaceChildren(document.createTextNode("No boards visible to this client."));
 		else {
-			fragment.appendChild(table_element);
+			// fragment.appendChild(table_element);
 			this.board_list_container.replaceChildren(table_element);
 		}
 	}
