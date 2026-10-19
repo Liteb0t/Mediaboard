@@ -714,7 +714,7 @@ class PermissionCollection {
 		7: "Create/edit board",
 		8: "Delete board",
 		9: "Share video/audio in room",
-		10:"Delete file"
+		10:"Delete/restore files"
 	};
 	static three_state_settings = {
 		0: "Deny",

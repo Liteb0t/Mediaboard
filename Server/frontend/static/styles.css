@@ -191,8 +191,10 @@ dialog {
 		width: auto;
 		height: auto;
 	}
-	.EmbedThumbnail, .EmbedImage {
-		cursor: pointer;
+	&[expandable] {
+		.EmbedThumbnail, .EmbedImage {
+			cursor: pointer;
+		}
 	}
 }
 [selectionactive] {

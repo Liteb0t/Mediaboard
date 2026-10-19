@@ -68,6 +68,11 @@ public:
 		db->query<void>("UPDATE stored_file SET deleted_at = $1 WHERE id = $2", time_since_epoch, id);
 		// this->recently_deleted = true;
 	}
+	void restore() {
+		if (deleted_at)
+			deleted_at = {};
+		db->query<void>("UPDATE stored_file SET deleted_at = NULL WHERE id = $1", id);
+	}
 	bool isDeleted() {
 		return deleted_at ? true : false;
 	}

@@ -296,4 +296,18 @@ Response deleteFiles(State* state, FuzeHttp::Request req) {
 	else
 		return Response{.status=http::status::bad_request, .error_message=res.error()};
 }
+Response patchFiles(State* state, FuzeHttp::Request req) {
+	auto action = req.searchParameters().find("action");
+	if (action == req.searchParameters().end()) {
+		return Response{.status=http::status::bad_request, .error_message="Missing 'action' URL parameter"};
+	}
+	else if (action->second == "Restore") {
+		if (auto res = state->restoreFiles(req.json(), req.client()))
+			return Response{.status=http::status::ok};
+		else
+			return Response{.status=http::status::bad_request, .error_message=res.error()};
+	}
+	else
+		return Response{.status=http::status::bad_request, .error_message="Unrecognised action"};
+}
 } // export namespace Mediaboard

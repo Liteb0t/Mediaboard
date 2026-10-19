@@ -2,7 +2,8 @@ import { global_styles } from "./styles.js";
 import { Format, Media } from "./embed_media.js";
 import { session } from "./session.js";
 import { MultipleSelectorElement } from "./MultipleSelector.js";
-
+import { FileUploadElement } from "./file_upload.js";
+// TODO import API and error handlers
 class MediaManagerElement extends HTMLElement {
 	server_permissions = {};
 	file_upload_component = null;
@@ -35,13 +36,17 @@ class MediaManagerElement extends HTMLElement {
 			this.multiple_selector_component = element;
 			// element.registerSelectableQuery("[selectable]");
 			element.noun = "file";
-			element.registerVerb("Delete");
+			element.setVerbs(["Delete"]);
 			element.render();
 			element.addEventListener("action", this.selectionActionHandler);
 			element.addEventListener("selectionstart", this.onSelectionStartHandler);
 			element.addEventListener("selectionclear", this.onSelectionClearHandler);
 		});
 		this.getAllBoards();
+		this.board_select.onchange = () => {this.render();}
+		this.type_select.onchange = () => {
+			this.render();
+		}
 	} // constructor()
 	static async mountElementIfNotThere(container, element_name) {
 		await customElements.whenDefined(element_name); // wait for component to be loaded and defined, since JS module deferred loading will process sooner than router resolution, or however the deer hits the fence
@@ -55,10 +60,6 @@ class MediaManagerElement extends HTMLElement {
 		return element;
 	}
 	onclickHandler = (event) => {
-		console.log(event.target);
-		console.log(event.target.closest("select"));
-		if (event.target.closest("select"))
-			return this.render();
 		if (this.multiple_selector_component?.handleOnClick(event))
 			return;
 		Media.handleOnClick(event);
@@ -73,24 +74,27 @@ class MediaManagerElement extends HTMLElement {
 	onSelectionStartHandler = () => { this.media_container.setAttribute("selectionactive", ""); }
 	onSelectionClearHandler = () => {this.media_container.removeAttribute("selectionactive");}
 	selectionActionHandler = async(event) => {
+		console.log("selectionActionHandler fired");
 		try {
-		console.log(event.detail.elements);
-		if (event.detail.verb === "Delete") {
+			console.log(event.detail.elements);
 			let filenames = [];
 			for (let media_embed of event.detail.elements) {
 				filenames.push(media_embed.getAttribute("filename"));
-				const response = await fetch("api/files", {method: "DELETE", body: JSON.stringify({files: filenames})});
-				if (response.ok) {
-					this.render();
-				}
-				else {
-					throw response.headers.get("message") ?? `Error occured when attempting to delete files\n${response.status} ${response.statusText}`;
-				}
 			}
-		}
-		else {
-			throw "Unrecognised verb " + event.detail.verb;
-		}
+			let response;
+			if (event.detail.verb === "Delete")
+				response = await fetch("api/files", {method: "DELETE", body: JSON.stringify({files: filenames})});
+			else if (event.detail.verb === "Restore")
+				response = await fetch("api/files?action=Restore", {method: "PATCH", body: JSON.stringify({files: filenames})});
+			else {
+				throw "Unrecognised verb " + event.detail.verb;
+			}
+			if (response.ok) {
+				this.render();
+			}
+			else {
+				throw response.headers.get("message") ?? `Error occured when attempting to delete files\n${response.status} ${response.statusText}`;
+			}
 		}
 		catch (error) {
 			console.error(error);
@@ -181,7 +185,7 @@ class MediaManagerElement extends HTMLElement {
 		this._abort_controller?.abort();
 		this._abort_controller = new AbortController();
 		const signal = this._abort_controller.signal;
-		this.multiple_selector_component?.clearSelection();
+		// this.multiple_selector_component?.clearSelection();
 
 		let params = new URLSearchParams(/*window.location.search*/);
 		// params.forEach(param => {
@@ -195,8 +199,15 @@ class MediaManagerElement extends HTMLElement {
 		if (this.type_select.value !== "Active") {
 			params.set("type", this.type_select.value);
 		}
+		if (params.get("type") == "deleted")
+			this.multiple_selector_component?.setVerbs(["Restore"]);
+		else
+			this.multiple_selector_component?.setVerbs(["Delete"]);
 
 		const params_string = params.toString();
+		const url = new URL(window.location.href);
+		url.search = params_string;
+		history.pushState(null, null, url);
 		console.log("params_string: " + params_string);
 		const files_json = await this.fetchJson(`api/files?${params_string}`, {signal: signal}, "files");
 		if (signal.aborted)

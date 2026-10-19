@@ -247,6 +247,22 @@ public:
 		}
 		return {}; // success
 	}
+	std::expected<void, std::string> restoreFiles(boost::json::object& json, const std::optional<Client>& client) {
+		boost::json::array files_json = json.at("files").as_array();
+		for (auto& filename : files_json) {
+			std::string filename_str = std::string(filename.as_string().c_str());
+			if (auto file_id_it = filename_to_file_id.find(filename_str); file_id_it != filename_to_file_id.end()) {
+				File* file = files.at(file_id_it->second).get();
+				if (!file->clientHasPermission(client, static_cast<int>(PERMISSION::NON_AUTHOR_DELETE_FILE)))
+					return std::unexpected(std::format("Permission denied to restore file `{}`", filename_str));
+				else
+					file->restore();
+			}
+			else
+				return std::unexpected(std::format("File `{}` not found", filename_str));
+		}
+		return {}; // success
+	}
 	[[nodiscard]]std::expected<void, std::string> setIceServers(boost::json::array ice_servers_json) {
 		std::lock_guard<std::mutex> lock(mutex);
 		ice_servers.clear();
@@ -291,7 +307,21 @@ public:
 			std::optional<std::chrono::time_point<std::chrono::system_clock>> deleted_at;
 			if (std::get<9>(file_tuple))
 				deleted_at = getTimePointFromEpoch(std::get<9>(file_tuple).value());
-			auto file = std::make_unique<File>(this, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_board_id, coupled_post_id, std::get<6>(file_tuple), std::get<7>(file_tuple), std::get<8>(file_tuple), deleted_at);
+
+			PermissionObjectBase* file_permission_parent;
+			if (coupled_board_id) {
+				if (auto board_it = boards.find(coupled_board_id.value()); board_it != boards.end()) {
+					file_permission_parent = board_it->second.get();
+				}
+				else {
+					std::println(std::cerr, "Board not found from coupled_board_id {} on file {}. File therefore won't be loaded.", coupled_board_id.value(), file_id);
+					continue;
+				}
+			}
+			else
+				file_permission_parent = this;
+
+			auto file = std::make_unique<File>(file_permission_parent, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_board_id, coupled_post_id, std::get<6>(file_tuple), std::get<7>(file_tuple), std::get<8>(file_tuple), deleted_at);
 			std::print("{}, ", file_id);
 			File* inserted_file = this->insertFile(std::move(file));
 

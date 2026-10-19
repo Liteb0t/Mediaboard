@@ -47,12 +47,7 @@ export class MultipleSelectorElement extends HTMLElement {
 
 		this.action_button_container = document.createElement("div");
 		this.action_button_container.style["display"] = "none";
-		for (const verb of Object.keys(this._verb_to_event)) {
-			const verb_button = document.createElement("button");
-			verb_button.textContent = verb;
-			verb_button.onclick = () => { this.dispatchEventFromVerb(verb); }
-			this.action_button_container.appendChild(verb_button);
-		}
+		this.renderActionButtons();
 		this.appendChild(this.action_button_container);
 
 		this.clear_button = document.createElement("button");
@@ -62,6 +57,21 @@ export class MultipleSelectorElement extends HTMLElement {
 		this.appendChild(this.clear_button);
 
 		return this;
+	}
+	renderActionButtons() {
+		console.log("renderActionButtons called");
+		console.log(Object.entries(this._verb_to_event));
+		let fragment = new DocumentFragment();
+		Object.entries(this._verb_to_event)
+			.filter(([verb, detail]) => {return detail.enabled;})
+			.forEach(([verb, detail]) => {
+			console.log(verb);
+			const verb_button = document.createElement("button");
+			verb_button.textContent = verb;
+			verb_button.onclick = () => { this.dispatchEventFromVerb(verb); }
+			fragment.appendChild(verb_button);
+		});
+		this.action_button_container.replaceChildren(fragment);
 	}
 	updateSelectionIndicator() {
 		this.selection_indicator.textContent = `${this.selected_elements.length} ${this.noun}` + (this.selected_elements.length !== 1 ? "s" : "") + " selected";
@@ -87,17 +97,37 @@ export class MultipleSelectorElement extends HTMLElement {
 		this.is_active = false;
 		this.dispatchEvent(this.selection_clear_event);
 	}
-	registerVerb(verb) {
-		const doAction = new CustomEvent("action", {
-			detail: {
-				verb: verb,
-				elements: this.selected_elements // hopefully not a copy
+	setVerbs(verbs) {
+		for (let verb of Object.keys(this._verb_to_event)) {
+			if (verbs.indexOf(verb) === -1)
+				this._verb_to_event[verb].enabled = false;
+		}
+		for (let verb of verbs) {
+			if (!this._verb_to_event[verb]) {
+				this.registerVerb(verb);
 			}
-		});
-		this._verb_to_event[verb] = {event: doAction};
+			else {
+				this._verb_to_event[verb].enabled = true;
+			}
+		}
+		if (this.action_button_container) {
+			this.clearSelection();
+			this.renderActionButtons();
+		}
+	}
+	registerVerb(verb) {
+		this._verb_to_event[verb] = {
+			enabled: true
+		};
 	}
 	dispatchEventFromVerb(verb) {
-		this.dispatchEvent(this._verb_to_event[verb].event);
+		const doAction = new CustomEvent("action", {
+			detail: {
+				verb: verb
+				,elements: [...this.selected_elements]
+			}
+		});
+		this.dispatchEvent(doAction);
 		this.clearSelection();
 	}
 	handleOnClick = (event) => {

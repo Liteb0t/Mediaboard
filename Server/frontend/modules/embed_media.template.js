@@ -63,18 +63,21 @@ class MediaEmbed extends HTMLElement {
 	render(file) {
 		this.classList.add("EmbedFigure");
 		// let figure_element = document.createElement("figure");
-		this.setAttribute("filename", file["filename"].replace(" ", "%20"));
+		const filename = file["filename"]/*.replace(" ", "%20")*/;
+		this.setAttribute("filename", filename);
 		let filename_extension_i = file["filename"].lastIndexOf(".");
 		let file_format = Format.fromFileName(file["filename"]); // Format enum
 		if (file_format === Format.AUDIO) {
 			this.embed_element = document.createElement("audio");
 			this.embed_element.controls = true;
 			this.embed_element.setAttribute("controlslist", "nofullscreen nodownload");
-			this.embed_element.setAttribute("src", Media.media_url + file["filename"].replace(" ", "%20"));
+			this.embed_element.setAttribute("src", Media.media_url + filename);
 			this.appendChild(this.embed_element);
 		}
 		else {
+			let expandable;
 			if (file_format === Format.IMAGE) {
+				expandable = true;
 				this.embed_element = document.createElement("img");
 				this.embed_element.classList.add("EmbedImage");
 				if (file["width"] && file["height"]) {
@@ -85,6 +88,7 @@ class MediaEmbed extends HTMLElement {
 				this.appendChild(this.embed_element);
 			}
 			else if (file_format === Format.VIDEO) {
+				expandable = true;
 				this.embed_element = document.createElement("video");
 				this.embed_element.classList.add("EmbedVideo");
 				this.embed_element.controls = true;
@@ -93,13 +97,18 @@ class MediaEmbed extends HTMLElement {
 				this.embed_element.style["display"] = "none";
 				this.appendChild(this.embed_element);
 			}
+			else {
+				expandable = false;
+			}
+			if (expandable)
+				this.setAttribute("expandable", "");
 
 			// Thumbnail
 			this.thumbnail_element = document.createElement("img");
 			this.thumbnail_element.classList.add("EmbedThumbnail");
 			if (file.thumbnail_file_extension) {
 				let thumbnail_filename = file.thumbnail_file_extension ? `THUMBNAIL_${file.filename}.${file.thumbnail_file_extension}` : "THUMBNAIL_" + file["filename"] + ".CONFIG_thumbnail_file_extension";
-				this.thumbnail_element.setAttribute("src", Media.thumbnail_url + thumbnail_filename.replace(" ", "%20"));
+				this.thumbnail_element.setAttribute("src", Media.thumbnail_url + thumbnail_filename/*.replace(" ", "%20")*/);
 				if (file["width"] && file["height"]) {
 					if (file["width"] < file["height"]) {
 						this.thumbnail_element.width = file["width"] < file["height"]>>1 ? Math.ceil(Media.thumbnail_size / 2) : Math.ceil(Media.thumbnail_size * (file["width"]/file["height"]));
@@ -138,7 +147,7 @@ class MediaEmbed extends HTMLElement {
 			caption_filename += file["filename"].slice(filename_extension_i, file["filename"].length);
 		}
 		let figcaption_element = document.createElement("figcaption");
-		let media_src = Media.media_url + file["filename"].replace(" ", "%20");
+		let media_src = Media.media_url + file["filename"]/*.replace(" ", "%20")*/;
 		let figcaption_element_a = document.createElement("a");
 		figcaption_element_a.setAttribute("href", media_src);
 		figcaption_element_a.setAttribute("target", "_blank");
@@ -178,13 +187,17 @@ class MediaEmbed extends HTMLElement {
 		}
 	}
 	expandEmbedFigure() {
-		this.embed_element.setAttribute("src", Media.media_url + this.getAttribute("filename"));
-		this.embed_element.style["display"] = "";
-		this.thumbnail_element.style["display"] = "none";
+		if (this.embed_element) {
+			this.embed_element.setAttribute("src", Media.media_url + this.getAttribute("filename"));
+			this.embed_element.style["display"] = "";
+			this.thumbnail_element.style["display"] = "none";
+		}
 	}
 	contractEmbedFigure() {
-		this.embed_element.style["display"] = "none";
-		this.thumbnail_element.style["display"] = "";
+		if (this.embed_element) {
+			this.embed_element.style["display"] = "none";
+			this.thumbnail_element.style["display"] = "";
+		}
 	}
 }
 customElements.define("media-embed", MediaEmbed)
