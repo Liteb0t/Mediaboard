@@ -44,9 +44,6 @@ export class Media {
 		if (element)
 			element.whenClicked(event.target);
 	}
-	static createMediaEmbed(file) {
-		return document.createElement("media-embed").render(file);
-	}
 }
 
 class MediaEmbed extends HTMLElement {
@@ -60,14 +57,23 @@ class MediaEmbed extends HTMLElement {
 		// 	this[element.id] = element;
 		// }
 	}
-	render(file) {
+	render(file, hide_deleted = false) {
+		const show_file_as_deleted = hide_deleted && file["deleted"];
 		this.classList.add("EmbedFigure");
 		// let figure_element = document.createElement("figure");
 		const filename = file["filename"]/*.replace(" ", "%20")*/;
 		this.setAttribute("filename", filename);
 		let filename_extension_i = file["filename"].lastIndexOf(".");
 		let file_format = Format.fromFileName(file["filename"]); // Format enum
-		if (file_format === Format.AUDIO) {
+		if (show_file_as_deleted) {
+			this.thumbnail_element = document.createElement("img");
+			this.thumbnail_element.classList.add("EmbedThumbnail");
+			this.thumbnail_element.setAttribute("src", Media.thumbnail_placeholder_url);
+			this.thumbnail_element.width = this.thumbnail_element.height = 64;
+			this.thumbnail_element.setAttribute("loading", "lazy");
+			this.append(this.thumbnail_element);
+		}
+		else if (file_format === Format.AUDIO) {
 			this.embed_element = document.createElement("audio");
 			this.embed_element.controls = true;
 			this.embed_element.setAttribute("controlslist", "nofullscreen nodownload");
@@ -149,19 +155,25 @@ class MediaEmbed extends HTMLElement {
 		let figcaption_element = document.createElement("figcaption");
 		let media_src = Media.media_url + file["filename"]/*.replace(" ", "%20")*/;
 		let figcaption_element_a = document.createElement("a");
-		figcaption_element_a.setAttribute("href", media_src);
-		figcaption_element_a.setAttribute("target", "_blank");
 		figcaption_element_a.textContent = caption_filename;
 		if (caption_filename.length !== download_filename.length)
 			figcaption_element_a.title = download_filename;
+		figcaption_element.appendChild(figcaption_element_a);
+		if (show_file_as_deleted) {
+			figcaption_element_a.textContent = "[DELETED] " + figcaption_element_a.textContent;
+		}
+		else {
+			figcaption_element_a.setAttribute("href", media_src);
+			figcaption_element_a.setAttribute("target", "_blank");
 
-		let file_download_button = document.createElement("a");
-		file_download_button.setAttribute("href", media_src);
-		file_download_button.setAttribute("download", download_filename);
-		file_download_button.setAttribute("title", "Download");
-		file_download_button.innerText = "\ud83d\udce5\ufe0e";
+			let file_download_button = document.createElement("a");
+			file_download_button.setAttribute("href", media_src);
+			file_download_button.setAttribute("download", download_filename);
+			file_download_button.setAttribute("title", "Download");
+			file_download_button.innerText = "\ud83d\udce5\ufe0e";
 
-		figcaption_element.append(figcaption_element_a, document.createTextNode("\u00A0"), file_download_button);
+			figcaption_element.append(document.createTextNode("\u00A0"), file_download_button);
+		}
 		this.appendChild(figcaption_element);
 		return this;
 	}

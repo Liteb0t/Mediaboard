@@ -444,7 +444,7 @@ class ThreadListElement extends HTMLElement {
 		let post_files_element = document.createElement("div");
 		post_files_element.classList.add("Files");
 		for (const file of data.files) {
-			post_files_element.appendChild(document.createElement("media-embed").render(file));
+			post_files_element.appendChild(document.createElement("media-embed").render(file, true));
 		}
 
 		if (!window.url_params_display_as_embed) {

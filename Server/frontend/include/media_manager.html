@@ -1,14 +1,15 @@
 <div class=".Main">
 	<h3 id="location_indicator">Media manager</h3>
-	<div id="filters_toolbar">
+	<div id="filters_toolbar" class="ToolBar">
 		<label for="board_select">Board: </label><select id="board_select"></select>
 		<label for="type_select">Type: </label>
 		<select id="type_select">
 			<option value="active">Active</option>
 			<option value="deleted">Recently deleted</option>
 		</select>
+		<div class="FlexSeparator"></div>
 	</div>
-	<div id="multiple_selector_container"></div>
+	<!--<div id="multiple_selector_container"></div>-->
 	<div id="media_container" class="Files" style="border-bottom: 2px solid #000;"></div>
 </div>
 <div id="body_separator" class="FlexSeparator"></div>
@@ -16,3 +17,7 @@
 	<summary><div>Upload files</div></summary>
 	<div id="file_upload_container"></div>
 </details>
+<dialog id="confirm_destroy_dialog">
+<p>Are you sure you want to wipe <span id="confirm_destroy_dialog_number_of_files"></span> files from the disk? This action cannot be undone.</p>
+<div class="ToolBar"><button id="confirm_destroy_dialog_confirm_button">Yes</button><button onclick="this.parentElement.parentElement.close()">Cancel</button></div>
+</dialog>

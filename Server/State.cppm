@@ -263,6 +263,30 @@ public:
 		}
 		return {}; // success
 	}
+	std::expected<void, std::string> destroyFiles(boost::json::object& json, const std::optional<Client>& client) {
+		boost::json::array files_json = json.at("files").as_array();
+		for (auto& filename : files_json) {
+			std::string filename_str = std::string(filename.as_string().c_str());
+			if (auto file_id_it = filename_to_file_id.find(filename_str); file_id_it != filename_to_file_id.end()) {
+				File* file = files.at(file_id_it->second).get();
+				if (!file->clientHasPermission(client, static_cast<int>(PERMISSION::NON_AUTHOR_DELETE_FILE)))
+					return std::unexpected(std::format("Permission denied to destroy file `{}`", filename_str));
+
+				std::filesystem::path file_location = getMediaLocation() / file->name();
+				if (!std::filesystem::exists(file_location))
+					throw std::format("Couldn't destroy file, because it was not found on the disk.\nfile_location: {}", file_location.string());
+				if (file->getStatus() == File::STATUS::DESTROYED)
+					std::println("Warning: file at `{}` was marked as destroyed, but still exists", file->name());
+				file->setStatus(File::STATUS::DESTROYED);
+				std::filesystem::remove(file_location);
+				std::filesystem::path thumbnail_path = file->getThumbnailPath(getMediaLocation());
+				std::filesystem::remove(thumbnail_path);
+			}
+			else
+				return std::unexpected(std::format("File `{}` not found", filename_str));
+		}
+		return {}; // success
+	}
 	[[nodiscard]]std::expected<void, std::string> setIceServers(boost::json::array ice_servers_json) {
 		std::lock_guard<std::mutex> lock(mutex);
 		ice_servers.clear();
@@ -298,7 +322,7 @@ public:
 	}
 	void cacheAllFiles() {
 		std::print("[State] Retrieving file references from database...");
-		for (auto file_tuple : db->queryRows<std::tuple<int, int, std::string, int, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<std::string>, std::optional<int>>>("SELECT id, permission_object_id, filename, created_at, coupled_board_id, coupled_post_id, width, height, thumbnail_file_extension, deleted_at FROM stored_file")) {
+		for (auto file_tuple : db->queryRows<std::tuple<int, int, std::string, int, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<int>, std::optional<std::string>, std::optional<int>, int>>("SELECT id, permission_object_id, filename, created_at, coupled_board_id, coupled_post_id, width, height, thumbnail_file_extension, deleted_at, status FROM stored_file")) {
 			int file_id = std::get<0>(file_tuple);
 			std::string filename = std::get<2>(file_tuple);
 			std::chrono::time_point<std::chrono::system_clock> created_at = getTimePointFromEpoch(std::get<3>(file_tuple));
@@ -307,6 +331,7 @@ public:
 			std::optional<std::chrono::time_point<std::chrono::system_clock>> deleted_at;
 			if (std::get<9>(file_tuple))
 				deleted_at = getTimePointFromEpoch(std::get<9>(file_tuple).value());
+			File::STATUS status = static_cast<File::STATUS>(std::get<10>(file_tuple));
 
 			PermissionObjectBase* file_permission_parent;
 			if (coupled_board_id) {
@@ -321,7 +346,7 @@ public:
 			else
 				file_permission_parent = this;
 
-			auto file = std::make_unique<File>(file_permission_parent, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_board_id, coupled_post_id, std::get<6>(file_tuple), std::get<7>(file_tuple), std::get<8>(file_tuple), deleted_at);
+			auto file = std::make_unique<File>(file_permission_parent, db, file_id, std::get<1>(file_tuple), filename, created_at, coupled_board_id, coupled_post_id, std::get<6>(file_tuple), std::get<7>(file_tuple), std::get<8>(file_tuple), deleted_at, status);
 			std::print("{}, ", file_id);
 			File* inserted_file = this->insertFile(std::move(file));
 
@@ -503,7 +528,9 @@ public:
 		for (auto& [file_id, file] : this->files) {
 			if (board && !file->isCoupledToBoard(board.value()->getId()))
 				continue;
-			if (file->isDeleted() == get_recently_deleted)
+			if (file->getStatus() == File::STATUS::DESTROYED)
+				continue;
+			if ((file->getStatus() == File::STATUS::CONDEMNED) == get_recently_deleted)
 				files_json.emplace_back(file->asJson());
 		}
 		std::println("[State] Finished assembling files list into JSON");

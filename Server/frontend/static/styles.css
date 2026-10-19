@@ -15,7 +15,9 @@
 		--main-text-color: #FFF;
 	}
 }
-
+* {
+	border-radius: 0;
+}
 html {
 	background-color: var(--backround-color);
 }

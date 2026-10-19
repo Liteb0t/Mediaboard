@@ -36,6 +36,7 @@ export class MultipleSelectorElement extends HTMLElement {
 		// }
 	}
 	render() {
+		this.classList.add("ToolBar");
 		this.select_button = document.createElement("button");
 		this.select_button.textContent = "Select";
 		this.select_button.onclick = () => { this.beginSelection(); }
@@ -47,6 +48,7 @@ export class MultipleSelectorElement extends HTMLElement {
 
 		this.action_button_container = document.createElement("div");
 		this.action_button_container.style["display"] = "none";
+		this.action_button_container.classList.add("ToolBar");
 		this.renderActionButtons();
 		this.appendChild(this.action_button_container);
 

@@ -37,6 +37,7 @@ void State::addMigrations() {
 	("0.3", "ALTER TABLE stored_file ADD COLUMN deleted_at INTEGER")
 	("0.3", "ALTER TABLE _sequences ADD COLUMN stored_file_id INTEGER DEFAULT 0")
 	("0.3", "ALTER TABLE stored_file ADD COLUMN permission_object_id INTEGER")
+	("0.3", "ALTER TABLE stored_file ADD COLUMN status INTEGER DEFAULT 0")
 	("0.3", this, [](FuzeDBI::Connection* db, Mediaboard::State* state){
 		for (std::string filename : db->queryRows<std::string>("SELECT filename FROM stored_file")) {
 			int file_id = db->incrementSequence("stored_file_id");

@@ -192,7 +192,7 @@ FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
 			thumbnail.resize(thumbnail_dimensions);
 			thumbnail.quality(60);
 			std::print(" writing...");
-			thumbnail.write(std::format("{}/thumbnails/THUMBNAIL_{}.{}", state->getMediaLocation().string(), out_filename, thumbnail_file_extension.value()));
+			thumbnail.write(File::getThumbnailPath(state->getMediaLocation(), out_filename, thumbnail_file_extension.value()).string());
 			std::println(" done.");
 		}
 		catch( Magick::Warning& magick_warning ) {
@@ -290,8 +290,8 @@ Response getFiles(State* state, FuzeHttp::Request req) {
 	return Response{.status=http::status::ok, .json=state->getFilesAsJson(board, get_recently_deleted)};
 }
 
-Response deleteFiles(State* state, FuzeHttp::Request req) {
-	if (auto res = state->markFilesAsDeleted(req.json(), req.client()))
+Response destroyFiles(State* state, FuzeHttp::Request req) {
+	if (auto res = state->destroyFiles(req.json(), req.client()))
 		return Response{.status=http::status::ok};
 	else
 		return Response{.status=http::status::bad_request, .error_message=res.error()};
@@ -300,6 +300,12 @@ Response patchFiles(State* state, FuzeHttp::Request req) {
 	auto action = req.searchParameters().find("action");
 	if (action == req.searchParameters().end()) {
 		return Response{.status=http::status::bad_request, .error_message="Missing 'action' URL parameter"};
+	}
+	else if (action->second == "Delete") {
+		if (auto res = state->markFilesAsDeleted(req.json(), req.client()))
+			return Response{.status=http::status::ok};
+		else
+			return Response{.status=http::status::bad_request, .error_message=res.error()};
 	}
 	else if (action->second == "Restore") {
 		if (auto res = state->restoreFiles(req.json(), req.client()))

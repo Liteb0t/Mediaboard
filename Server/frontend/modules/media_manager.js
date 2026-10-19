@@ -26,15 +26,16 @@ class MediaManagerElement extends HTMLElement {
 		this.file_upload_component_promise = MediaManagerElement.mountElementIfNotThere(this.file_upload_container, "file-upload"); // async. module FileUploadElement from file_upload.js
 		this.file_upload_component_promise.then(component => {
 			this.file_upload_component = component;
-			component.setFileCountLimit(4);
+			// component.setFileCountLimit(4);
 			component.file_upload.onchange = (event) => {
 				console.log("file changed.");
 				component.addFiles(component.file_upload.files, MediaManagerElement.upload_destination);
 			}
 		});
-		MediaManagerElement.mountElementIfNotThere(this.multiple_selector_container, "multiple-selector").then(element => {
+		customElements.whenDefined("multiple-selector").then(() => {
+			const element = document.createElement("multiple-selector");
+			this.filters_toolbar.appendChild(element);
 			this.multiple_selector_component = element;
-			// element.registerSelectableQuery("[selectable]");
 			element.noun = "file";
 			element.setVerbs(["Delete"]);
 			element.render();
@@ -81,14 +82,35 @@ class MediaManagerElement extends HTMLElement {
 			for (let media_embed of event.detail.elements) {
 				filenames.push(media_embed.getAttribute("filename"));
 			}
-			let response;
-			if (event.detail.verb === "Delete")
-				response = await fetch("api/files", {method: "DELETE", body: JSON.stringify({files: filenames})});
-			else if (event.detail.verb === "Restore")
-				response = await fetch("api/files?action=Restore", {method: "PATCH", body: JSON.stringify({files: filenames})});
+			if (event.detail.verb === "Delete") {
+				const response = await fetch("api/files?action=Delete", {method: "PATCH", body: JSON.stringify({files: filenames})});
+				this.renderIfResponseOkay(response);
+			}
+			else if (event.detail.verb === "Restore") {
+				const response = await fetch("api/files?action=Restore", {method: "PATCH", body: JSON.stringify({files: filenames})});
+				this.renderIfResponseOkay(response);
+			}
+			else if (event.detail.verb === "Destroy") {
+				this.confirm_destroy_dialog_number_of_files = filenames.length;
+				this.confirm_destroy_dialog_confirm_button.onclick = async() => {
+					const response = await fetch("api/files", {method: "DELETE", body: JSON.stringify({files: filenames})});
+					this.renderIfResponseOkay(response);
+					this.confirm_destroy_dialog.close();
+				}
+				this.confirm_destroy_dialog.showModal();
+			}
 			else {
 				throw "Unrecognised verb " + event.detail.verb;
 			}
+		}
+		catch (error) {
+			console.error(error);
+			error_message.textContent = error;
+			error_dialog.showModal();
+		}
+	}
+	renderIfResponseOkay(response) {
+		try {
 			if (response.ok) {
 				this.render();
 			}
@@ -200,7 +222,7 @@ class MediaManagerElement extends HTMLElement {
 			params.set("type", this.type_select.value);
 		}
 		if (params.get("type") == "deleted")
-			this.multiple_selector_component?.setVerbs(["Restore"]);
+			this.multiple_selector_component?.setVerbs(["Restore", "Destroy"]);
 		else
 			this.multiple_selector_component?.setVerbs(["Delete"]);
 
@@ -219,7 +241,7 @@ class MediaManagerElement extends HTMLElement {
 	showAllFiles(files_json) {
 		const fragment = new DocumentFragment();
 		for (let file of files_json.files) {
-			const embed = Media.createMediaEmbed(file);
+			const embed = document.createElement("media-embed").render(file, false);
 			embed.setAttribute("selectable", "");
 			fragment.appendChild(embed);
 		}
