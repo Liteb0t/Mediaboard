@@ -27,31 +27,18 @@ class BoardListElement extends HTMLElement {
 	updateInterface = () => {
 		this.manage_server_button.style["display"] = session.server_permissions["manage_permissions"] ? "" : "none";
 	}
-	async getAllBoards() {
-		// try {
-			let response = await fetch("api/boards");
-			console.log(response);
-			if (response.ok) {
-				await response.json().then(response_obj => {
-					console.log(response_obj);
-					this.showAllBoards(response_obj);
-				});
-			}
-			else {
-				let error_message = response.headers.get("message");
-				error_message ??= "An unknown error occured when attempting to fetch boards.";
-				throw error_message;
-			}
-		// }
-		// catch (error) {
-		// 	console.error(error);
-		// 	error_message.textContent = error;
-		// 	error_dialog.showModal();
-		// }
+	async render() {
+		this._abort_controller?.abort();
+		this._abort_controller = new AbortController();
+		const signal = this._abort_controller.signal;
+		let boards_json = await API.fetch("api/boards", {signal: signal}, "boards");
+		if (signal.aborted)
+			return;
+		this.showAllBoards(boards_json);
 	}
 
 	showAllBoards(response_json) {
-		this.create_board_button.style["display"] = response_json["client_permissions"]["create_board"] ? "initial" : "none";
+		this.create_board_button.style["display"] = response_json["client_permissions"]["create_board"] ? "" : "none";
 		// const fragment = new DocumentFragment();
 		const table_element = document.createElement("table");
 		const headers_element = document.createElement("tr");

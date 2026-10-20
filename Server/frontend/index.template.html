@@ -51,19 +51,25 @@ main {
 <script src="static/navigo.min.js"></script>
 <script type="module" src="modules/board.js"></script>
 <script type="module" src="modules/media_manager.js"></script>
+<script type="module" src="modules/RoomListElement.js"></script>
 <script type="module">
 import { global_styles } from "./modules/styles.js";
 import { session } from "./modules/session.js";
 
 #include "include/board_list.js"
 
+let abort_controller;
+
 const router = new Navigo('/', { hash: true });
 router.on(async() => {
 	console.log("ROOT opened");
 	try {
 		loading_dialog.showModal();
+		const url = new URL(window.location.href);
+		url.search = "";
+		history.replaceState(null, null, url);
 		let board_list = await mountElementIfNotThere("board-list");
-		await board_list.getAllBoards();
+		await board_list.render();
 		loading_dialog.close();
 	}
 	catch (error) {
@@ -100,7 +106,23 @@ router.on("/media", async({data}) => {
 	try {
 		console.log(data);
 		let media_manager_element = await mountElementIfNotThere("media-manager");
-		await media_manager_element.render();
+		await media_manager_element.render(true); // true means fetch boards as well
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+});
+router.on("/rooms", async({data}) => {
+	try {
+		console.log(data);
+		abort_controller?.abort();
+		abort_controller = new AbortController();
+		if (!document.getElementById("room-list-template"))
+			await getRoomList(abort_controller.signal);
+		let room_list_element = await mountElementIfNotThere("room-list");
+		await room_list_element.render(true); // true means fetch boards as well
 	}
 	catch (error) {
 		console.error(error);
@@ -124,18 +146,20 @@ async function mountElementIfNotThere(element_name) {
 	console.log(element);
 	return element;
 }
-/*
-async function getBoardTree() {
-	const response = await fetch("board.html");
-    if (!response.ok) {
-      throw new Error(`Response status: ${response.status}`);
-    }
 
-    const result = await response.text();
-	view_container.innerHTML = result;
-	console.log(result);
+async function getRoomList(signal) {
+	const response = await fetch("./static/room-list.html", {signal: signal});
+	// if (signal.aborted)
+	// 	return;
+	if (!response.ok) {
+		throw new Error(`Response status: ${response.status}`);
+	}
+	const result = await response.text();
+	const template = document.createElement("template");
+	template.id = "room-list-template";
+	template.innerHTML = result;
+	document.body.appendChild(template);
 }
-*/
 
 // For embedding Mediaboard within a webpage using an <iframe>.
 // Hides everything except messages.

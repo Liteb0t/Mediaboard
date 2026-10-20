@@ -19,9 +19,6 @@ export module Mediaboard.Board;
 
 export import Mediaboard.Thread;
 import Mediaboard.File;
-#ifdef WITH_WEBRTC
-import Mediaboard.Room;
-#endif
 import Mediaboard.Permission;
 import FuzeDBI;
 import FuzeHttp.PermissionObject;
@@ -135,27 +132,6 @@ public:
 	// 	this->rooms.emplace(new_room_id, std::move(room));
 	// 	return new_room_id;
 	// }
-	boost::json::object getRoomsAsJson() const {
-		boost::json::array rooms_json = boost::json::array();
-		for (auto& [room_id, weak_room] : this->rooms) {
-			if (auto strong_room = weak_room.lock())
-				rooms_json.push_back(strong_room->asJson());
-		}
-		return {{"rooms", rooms_json}};
-	}
-	std::optional<std::shared_ptr<Room>> getSharedRoomIfExists(int room_id) const {
-		auto it = rooms.find(room_id);
-		if (it != rooms.end()) {
-			if (auto strong_room = it->second.lock())
-				return strong_room;
-		}
-		return {};
-	}
-	void clearEmptyRooms() { // TODO use this at some point
-		std::erase_if(this->rooms, [this](const auto& id_weak_room_pair)->bool{
-			return id_weak_room_pair.second.expired();
-		});
-	}
 #endif
 	Thread* createThread(Thread::Validated validated_thread, int author_client_id) {
 		// int new_thread_id_in_board = db->query<int>("SELECT thread_id_seq FROM board WHERE id = $1", this->id);
@@ -287,10 +263,6 @@ public:
 			db->query<void>("UPDATE board SET title = $1 WHERE id = $2", new_title, id);
 		}
 	}
-#ifdef WITH_WEBRTC
-	int room_id_seq = 0;
-	std::unordered_map<int, std::weak_ptr<Room>> rooms;
-#endif
 	inline bool isDeleted() const { return this->deleted; }
 	// int getTitle() const { return this->title; }
 	inline static const size_t MAX_SLUG = 32;

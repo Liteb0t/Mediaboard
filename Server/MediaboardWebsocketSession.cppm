@@ -114,15 +114,12 @@ private:
 				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
 				if (!board)
 					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
-				// int new_room_id = board.value()->createRoom(this);
 
-				int new_room_id = board.value()->room_id_seq++;
-				auto room = std::make_shared<Room>(getState(), new_room_id/*, this->getExecutor()*/);
-				this->tracking_room_ptr = room;
-				board.value()->rooms.emplace(new_room_id, room);
+				this->tracking_room_ptr = getState()->createRoom();
+
 				this->send({
 					{"type", "create_room_response"},
-					{"payload", {{"room_id", new_room_id}}}
+					{"payload", {{"room_id", tracking_room_ptr.value()->getId()}}}
 				});
 			}
 			else if (request_type == "webrtc_relay_added_answer") {
@@ -141,7 +138,7 @@ private:
 				if (!board)
 					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
 				this->tracking_board = board.value()->getId();
-				this->tracking_room_ptr = board.value()->getSharedRoomIfExists(room_id); // TODO check client permission
+				this->tracking_room_ptr = getState()->getSharedRoomIfExists(room_id); // TODO check client permission
 				if (!tracking_room_ptr)
 					throw std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id);
 

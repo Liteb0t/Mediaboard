@@ -1,0 +1,34 @@
+<div id="room_list_container">
+	<h3 id="location_indicator">Rooms</h3>
+	<div id="filters_toolbar" class="ToolBar">
+		<label for="board_select">Board: </label><select id="board_select"></select>
+	</div>
+	<p>
+		Click "Create room" to start a live WebRTC session, or join an existing one from the table below.
+	</p>
+	<button id="create_room_button">Create room</button><br>
+	<h4>Rooms</h4>
+	<table><thead>
+		<tr>
+		<th>Room ID</th>
+		<th>Peers</th>
+		</tr></thead>
+	<tbody id="room_list"></tbody></table>
+</div>
+<dialog id="error_dialog" closedby="any">
+<h2>Error</h2>
+<p id="error_message">Something happened.</p>
+<div class="ToolBar"><button onclick="error_dialog.close()">&#x1F5D9; Close</button></div>
+</dialog>
+<style>
+.VoiceChatContainer >* {
+	border: 2px dotted #f93;
+}
+.LiveVideoContainer >video {
+	border: 2px solid #000;
+	margin: 4px;
+}
+.Connected {
+	color: var(--information-text);
+}
+</style>

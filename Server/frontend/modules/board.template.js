@@ -41,7 +41,6 @@ class ThreadListElement extends HTMLElement {
 		shadow.adoptedStyleSheets = [global_styles]; // imported at the top there
 		shadow.appendChild(template.content.cloneNode(true));
 
-		// TODO explicitly map elements post_container etc
 		for (const element of shadow.querySelectorAll("[id]")) {
 			this[element.id] = element;
 		}

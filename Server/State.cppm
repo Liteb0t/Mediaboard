@@ -26,6 +26,9 @@ import FuzeHttp.State;
 import Mediaboard.Board;
 import Mediaboard.File;
 import Mediaboard.Permission;
+#ifdef WITH_WEBRTC
+import Mediaboard.Room;
+#endif
 
 using namespace FuzeHttp;
 
@@ -522,6 +525,7 @@ public:
 			}}
 		};
 	}
+	// TODO check client permission to view files
 	boost::json::object getFilesAsJson(std::optional<Board*> board, bool get_recently_deleted) const {
 		std::lock_guard<std::mutex> lock(mutex);
 		boost::json::array files_json = boost::json::array();
@@ -537,6 +541,18 @@ public:
 		return {
 			{"files", files_json}
 		};
+	}
+	// TODO check client permission to view rooms
+	boost::json::object getRoomsAsJson(std::optional<Board*> board) const {
+		boost::json::array rooms_json = boost::json::array();
+		for (auto& [room_id, weak_room] : this->rooms) {
+			if (auto room = weak_room.lock()) {
+				if (board && !room->isCoupledToBoard(board.value()->getId()))
+					continue;
+				rooms_json.push_back(room->asJson());
+			}
+		}
+		return {{"rooms", rooms_json}};
 	}
 	std::optional<const Group*> getHighestRankGroupForClient(const std::optional<FuzeHttp::Client>& client) const {
 		std::lock_guard<std::mutex> lock(mutex);
@@ -641,6 +657,29 @@ public:
 	const std::filesystem::path& getMediaLocation() const { return media_location; }
 #ifdef WITH_WEBRTC
 	const std::vector<IceServer> getIceServers() const { return ice_servers; }
+
+	std::shared_ptr<Room> createRoom() {
+		int new_room_id = room_id_seq++;
+		auto room = std::make_shared<Room>(this, new_room_id/*, this->getExecutor()*/);
+		rooms.emplace(new_room_id, room);
+		return room;
+	}
+	std::optional<std::shared_ptr<Room>> getSharedRoomIfExists(int room_id) const {
+		auto it = rooms.find(room_id);
+		if (it != rooms.end()) {
+			if (auto strong_room = it->second.lock())
+				return strong_room;
+		}
+		return {};
+	}
+	void clearEmptyRooms() { // TODO use this at some point
+		std::erase_if(this->rooms, [this](const auto& id_weak_room_pair)->bool{
+			return id_weak_room_pair.second.expired();
+		});
+	}
+
+	int room_id_seq = 0;
+	std::unordered_map<int, std::weak_ptr<Room>> rooms;
 #endif
 private:
 	std::expected<Thread::Validated, std::string> validateThread(const boost::json::object json, const Board* board, const FuzeHttp::Client client) {

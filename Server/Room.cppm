@@ -242,13 +242,15 @@ public:
 			// 	addRelaySlot<rtc::Description::Audio>(next, peer_ptr, relay_ptr);
 		}
 	}
+	bool isCoupledToBoard(int board_id) const { return coupled_board_id && board_id == coupled_board_id.value(); }
 
-	int id;
+	int getId() const {return id; }
 	int connection_id_counter = 0;
 	unsigned int ssrc_counter = 0;
 	std::unordered_map<int, std::weak_ptr<RtcPeer>> peers;
 	mutable std::mutex mutex;
 private:
+	int id;
 	void addRelayTrackToRelay(Relay* relay, int sender_connection_id, std::shared_ptr<rtc::PeerConnection> connection) {
 		RelaySlot relay_slot = relay->relay_factory->addRelayTrack(sender_connection_id, connection, ++ssrc_counter);
 		if (relay->relay_factory->isVideo()) {
@@ -329,6 +331,7 @@ private:
 		else
 			throw "action not recognised";
 	}
+	std::optional<int> coupled_board_id;
 	FuzeHttp::StateBase* state_base;
 };
 }

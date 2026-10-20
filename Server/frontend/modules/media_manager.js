@@ -3,7 +3,8 @@ import { Format, Media } from "./embed_media.js";
 import { session } from "./session.js";
 import { MultipleSelectorElement } from "./MultipleSelector.js";
 import { FileUploadElement } from "./file_upload.js";
-// TODO import API and error handlers
+import { API } from "./API.js";
+
 class MediaManagerElement extends HTMLElement {
 	server_permissions = {};
 	file_upload_component = null;
@@ -43,7 +44,6 @@ class MediaManagerElement extends HTMLElement {
 			element.addEventListener("selectionstart", this.onSelectionStartHandler);
 			element.addEventListener("selectionclear", this.onSelectionClearHandler);
 		});
-		this.getAllBoards();
 		this.board_select.onchange = () => {this.render();}
 		this.type_select.onchange = () => {
 			this.render();
@@ -124,33 +124,6 @@ class MediaManagerElement extends HTMLElement {
 			error_dialog.showModal();
 		}
 	}
-	async getAllBoards() { // DUPLICATED from board_list.js
-		let response = await fetch("api/boards");
-		console.log(response);
-		if (response.ok) {
-			await response.json().then(response_obj => {
-				console.log(response_obj);
-				this.showBoardOptions(response_obj);
-			});
-		}
-		else {
-			throw response.headers.get("message") ?? `An unknown error occured when attempting to fetch boards.\n${response.status} ${response.statusText}`;
-		}
-	}
-	showBoardOptions(boards_json) {
-		const fragment = new DocumentFragment();
-		let option_element = document.createElement("option");
-		option_element.value = MediaManagerElement.select_all_boards;
-		option_element.textContent = MediaManagerElement.select_all_boards;
-		fragment.appendChild(option_element);
-		for (let board of boards_json.boards) {
-			let option_element = document.createElement("option");
-			option_element.value = board.slug;
-			option_element.textContent = `${board.slug} - ${board.title}`;
-			fragment.appendChild(option_element);
-		}
-		this.board_select.replaceChildren(fragment);
-	}
 	connectedCallback() {
 		console.log("Custom element added to page.");
 		session.addEventListener("change", () => { this.updateUploadContainer(session.server_permissions); });
@@ -190,20 +163,8 @@ class MediaManagerElement extends HTMLElement {
 	// console.log(`Attribute ${name} has changed.`);
 	// }
 
-	async fetchJson(location, args, thing = "something") {
-		const response = await fetch(location, args);
-		if (response.ok) {
-			const response_json = await response.json();
-			return response_json;
-		}
-		else {
-			const error_message = response.headers.get("message") ?? `An unknown error occured when attempting to fetch ${thing}.`;
-			throw error_message;
-		}
-	}
-
 	static valid_search_parameters = ["board"];
-	async render() {
+	async render(get_boards = false) {
 		this._abort_controller?.abort();
 		this._abort_controller = new AbortController();
 		const signal = this._abort_controller.signal;
@@ -231,13 +192,42 @@ class MediaManagerElement extends HTMLElement {
 		url.search = params_string;
 		history.pushState(null, null, url);
 		console.log("params_string: " + params_string);
-		const files_json = await this.fetchJson(`api/files?${params_string}`, {signal: signal}, "files");
-		if (signal.aborted)
-			return;
-		console.log(files_json);
-		this.showAllFiles(files_json);
+		if (get_boards) {
+			await Promise.all([
+				this.getAllBoards(signal),
+				this.getAllFiles(params_string, signal)
+			]);
+		}
+		else
+			this.getAllFiles(params_string, signal)
 	}
 
+	async getAllBoards(signal) {
+		const boards_json = await API.fetchJson("api/boards", {signal: signal}, "boards");
+		if (signal.aborted)
+			return;
+		this.showBoardOptions(boards_json);
+	}
+	showBoardOptions(boards_json) {
+		const fragment = new DocumentFragment();
+		let option_element = document.createElement("option");
+		option_element.value = MediaManagerElement.select_all_boards;
+		option_element.textContent = MediaManagerElement.select_all_boards;
+		fragment.appendChild(option_element);
+		for (let board of boards_json.boards) {
+			let option_element = document.createElement("option");
+			option_element.value = board.slug;
+			option_element.textContent = `${board.slug} - ${board.title}`;
+			fragment.appendChild(option_element);
+		}
+		this.board_select.replaceChildren(fragment);
+	}
+	async getAllFiles(params_string, signal) {
+		const files_json = await API.fetchJson(`api/files?${params_string}`, {signal: signal}, "files");
+		if (signal.aborted)
+			return;
+		this.showAllFiles(files_json);
+	}
 	showAllFiles(files_json) {
 		const fragment = new DocumentFragment();
 		for (let file of files_json.files) {

@@ -282,8 +282,8 @@ FuzeHttp::Response createRoom(State* state, FuzeHttp::Request req, Client client
 }
 */
 
-FuzeHttp::Response getRoom(State* state, FuzeHttp::Request req, Board* board, int room_id) {
-	auto room = board->getSharedRoomIfExists(room_id);
+FuzeHttp::Response getRoom(State* state, FuzeHttp::Request req, int room_id) {
+	auto room = state->getSharedRoomIfExists(room_id);
 	if (!room)
 		return Response{.status = http::status::not_found, .error_message = std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id)};
 	return FuzeHttp::Response{
@@ -292,10 +292,15 @@ FuzeHttp::Response getRoom(State* state, FuzeHttp::Request req, Board* board, in
 	};
 }
 
-FuzeHttp::Response getRooms(State* state, FuzeHttp::Request req, Board* board) {
+FuzeHttp::Response getRooms(State* state, FuzeHttp::Request req) {
+	std::optional<Board*> board;
+	if (auto board_param_it = req.searchParameters().find("board"); board_param_it != req.searchParameters().end()) {
+		std::println("Found board param: {}", board_param_it->second);
+		board = state->getBoardIfExists(board_param_it->second);
+	}
 	return FuzeHttp::Response{
 		.status = http::status::ok,
-		.json = board->getRoomsAsJson()
+		.json = state->getRoomsAsJson(board)
 	};
 }
 #endif
