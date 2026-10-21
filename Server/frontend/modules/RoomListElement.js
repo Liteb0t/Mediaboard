@@ -124,8 +124,9 @@ class RoomListElement extends HTMLElement {
 			id_indicator.textContent = room_element.id;
 			const number_of_peers = document.createElement("span");
 			number_of_peers.innerHTML = `<b>${room.number_of_peers}</b>&nbsp;connected`;
-			const connect_button = document.createElement("button");
+			const connect_button = document.createElement("a");
 			connect_button.textContent = "Connect";
+			connect_button.href = "#/room/" + room.id;
 			// connect_button.onclick = () => {
 			// 	this.connectClientToRoom(room.id);
 			// }

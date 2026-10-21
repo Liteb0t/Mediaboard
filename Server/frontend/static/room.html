@@ -10,3 +10,8 @@
 <div id="peers_list_container"><table><thead><tr><th>Peer ID</th><th>Name</th><th>Sharing audio</th><th>Sharing video</th></tr></thead><tbody id="peers_list"></tbody></table></div>
 <div id="voice_chat_container"></div>
 <div id="video_container" class="LiveVideoContainer"></div>
+<dialog id="disconnected_dialog">
+	<h2>Disconnected</h2>
+	<p id="error_message">You are no longer connected to this room.</p>
+	<div class="ToolBar"><a href="#/rooms" class="Button" data-navigo>Rooms</a><button onclick="this.parentElement().parentElement().close()">&#x1F5D9; Close</button></div>
+</dialog>

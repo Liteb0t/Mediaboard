@@ -50,14 +50,27 @@ class PeerMedia {
 class RoomElementPeerElements {
 	video = null;
 	constructor(id) {
-		this.video = document.createElement("video");
-		this.video.autoplay = true;
-		this.video.playsInline = true;
 		this.table_entry = {row: document.createElement("tr")};
 	}
+	static createVideo(source_stream) {
+		const video = document.createElement("video");
+		video.autoplay = true;
+		video.playsInline = true;
+		video.srcObject = source_stream;
+		console.log(video.srcObject.getVideoTracks()[0].muted);
+		return video;
+	}
 	update(peer) {
-		if (peer.streams.video && !this.video.srcObject) {
-			this.video.srcObject = peer.streams.video;
+		if (peer.trackEnabled("video") && peer.streams.video) {
+			if (!this.video)
+				this.video = RoomElementPeerElements.createVideo(peer.streams.video);
+			if (this.video.srcObject !== peer.streams.video)
+				this.video.srcObject = peer.streams.video;
+		}
+		else if (this.video) {
+			this.video.srcObject = null;
+			this.video.remove();
+			this.video = null;
 		}
 		let row_element = document.createElement("tr");
 		["id", "username"].forEach(column_name => {
@@ -76,9 +89,17 @@ class RoomElementPeerElements {
 		});
 		// else if (this.video.srcObject && !peer.streams.video)
 	}
+	updateVisibility(video_container, peer_list_container) {
+		if (this.video && !video_container.contains(this.video))
+			video_container.appendChild(this.video);
+		if (!peer_list_container.contains(this.table_entry.row))
+			peer_list_container.appendChild(this.table_entry.row);
+	}
 	unset() {
-		this.video.srcObject = null;
-		this.video.remove();
+		if (this.video) {
+			this.video.srcObject = null;
+			this.video.remove();
+		}
 		this.table_entry.row.remove();
 	}
 }
@@ -95,6 +116,16 @@ class RoomElement extends HTMLElement {
 
 		for (const element of shadow.querySelectorAll("[id]")) {
 			this[element.id] = element;
+		}
+		this.room_share_button.onclick = async() => {
+			this.room_share_button.disabled = true;
+			if (await call_manager.connection?.toggleShareVideo(this.share_screen_checkbox.checked, this.share_desktop_audio_checkbox.checked)) {
+				this.room_share_button.textContent = "Stop sharing video";
+			}
+			else {
+				this.room_share_button.textContent = "Share video";
+			}
+			this.room_share_button.disabled = false;
 		}
 	} // constructor()
 	connectedCallback() {
@@ -140,11 +171,7 @@ class RoomElement extends HTMLElement {
 				this.peer_elements.set(id, new RoomElementPeerElements());
 			}
 			this.peer_elements.get(id).update(peer);
-
-			if (!this.video_container.contains(this.peer_elements.get(id).video))
-				this.video_container.appendChild(this.peer_elements.get(id).video);
-			if (!this.peers_list.contains(this.peer_elements.get(id).table_entry.row))
-				this.peers_list.appendChild(this.peer_elements.get(id).table_entry.row);
+			this.peer_elements.get(id).updateVisibility(this.video_container, this.peers_list);
 		}
 		for (const [id, peer] of this.peer_elements) {
 			if (!peers.has(id)) {
@@ -162,6 +189,7 @@ class RoomElement extends HTMLElement {
 			// this.peer_elements.clear();
 			// this.video_container.innerHTML = "";
 			this.connection_status_indicator.textContent = "Not connected.";
+			this.disconnected_dialog.showModal();
 		}
 		else if (call_manager.connection.rtc_connection.iceGatheringState === 'complete')
 			this.connection_status_indicator.textContent = "Connected";

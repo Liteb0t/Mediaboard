@@ -159,15 +159,14 @@ class RoomConnection extends EventTarget {
 		room_container.style["display"] = "none";
 		// document.getElementById(`room_${selected_room_id}`).classList.add("Connected");
 	}*/
-	async enableShareVideo() {
-		room_share_button.disabled = true;
+	async enableShareVideo(share_screen_checkbox_checked, share_desktop_audio_checkbox_checked) {
 		try {
-			if (share_screen_checkbox.checked) {
+			if (share_screen_checkbox_checked) {
 				const display = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
 				this.video_sending_track = display.getVideoTracks()[0];
 				console.log("depug information:");
 				console.log(display.getAudioTracks());
-				if (share_desktop_audio_checkbox.checked)
+				if (share_desktop_audio_checkbox_checked)
 					this.desktop_audio_track = display.getAudioTracks()[0]; // undefined if the OS/browser doesn't support system audio capture
 				else
 					this.desktop_audio_track = null;
@@ -181,28 +180,27 @@ class RoomConnection extends EventTarget {
 			await this.video_sending_transceiver.sender.replaceTrack(this.video_sending_track);
 			await this.desktop_audio_transceiver.sender.replaceTrack(this.desktop_audio_track);
 			this.broadcastSharingStatus();
-			room_share_button.textContent = "Stop sharing video";
-			room_share_button.onclick = () => { this.disableShareVideo(); }
 		}
 		catch (error) {
 			RoomConnection.handleMediaError(error);
 		}
-		finally {
-			room_share_button.disabled = false;
-		}
 	}
 	async disableShareVideo() {
-		room_share_button.disabled = true;
+		// room_share_button.disabled = true;
 		await this.video_sending_transceiver.sender.replaceTrack(null);
 		await this.desktop_audio_transceiver.sender.replaceTrack(null);
 		this.video_sending_track?.stop();
 		this.desktop_audio_track?.stop();
 		this.video_sending_track = null;
 		this.desktop_audio_track = null;
-		room_share_button.textContent = "Share video";
-		room_share_button.onclick = () => { this.enableShareVideo(); }
-		room_share_button.disabled = false;
 		this.broadcastSharingStatus();
+	}
+	async toggleShareVideo(share_screen_checkbox_checked, share_desktop_audio_checkbox_checked) {
+		if (!!this.video_sending_track)
+			await this.disableShareVideo();
+		else
+			await this.enableShareVideo(share_screen_checkbox_checked, share_desktop_audio_checkbox_checked);
+		return !!this.video_sending_track;
 	}
 
 	makeRtcConnection(room_id) {
@@ -303,6 +301,7 @@ class RoomConnection extends EventTarget {
 			else {
 				throw "Unrecognized MID " + mid;
 			}
+			this.dispatchEvent(this.on_peers_updated_event);
 		}
 		catch (err) {
 			RoomConnection.handleMediaError(err);
@@ -376,12 +375,13 @@ class CallManager extends EventTarget {
 	leave() {
 		this.connection.close();
 		this.connection = null; // event listeners cleared
+		this.muted = true;
 	}
 	isConnected() {
 		return !(this.connection == null);
 	}
 	getNumberOfPeers() {
-		return this.connection ? this.connection.peers.length : 0;
+		return this.connection ? this.connection.peers.size : 0;
 	}
 	getPeers() {
 		return this.connection?.peers ?? new Map();
