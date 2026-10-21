@@ -4,6 +4,7 @@ import { API } from "./API.js";
 
 class RoomListElement extends HTMLElement {
 	static select_all_boards = "(all)";
+	router = null;
 	constructor() {
 		// Always call super first in constructor
 		super();
@@ -17,6 +18,9 @@ class RoomListElement extends HTMLElement {
 		}
 
 		this.board_select.onchange = () => {this.render();}
+		this.create_room_button.onclick = async() => {
+			await this.connectToNewRoom();
+		}
 	} // constructor()
 	connectedCallback() {
 		console.log("Custom element added to page.");
@@ -31,16 +35,29 @@ class RoomListElement extends HTMLElement {
 	// 	room_list_container.style["display"] = "none";
 	// 	room_connection = new RoomConnection(room_id);
 	// }
-	// connectToNewRoom() {
-	// 	room_list_container.style["display"] = "none";
-	// 	room_connection = new RoomConnection();
-	// }
+	async connectToNewRoom() {
+		// const room_id = await this.createNewRoom();
+		this.router.navigate("/room/new");
+	}
+	/*
+	async createNewRoom() {
+		// TODO add optional board parameter, and maybe signalling
+		const response = await fetch("/api/room", {method: "POST"});
+		if (response.ok) {
+			let new_room_id = Number(response.headers.get("new-room-id"));
+			return new_room_id;
+		}
+		else {
+			const error_message = response.headers.get("message") ?? `An unknown error occured when attempting to fetch ${thing}.`;
+			throw error_message;
+		}
+	}
+	*/
 	// refresh_button.onclick = () => {getAllRooms();} // imported from navbar.html
 	// document.addEventListener("on_room_exit", () => {  // imported from room.html
 	// 	this.getAllRooms();
 	// 	room_list_container.style["display"] = null;
 	// });
-	// create_room_button.onclick = () => { connectToNewRoom(); }
 
 	async render(get_boards = false) {
 		this._abort_controller?.abort();

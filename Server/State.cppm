@@ -542,18 +542,6 @@ public:
 			{"files", files_json}
 		};
 	}
-	// TODO check client permission to view rooms
-	boost::json::object getRoomsAsJson(std::optional<Board*> board) const {
-		boost::json::array rooms_json = boost::json::array();
-		for (auto& [room_id, weak_room] : this->rooms) {
-			if (auto room = weak_room.lock()) {
-				if (board && !room->isCoupledToBoard(board.value()->getId()))
-					continue;
-				rooms_json.push_back(room->asJson());
-			}
-		}
-		return {{"rooms", rooms_json}};
-	}
 	std::optional<const Group*> getHighestRankGroupForClient(const std::optional<FuzeHttp::Client>& client) const {
 		std::lock_guard<std::mutex> lock(mutex);
 		std::optional<const Group*> group_maybe;
@@ -658,9 +646,14 @@ public:
 #ifdef WITH_WEBRTC
 	const std::vector<IceServer> getIceServers() const { return ice_servers; }
 
-	std::shared_ptr<Room> createRoom() {
+	// object with shared_ptr owns the room as its stored in a weak_ptr here
+	std::shared_ptr<Room> createRoom(std::optional<Board*> board) {
 		int new_room_id = room_id_seq++;
-		auto room = std::make_shared<Room>(this, new_room_id/*, this->getExecutor()*/);
+		PermissionObjectBase* room_permission_parent;
+		if (board) room_permission_parent = board.value(); else room_permission_parent = this;
+		auto room = std::make_shared<Room>(this,room_permission_parent, new_room_id/*, this->getExecutor()*/);
+		if (board)
+			room->coupleToBoard(board.value()->getId());
 		rooms.emplace(new_room_id, room);
 		return room;
 	}
@@ -669,8 +662,22 @@ public:
 		if (it != rooms.end()) {
 			if (auto strong_room = it->second.lock())
 				return strong_room;
+			else
+				std::println(std::cerr, "Couldn't lock room {}", room_id);
 		}
 		return {};
+	}
+	// TODO check client permission to view rooms
+	boost::json::object getRoomsAsJson(std::optional<Board*> board) const {
+		boost::json::array rooms_json = boost::json::array();
+		for (auto& [room_id, weak_room] : this->rooms) {
+			if (auto room = weak_room.lock()) {
+				if (board && !room->isCoupledToBoard(board.value()->getId()))
+					continue;
+				rooms_json.push_back(room->asJson());
+			}
+		}
+		return {{"rooms", rooms_json}};
 	}
 	void clearEmptyRooms() { // TODO use this at some point
 		std::erase_if(this->rooms, [this](const auto& id_weak_room_pair)->bool{

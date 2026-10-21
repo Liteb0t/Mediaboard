@@ -130,8 +130,8 @@ struct RtcPeer {
 
 class Room : public std::enable_shared_from_this<Room> /*: public FuzeHttp::PermissionManagedObject*/ {
 public:
-	Room(FuzeHttp::StateBase* state_base, int id)
-			: /*PermissionManagedObject(permission_parent, db), */state_base(state_base), id(id) {}
+	Room(FuzeHttp::StateBase* state_base, PermissionObjectBase* permission_parent, int id)
+			: /*PermissionManagedObject(permission_parent, db), */state_base(state_base), permission_parent(permission_parent), id(id) {}
 
 	enum struct ACTION : int {
 		JOIN,
@@ -243,7 +243,9 @@ public:
 		}
 	}
 	bool isCoupledToBoard(int board_id) const { return coupled_board_id && board_id == coupled_board_id.value(); }
+	void coupleToBoard(int board_id) { this->coupled_board_id = board_id; }
 
+	const PermissionObjectBase* permission_parent;
 	int getId() const {return id; }
 	int connection_id_counter = 0;
 	unsigned int ssrc_counter = 0;

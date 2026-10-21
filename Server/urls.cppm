@@ -37,6 +37,7 @@ void addURLsToController(FuzeHttp::Controller<State*>* controller) {
 #ifdef WITH_WEBRTC
 	// (verb::post, createRoom, Client{},			"api", "board", std::string{}, "room")
 	(verb::get, getRoom,							"api", "room", int())
+	// (verb::post, createRoom,						"api", "room")
 	(verb::get, getRooms,							"api", "rooms")
 #endif
 	(verb::post, createMessage, Client{},			"api", "board", BoardResolver{}, "thread", ThreadResolver<PERMISSION::SEND_MESSAGE>{}, "message")

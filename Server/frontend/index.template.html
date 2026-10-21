@@ -11,6 +11,7 @@
 	<body>
 #define SERVER_LEVEL 1
 #include "include/navbar.html"
+		<div id="room_bar_container"></div>
 		<main id="view_container">
 			<!--<h3 id="location_indicator">List of boards</h3>
 			<div id="view_container"></div>
@@ -38,6 +39,9 @@
 <template id="media-manager-template">
 #include "include/media_manager.html"
 </template>
+<template id="room-bar-template">
+#include "include/room-bar.html"
+</template>
 <style>
 main {
 	flex-grow: 1;
@@ -51,7 +55,9 @@ main {
 <script src="static/navigo.min.js"></script>
 <script type="module" src="modules/board.js"></script>
 <script type="module" src="modules/media_manager.js"></script>
+<script type="module" src="modules/RoomElement.js"></script>
 <script type="module" src="modules/RoomListElement.js"></script>
+<script type="module" src="modules/RoomBarElement.js"></script>
 <script type="module">
 import { global_styles } from "./modules/styles.js";
 import { session } from "./modules/session.js";
@@ -117,12 +123,29 @@ router.on("/media", async({data}) => {
 router.on("/rooms", async({data}) => {
 	try {
 		console.log(data);
-		abort_controller?.abort();
-		abort_controller = new AbortController();
+		// abort_controller?.abort();
+		// abort_controller = new AbortController();
 		if (!document.getElementById("room-list-template"))
-			await getRoomList(abort_controller.signal);
+			await saveRemoteHTMLToTemplate("./static/room-list.html", "room-list-template");
 		let room_list_element = await mountElementIfNotThere("room-list");
+		room_list_element.router = router;
 		await room_list_element.render(true); // true means fetch boards as well
+	}
+	catch (error) {
+		console.error(error);
+		error_message.textContent = error;
+		error_dialog.showModal();
+	}
+});
+router.on("/room/:room_id", async({data}) => {
+	try {
+		console.log(data);
+		// abort_controller?.abort();
+		// abort_controller = new AbortController();
+		if (!document.getElementById("room-template"))
+			await saveRemoteHTMLToTemplate("./static/room.html", "room-template");
+		let room_element = await mountElementIfNotThere("room-container");
+		await room_element.render(data.room_id === "new" ? null : Number(data.room_id));
 	}
 	catch (error) {
 		console.error(error);
@@ -147,8 +170,8 @@ async function mountElementIfNotThere(element_name) {
 	return element;
 }
 
-async function getRoomList(signal) {
-	const response = await fetch("./static/room-list.html", {signal: signal});
+async function saveRemoteHTMLToTemplate(location, template_name) {
+	const response = await fetch(location);
 	// if (signal.aborted)
 	// 	return;
 	if (!response.ok) {
@@ -156,7 +179,7 @@ async function getRoomList(signal) {
 	}
 	const result = await response.text();
 	const template = document.createElement("template");
-	template.id = "room-list-template";
+	template.id = template_name;
 	template.innerHTML = result;
 	document.body.appendChild(template);
 }
@@ -175,6 +198,15 @@ else window.url_params_display_as_embed = false;
 document.addEventListener("logout", () => {
 	session.refresh();
 	router.resolve();
+})
+
+customElements.whenDefined("room-bar").then(() => {
+	const existing_bar = room_bar_container.querySelector("room-bar");
+	if (!existing_bar) {
+		const room_bar = document.createElement("room-bar");
+		room_bar.render();
+		room_bar_container.replaceChildren(room_bar);
+	}
 })
 
 router.resolve();

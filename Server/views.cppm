@@ -292,6 +292,27 @@ FuzeHttp::Response getRoom(State* state, FuzeHttp::Request req, int room_id) {
 	};
 }
 
+/*
+FuzeHttp::Response createRoom(State* state, FuzeHttp::Request req) {
+	std::optional<Board*> board;
+	if (auto board_param_it = req.searchParameters().find("board"); board_param_it != req.searchParameters().end()) {
+		std::println("Found board param: {}", board_param_it->second);
+		board = state->getBoardIfExists(board_param_it->second);
+		if (!board)
+			return Response{.status=http::status::not_found, .error_message="board not found"};
+	}
+	// TODO check client permission to create room in board
+	int new_room_id = state->createRoom(board);
+
+	return FuzeHttp::Response{
+		.status = http::status::created,
+		.headers = {{
+			{"New-Room-Id", std::to_string(new_room_id)}
+		}}
+	};
+}
+*/
+
 FuzeHttp::Response getRooms(State* state, FuzeHttp::Request req) {
 	std::optional<Board*> board;
 	if (auto board_param_it = req.searchParameters().find("board"); board_param_it != req.searchParameters().end()) {

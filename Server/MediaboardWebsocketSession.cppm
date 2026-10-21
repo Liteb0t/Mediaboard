@@ -53,8 +53,8 @@ private:
 	State* getState() const {
 		return (State*)this->state_; // base FuzeHttp state must be casted to Mediaboard state
 	}
-	int tracking_board = -1; // using pointer could segfault bringing down the whole server, so avoid raw pointers unless its lifetime is within a function
-	int tracking_thread = -1;
+	// int tracking_board = -1; // using pointer could segfault bringing down the whole server, so avoid raw pointers unless its lifetime is within a function
+	// int tracking_thread = -1;
 #ifdef WITH_WEBRTC
 	std::optional<std::shared_ptr<Room>> tracking_room_ptr;
 	int own_connection_id;
@@ -100,28 +100,15 @@ private:
 				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
 				if (!board)
 					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
-				this->tracking_board = board.value()->getId();
+				//this->tracking_board = board.value()->getId();
 				if (!board.value()->threadExists(thread_id))
 					std::cout << "Warning: thread " << thread_id << " does not exist" << std::endl;
 				if (!board.value()->getThread(thread_id)->clientHasPermission(this->getClient(), static_cast<int>(PERMISSION::VIEW_THREAD)))
 					throw std::runtime_error("Client does not have VIEW_THREAD permission");
-				this->tracking_thread = thread_id;
+				// this->tracking_thread = thread_id;
 				board.value()->addListenerToThread(this->weak_from_this(), thread_id);
 			}
 #ifdef WITH_WEBRTC
-			else if (request_type == "create_room") {
-				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
-				if (!board)
-					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
-
-				this->tracking_room_ptr = getState()->createRoom();
-
-				this->send({
-					{"type", "create_room_response"},
-					{"payload", {{"room_id", tracking_room_ptr.value()->getId()}}}
-				});
-			}
 			else if (request_type == "webrtc_relay_added_answer") {
 				std::string sdp = buffer_as_json.at("payload").at("description").at("sdp").as_string().c_str();
 				std::string type = buffer_as_json.at("payload").at("description").at("type").as_string().c_str();
@@ -131,24 +118,34 @@ private:
 				own_peer_ptr.value()->connection->setRemoteDescription(rtc::Description(sdp, type));
 				tracking_room_ptr.value()->addRelaySlotDependingOnMid(relay_name, own_peer_ptr.value());
 			}
+			else if (request_type == "create_room") {
+				std::optional<Board*> board;
+				if (buffer_as_json.contains("board")) {
+					std::string board_slug = buffer_as_json.at("board").as_string().c_str();
+					board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
+				}
+				// if (!board)
+				// 	throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
+
+				this->tracking_room_ptr = getState()->createRoom(board);
+
+				this->send({
+					{"type", "create_room_response"},
+					{"payload", {{"room_id", tracking_room_ptr.value()->getId()}}}
+				});
+			}
 			else if (request_type == "webrtc_room_connect_request") {
-				std::string board_slug = buffer_as_json.at("board").as_string().c_str();
 				int room_id = buffer_as_json.at("room").as_int64();
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(board_slug, getClient());
-				if (!board)
-					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", board_slug);
-				this->tracking_board = board.value()->getId();
 				this->tracking_room_ptr = getState()->getSharedRoomIfExists(room_id); // TODO check client permission
 				if (!tracking_room_ptr)
-					throw std::format("Room '{}' either doesn't exist, or client lacks permission to access it.", room_id);
+					throw std::format("Room '{}' does not exist", room_id);
 
 				this->own_connection_id = tracking_room_ptr.value()->connection_id_counter++;
 				this->own_peer_ptr = std::make_shared<RtcPeer>(own_connection_id, getClient());
 				own_peer_ptr.value()->send_message = [this](boost::json::object payload) { this->send(std::move(payload)); };
 				own_peer_ptr.value()->connection = std::make_shared<rtc::PeerConnection>(getRtcConfig());
 
-
-				bool client_has_permission_to_share_media = board.value()->clientHasPermission(this->getClient(), static_cast<int>(PERMISSION::ROOM_SHARE_MEDIA));
+				bool client_has_permission_to_share_media = tracking_room_ptr.value()->permission_parent->clientHasPermission(this->getClient(), static_cast<int>(PERMISSION::ROOM_SHARE_MEDIA));
 
 				///////////// RECEIVING /////////////
 				tracking_room_ptr.value()->addReceivingRelayTracks(own_connection_id, own_peer_ptr.value());
@@ -242,9 +239,6 @@ private:
 				this->tracking_room_ptr.value()->broadcastPeerList(own_connection_id, Room::ACTION::JOIN);
 			}
 			else if (request_type == "webrtc_room_connect_answer") {
-				std::optional<Board*> board = getState()->getBoardIfExistsAndClientHasReadPermission(tracking_board, getClient());
-				if (!board)
-					throw std::format("Board '{}' either doesn't exist, or client lacks permission to access it.", tracking_board);
 				if (!tracking_room_ptr)
 					throw "Client is not connected to a room";
 				// int sender_connection_id = buffer_as_json.at("payload").at("sender_connection_id").as_int64();

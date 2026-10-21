@@ -1,0 +1,12 @@
+<h4 id="connection_status_indicator">Not connected.</h4>
+<!--<button id="connection_information_disconnect_button">Exit room</button>-->
+<fieldset>
+<!--<button id="mic_toggle_button" disabled>Share microphone audio</button><br>-->
+<input id="share_screen_checkbox" type="checkbox" checked="true"><label for="share_screen_checkbox">Share screen</label><br>
+<input id="share_desktop_audio_checkbox" type="checkbox" checked="true"><label for="share_desktop_audio_checkbox">Share desktop audio</label><br>
+<button id="room_share_button" disabled>Share video</button>
+</fieldset>
+<h3>Peers</h3>
+<div id="peers_list_container"><table><thead><tr><th>Peer ID</th><th>Name</th><th>Sharing audio</th><th>Sharing video</th></tr></thead><tbody id="peers_list"></tbody></table></div>
+<div id="voice_chat_container"></div>
+<div id="video_container" class="LiveVideoContainer"></div>

@@ -1,4 +1,5 @@
 // import { session } from "./session.js";
+#include "./modules/API.js"
 
 class BoardListElement extends HTMLElement {
 	constructor() {
@@ -31,7 +32,7 @@ class BoardListElement extends HTMLElement {
 		this._abort_controller?.abort();
 		this._abort_controller = new AbortController();
 		const signal = this._abort_controller.signal;
-		let boards_json = await API.fetch("api/boards", {signal: signal}, "boards");
+		let boards_json = await API.fetchJson("api/boards", {signal: signal}, "boards");
 		if (signal.aborted)
 			return;
 		this.showAllBoards(boards_json);
