@@ -134,7 +134,7 @@ class ThreadListElement extends HTMLElement {
 		FileUploadElement.onDropHandler(this.file_upload_component, this.buildUploadDestination(this.selected_board.slug, this.selected_thread.id));
 	}
 	buildUploadDestination(board_slug, thread_id = -1) {
-		return `./api/board/${board_slug}/` + (thread_id > -1 ? `thread/${thread_id}/` : "") + "upload/";
+		return `./api/files?status=transient&board=${board_slug}` + (thread_id > -1 ? `&thread=${thread_id}` : "");
 	}
 	connectedCallback() {
 		console.log("Custom element added to page.");

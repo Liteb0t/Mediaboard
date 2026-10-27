@@ -6,6 +6,7 @@ module;
 // #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <expected>
 #ifdef WITH_MAGICK
 #include <Magick++.h>
 #endif
@@ -32,6 +33,38 @@ using namespace FuzeHttp;
 export namespace Mediaboard {
 
 FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
+	std::optional<Board*> board;
+	if (auto board_param_it = req.searchParameters().find("board"); board_param_it != req.searchParameters().end()) {
+		std::println("Found board param: {}", board_param_it->second);
+		board = state->getBoardIfExists(board_param_it->second);
+	}
+	std::optional<Thread*> thread;
+	if (auto thread_param_it = req.searchParameters().find("thread"); thread_param_it != req.searchParameters().end()) {
+		std::println("Found thread param: {}", thread_param_it->second);
+		if (!board)
+			throw "Can't bind to thread without board";
+		int thread_id;
+		std::from_chars_result res = std::from_chars(thread_param_it->second.data(), thread_param_it->second.data() + thread_param_it->second.size(), thread_id);
+		if (res.ec != std::errc()) {
+			return Response{.status=http::status::bad_request, .error_message=std::format("thread param `{}` is not a valid integer.", thread_param_it->second)};
+		}
+		if (!board.value()->threadExists(thread_id))
+			throw "thread does not exist in board";
+		thread = board.value()->getThread(thread_id);
+	}
+	File::STATUS file_status;
+	if (auto status_param_it = req.searchParameters().find("status"); status_param_it != req.searchParameters().end()) {
+		std::println("Found status param: {}", status_param_it->second);
+		if (status_param_it->second == "transient")
+			file_status = File::STATUS::TRANSIENT;
+		else if (status_param_it->second == "normal")
+			file_status = File::STATUS::NORMAL;
+		else
+			throw std::format("[uploadFile] Invalid upload file status: {}", status_param_it->second);
+	}
+	if (file_status == File::STATUS::TRANSIENT && !board)
+		return Response{.status=http::status::bad_request, .error_message="uploading file with status=transient requires a board to be specified"};
+
 	std::istringstream req_stream(req.message.body());
 	std::string req_line;
 	std::getline(req_stream, req_line);
@@ -211,26 +244,28 @@ FuzeHttp::Response uploadFile(State* state, FuzeHttp::Request req) {
 		response.headers.emplace("Image-Height", std::to_string(image_height.value()));
 		response.headers.emplace("Thumbnail-File-Extension", thumbnail_file_extension.value());
 	}
-	auto file = std::make_unique<File>(state, state->db, out_filename, image_width, image_height, thumbnail_file_extension);
-	state->insertFile(std::move(file));
 #endif
+	auto file = std::make_unique<File>(state, state->db, out_filename, image_width, image_height, thumbnail_file_extension, file_status);
+	if (board)
+		file->coupleToBoard(board.value()->getId());
+	state->insertFile(std::move(file));
 	return response;
 } // uploadFile()
-
+/*
 FuzeHttp::Response uploadFileInThread(State* state, FuzeHttp::Request req, Board* board, Thread* thread) {
 	if (!thread->clientHasPermission(req.client(), static_cast<int>(PERMISSION::UPLOAD_FILE)))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files in this thread."};
 	else
-		return uploadFile(state, req);
+		return uploadFile(state, req, true);
 }
 
 FuzeHttp::Response uploadFileInBoard(State* state, FuzeHttp::Request req, Board* board) {
 	if (!board->clientHasPermission(req.client(), static_cast<int>(PERMISSION::UPLOAD_FILE)))
 		return FuzeHttp::Response{.status = http::status::forbidden, .error_message = "You lack permission to upload files in this board."};
 	else
-		return uploadFile(state, req);
+		return uploadFile(state, req, true);
 }
-
+*/
 // TODO find a way to handle multiple directories under one view
 FuzeHttp::Response getMedia(State* state, FuzeHttp::Request req, std::string location) {
 	std::cout << "Showing thru getMedia" << std::endl;

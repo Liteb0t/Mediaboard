@@ -9,7 +9,7 @@ class MediaManagerElement extends HTMLElement {
 	server_permissions = {};
 	file_upload_component = null;
 	multiple_selector_component = null;
-	static upload_destination = "/api/upload";
+	static upload_destination = "/api/files";
 	static select_all_boards = "(all)";
 
 	constructor() {

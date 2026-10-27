@@ -1,3 +1,5 @@
+// Copyright (c) 2026, Fuze.page
+// Fuze Human-oriented License v1
 module;
 #include <ctime>
 #include <boost/json.hpp>
@@ -13,14 +15,20 @@ import FuzeHttp.PermissionObject;
 export namespace Mediaboard {
 class File : public FuzeHttp::PermissionManagedObject {
 public:
-	enum struct STATUS : int {NORMAL=0, CONDEMNED, DESTROYED, MISSING};
+	enum struct STATUS : int {NORMAL=0,
+		CONDEMNED, // marked as deleted but file is still there -- will show in "recently deleted" category in media manager
+		DESTROYED, // file itself is deleted
+		MISSING, // file is missing for an unknown reason
+		TRANSIENT // uploaded from message form but not yet coupled to a post
+	};
 	struct Validated {
 		int id;
 		std::string filename;
 		std::optional<int> width, height;
 		std::optional<std::string> thumbnail_file_extension;
 	};
-	File(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, /*std::optional<int> coupled_post_id,*/ std::string filename, std::optional<int> width, std::optional<int> height, std::optional<std::string> thumbnail_file_extension)
+	// save to database
+	File(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, /*std::optional<int> coupled_post_id,*/ std::string filename, std::optional<int> width, std::optional<int> height, std::optional<std::string> thumbnail_file_extension, STATUS status)
 			: PermissionManagedObject(permission_parent, db),
 			filename(filename),
 			id(db->incrementSequence("stored_file_id")),
@@ -29,16 +37,17 @@ public:
 			width(width),
 			height(height),
 			thumbnail_file_extension(thumbnail_file_extension),
-			status(STATUS::NORMAL) {
+			status(status) {
 		int time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(this->created_at.time_since_epoch()).count();
 		// TODO allow std::optional args to FuzeDBI::query
 		if (width && height && thumbnail_file_extension) {
-			db->query<void>("INSERT INTO stored_file(id, permission_object_id, filename, created_at, width, height, thumbnail_file_extension) VALUES ($1, $2, $3, $4, $5, $6, $7)", this->id, this->getPermissionObjectId(), filename.c_str(), time_since_epoch, width.value(), height.value(), thumbnail_file_extension.value());
+			db->query<void>("INSERT INTO stored_file(id, permission_object_id, filename, created_at, width, height, thumbnail_file_extension, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)", this->id, this->getPermissionObjectId(), filename.c_str(), time_since_epoch, width.value(), height.value(), thumbnail_file_extension.value(), static_cast<int>(status));
 		}
 		else {
-			db->query<void>("INSERT INTO stored_file(id, permission_object_id, filename, created_at) VALUES ($1, $2, $3, $4)", this->id, this->getPermissionObjectId(), filename.c_str(), time_since_epoch);
+			db->query<void>("INSERT INTO stored_file(id, permission_object_id, filename, created_at, status) VALUES ($1, $2, $3, $4, $5)", this->id, this->getPermissionObjectId(), filename.c_str(), time_since_epoch, static_cast<int>(status));
 		}
 	}
+	// load from database
 	File(PermissionObjectBase* permission_parent, FuzeDBI::Connection* db, int id, int permission_object_id, std::string filename, std::chrono::time_point<std::chrono::system_clock> created_at, std::optional<int> coupled_board_id, std::optional<int> coupled_post_id, std::optional<int> width, std::optional<int> height, std::optional<std::string> thumbnail_file_extension, std::optional<std::chrono::time_point<std::chrono::system_clock>> deleted_at, STATUS status)
 			: PermissionManagedObject(permission_parent, permission_object_id, db),
 			id(id),
@@ -64,17 +73,41 @@ public:
 		return file_json;
 	}
 	bool isCoupledToBoard(int board_id) const { return coupled_board_id && board_id == coupled_board_id.value(); }
-	void coupleToPost(int board_id, int post_id) { // called from Message.cppm
+	// Transient file MUST be coupled to board before it can be coupled to a post
+	void coupleToBoard(int board_id) {
+		if (coupled_board_id)
+			throw std::format("[File::coupleToPost] attempted to couple file {} to a board, and it was already coupled to a board.", getId());
+		if (status != STATUS::TRANSIENT)
+			throw std::format("[File::coupleToPost] attempted to couple file {} which was not with state == File::STATE::TRANSIENT.", getId());
 		db->query<void>("UPDATE stored_file SET coupled_board_id = $1 WHERE id = $2", board_id, this->id);
 		this->coupled_board_id = board_id;
+	}
+	void coupleToPost(int board_id, int post_id) { // called from Message.cppm
+		if (!coupled_board_id)
+			throw std::format("[File::coupleToPost] attempted to couple file {} which is not coupled to a board.", getId());
+		if (coupled_post_id) // TODO allow multiple coupling
+			throw std::format("[File::coupleToPost] attempted to couple file {} which was already coupled.", getId());
+		if (status != STATUS::TRANSIENT)
+			throw std::format("[File::coupleToPost] attempted to couple file {} which was not with state == File::STATE::TRANSIENT.", getId());
 		db->query<void>("UPDATE stored_file SET coupled_post_id = $1 WHERE id = $2", post_id, this->id);
 		this->coupled_post_id = post_id;
+		setStatus(STATUS::NORMAL);
 	}
 	void markAsDeleted() {
 		this->deleted_at = std::chrono::system_clock::now();
 		int time_since_epoch = std::chrono::duration_cast<std::chrono::seconds>(deleted_at->time_since_epoch()).count();
 		db->query<void>("UPDATE stored_file SET deleted_at = $1 WHERE id = $2", time_since_epoch, id);
 		setStatus(STATUS::CONDEMNED);
+	}
+	void destroy(const std::filesystem::path& media_location, const std::filesystem::path& file_location) {
+		if (!std::filesystem::exists(file_location))
+			throw std::format("Couldn't destroy file, because it was not found on the disk.\nfile_location: {}", file_location.string());
+		if (this->getStatus() == File::STATUS::DESTROYED)
+			std::println("Warning: file at `{}` was marked as destroyed, but still exists", this->name());
+		this->setStatus(File::STATUS::DESTROYED);
+		std::filesystem::remove(file_location);
+		std::filesystem::path thumbnail_path = this->getThumbnailPath(media_location);
+		std::filesystem::remove(thumbnail_path);
 	}
 	void restore() {
 		if (deleted_at)

@@ -168,6 +168,9 @@ public:
 	State(FuzeDBI::Connection* db) : FuzeHttp::StateBase(db) {
 		this->grantOwnerPrivileges(static_cast<int>(PERMISSION::NUMBER_OF_PERMISSIONS));
 	}
+	~State() {
+		this->markExpiredTransientFilesAsDeleted();
+	}
 	// shared_state(FuzeDBI::Connection* fuze_database_interface, std::filesystem::path document_root, std::filesystem::path media_location_relative, StateConfig config, std::unordered_map<std::string, std::string>&& busted_target_to_target, std::unordered_set<std::string>&& files_generated_from_templates);
 	StateConfig config;
 	void start() override {
@@ -276,19 +279,21 @@ public:
 					return std::unexpected(std::format("Permission denied to destroy file `{}`", filename_str));
 
 				std::filesystem::path file_location = getMediaLocation() / file->name();
-				if (!std::filesystem::exists(file_location))
-					throw std::format("Couldn't destroy file, because it was not found on the disk.\nfile_location: {}", file_location.string());
-				if (file->getStatus() == File::STATUS::DESTROYED)
-					std::println("Warning: file at `{}` was marked as destroyed, but still exists", file->name());
-				file->setStatus(File::STATUS::DESTROYED);
-				std::filesystem::remove(file_location);
-				std::filesystem::path thumbnail_path = file->getThumbnailPath(getMediaLocation());
-				std::filesystem::remove(thumbnail_path);
+				file->destroy(getMediaLocation(), file_location);
 			}
 			else
 				return std::unexpected(std::format("File `{}` not found", filename_str));
 		}
 		return {}; // success
+	}
+	void markExpiredTransientFilesAsDeleted() { // TODO run as async task with cooldown instead of on shutdown
+		int initial_number_of_files = files.size();
+		for (const auto& [file_id, file] : this->files | std::ranges::views::filter([this](const auto& file_id_to_file)->bool{
+			return file_id_to_file.second->getStatus() == File::STATUS::TRANSIENT;
+		})) {
+			file->markAsDeleted();
+		}
+		std::println("[State::markExpiredTransientFilesAsDeleted] pruned {} files.", initial_number_of_files - files.size());
 	}
 	[[nodiscard]]std::expected<void, std::string> setIceServers(boost::json::array ice_servers_json) {
 		std::lock_guard<std::mutex> lock(mutex);

@@ -1,52 +1,6 @@
 import { call_manager } from "./RoomConnection.js";
 import { global_styles } from "./styles.js";
 
-class PeerMedia {
-	constructor() {
-		this.audio_elements = {}; // keyed by MID because sender can send multiple audio tracks
-		this.video_element = null;
-		this.video_track = null;
-	}
-	setAudio(event, mid) {
-		const audio_element = document.createElement("audio");
-		audio_element.autoplay = true;
-		// audio_element.controls = true; // element is hidden otherwise
-		audio_element.srcObject = new MediaStream([event.track]);
-		this.audio_elements[mid] = audio_element;
-		return this.audio_elements[mid];
-	}
-	showVideo(on_track_event = null) {
-		if (this.video_element)
-			return;
-		if (on_track_event) {
-			this.video_track = on_track_event.track;
-		}
-		if (this.video_track) {
-			this.video_element = document.createElement("video");
-			this.video_element.autoplay = true;
-			this.video_element.playsInline = true;
-			this.video_element.srcObject = new MediaStream([this.video_track]);
-			video_container.appendChild(this.video_element);
-		}
-		else {
-			console.log("[PeerMedia.showVideo()] There is no video_track from which to create a MediaStream.");
-		}
-		// this.video_element.dataset.senderConnectionId = sender_id;
-		// return this.video_element;
-	}
-	showVideoIfSharing(peer_info) {
-		peer_info.video_sharing_enabled ? this.showVideo() : this.hideVideo();
-	}
-	hideVideo() {
-		this.video_element?.parentNode.removeChild(this.video_element);
-		this.video_element = null;
-	}
-	onLeave() {
-		this.video_element?.parentNode.removeChild(this.video_element);
-		this.audio_element?.parentNode.removeChild(this.audio_element);
-	}
-}
-
 class RoomElementPeerElements {
 	video = null;
 	constructor(id) {
@@ -152,18 +106,6 @@ class RoomElement extends HTMLElement {
 	onConnectionPeersUpdate = () => {
 		console.log("onConnectionPeersUpdate called");
 		this.setPeerDisplays(call_manager.getPeers());
-		/*
-		updateMediaElements(payload) {
-			if (payload.action.type == "join") {
-				this.peer_media[payload.action.peer] = new PeerMedia();
-			}
-			else if (payload.action.type == "update") {
-				this.peer_media[payload.action.peer]?.showVideoIfSharing(payload.peers[payload.action.peer]);
-			}
-			else if (payload.action.type == "leave") {
-				this.peer_media[payload.action.peer]?.onLeave();
-			}
-		}*/
 	}
 	setPeerDisplays(peers) {
 		for (const [id, peer] of peers) {

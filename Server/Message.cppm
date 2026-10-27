@@ -84,6 +84,8 @@ public:
 	std::chrono::time_point<std::chrono::system_clock> createdAt() const { return this->created_at; }
 	void markAsDeleted() {
 		this->deleted = true;
+		for (auto& file : this->files)
+			file->markAsDeleted();
 		uncacheInternalJSON();
 	}
 	bool isDeleted() const { return this->deleted; }
